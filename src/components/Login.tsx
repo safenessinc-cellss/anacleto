@@ -27,6 +27,7 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
   const [demoLoading, setDemoLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [showConfigGuide, setShowConfigGuide] = useState(false);
+  const [showDomainConfigGuide, setShowDomainConfigGuide] = useState(false);
 
   // Label map for Google authentication trigger matching chosen language
   const googleLabelMap: Record<string, string> = {
@@ -71,6 +72,10 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
       if (err.code === "auth/operation-not-allowed") {
         setErrorMsg("O Login com o Google não está ativo. Por favor, ative o provedor 'Google' nas configurações de Authentication do console Firebase.");
         setShowConfigGuide(true);
+      } else if (err.code === "auth/unauthorized-domain") {
+        setErrorMsg(`Erro de domínio não autorizado: '${window.location.hostname}' não está autorizado para autenticação no console do Firebase.`);
+        setShowDomainConfigGuide(true);
+        setShowConfigGuide(false);
       } else {
         setErrorMsg("Erro de acesso com o Google: " + (err.message || err));
       }
@@ -224,6 +229,51 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
               </li>
               <li>
                 Recarregue esta página e tente fazer o login novamente!
+              </li>
+            </ol>
+          </div>
+        )}
+
+        {/* Firebase Domain Authorization Guide */}
+        {showDomainConfigGuide && (
+          <div className="mb-6 p-4 bg-[#14151b] border border-amber-500/30 rounded-xl text-left space-y-3 font-sans text-xs">
+            <h4 className="font-extrabold text-amber-500 flex items-center gap-2 uppercase tracking-wider text-[10px]">
+              <Info className="w-4 h-4 shrink-0 text-amber-500" /> Autorizar domínio no Firebase:
+            </h4>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              Para resolver o erro <code className="text-rose-450 font-mono">auth/unauthorized-domain</code>, você precisa cadastrar o domínio temporário ou definitivo da sua aplicação no console do Firebase. Siga este passo a passo rápido:
+            </p>
+            <ol className="list-decimal pl-4 text-slate-300 space-y-1.5 text-[11px] leading-relaxed">
+              <li>
+                Abra as <a href="https://console.firebase.google.com/project/fiery-mode-7cf5x/authentication/settings" target="_blank" rel="noreferrer" className="text-luxury-gold underline hover:text-luxury-gold-light font-bold">Configurações de Autenticação do Firebase</a>.
+              </li>
+              <li>
+                Clique na aba <strong className="text-white">Authorized domains</strong> (Domínios autorizados) ou na aba de configurações.
+              </li>
+              <li>
+                Clique no botão <strong className="text-white">Add domain</strong> (Adicionar domínio).
+              </li>
+              <li>
+                Copie e cole o seguinte domínio exatamente:
+                <div className="my-1.5 p-2 bg-[#1a1b22] border border-luxury-border rounded-lg flex items-center justify-between font-mono text-[10px] text-emerald-400">
+                  <span>{window.location.hostname}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.hostname);
+                      alert("Domínio copiado para a área de transferência!");
+                    }}
+                    className="px-2 py-0.5 bg-luxury-gold text-slate-950 font-sans font-extrabold rounded-sm text-[9px] cursor-pointer hover:bg-luxury-gold-light transition"
+                  >
+                    Copiar
+                  </button>
+                </div>
+              </li>
+              <li>
+                Se desejar rodar em ambiente de desenvolvimento local, adicione também o domínio <code className="text-slate-400 font-mono">localhost</code>.
+              </li>
+              <li>
+                Clique no botão de salvar e tente o login com o Google novamente!
               </li>
             </ol>
           </div>
