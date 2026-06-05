@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global safety catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins logic
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'safeness.c.a@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Helper to validate IDs
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Sender Config
+    match /sender_config/{configId} {
+      allow read: if true; // Clients can access sender info (required for dynamic invoice calculations)
+      allow write: if isAdmin();
+    }
+
+    // Budgets
+    match /budgets/{budgetId} {
+      allow read: if true; // Accessible by client via ID
+      allow create: if true; // Anyone can submit an estimate request
+      allow update, delete: if isAdmin();
+    }
+
+    // Invoices
+    match /invoices/{invoiceId} {
+      allow read: if true; // Accessible by client via ID
+      allow write: if isAdmin();
+    }
+
+    // Visits (Agendamentos de visitas)
+    match /visits/{visitId} {
+      allow create: if true; // Any visitor can request a free technical visit
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Chat sessions
+    match /chat_sessions/{sessionId} {
+      allow read: if isAdmin() || (isSignedIn() && sessionId == request.auth.uid);
+      allow create: if true; // Floating chat assistance is available to anyone
+      allow update: if true; // Allow appending message elements
+      allow delete: if isAdmin();
+    }
+  }
+}

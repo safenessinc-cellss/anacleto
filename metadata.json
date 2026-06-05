@@ -1,0 +1,6 @@
+{
+  "name": "Anacleto",
+  "description": "Plataforma profissional de faturamento, orçamentos e faturas multilíngues com assistente de IA integrado em tempo real.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

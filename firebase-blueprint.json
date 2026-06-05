@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "sender_config": {
+      "title": "SenderConfig",
+      "description": "Configuration details for the billing entity/issuer",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Issuer business or person name" },
+        "nif": { "type": "string", "description": "NIF, CIF, or CNPJ identifier" },
+        "address": { "type": "string", "description": "Complete street address" },
+        "postalCode": { "type": "string", "description": "Postal code" },
+        "city": { "type": "string", "description": "City name" },
+        "country": { "type": "string", "description": "Country name" },
+        "logoUrl": { "type": "string", "description": "Issuer logo image URL or base64 data" },
+        "bankAccount": { "type": "string", "description": "Banking routing and account information (IBAN/PIX/etc)" },
+        "currency": { "type": "string", "description": "Default currency code (e.g., EUR, USD, BRL)" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "nif", "address", "city", "country"]
+    },
+    "budget": {
+      "title": "Budget",
+      "description": "Budget estimation document generated across multiple languages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique budget ID" },
+        "number": { "type": "string", "description": "Sequential identifier (e.g. PRES-2026-001)" },
+        "clientName": { "type": "string", "description": "Client name" },
+        "clientEmail": { "type": "string", "description": "Client email address" },
+        "clientNif": { "type": "string", "description": "Client NIF/CNPJ tax ID" },
+        "clientAddress": { "type": "string", "description": "Client billing address" },
+        "date": { "type": "string", "description": "Issue date" },
+        "items": {
+          "type": "array",
+          "description": "List of services or products included in the budget"
+        },
+        "subtotal": { "type": "number", "description": "Sum of item prices before tax" },
+        "taxRate": { "type": "number", "description": "Tax percentage (e.g., 23 for 23%)" },
+        "taxAmount": { "type": "number", "description": "Tax value calculated" },
+        "total": { "type": "number", "description": "Total price including tax" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "invoiced"] },
+        "language": { "type": "string", "description": "Language used by default (e.g., pt, es, en)" },
+        "translations": { "type": "object", "description": "Automatic multilingual copies of translations for products and descriptions" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["number", "clientName", "clientEmail", "items", "total", "status"]
+    },
+    "invoice": {
+      "title": "Invoice",
+      "description": "Invoice generated from accepted budget",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique invoice ID" },
+        "number": { "type": "string", "description": "Sequential invoice number (e.g., FACT-2026-001)" },
+        "budgetId": { "type": "string", "description": "Reference source budget ID" },
+        "clientName": { "type": "string", "description": "Client name" },
+        "clientEmail": { "type": "string", "description": "Client email address" },
+        "clientNif": { "type": "string", "description": "Client NIF" },
+        "clientAddress": { "type": "string", "description": "Client billing address" },
+        "date": { "type": "string", "description": "Invoice date" },
+        "items": { "type": "array", "description": "List of products or services in the invoice" },
+        "subtotal": { "type": "number", "description": "Subtotal" },
+        "taxRate": { "type": "number", "description": "Tax rate applied" },
+        "taxAmount": { "type": "number", "description": "Tax amount" },
+        "total": { "type": "number", "description": "Total value" },
+        "language": { "type": "string", "description": "Selected client language" },
+        "senderSnapshot": { "type": "object", "description": "Snapshot of sender billing data when the invoice was generated" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["number", "budgetId", "clientName", "clientEmail", "items", "total"]
+    },
+    "chat_session": {
+      "title": "ChatSession",
+      "description": "Auditable log of conversations with the assistant for administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientEmail": { "type": "string", "description": "Nullable / anonymous client identifier if provided" },
+        "language": { "type": "string", "description": "Current interface language" },
+        "messages": {
+          "type": "array",
+          "description": "List of chat messages"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["messages"]
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "Authorized administrators list record",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["email"]
+    },
+    "visit": {
+      "title": "Visit",
+      "description": "Technical visit appointment requested by visitors",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "service": { "type": "string" },
+        "address": { "type": "string" },
+        "preferDate": { "type": "string" },
+        "preferTime": { "type": "string" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "preferDate", "preferTime"]
+    }
+  },
+  "firestore": {
+    "sender_config/default": {
+      "schema": "sender_config",
+      "description": "Issuer company configuration singleton"
+    },
+    "budgets/{budgetId}": {
+      "schema": "budget",
+      "description": "Manage systems budgets"
+    },
+    "invoices/{invoiceId}": {
+      "schema": "invoice",
+      "description": "Manage systems invoices"
+    },
+    "chat_sessions/{sessionId}": {
+      "schema": "chat_session",
+      "description": "Historic assistant logs"
+    },
+    "admins/{adminId}": {
+      "schema": "admin",
+      "description": "Registered admins database"
+    },
+    "visits/{visitId}": {
+      "schema": "visit",
+      "description": "Technical visit appointments database"
+    }
+  }
+}
