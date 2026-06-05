@@ -245,7 +245,7 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
             </p>
             <ol className="list-decimal pl-4 text-slate-300 space-y-1.5 text-[11px] leading-relaxed">
               <li>
-                Abra as <a href="https://console.firebase.google.com/project/fiery-mode-7cf5x/authentication/settings" target="_blank" rel="noreferrer" className="text-luxury-gold underline hover:text-luxury-gold-light font-bold">Configurações de Autenticação do Firebase</a>.
+                Abra as <a href={`https://console.firebase.google.com/project/${auth.app.options.projectId || "anacleto-e2bca"}/authentication/settings`} target="_blank" rel="noreferrer" className="text-luxury-gold underline hover:text-luxury-gold-light font-bold">Configurações de Autenticação do Firebase</a>.
               </li>
               <li>
                 Clique na aba <strong className="text-white">Authorized domains</strong> (Domínios autorizados) ou na aba de configurações.
