@@ -35,6 +35,7 @@ import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
 import Chatbot from "./components/Chatbot";
 import WhatsAppButton from "./components/WhatsAppButton";
+import WindowBuilderLoader from "./components/WindowBuilderLoader";
 import { useToast } from "./components/ToastContext";
 
 // Premium Brand Assets
@@ -48,6 +49,7 @@ export default function App() {
   const { showToast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [animationLoading, setAnimationLoading] = useState(true);
   const [isAdminPortal, setIsAdminPortal] = useState(false);
   const [language, setLanguage] = useState<LanguageCode>("pt");
   const [darkMode, setDarkMode] = useState(true);
@@ -319,16 +321,12 @@ export default function App() {
   const liveTax = Number(((liveSubtotal * 23) / 100).toFixed(2));
   const liveTotal = Number((liveSubtotal + liveTax).toFixed(2));
 
-  if (authLoading) {
+  if (authLoading || animationLoading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-semibold text-slate-500 tracking-wider uppercase">
-            Iniciando Portal Anacleto...
-          </p>
-        </div>
-      </div>
+      <WindowBuilderLoader
+        currentLanguage={language}
+        onFinish={() => setAnimationLoading(false)}
+      />
     );
   }
 
