@@ -28,7 +28,7 @@ import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
 import { useToast } from "./components/ToastContext";
 
 // Premium Brand Assets
-import logoImg from "./assets/images/src/assets/images/logoana.png";
+import logoImg from "./assets/images/anacleto_logo_1780594599493.png";
 import heroImg from "./assets/images/modern_house_esquadrias_1780594310165.png";
 import facadeImg from "./assets/images/corporate_facade_1780594325774.png";
 import bathImg from "./assets/images/bathroom_box_glass_1780594338585.png";
