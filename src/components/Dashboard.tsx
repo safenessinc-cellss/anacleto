@@ -85,7 +85,10 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         });
         setBudgets(loaded);
       },
-      (err) => console.warn("Budgets permission issue or offline: ", err)
+      (err) => {
+        console.warn("Budgets permission issue or offline: ", err);
+        handleFirestoreError(err, OperationType.GET, "budgets");
+      }
     );
 
     // 2. Listen for Invoices
@@ -98,7 +101,10 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         });
         setInvoices(loaded);
       },
-      (err) => console.warn("Invoices permission issue: ", err)
+      (err) => {
+        console.warn("Invoices permission issue: ", err);
+        handleFirestoreError(err, OperationType.GET, "invoices");
+      }
     );
 
     // 3. Listen for AI chat histories (auditing logs)
@@ -111,7 +117,10 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         });
         setChats(loaded);
       },
-      (err) => console.warn("Chats permission issues: ", err)
+      (err) => {
+        console.warn("Chats permission issues: ", err);
+        handleFirestoreError(err, OperationType.GET, "chat_sessions");
+      }
     );
 
     // 4. Listen for admin users
@@ -124,7 +133,10 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         });
         setAdmins(loaded);
       },
-      (err) => console.warn("Admins list issues: ", err)
+      (err) => {
+        console.warn("Admins list issues: ", err);
+        handleFirestoreError(err, OperationType.GET, "admins");
+      }
     );
 
     // Visits technical scheduling listener
@@ -137,7 +149,10 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         });
         setVisits(loaded);
       },
-      (err) => console.warn("Visits subscription warning: ", err)
+      (err) => {
+        console.warn("Visits subscription warning: ", err);
+        handleFirestoreError(err, OperationType.GET, "visits");
+      }
     );
 
     return () => {
@@ -1067,29 +1082,79 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
                   {/* WEBSITE LOGO CUSTOMIZATION */}
                   <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-6">
                     <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider mb-3">
-                      🖼️ Logotipo Customizado da Página
+                      🖼️ Logotipo do Website (Customizado)
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="block text-xs font-bold text-slate-655 dark:text-slate-400">
-                          URL do Logotipo do Website (Substitui o padrão)
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400">
+                          Logotipo de Exibição no Site (Upload Imagem ou URL)
                         </label>
+                        
+                        {/* File Upload Button for websiteLogoUrl */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <label className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-650 dark:bg-emerald-950/20 dark:text-emerald-400 font-extrabold rounded-lg text-xs cursor-pointer select-none transition">
+                            <Upload className="w-4 h-4 text-emerald-500" />
+                            Carregar Logotipo do Site
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  if (file.size > 1.5 * 1024 * 1024) {
+                                    showToast("Por favor, selecione uma imagem menor que 1.5MB.", "warning");
+                                    return;
+                                  }
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setSenderConfig({ ...senderConfig, websiteLogoUrl: reader.result as string });
+                                    showToast("Logo do site atualizado com sucesso no painel!", "success");
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                          
+                          {senderConfig.websiteLogoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSenderConfig({ ...senderConfig, websiteLogoUrl: "" });
+                                showToast("Logo customizado removido. Usando padrão.", "success");
+                              }}
+                              className="px-2 py-1.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-xs select-none transition cursor-pointer"
+                            >
+                              Remover
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Manual Url Field */}
                         <input
                           type="text"
                           value={senderConfig.websiteLogoUrl || ""}
                           onChange={(e) => setSenderConfig({ ...senderConfig, websiteLogoUrl: e.target.value })}
                           className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs"
-                          placeholder="Ex: https://dominio.com/marca-logo.png"
+                          placeholder="Ou insira a URL direta do logotipo"
                         />
                         <p className="text-[10px] text-slate-400 mt-1">
-                          Insira o endereço de uma imagem online para trocar o logo principal exibido na barra de navegação pública.
+                          Este logotipo substitui o logo padrão exibido na barra de navegação principal e em toda a página pública.
                         </p>
                       </div>
-                      <div className="flex items-center justify-center p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                      
+                      <div className="flex flex-col items-center justify-center p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
                         {senderConfig.websiteLogoUrl ? (
-                          <img src={senderConfig.websiteLogoUrl} className="max-h-16 object-contain" alt="Website Logo Preview" />
+                          <>
+                            <img src={senderConfig.websiteLogoUrl} className="max-h-20 object-contain rounded" alt="Website Logo Preview" />
+                            <span className="text-[10px] text-emerald-500 font-extrabold uppercase mt-2">Logotipo Customizado Ativo</span>
+                          </>
                         ) : (
-                          <span className="text-[11px] text-slate-400 font-bold">Logo Padrão Ativo</span>
+                          <div className="text-center">
+                            <span className="text-[11px] text-slate-400 font-bold block mb-1">Logo Padrão Ativo</span>
+                            <span className="text-[9px] text-slate-500 block">Usando logotipo institucional padrão do sistema</span>
+                          </div>
                         )}
                       </div>
                     </div>
