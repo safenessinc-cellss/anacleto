@@ -182,6 +182,8 @@ export default function App() {
           ...data
         }));
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, "sender_config/default");
     });
 
     return () => {
