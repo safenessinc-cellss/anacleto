@@ -3,6 +3,7 @@ import { Printer, X, ShieldCheck, Landmark, Tag } from "lucide-react";
 import { Budget, SenderConfig } from "../types";
 import { formatCurrency, languageMeta } from "../utils";
 import { translations, LanguageCode, Translation } from "../translations";
+import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
 
 interface BudgetPreviewModalProps {
   isOpen: boolean;
@@ -105,19 +106,12 @@ export default function BudgetPreviewModal({
           {/* Header Grid */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-amber-100 dark:border-slate-800 pb-8">
             <div className="space-y-4">
-              {senderConfig.logoUrl ? (
-                <img
-                  src={senderConfig.logoUrl}
-                  alt="Company Logo"
-                  className="max-h-16 w-auto object-contain rounded-md"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="px-4 py-2 bg-gradient-to-r from-slate-900 to-slate-850 text-white font-black text-xl tracking-[0.152em] rounded-xl inline-flex items-center gap-2 border border-amber-400/20">
-                  <ShieldCheck className="w-6 h-6 text-amber-400" />
-                  {senderConfig.name.split(" ")[0].toUpperCase()}
-                </div>
-              )}
+              <img
+                src={senderConfig.logoUrl || logoImg}
+                alt="Company Logo"
+                className="max-h-16 w-auto object-contain rounded-md"
+                referrerPolicy="no-referrer"
+              />
               
               <div className="text-xs space-y-1">
                 <p className="font-extrabold text-slate-900 dark:text-slate-100 print:text-black text-sm tracking-tight text-gradient bg-gradient-to-r from-slate-900 to-slate-700">
