@@ -359,7 +359,7 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-3 py-2.5 text-xs text-white border border-luxury-border bg-luxury-darker rounded-xl focus:border-luxury-gold focus:ring-1 focus:ring-luxury-gold/40 transition outline-hidden"
-                placeholder="exemplo@anacleto.gt.tc"
+                placeholder="exemplo@anacletoesquadrias.com.br"
               />
             </div>
           </div>
