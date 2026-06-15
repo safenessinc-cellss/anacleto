@@ -3,7 +3,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { translations, LanguageCode } from "./translations";
-import { languageMeta, generateBudgetTranslations } from "./utils";
+import { languageMeta } from "./utils";  // ← ELIMINÉ generateBudgetTranslations
 import {
   ShieldCheck,
   Globe,
