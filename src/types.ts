@@ -43,6 +43,33 @@ export interface SenderConfig {
   bankAccount: string;
   currency: string;
   updatedAt: string;
+  websiteLogoUrl?: string;
+  profileName?: string;
+  profileBio?: string;
+  profileRole?: string;
+  profileAvatarUrl?: string;
+  profilePhone?: string;
+  profileEmail?: string;
+  promotions?: {
+    id: string;
+    title: string;
+    description: string;
+    discountBadge: string;
+    isActive: boolean;
+  }[];
+  publicity?: {
+    id: string;
+    bannerText: string;
+    bannerLink?: string;
+    isActive: boolean;
+    bgColor?: string;
+  }[];
+  videos?: {
+    id: string;
+    title: string;
+    url: string;
+    description?: string;
+  }[];
 }
 
 export interface Invoice {
