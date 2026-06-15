@@ -3,7 +3,8 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   GoogleAuthProvider, 
-  signInWithPopup 
+  signInWithPopup,
+  sendPasswordResetEmail
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "../firebase";
@@ -25,6 +26,7 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [showConfigGuide, setShowConfigGuide] = useState(false);
   const [showDomainConfigGuide, setShowDomainConfigGuide] = useState(false);
@@ -33,7 +35,7 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
   const googleLabelMap: Record<string, string> = {
     pt: "Entrar com o Google - Acesso Rápido",
     en: "Sign in with Google - Fast Access",
-    es: "Iniciar sesión con Google",
+    es: "Iniciar sesión com Google",
     fr: "Se connecter avec Google",
     de: "Mit Google anmelden",
     it: "Accedi con Google",
@@ -45,15 +47,47 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
 
   const currentGoogleLabel = googleLabelMap[language] || googleLabelMap["pt"];
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setErrorMsg("Insira seu e-mail no campo correspondente para solicitar a redefinição de senha.");
+      return;
+    }
+    setResetLoading(true);
+    setErrorMsg("");
+    try {
+      await sendPasswordResetEmail(auth, email);
+      alert("Sucesso! O link de redefinição de senha foi enviado para sua caixa de entrada. Siga as instruções do e-mail.");
+    } catch (err: any) {
+      console.error("Password reset failure: ", err);
+      setErrorMsg("Erro ao redefinir: " + (err.message || err));
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     setErrorMsg("");
+
+    // Race the Google Sign-In pop-up against a timeout promise. 
+    // If running in development iframe environments, cross-origin restrictions on 'apis.google.com' (gapi)
+    // might block or hang the iframe's message handshake process.
+    const iframeTimeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        const timeoutErr = new Error("POPUP_TIMEOUT");
+        (timeoutErr as any).code = "auth/popup-timeout";
+        reject(timeoutErr);
+      }, 7000);
+    });
+
     try {
-      const credential = await signInWithPopup(auth, googleProvider);
-      const user = credential.user;
+      await Promise.race([
+        signInWithPopup(auth, googleProvider),
+        iframeTimeoutPromise
+      ]);
       
-      // Auto-validate admin settings if email matches key user, save meta and proceed
-      if (user.email === "safeness.c.a@gmail.com" || user.email === auth.currentUser?.email) {
+      const user = auth.currentUser;
+      if (user && (user.email === "safeness.c.a@gmail.com" || user.email === auth.currentUser?.email)) {
         try {
           await setDoc(doc(db, "admins", user.uid), {
             id: user.uid,
@@ -62,14 +96,16 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
             createdAt: new Date().toISOString()
           }, { merge: true });
         } catch (dbErr) {
-          console.warn("Could not save admin document in Firestore. Check rules/schema: ", dbErr);
+          console.warn("Could not save admin document in Firestore during Google Sign-In. Check your collection access rules: ", dbErr);
         }
       }
       
       onLoginSuccess();
     } catch (err: any) {
       console.error("Google login failed:", err);
-      if (err.code === "auth/operation-not-allowed") {
+      if (err.message === "POPUP_TIMEOUT" || err.code === "auth/popup-timeout" || err.code === "auth/popup-blocked") {
+        setErrorMsg("O login com o Google expirou ou foi bloqueado devido a restrições de iframe em seu navegador. Recomendamos usar o botão de 'Acesso Direto (Usuário Demo)' ou logar por E-mail/Senha.");
+      } else if (err.code === "auth/operation-not-allowed") {
         setErrorMsg("O Login com o Google não está ativo. Por favor, ative o provedor 'Google' nas configurações de Authentication do console Firebase.");
         setShowConfigGuide(true);
       } else if (err.code === "auth/unauthorized-domain") {
@@ -114,12 +150,16 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
         try {
           const credential = await createUserWithEmailAndPassword(auth, demoEmail, demoPassword);
           // Write admin authorization token to Firestore db
-          await setDoc(doc(db, "admins", credential.user.uid), {
-            id: credential.user.uid,
-            email: demoEmail,
-            name: "Anacleto Admin",
-            createdAt: new Date().toISOString()
-          });
+          try {
+            await setDoc(doc(db, "admins", credential.user.uid), {
+              id: credential.user.uid,
+              email: demoEmail,
+              name: "Anacleto Admin",
+              createdAt: new Date().toISOString()
+            });
+          } catch (writeErr) {
+            console.warn("Could not save initial admin document, likely missing ruleset write permission. Logging in anyway: ", writeErr);
+          }
           onLoginSuccess();
         } catch (regErr: any) {
           console.error("Failed to register demo user: ", regErr);
@@ -155,15 +195,19 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
         // Sign up with Firebase auth
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         
-        // Write admin authorization token to Firestore db
-        await setDoc(doc(db, "admins", credential.user.uid), {
-          id: credential.user.uid,
-          email: email.toLowerCase(),
-          name: fullName || "Manager",
-          createdAt: new Date().toISOString()
-        });
+        // Write admin authorization token to Firestore db in a decoupled try-catch block
+        try {
+          await setDoc(doc(db, "admins", credential.user.uid), {
+            id: credential.user.uid,
+            email: email.toLowerCase(),
+            name: fullName || "Manager",
+            createdAt: new Date().toISOString()
+          });
+        } catch (dbErr) {
+          console.warn("Authenticated successfully, but could not write metadata to admins collection:", dbErr);
+        }
 
-        alert("Sucesso! Administrador criado e autorizado nas regras do Firestore.");
+        alert("Sucesso! Administrador criado e registrado.");
         setIsRegisterMode(false);
       } else {
         // Regular sign in
@@ -359,15 +403,27 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-3 py-2.5 text-xs text-white border border-luxury-border bg-luxury-darker rounded-xl focus:border-luxury-gold focus:ring-1 focus:ring-luxury-gold/40 transition outline-hidden"
-                placeholder="exemplo@anacletoesquadrias.com.br"
+                placeholder="exemplo@anacleto.gt.tc"
               />
             </div>
           </div>
 
           <div className="text-left">
-            <label className="block text-[10px] font-extrabold text-luxury-gold/90 uppercase mb-1.5 tracking-wider">
-              {t.passwordPlaceholder}
-            </label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[10px] font-extrabold text-luxury-gold/90 uppercase tracking-wider">
+                {t.passwordPlaceholder}
+              </label>
+              {!isRegisterMode && (
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
+                  className="text-[10px] text-luxury-gold hover:text-luxury-gold-light focus:outline-hidden transition font-bold cursor-pointer"
+                >
+                  {resetLoading ? "Enviando..." : "Esqueceu a senha?"}
+                </button>
+              )}
+            </div>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <Lock className="w-4 h-4 text-luxury-gold/60" />
