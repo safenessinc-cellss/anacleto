@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, addDoc, doc, setDoc } from "firebase/firestore";
+import { collection, addDoc, doc, setDoc, onSnapshot } from "firebase/firestore";
 import { auth, db, handleFirestoreError, OperationType } from "./firebase";
 import { translations, LanguageCode } from "./translations";
 import { languageMeta, formatCurrency, generateBudgetTranslations } from "./utils";
@@ -53,6 +53,37 @@ export default function App() {
   const [isAdminPortal, setIsAdminPortal] = useState(false);
   const [language, setLanguage] = useState<LanguageCode>("pt");
   const [darkMode, setDarkMode] = useState(true);
+
+  // Real-time synchronization of website & billing settings (including custom promotions, videos, logo)
+  const [senderConfig, setSenderConfig] = useState<any>({
+    name: "Anacleto Esquadrias",
+    nif: "CNPJ 50.204.533/0001-99",
+    address: "Av. Caxias do Sul, 1069 - Rio dos Sinos",
+    postalCode: "93110-000",
+    city: "São Leopoldo - RS",
+    country: "Brasil",
+    logoUrl: "",
+    bankAccount: "PIX: CNPJ 50.204.533/0001-99 - Banco Sicredi",
+    currency: "BRL",
+    updatedAt: new Date().toISOString(),
+    websiteLogoUrl: "",
+    profileName: "Anacleto Esquadrias",
+    profileRole: "Diretor Comercial & Operações",
+    profileBio: "Mais de 20 anos de experiência prestando serviços qualificados em esquadrias de alumínio residenciais, prediais e corporativas de alto padrão. Medições a laser precisas, design exclusivas e total conformidade técnica.",
+    profileAvatarUrl: "",
+    profilePhone: "(51) 99311-0000",
+    profileEmail: "contato@anacletoesquadrias.com.br",
+    promotions: [
+      { id: "p1", title: "Campanha Especial de Inverno", description: "Fechamentos de sacadas com esquadria Linha Suprema ou Gold e isolamento de vidro temperado com 10% de desconto real.", discountBadge: "10% OFF", isActive: true },
+      { id: "p2", title: "Medição e Visita Gratuita", description: "Ganhe medição a laser residencial com orçamento completo sem compromisso em Porto Alegre e Região Metropolitana.", discountBadge: "GRÁTIS", isActive: true }
+    ],
+    publicity: [
+      { id: "ads1", bannerText: "✨ NOVIDADE: Parcelamento facilitado em até 10x sem juros em todas as esquadrias de alumínio de alto padrão!", bannerLink: "#solicitar", isActive: true, bgColor: "bg-amber-500 text-slate-950" }
+    ],
+    videos: [
+      { id: "v1", title: "Showcase: Mansão Alto Padrão - Pele de Vidro & Alumínio Preto", url: "https://www.youtube.com/embed/dQw4w9WgXcQ", description: "Confira a espetacular instalação de esquadrias Suprema e vidros laminados acústicos de controle térmico nesta residência exclusiva." }
+    ]
+  });
 
   // Technical visit scheduling states
   const [schName, setSchName] = useState("");
@@ -142,7 +173,21 @@ export default function App() {
       setAuthLoading(false);
     });
 
-    return () => unsubscribe();
+    // Real-time listener for website configurations & promotions
+    const unsubConfig = onSnapshot(doc(db, "sender_config", "default"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSenderConfig((prev: any) => ({
+          ...prev,
+          ...data
+        }));
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubConfig();
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -384,6 +429,8 @@ export default function App() {
               t={t}
               onLogout={handleLogout}
               currentLanguage={language}
+              senderConfig={senderConfig}
+              setSenderConfig={setSenderConfig}
             />
           ) : (
             <Login t={t} language={language} onLoginSuccess={() => {}} />
@@ -403,6 +450,16 @@ export default function App() {
       dir={isRtl ? "rtl" : "ltr"}
       className="min-h-screen bg-luxury-darker text-slate-100 flex flex-col transition-colors duration-300 selection:bg-luxury-gold/30 selection:text-white"
     >
+      {senderConfig.publicity && senderConfig.publicity.filter((item: any) => item.isActive).map((item: any) => (
+        <div key={item.id} className={`${item.bgColor || "bg-amber-500 text-slate-950"} text-center py-2 px-4 text-xs font-black tracking-wide flex items-center justify-center gap-2 transition animate-fade-in print:hidden`}>
+          <span>{item.bannerText}</span>
+          {item.bannerLink && (
+            <a href={item.bannerLink} className="underline hover:opacity-85 ml-1 inline-flex items-center gap-0.5">
+              Saber mais <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+      ))}
       
       {/* 1. Brand navigation Ribbon */}
       <nav className="sticky top-0 z-30 bg-luxury-darker/90 backdrop-blur-md border-b border-luxury-border/60 py-4 px-6 transition-colors duration-300 shadow-xl shadow-black/20">
@@ -410,7 +467,7 @@ export default function App() {
           
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 bg-luxury-dark rounded-xl overflow-hidden relative shrink-0 border border-luxury-border shadow-md">
-              <img src={logoImg} referrerPolicy="no-referrer" className="w-full h-full object-contain scale-105" alt="Anacleto Logo" />
+              <img src={senderConfig.websiteLogoUrl || senderConfig.logoUrl || logoImg} referrerPolicy="no-referrer" className="w-full h-full object-contain scale-105" alt="Anacleto Logo" />
             </div>
             <div className="text-left">
               <h1 className="text-lg font-black tracking-[0.2em] uppercase text-white font-sans">
@@ -570,6 +627,39 @@ export default function App() {
         </div>
       </section>
 
+      {/* 3.1 GORGEOUS ACTIVE PROMOTIONS SECTION */}
+      {senderConfig.promotions && senderConfig.promotions.filter((p: any) => p.isActive).length > 0 && (
+        <section className="py-12 px-6 bg-gradient-to-r from-luxury-darker via-luxury-dark to-luxury-darker border-b border-luxury-border/30">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center gap-2 justify-center mb-8">
+              <span className="p-1 px-2.5 bg-luxury-gold/10 text-luxury-gold border border-luxury-gold/25 rounded-md font-extrabold text-[10px] tracking-widest uppercase">
+                CAMPANHAS ATIVAS SOB MEDIDA
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              {senderConfig.promotions.filter((p: any) => p.isActive).map((p: any) => (
+                <div key={p.id} className="p-6 bg-luxury-darker/90 rounded-3xl border border-luxury-gold/30 shadow-2xl relative overflow-hidden group hover:border-luxury-gold transition duration-300 text-left">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-luxury-gold/5 rounded-full blur-xl pointer-events-none"></div>
+                  <div className="flex justify-between items-start gap-4 mb-3">
+                    <h3 className="font-black text-white text-base tracking-tight">{p.title}</h3>
+                    <span className="px-3 py-1 bg-luxury-gold text-luxury-darker text-[10px] font-black rounded-lg uppercase tracking-wider shrink-0 shadow-sm animate-pulse">
+                      {p.discountBadge}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-350 leading-relaxed mb-4">{p.description}</p>
+                  <a
+                    href="#solicitar"
+                    className="inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-luxury-gold hover:text-white transition duration-200"
+                  >
+                    Simular Projeto Agora <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 4. Real-time Pitch & Value Props */}
       <section className="py-20 px-6 bg-luxury-darker border-b border-luxury-border/30">
         <div className="max-w-5xl mx-auto text-center space-y-12">
@@ -707,6 +797,92 @@ export default function App() {
               </div>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      {/* 4.5 EXCLUSIVE VIDEOS & WORKPROOF SHOWCASE */}
+      {senderConfig.videos && senderConfig.videos.length > 0 && (
+        <section className="py-20 px-6 bg-luxury-dark border-b border-luxury-border/30">
+          <div className="max-w-7xl mx-auto text-center space-y-4 mb-12">
+            <span className="px-3 py-1 bg-luxury-darker border border-luxury-gold/20 text-luxury-gold text-[10px] font-black tracking-widest uppercase rounded-full">
+              PORTFÓLIO EM LÍGICA DE VÍDEO
+            </span>
+            <h2 className="text-3xl font-black tracking-tight text-white uppercase">
+              Demonstrações Especiais em Vídeo
+            </h2>
+            <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+              Assista depoimentos de clientes e acompanhe a fabricação e montagem de nossas esquadrias certificadas Suprema e Gold diretamente em obra.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto text-left animate-fade-in">
+            {senderConfig.videos.map((vid: any) => (
+              <div key={vid.id} className="bg-luxury-darker p-4 rounded-3xl border border-luxury-border/70 hover:border-luxury-gold/40 transition duration-300 flex flex-col justify-between">
+                <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black mb-3.5 border border-luxury-border">
+                  {vid.url && (vid.url.includes("embed") || vid.url.includes("youtube.com") || vid.url.includes("youtu.be")) ? (
+                    <iframe
+                      src={vid.url.includes("embed") ? vid.url : `https://www.youtube.com/embed/${vid.url.split("/").pop()?.split("?v=").pop()}`}
+                      title={vid.title}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    ></iframe>
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-xs text-slate-400">
+                      <p className="font-bold text-luxury-gold mb-1">Vídeo Externo</p>
+                      <a href={vid.url} target="_blank" rel="noreferrer" className="underline font-mono truncate max-w-full">
+                        {vid.url}
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-white line-clamp-1 mb-1">{vid.title}</h3>
+                  {vid.description && <p className="text-[11px] text-slate-400 line-clamp-2">{vid.description}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 4.9 EXECUTIVE BIO PROFILE & LEAD DESIGNER SECTION */}
+      <section className="py-16 px-6 bg-gradient-to-r from-luxury-darker via-luxury-dark to-luxury-darker border-b border-luxury-border/30">
+        <div className="max-w-4xl mx-auto bg-luxury-darker/90 rounded-3xl border border-luxury-gold/20 p-8 shadow-2xl flex flex-col md:flex-row gap-8 items-center text-left">
+          <div className="w-32 h-32 rounded-3xl overflow-hidden shrink-0 bg-luxury-dark border-2 border-luxury-gold/30 flex items-center justify-center relative shadow-lg">
+            {senderConfig.profileAvatarUrl ? (
+              <img src={senderConfig.profileAvatarUrl} className="w-full h-full object-cover" alt="Avatar Administrador" />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-luxury-dark text-center">
+                <Users className="w-10 h-10 text-luxury-gold/60" />
+                <span className="text-[9px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Liderança</span>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 space-y-3.5">
+            <div>
+              <span className="px-2.5 py-0.5 bg-luxury-gold/10 text-luxury-gold border border-luxury-gold/20 text-[9px] font-black uppercase rounded tracking-wider">
+                Perfil Corporativo Autorizado
+              </span>
+              <h3 className="text-xl font-black text-white uppercase tracking-tight mt-1.5">
+                {senderConfig.profileName || "Anacleto Esquadrias"}
+              </h3>
+              <p className="text-xs text-luxury-gold font-bold tracking-wide">
+                {senderConfig.profileRole || "Fundador & Diretor Geral"}
+              </p>
+            </div>
+            <p className="text-xs text-slate-350 leading-relaxed font-medium">
+              {senderConfig.profileBio || "Atuando com inteligência técnica especializada na confecção e montagem de esquadrias de alumínio sob medida de alto padrão na Região Metropolitana, assegurando pleno isolamento acústico e térmico predial."}
+            </p>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-[10px] font-mono text-slate-450">
+              {senderConfig.profilePhone && (
+                <span>📞 WhatsApp: <strong className="text-white">{senderConfig.profilePhone}</strong></span>
+              )}
+              {senderConfig.profileEmail && (
+                <span>✉️ E-mail: <strong className="text-white">{senderConfig.profileEmail}</strong></span>
+              )}
+            </div>
           </div>
         </div>
       </section>
