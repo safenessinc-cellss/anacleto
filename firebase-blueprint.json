@@ -115,6 +115,37 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "phone", "preferDate", "preferTime"]
+    },
+    "ledger_entry": {
+      "title": "LedgerEntry",
+      "description": "Financial transaction ledger entry of revenue or expenditure",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["description", "type", "category", "amount", "date"]
+    },
+    "client_profile": {
+      "title": "ClientProfile",
+      "description": "Rich client credentials and metrics stored in CRM",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "nif": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "totalDealsWorth": { "type": "number" },
+        "stage": { "type": "string", "enum": ["Lead", "Medição Grátis", "Em Negociação", "Contrato Fechado", "Cancelado"] },
+        "isVIP": { "type": "boolean" },
+        "notes": { "type": "string" }
+      },
+      "required": ["email", "name"]
     }
   },
   "firestore": {
@@ -141,6 +172,15 @@
     "visits/{visitId}": {
       "schema": "visit",
       "description": "Technical visit appointments database"
+    },
+    "ledger_entries/{entryId}": {
+      "schema": "ledger_entry",
+      "description": "Stores financial journal items of the company"
+    },
+    "companies_crm/{clientId}": {
+      "schema": "client_profile",
+      "description": "Rich contact details and pipeline stage metrics for prospective clients"
     }
   }
 }
+
