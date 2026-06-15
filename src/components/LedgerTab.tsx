@@ -55,7 +55,7 @@ export default function LedgerTab({ invoices, t }: LedgerTabProps) {
       },
       (err) => {
         console.warn("Ledger tracking permissions error: ", err);
-        handleFirestoreError(err, OperationType.GET, "ledger_entries");
+        handleFirestoreError(err, OperationType.GET, "ledger_entries", false);
       }
     );
 
