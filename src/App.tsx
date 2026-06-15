@@ -3,7 +3,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { translations, LanguageCode } from "./translations";
-import { languageMeta } from "./utils";  // ← ELIMINÉ generateBudgetTranslations
+import { languageMeta } from "./utils";
 import {
   ShieldCheck,
   Globe,
@@ -24,6 +24,7 @@ import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
 import Chatbot from "./components/Chatbot";
 import WhatsAppButton from "./components/WhatsAppButton";
+import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
 import { useToast } from "./components/ToastContext";
 
 // Premium Brand Assets
@@ -32,116 +33,6 @@ import heroImg from "./assets/images/modern_house_esquadrias_1780594310165.png";
 import facadeImg from "./assets/images/corporate_facade_1780594325774.png";
 import bathImg from "./assets/images/bathroom_box_glass_1780594338585.png";
 import pergolaImg from "./assets/images/pergola_glass_1780594351717.png";
-
-// Componente de animación de inicio mejorado (sin canvas)
-const AnimatedLoader = ({ onFinish }: { onFinish: () => void }) => {
-  const [progress, setProgress] = useState(0);
-  const [dots, setDots] = useState("");
-
-  useEffect(() => {
-    // Animación de progreso
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => onFinish(), 300);
-          return 100;
-        }
-        return prev + 2;
-      });
-    }, 20);
-
-    // Animación de puntos suspensivos
-    const dotsInterval = setInterval(() => {
-      setDots(prev => prev.length >= 3 ? "" : prev + ".");
-    }, 400);
-
-    // Precarga de imágenes para evitar flashes
-    const preloadImages = async () => {
-      const images = [logoImg, heroImg, facadeImg, bathImg, pergolaImg];
-      for (const src of images) {
-        const img = new Image();
-        img.src = src;
-      }
-    };
-    preloadImages();
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(dotsInterval);
-    };
-  }, [onFinish]);
-
-  return (
-    <div className="fixed inset-0 bg-gradient-to-br from-luxury-darker via-luxury-dark to-luxury-darker z-50 flex flex-col items-center justify-center">
-      <div className="text-center space-y-8 max-w-md px-6 animate-fade-in">
-        {/* Logo con animación de pulso */}
-        <div className="relative w-28 h-28 mx-auto">
-          <div className="absolute inset-0 border-4 border-luxury-gold/20 rounded-full animate-ping"></div>
-          <div className="absolute inset-0 border-4 border-luxury-gold/40 rounded-full animate-pulse"></div>
-          <div className="absolute inset-0 bg-luxury-dark rounded-full flex items-center justify-center shadow-2xl shadow-luxury-gold/20">
-            <span className="text-4xl font-black text-luxury-gold">A</span>
-          </div>
-        </div>
-
-        {/* Texto de marca */}
-        <div className="space-y-2">
-          <h1 className="text-2xl font-black tracking-[0.3em] text-white uppercase animate-slide-up">
-            ANACLETO
-          </h1>
-          <p className="text-xs text-luxury-gold tracking-[0.2em] font-medium uppercase animate-slide-up animation-delay-100">
-            ESQUADRIAS DE ALUMÍNIO
-          </p>
-        </div>
-
-        {/* Barra de progreso premium */}
-        <div className="w-full max-w-xs mx-auto space-y-2">
-          <div className="w-full bg-luxury-dark/50 rounded-full h-1 overflow-hidden backdrop-blur-sm">
-            <div 
-              className="bg-gradient-to-r from-luxury-gold to-amber-500 h-full transition-all duration-100 ease-out rounded-full relative"
-              style={{ width: `${progress}%` }}
-            >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-lg shadow-luxury-gold"></div>
-            </div>
-          </div>
-          <p className="text-luxury-gold text-[10px] font-mono tracking-wider">
-            CARGANDO SISTEMA{dots}
-          </p>
-        </div>
-
-        {/* Mensajes rotativos */}
-        <div className="text-slate-500 text-[9px] font-mono space-y-1">
-          <p className="animate-pulse">✨ Sistema multilíngue integrado</p>
-          <p className="animate-pulse animation-delay-300">🔒 Firestore sincronizado</p>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes slide-up {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out forwards;
-        }
-        .animate-slide-up {
-          animation: slide-up 0.5s ease-out forwards;
-          opacity: 0;
-        }
-        .animation-delay-100 {
-          animation-delay: 0.1s;
-        }
-        .animation-delay-300 {
-          animation-delay: 0.3s;
-        }
-      `}</style>
-    </div>
-  );
-};
 
 export default function App() {
   const { showToast } = useToast();
@@ -225,7 +116,7 @@ export default function App() {
     // Tiempo de carga mínimo para mostrar animación
     const timer = setTimeout(() => {
       setAnimationLoading(false);
-    }, 2500);
+    }, 8000); // 8 segundos para ver toda la animación de la ventana
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -420,9 +311,9 @@ export default function App() {
   const t = translations[language] || translations.pt;
   const isRtl = language === "ar";
 
-  // Mostrar animación de carga
+  // Mostrar animación de la ventana de aluminio
   if (authLoading || animationLoading) {
-    return <AnimatedLoader onFinish={() => setAnimationLoading(false)} />;
+    return <AnimatedWindowLoader onFinish={() => setAnimationLoading(false)} currentLanguage={language} />;
   }
 
   // Panel de administración
