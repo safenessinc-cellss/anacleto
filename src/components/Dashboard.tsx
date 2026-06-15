@@ -47,30 +47,18 @@ interface DashboardProps {
   t: Translation;
   onLogout: () => void;
   currentLanguage: string;
+  senderConfig: SenderConfig;
+  setSenderConfig: React.Dispatch<React.SetStateAction<SenderConfig>>;
 }
 
-export default function Dashboard({ t, onLogout, currentLanguage }: DashboardProps) {
+export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, setSenderConfig }: DashboardProps) {
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<"budgets" | "visits" | "invoices" | "settings" | "chats" | "users" | "ledger" | "crm" | "advisor">("budgets");
+  const [activeTab, setActiveTab ] = useState<"budgets" | "visits" | "invoices" | "settings" | "chats" | "users" | "ledger" | "crm" | "advisor">("budgets");
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [visits, setVisits] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
-  
-  // Singleton sender configuration
-  const [senderConfig, setSenderConfig] = useState<SenderConfig>({
-    name: "Anacleto Esquadrias",
-    nif: "CNPJ 50.204.533/0001-99",
-    address: "Av. Caxias do Sul, 1069 - Rio dos Sinos",
-    postalCode: "93110-000",
-    city: "São Leopoldo - RS",
-    country: "Brasil",
-    logoUrl: "",
-    bankAccount: "PIX: CNPJ 50.204.533/0001-99 - Banco Sicredi",
-    currency: "BRL",
-    updatedAt: new Date().toISOString()
-  });
 
   // Modals state
   const [isBudgetOpen, setIsBudgetOpen] = useState(false);
@@ -151,23 +139,6 @@ export default function Dashboard({ t, onLogout, currentLanguage }: DashboardPro
       },
       (err) => console.warn("Visits subscription warning: ", err)
     );
-
-    // 5. Fetch Singleton Sender Configurations
-    const fetchSender = async () => {
-      try {
-        const docRef = doc(db, "sender_config", "default");
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setSenderConfig(docSnap.data() as SenderConfig);
-        } else {
-          // Initialize singleton record if empty
-          await setDoc(docRef, senderConfig);
-        }
-      } catch (err) {
-        console.warn("Could not fetch defaults: ", err);
-      }
-    };
-    fetchSender();
 
     return () => {
       unsubscribeBudgets();
@@ -1092,6 +1063,417 @@ export default function Dashboard({ t, onLogout, currentLanguage }: DashboardPro
                       <option value="JPY">¥ JPY (Iene Japonês)</option>
                     </select>
                   </div>
+
+                  {/* WEBSITE LOGO CUSTOMIZATION */}
+                  <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-6">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider mb-3">
+                      🖼️ Logotipo Customizado da Página
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-655 dark:text-slate-400">
+                          URL do Logotipo do Website (Substitui o padrão)
+                        </label>
+                        <input
+                          type="text"
+                          value={senderConfig.websiteLogoUrl || ""}
+                          onChange={(e) => setSenderConfig({ ...senderConfig, websiteLogoUrl: e.target.value })}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs"
+                          placeholder="Ex: https://dominio.com/marca-logo.png"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Insira o endereço de uma imagem online para trocar o logo principal exibido na barra de navegação pública.
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-center p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                        {senderConfig.websiteLogoUrl ? (
+                          <img src={senderConfig.websiteLogoUrl} className="max-h-16 object-contain" alt="Website Logo Preview" />
+                        ) : (
+                          <span className="text-[11px] text-slate-400 font-bold">Logo Padrão Ativo</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EDIT PROFILE PRESENTATION */}
+                  <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                      👤 Perfil Executivo de Liderança (Quem Somos)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                          Nome do Perfil / Gestor
+                        </label>
+                        <input
+                          type="text"
+                          value={senderConfig.profileName || ""}
+                          onChange={(e) => setSenderConfig({ ...senderConfig, profileName: e.target.value })}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm"
+                          placeholder="Ex: João Anacleto"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                          Cargo / Role
+                        </label>
+                        <input
+                          type="text"
+                          value={senderConfig.profileRole || ""}
+                          onChange={(e) => setSenderConfig({ ...senderConfig, profileRole: e.target.value })}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm"
+                          placeholder="Ex: Fundador & Diretor Geral"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                          URL da Foto / Avatar
+                        </label>
+                        <input
+                          type="text"
+                          value={senderConfig.profileAvatarUrl || ""}
+                          onChange={(e) => setSenderConfig({ ...senderConfig, profileAvatarUrl: e.target.value })}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm"
+                          placeholder="Ex: https://images.com/foto.jpg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                          Contato Celular (WhatsApp)
+                        </label>
+                        <input
+                          type="text"
+                          value={senderConfig.profilePhone || ""}
+                          onChange={(e) => setSenderConfig({ ...senderConfig, profilePhone: e.target.value })}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm"
+                          placeholder="Ex: (51) 99311-0000"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                          E-mail de Contato Comercial
+                        </label>
+                        <input
+                          type="text"
+                          value={senderConfig.profileEmail || ""}
+                          onChange={(e) => setSenderConfig({ ...senderConfig, profileEmail: e.target.value })}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm"
+                          placeholder="Ex: contato@anacletoesquadrias.com.br"
+                        />
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                          Biografia Resumida de Apresentação
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={senderConfig.profileBio || ""}
+                          onChange={(e) => setSenderConfig({ ...senderConfig, profileBio: e.target.value })}
+                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm resize-none"
+                          placeholder="Insira uma curta biografia contando as realizações profissionais..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EDIT PROMOTIONS */}
+                  <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                        🎁 Gerenciamento de Promoções & Ofertas Ativas
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...(senderConfig.promotions || [])];
+                          updated.push({
+                            id: "p_" + Date.now(),
+                            title: "Nova Promoção Imperdível",
+                            description: "Descrição da promoção contendo prazos, produtos sob medida inclusos ou condições.",
+                            discountBadge: "10% OFF",
+                            isActive: true
+                          });
+                          setSenderConfig({ ...senderConfig, promotions: updated });
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-xs tracking-wide cursor-pointer transition select-none"
+                      >
+                        + Nova Promoção
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {(!senderConfig.promotions || senderConfig.promotions.length === 0) ? (
+                        <p className="text-xs text-slate-450 italic mt-2">Nenhuma promoção ativa cadastrada. Clique em "+ Nova Promoção" para cadastrar uma campanha.</p>
+                      ) : (
+                        senderConfig.promotions.map((p, idx) => (
+                          <div key={p.id} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="md:col-span-2">
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Título da Campanha</label>
+                                <input
+                                  type="text"
+                                  value={p.title}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.promotions!];
+                                    updated[idx].title = e.target.value;
+                                    setSenderConfig({ ...senderConfig, promotions: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs font-bold"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Selo de Desconto (Badge)</label>
+                                <input
+                                  type="text"
+                                  value={p.discountBadge}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.promotions!];
+                                    updated[idx].discountBadge = e.target.value;
+                                    setSenderConfig({ ...senderConfig, promotions: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs"
+                                />
+                              </div>
+                              <div className="md:col-span-3">
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Texto Descritivo</label>
+                                <textarea
+                                  rows={2}
+                                  value={p.description}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.promotions!];
+                                    updated[idx].description = e.target.value;
+                                    setSenderConfig({ ...senderConfig, promotions: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs resize-none"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800">
+                              <label className="flex items-center gap-1.5 text-xs text-slate-650 dark:text-slate-350 select-none cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={p.isActive}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.promotions!];
+                                    updated[idx].isActive = e.target.checked;
+                                    setSenderConfig({ ...senderConfig, promotions: updated });
+                                  }}
+                                  className="rounded border-slate-300 text-indigo-650 focus:ring-indigo-500"
+                                />
+                                Ativa Pública no Site
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = senderConfig.promotions!.filter((item) => item.id !== p.id);
+                                  setSenderConfig({ ...senderConfig, promotions: updated });
+                                }}
+                                className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:text-red-400 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                              >
+                                Excluir Campanha
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* EDIT PUBLICITY */}
+                  <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                        ⚡ Banner de anúncios de Publicidade Comercial
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...(senderConfig.publicity || [])];
+                          updated.push({
+                            id: "ads_" + Date.now(),
+                            bannerText: "✨ NOVIDADE EXCLUSIVA: Descrição chamativa para este banner publicitário!",
+                            bannerLink: "#agendar",
+                            bgColor: "bg-amber-500 text-slate-950",
+                            isActive: true
+                          });
+                          setSenderConfig({ ...senderConfig, publicity: updated });
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-xs tracking-wide cursor-pointer transition select-none"
+                      >
+                        + Novo Banner Publicitário
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {(!senderConfig.publicity || senderConfig.publicity.length === 0) ? (
+                        <p className="text-xs text-slate-450 italic mt-2">Nenhum banner ativo. Crie um banner acima para destacar no topo da página institucional.</p>
+                      ) : (
+                        senderConfig.publicity.map((ads, idx) => (
+                          <div key={ads.id} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="md:col-span-2">
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Texto do Anúncio (Suporta Emojis)</label>
+                                <input
+                                  type="text"
+                                  value={ads.bannerText}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.publicity!];
+                                    updated[idx].bannerText = e.target.value;
+                                    setSenderConfig({ ...senderConfig, publicity: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs font-bold"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Cores (Tailwind classes)</label>
+                                <input
+                                  type="text"
+                                  value={ads.bgColor}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.publicity!];
+                                    updated[idx].bgColor = e.target.value;
+                                    setSenderConfig({ ...senderConfig, publicity: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs"
+                                  placeholder="Ex: bg-amber-500 text-slate-950"
+                                />
+                              </div>
+                              <div className="md:col-span-3">
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Link de Destino do Banner</label>
+                                <input
+                                  type="text"
+                                  value={ads.bannerLink || ""}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.publicity!];
+                                    updated[idx].bannerLink = e.target.value;
+                                    setSenderConfig({ ...senderConfig, publicity: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs"
+                                  placeholder="Ex: #agendar ou #solicitar"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800">
+                              <label className="flex items-center gap-1.5 text-xs text-slate-655 dark:text-slate-350 select-none cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={ads.isActive}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.publicity!];
+                                    updated[idx].isActive = e.target.checked;
+                                    setSenderConfig({ ...senderConfig, publicity: updated });
+                                  }}
+                                  className="rounded border-slate-300 text-indigo-650 focus:ring-indigo-500"
+                                />
+                                Anúncio Ativo no Topo
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = senderConfig.publicity!.filter((item) => item.id !== ads.id);
+                                  setSenderConfig({ ...senderConfig, publicity: updated });
+                                }}
+                                className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:text-red-400 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                              >
+                                Excluir Anúncio
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* EDIT VIDEOS */}
+                  <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider font-sans">
+                        📽️ Incorporação de Vídeos & Projetos de Portfólio
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...(senderConfig.videos || [])];
+                          updated.push({
+                            id: "v_" + Date.now(),
+                            title: "Novo Showcase Realizado",
+                            url: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+                            description: "Assista os detalhes de design, fabricação e montagem desta obra."
+                          });
+                          setSenderConfig({ ...senderConfig, videos: updated });
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-xs tracking-wide cursor-pointer transition select-none"
+                      >
+                        + Adicionar Vídeo
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {(!senderConfig.videos || senderConfig.videos.length === 0) ? (
+                        <p className="text-xs text-slate-450 italic mt-2">Nenhum vídeo cadastrado. Insira um vídeo do Youtube acima para incorporar no portfólio.</p>
+                      ) : (
+                        senderConfig.videos.map((vid, idx) => (
+                          <div key={vid.id} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Título do Vídeo</label>
+                                <input
+                                  type="text"
+                                  value={vid.title}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.videos!];
+                                    updated[idx].title = e.target.value;
+                                    setSenderConfig({ ...senderConfig, videos: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs font-bold"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Embed URL Youtube / Link</label>
+                                <input
+                                  type="text"
+                                  value={vid.url}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.videos!];
+                                    updated[idx].url = e.target.value;
+                                    setSenderConfig({ ...senderConfig, videos: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-905 dark:text-white rounded-lg text-xs"
+                                  placeholder="Ex: https://www.youtube.com/embed/dQw4w9WgXcQ"
+                                />
+                              </div>
+                              <div className="md:col-span-2">
+                                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-0.5">Descrição Curta</label>
+                                <input
+                                  type="text"
+                                  value={vid.description || ""}
+                                  onChange={(e) => {
+                                    const updated = [...senderConfig.videos!];
+                                    updated[idx].description = e.target.value;
+                                    setSenderConfig({ ...senderConfig, videos: updated });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-350 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-xs"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end pt-1 border-t border-slate-200 dark:border-slate-800">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = senderConfig.videos!.filter((item) => item.id !== vid.id);
+                                  setSenderConfig({ ...senderConfig, videos: updated });
+                                }}
+                                className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:text-red-400 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                              >
+                                Excluir Vídeo
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
                 </div>
 
                 <div className="flex justify-end pt-4">
