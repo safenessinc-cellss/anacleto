@@ -183,7 +183,7 @@ export default function App() {
         }));
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, "sender_config/default");
+      console.warn("Could not load dynamic configuration from Firestore sender_config/default. Using local default configuration instead.");
     });
 
     return () => {
