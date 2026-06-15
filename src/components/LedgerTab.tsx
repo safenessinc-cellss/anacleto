@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { DollarSign, Plus, Trash, ArrowDownLeft, ArrowUpRight, TrendingUp, Receipt, Calendar, Sparkles } from "lucide-react";
 import { Invoice } from "../types";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, handleFirestoreError, OperationType } from "../firebase";
 
 interface LedgerTabProps {
   invoices: Invoice[];
@@ -53,7 +53,10 @@ export default function LedgerTab({ invoices, t }: LedgerTabProps) {
         combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setEntries(combined);
       },
-      (err) => console.warn("Ledger tracking permissions error: ", err)
+      (err) => {
+        console.warn("Ledger tracking permissions error: ", err);
+        handleFirestoreError(err, OperationType.GET, "ledger_entries");
+      }
     );
 
     return () => unsub();
