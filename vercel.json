@@ -1,27 +1,26 @@
 {
+  "installCommand": "npm install",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "builds": [
     {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
         "installCommand": "npm install",
-        "buildCommand": "npm run build",
-        "outputDirectory": "dist/public"
+        "buildCommand": "npm run vercel-build",
+        "outputDirectory": "dist"
       }
-    },
-    {
-      "src": "dist/server.cjs",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/dist/server.cjs"
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/dist/public/$1"
+      "dest": "/index.html"
     }
   ]
 }
