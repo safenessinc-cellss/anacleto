@@ -320,6 +320,8 @@ export default function App() {
         setSenderConfig={setSenderConfig}
         onSwitchToPublicLanding={() => setCurrentView("landing")}
         onLogout={handleLogout}
+        language={language}
+        onLanguageChange={handleLanguageChange}
       />
     );
   }

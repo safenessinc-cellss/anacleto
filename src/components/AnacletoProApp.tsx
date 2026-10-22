@@ -35,6 +35,8 @@ interface AnacletoProAppProps {
   setSenderConfig: React.Dispatch<React.SetStateAction<SenderConfig>>;
   onSwitchToPublicLanding?: () => void;
   onLogout?: () => void;
+  language?: string;
+  onLanguageChange?: (lang: string) => void;
 }
 
 export default function AnacletoProApp({
@@ -42,6 +44,8 @@ export default function AnacletoProApp({
   setSenderConfig,
   onSwitchToPublicLanding,
   onLogout,
+  language = "pt",
+  onLanguageChange,
 }: AnacletoProAppProps) {
   const [activeTab, setActiveTab] = useState<NavigationTab>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -235,6 +239,22 @@ export default function AnacletoProApp({
             >
               <ExternalLink className="w-3.5 h-3.5 text-amber-400" /> Ver Web Comercial
             </button>
+          )}
+
+          {/* Selector de idioma */}
+          {onLanguageChange && (
+            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5">
+              <span className="text-sm">🌐</span>
+              <select
+                value={language}
+                onChange={(e) => onLanguageChange(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
+              >
+                <option value="pt">🇵🇹 PT</option>
+                <option value="es">🇪🇸 ES</option>
+                <option value="en">🇬🇧 EN</option>
+              </select>
+            </div>
           )}
 
           {onLogout && (
