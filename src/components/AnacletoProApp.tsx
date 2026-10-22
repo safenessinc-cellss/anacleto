@@ -116,10 +116,10 @@ export default function AnacletoProApp({
   const navItems = [
     { id: "dashboard" as NavigationTab, label: "Dashboard", icon: LayoutDashboard, badge: null },
     { id: "crm" as NavigationTab, label: "CRM (Empresas)", icon: Building, badge: companies.length },
-    { id: "quotes" as NavigationTab, label: "Presupuestos", icon: FileText, badge: quotes.length },
-    { id: "invoices" as NavigationTab, label: "Facturas", icon: FileCheck, badge: invoices.length },
-    { id: "technical_drawing" as NavigationTab, label: "Dibujo Técnico", icon: Compass, badge: "AI CAD" },
-    { id: "settings" as NavigationTab, label: "Configuración", icon: Settings, badge: null },
+    { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
+    { id: "invoices" as NavigationTab, label: "Faturas", icon: FileCheck, badge: invoices.length },
+    { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico", icon: Compass, badge: "AI CAD" },
+    { id: "settings" as NavigationTab, label: "Configuração", icon: Settings, badge: null },
   ];
 
   const handleSelectCompanyForQuote = (comp: Company) => {
