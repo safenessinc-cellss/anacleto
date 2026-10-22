@@ -497,3 +497,5 @@ app.post("/api/create-calendar-event", async (req, res) => {
     return res.status(500).json({ success: false, error: err?.message || "Error desconocido" });
   }
 });
+
+export default app;
