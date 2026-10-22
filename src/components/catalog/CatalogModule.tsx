@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from "firebase/firestore";
-import { db } from "../../firebase";
+import { db, auth } from "../../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { Package, Plus, Trash2, Edit, Search, FileUp } from "lucide-react";
 import Papa from "papaparse";
 
@@ -20,7 +21,14 @@ export default function CatalogModule() {
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [form, setForm] = useState<CatalogItem>({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" });
 
+  const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setAuthReady(!!u));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
     const q = query(collection(db, "catalog"), orderBy("name", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       const list: CatalogItem[] = [];
@@ -28,7 +36,7 @@ export default function CatalogModule() {
       setItems(list);
     }, (err) => console.warn("Catalog listener:", err));
     return () => unsub();
-  }, []);
+  }, [authReady]);
 
   const handleSave = async () => {
     if (!form.sku || !form.name) return alert("SKU y Nombre son obligatorios");
