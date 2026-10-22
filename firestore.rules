@@ -1,3 +1,5 @@
+// Forzando deploy Qui 22 Out 2026 14:43:01 -03
+// Forzando deploy Qui 22 Out 2026 14:42:40 -03
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
