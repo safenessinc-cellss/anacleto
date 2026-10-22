@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
-import { Package, Plus, Trash2, Edit, Upload, Search } from "lucide-react";
+import { Package, Plus, Trash2, Edit, Search, FileUp } from "lucide-react";
+import Papa from "papaparse";
 
 interface CatalogItem {
   id?: string;
@@ -44,6 +45,39 @@ export default function CatalogModule() {
     if (confirm("¿Eliminar este producto?")) await deleteDoc(doc(db, "catalog", id));
   };
 
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const itemsToSave = results.data.map((row: any) => ({
+          sku: row.sku || row.SKU || "",
+          name: row.name || row.nome || row.Nome || "",
+          category: row.category || row.categoria || "Perfil",
+          unit: row.unit || row.unidade || "UN",
+          price: parseFloat(row.price || row.preco || row.Preço || 0),
+          supplier: row.supplier || row.fornecedor || "Importado",
+        })).filter(item => item.sku && item.name);
+
+        if (itemsToSave.length === 0) {
+          alert("No se encontraron filas válidas.");
+          return;
+        }
+
+        const { writeBatch, doc, collection } = await import("firebase/firestore");
+        const batch = writeBatch(db);
+        itemsToSave.forEach((item) => {
+          const newDocRef = doc(collection(db, "catalog"));
+          batch.set(newDocRef, item);
+        });
+        await batch.commit();
+        alert(`✅ ${itemsToSave.length} productos importados.`);
+      },
+    });
+  };
+
   const filtered = items.filter(i => 
     i.name.toLowerCase().includes(search.toLowerCase()) || 
     i.sku.toLowerCase().includes(search.toLowerCase())
@@ -65,6 +99,10 @@ export default function CatalogModule() {
           <button onClick={() => { setEditing(null); setForm({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" }); }} className="flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold">
             <Plus className="w-4 h-4" /> Nuevo
           </button>
+          <label className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-emerald-700">
+            <FileUp className="w-4 h-4" /> Importar CSV
+            <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+          </label>
         </div>
       </div>
 
