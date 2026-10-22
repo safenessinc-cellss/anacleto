@@ -83,7 +83,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       name: "Cliente Particular",
       taxId: "44556677B",
       email: "cliente@ejemplo.com",
-      address: "Calle Principal 123",
+      address: "Rua Principal 123",
     };
 
     const newQ: Quote = {
@@ -99,7 +99,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       items: [
         {
           id: "item_1",
-          description: "Ventana de Aluminio Linha Suprema 120×100 cm c/ Vidro Incolor 6mm",
+          description: "Janela de Alumínio Linha Suprema 120×100 cm c/ Vidro Incolor 6mm",
           quantity: 2,
           unitPrice: 380,
           subtotal: 760,
@@ -113,7 +113,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       total: 919.6,
       currency: senderConfig.currency || "EUR",
       status: "pendente",
-      notes: "Plazo de entrega estimado: 15 días laborables. Garantía de 5 años en carpintería.",
+      notes: "Prazo de entrega estimado: 15 dias úteis. Garantia de 5 anos em carpintaria.",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -191,7 +191,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       showToast(`Presupuesto ${target.number} y PDF almacenados en la plataforma.`, "success");
     } catch (err) {
       console.error(err);
-      showToast("Error al guardar presupuesto en Firestore.", "error");
+      showToast("Erro ao salvar orçamento no Firestore.", "error");
     }
   };
 
@@ -221,7 +221,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         total: quote.total,
         currency: quote.currency,
         status: "pendente",
-        paymentMethod: "Transferencia Bancaria",
+        paymentMethod: "Transferência Bancária",
         notes: `Factura generada a partir del Presupuesto ${quote.number}.`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -251,7 +251,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       }
     } catch (err) {
       console.error(err);
-      showToast("No se pudo generar la factura.", "error");
+      showToast("Não foi possível gerar a fatura.", "error");
     }
   };
 
@@ -278,7 +278,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         }),
       });
 
-      if (!res.ok) throw new Error("Error en servidor de IA");
+      if (!res.ok) throw new Error("Erro no servidor de IA");
 
       const data = await res.json();
 
@@ -324,7 +324,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         ...prev,
         {
           role: "assistant",
-          text: data.reply || "He recalculado los ítems, impuestos y totales de tu presupuesto en tiempo real.",
+          text: data.reply || "Recalculei os itens, impostos e totais do seu orçamento em tempo real.",
         },
       ]);
     } catch (err: any) {
@@ -332,23 +332,23 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       // Smart local command execution fallback
       const lower = userText.toLowerCase();
       let updated = { ...selectedQuote };
-      let reply = "He procesado tu instrucción:";
+      let reply = "Processei sua instrução:";
 
       if (lower.includes("iva") && lower.includes("21")) {
         updated.taxRate = 21;
-        reply = "Cambiado el IVA al 21%. Totales recalculados.";
+        reply = "IVA alterado para 21%. Totais recalculados.";
       } else if (lower.includes("iva") && lower.includes("10")) {
         updated.taxRate = 10;
-        reply = "Cambiado el IVA reducido al 10%. Totales recalculados.";
+        reply = "IVA reduzido alterado para 10%. Totais recalculados.";
       } else if (lower.includes("descuento") && lower.includes("10")) {
         updated.discountRate = 10;
-        reply = "Aplicado un descuento comercial del 10% sobre la base imponible.";
+        reply = "Aplicado desconto comercial de 10% sobre a base tributável.";
       } else if (lower.includes("descuento") && lower.includes("15")) {
         updated.discountRate = 15;
-        reply = "Aplicado un descuento del 15% sobre el presupuesto.";
+        reply = "Aplicado desconto de 15% sobre o orçamento.";
       } else if (lower.includes("factura")) {
         handleConvertQuoteToInvoice(selectedQuote);
-        reply = "Factura emitida exitosamente a partir de este presupuesto.";
+        reply = "Fatura emitida com sucesso a partir deste orçamento.";
       } else {
         // Add sample requested item
         updated.items.push({
@@ -389,7 +389,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     if (!selectedQuote) return;
     const newItem: QuoteItem = {
       id: "it_" + Math.random().toString(36).substring(2, 7),
-      description: "Servicio de Carpintería de Aluminio / Instalación Técnica",
+      description: "Serviço de Carpintaria de Alumínio / Instalação Técnica",
       quantity: 1,
       unitPrice: 150,
       subtotal: 150,
@@ -470,7 +470,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder="Buscar por nº o cliente..."
+                placeholder="Buscar por nº ou cliente..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500/50"
@@ -488,7 +488,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                       : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
                   }`}
                 >
-                  {st === "all" ? "Todos" : st === "pendente" ? "Pendientes" : st === "approved" ? "Aprobados" : "Rechazados"}
+                  {st === "all" ? "Todos" : st === "pendente" ? "Pendentes" : st === "approved" ? "Aprovados" : "Rejeitados"}
                 </button>
               ))}
             </div>
@@ -547,7 +547,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                           e.stopPropagation();
                           handleOpenQuotePdf(q);
                         }}
-                        title="Ver PDF almacenado en plataforma"
+                        title="Ver PDF armazenado na plataforma"
                         className="p-1 hover:bg-slate-700 text-slate-400 hover:text-amber-400 rounded-lg transition"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -690,7 +690,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                           type="text"
                           value={item.description}
                           onChange={(e) => handleUpdateItem(item.id, "description", e.target.value)}
-                          placeholder="Descripción del ítem..."
+                          placeholder="Descrição do item..."
                           className="flex-1 w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white outline-none focus:border-amber-500/50"
                         />
                         <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -818,7 +818,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                     type="text"
                     value={aiMessage}
                     onChange={(e) => setAiMessage(e.target.value)}
-                    placeholder="Escribe una instrucción al agente (ej: 'cambia el IVA al 21%')..."
+                    placeholder="Escreva uma instrução ao agente (ex: 'mude o IVA para 21%')..."
                     className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500/50"
                   />
                   <button

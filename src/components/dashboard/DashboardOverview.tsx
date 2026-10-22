@@ -72,11 +72,11 @@ export default function DashboardOverview({
               <Sparkles className="w-3.5 h-3.5" /> Anacleto Pro Enterprise OS
             </span>
             <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">
-              Bienvenido al Panel de Control
+              Bem-vindo ao Painel de Controle
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Gestión unificada de carpintería de aluminio, presupuestos dinámicos asistidos por IA,
-              facturas con exportación a PDF y motor CAD de dibujo técnico 2D por fases.
+              Gestión unificada de carpintería de aluminio, orçamentos dinámicos asistidos por IA,
+              faturas con exportación a PDF y motor CAD de dibujo técnico 2D por fases.
             </p>
           </div>
 
@@ -85,13 +85,13 @@ export default function DashboardOverview({
               onClick={() => onNavigateTab("technical_drawing")}
               className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-2xl transition shadow-lg shadow-amber-500/20"
             >
-              <Compass className="w-4 h-4" /> Nuevo Dibujo Técnico
+              <Compass className="w-4 h-4" /> Novo Desenho Técnico
             </button>
             <button
               onClick={() => onNavigateTab("quotes")}
               className="flex items-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold uppercase tracking-wider rounded-2xl transition border border-slate-700"
             >
-              <FileText className="w-4 h-4 text-amber-400" /> Crear Presupuesto
+              <FileText className="w-4 h-4 text-amber-400" /> Criar Orçamento
             </button>
           </div>
         </div>
@@ -102,7 +102,7 @@ export default function DashboardOverview({
 
       {/* 4 Summary Stat Cards Required by Prompt */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Presupuestos */}
+        {/* Card 1: Orçamentos */}
         <div
           onClick={() => onNavigateTab("quotes")}
           className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 p-5 rounded-3xl shadow-xl transition cursor-pointer group"
@@ -113,17 +113,17 @@ export default function DashboardOverview({
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Presupuestos</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total de Orçamentos</span>
           <div className="flex items-baseline justify-between mt-1">
             <h3 className="text-2xl font-black text-white">{quotes.length}</h3>
             <span className="text-xs font-mono font-bold text-amber-400">{totalQuotesValue.toFixed(2)} €</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Presupuestos creados y cotizados
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Orçamentos criados e cotados
           </p>
         </div>
 
-        {/* Card 2: Facturas Emitidas */}
+        {/* Card 2: Faturas Emitidas */}
         <div
           onClick={() => onNavigateTab("invoices")}
           className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 p-5 rounded-3xl shadow-xl transition cursor-pointer group"
@@ -134,13 +134,13 @@ export default function DashboardOverview({
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-600 group-hover:text-emerald-400 transition" />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Facturas Emitidas</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Faturas Emitidas</span>
           <div className="flex items-baseline justify-between mt-1">
             <h3 className="text-2xl font-black text-white">{invoices.length}</h3>
             <span className="text-xs font-mono font-bold text-emerald-400">{totalPaid.toFixed(2)} € cobrado</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Total Facturado: {totalInvoiced.toFixed(2)} €
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Total Faturado: {totalInvoiced.toFixed(2)} €
           </p>
         </div>
 
@@ -158,10 +158,10 @@ export default function DashboardOverview({
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Empresas Registradas</span>
           <div className="flex items-baseline justify-between mt-1">
             <h3 className="text-2xl font-black text-white">{companies.length}</h3>
-            <span className="text-xs text-indigo-400 font-bold">CRM Activo</span>
+            <span className="text-xs text-indigo-400 font-bold">CRM Ativo</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Clientes y empresas colaboradoras
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Clientes e empresas colaboradoras
           </p>
         </div>
 
@@ -176,13 +176,13 @@ export default function DashboardOverview({
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition" />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Dibujos Técnicos CAD</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Desenhos Técnicos CAD</span>
           <div className="flex items-baseline justify-between mt-1">
             <h3 className="text-2xl font-black text-white">{drawings.length}</h3>
-            <span className="text-xs text-amber-400 font-bold">5 Fases c/u</span>
+            <span className="text-xs text-amber-400 font-bold">5 Fases cada</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Cotas, despiece y vistas puzzle
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Cotas, despiece e vistas quebra-cabeça
           </p>
         </div>
       </div>
@@ -194,7 +194,7 @@ export default function DashboardOverview({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-black uppercase tracking-wider text-white">Últimos Presupuestos</h3>
+              <h3 className="text-sm font-black uppercase tracking-wider text-white">Últimos Orçamentos</h3>
             </div>
             <button
               onClick={() => onNavigateTab("quotes")}
@@ -233,7 +233,7 @@ export default function DashboardOverview({
               </div>
             ))}
             {quotes.length === 0 && (
-              <p className="text-xs text-slate-500 py-4 text-center">No hay presupuestos recientes.</p>
+              <p className="text-xs text-slate-500 py-4 text-center">Não há orçamentos recentes.</p>
             )}
           </div>
         </div>
@@ -243,13 +243,13 @@ export default function DashboardOverview({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Compass className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-black uppercase tracking-wider text-white">Dibujos Técnicos Recientes</h3>
+              <h3 className="text-sm font-black uppercase tracking-wider text-white">Desenhos Técnicos Recentes</h3>
             </div>
             <button
               onClick={() => onNavigateTab("technical_drawing")}
               className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
             >
-              Ver taller CAD <ChevronRight className="w-3.5 h-3.5" />
+              Ver oficina CAD <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -280,8 +280,8 @@ export default function DashboardOverview({
                 className="p-6 text-center bg-slate-950 rounded-2xl border border-dashed border-slate-800 cursor-pointer hover:border-amber-500/40 transition"
               >
                 <Compass className="w-8 h-8 text-amber-400 mx-auto mb-2" />
-                <p className="text-xs font-bold text-white">Genera tu primer plano técnico</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">Describe una mesa, ventana o mueble en lenguaje natural.</p>
+                <p className="text-xs font-bold text-white">Gere seu primeiro plano técnico</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Descreva uma mesa, janela ou móvel em linguagem natural.</p>
               </div>
             )}
           </div>
@@ -298,14 +298,14 @@ export default function DashboardOverview({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3 text-emerald-400" /> Almacenamiento PDF Persistente
+                  <CheckCircle className="w-3 h-3 text-emerald-400" /> Armazenamento PDF Persistente
                 </span>
                 <span className="text-[10px] font-mono text-slate-400">
                   Total: {quotes.length + invoices.length + drawings.length} documentos
                 </span>
               </div>
               <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight mt-0.5">
-                Bóveda de Documentos PDF Almacenados
+                Cofre de Documentos PDF Armazenados
               </h2>
             </div>
           </div>
@@ -326,9 +326,9 @@ export default function DashboardOverview({
               {(
                 [
                   { id: "all", label: "Todos" },
-                  { id: "quotes", label: `Presupuestos (${quotes.length})` },
-                  { id: "invoices", label: `Facturas (${invoices.length})` },
-                  { id: "drawings", label: `Planos (${drawings.length})` },
+                  { id: "quotes", label: `Orçamentos (${quotes.length})` },
+                  { id: "invoices", label: `Faturas (${invoices.length})` },
+                  { id: "drawings", label: `Plantas (${drawings.length})` },
                 ] as const
               ).map((tab) => (
                 <button
@@ -527,7 +527,7 @@ export default function DashboardOverview({
               {filteredVault.length === 0 && (
                 <div className="p-8 text-center bg-slate-950/60 rounded-2xl border border-slate-800">
                   <HardDrive className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                  <p className="text-xs text-slate-400">No se encontraron documentos almacenados en este filtro.</p>
+                  <p className="text-xs text-slate-400">Nenhum documento encontrado neste filtro.</p>
                 </div>
               )}
             </div>

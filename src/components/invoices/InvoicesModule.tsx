@@ -98,7 +98,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
       showToast(`Factura ${invoice.number} marcada como ${nextStatus === "pago" ? "PAGADA" : "PENDIENTE"} y PDF actualizado.`, "success");
     } catch (err) {
       console.error(err);
-      showToast("Error al actualizar estado.", "error");
+      showToast("Erro ao atualizar status.", "error");
     }
   };
 
@@ -108,7 +108,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
       showToast(`Factura ${inv.number} exportada a PDF.`, "success");
     } catch (err) {
       console.error(err);
-      showToast("Error al exportar factura a PDF.", "error");
+      showToast("Erro ao exportar fatura para PDF.", "error");
     }
   };
 
@@ -119,10 +119,10 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
       if (selectedInvoice?.id === id) {
         setSelectedInvoice(null);
       }
-      showToast("Factura eliminada.", "info");
+      showToast("Fatura excluída.", "info");
     } catch (err) {
       console.error(err);
-      showToast("No se pudo eliminar la factura.", "error");
+      showToast("Não foi possível excluir a fatura.", "error");
     }
   };
 
@@ -185,7 +185,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder="Buscar por nº o cliente..."
+                placeholder="Buscar por nº ou cliente..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-emerald-500/50"
@@ -203,7 +203,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                       : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
                   }`}
                 >
-                  {st === "all" ? "Todas" : st === "pago" ? "Cobradas" : "Pendientes"}
+                  {st === "all" ? "Todas" : st === "pago" ? "Cobradas" : "Pendentes"}
                 </button>
               ))}
             </div>
@@ -239,7 +239,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                           : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                       }`}
                     >
-                      {inv.status === "pago" ? "Pagada" : "Pendiente"}
+                      {inv.status === "pago" ? "Paga" : "Pendente"}
                     </span>
                   </div>
 
@@ -261,7 +261,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                           e.stopPropagation();
                           handleOpenInvoicePdf(inv);
                         }}
-                        title="Ver PDF almacenado en la plataforma"
+                        title="Ver PDF armazenado na plataforma"
                         className="p-1 hover:bg-slate-700 text-slate-400 hover:text-emerald-400 rounded-lg transition"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -312,7 +312,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                     }`}
                   >
                     <CheckCircle className="w-3.5 h-3.5" />
-                    {selectedInvoice.status === "pago" ? "Marcar Pendiente" : "Marcar como Pagada"}
+                    {selectedInvoice.status === "pago" ? "Marcar Pendente" : "Marcar como Paga"}
                   </button>
 
                   <button
@@ -343,7 +343,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                   <span className="text-[10px] font-black uppercase text-slate-500 block mb-1">Receptor (Cliente):</span>
                   <p className="font-bold text-white">{selectedInvoice.clientName}</p>
                   <p className="text-slate-400 font-mono">NIF/DNI: {selectedInvoice.clientTaxId}</p>
-                  <p className="text-slate-400">{selectedInvoice.clientAddress || "Domicilio fiscal del cliente"}</p>
+                  <p className="text-slate-400">{selectedInvoice.clientAddress || "Domicílio fiscal do cliente"}</p>
                 </div>
               </div>
 
