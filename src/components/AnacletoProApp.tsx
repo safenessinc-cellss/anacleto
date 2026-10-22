@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   ChevronRight, Calendar } from "lucide-react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../firebase";
 import { db } from "../firebase";
 import { Quote, Invoice, Company, TechnicalDrawing, SenderConfig } from "../types";
 import DashboardOverview from "./dashboard/DashboardOverview";
@@ -56,8 +58,18 @@ export default function AnacletoProApp({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
 
-  // 1. Listen for Quotes
+  // 0. Esperar a que el usuario esté autenticado antes de escuchar Firestore
+  const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setAuthReady(!!u);
+    });
+    return () => unsub();
+  }, []);
+
+  // 1. Listen for Quotes (solo cuando authReady === true)
+  useEffect(() => {
+    if (!authReady) return;
     const unsub = onSnapshot(
       query(collection(db, "quotes"), orderBy("createdAt", "desc")),
       (snap) => {
@@ -68,10 +80,11 @@ export default function AnacletoProApp({
       (err) => console.warn("Quotes listener:", err)
     );
     return () => unsub();
-  }, []);
+  }, [authReady]);
 
-  // 2. Listen for Invoices
+  // 2. Listen for Invoices (solo cuando authReady === true)
   useEffect(() => {
+    if (!authReady) return;
     const unsub = onSnapshot(
       query(collection(db, "invoices"), orderBy("createdAt", "desc")),
       (snap) => {
@@ -82,7 +95,7 @@ export default function AnacletoProApp({
       (err) => console.warn("Invoices listener:", err)
     );
     return () => unsub();
-  }, []);
+  }, [authReady]);
 
   // 3. Listen for Companies (CRM)
   useEffect(() => {
