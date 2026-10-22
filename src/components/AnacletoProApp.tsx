@@ -102,6 +102,7 @@ export default function AnacletoProApp({
 
   // 3. Listen for Companies (CRM)
   useEffect(() => {
+    if (!authReady) return;
     const unsub = onSnapshot(
       query(collection(db, "companies"), orderBy("createdAt", "desc")),
       (snap) => {
@@ -112,10 +113,11 @@ export default function AnacletoProApp({
       (err) => console.warn("Companies listener:", err)
     );
     return () => unsub();
-  }, []);
+  }, [authReady]);
 
-  // 4. Listen for Technical Drawings
+  // 4. Listen for Technical Drawings (solo cuando authReady)
   useEffect(() => {
+    if (!authReady) return;
     const unsub = onSnapshot(
       query(collection(db, "technical_drawings"), orderBy("createdAt", "desc")),
       (snap) => {
@@ -126,7 +128,7 @@ export default function AnacletoProApp({
       (err) => console.warn("Drawings listener:", err)
     );
     return () => unsub();
-  }, []);
+  }, [authReady]);
 
   // Navigation Items Required in Prompt
   const navItems = [
