@@ -1,4 +1,5 @@
 import express from "express";
+import http from "http";
 import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
@@ -8,8 +9,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
-// Create Express app
+// Create Express app and HTTP server
 const app = express();
+const httpServer = http.createServer(app);
 app.use(express.json({ limit: "10mb" }));
 
 const PORT = 3000;
@@ -69,7 +71,7 @@ app.post("/api/chat", async (req, res) => {
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
@@ -131,7 +133,7 @@ app.post("/api/ai/quote-agent", async (req, res) => {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: message,
       config: {
         systemInstruction: systemPrompt,
@@ -281,7 +283,7 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Diseña y despieza la siguiente pieza arquitectónica o mueble: "${prompt}"`,
       config: {
         systemInstruction: systemPrompt,
@@ -411,7 +413,10 @@ const startServer = async () => {
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting server in DEVELOPMENT mode with Vite middleware...");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: process.env.DISABLE_HMR === "true" ? false : { server: httpServer },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -424,7 +429,11 @@ const startServer = async () => {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  httpServer.on("error", (err: any) => {
+    console.error("HTTP server error:", err);
+  });
+
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Anacleto Pro platform running on port ${PORT}`);
   });
 };
