@@ -137,6 +137,10 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setAuthLoading(false);
+      // Si no hay usuario y estamos en la vista "pro", forzar landing/login
+      if (!firebaseUser && currentView === "pro") {
+        setCurrentView("landing");
+      }
     });
 
     const unsubConfig = onSnapshot(doc(db, "sender_config", "default"), (docSnap) => {
@@ -176,6 +180,8 @@ export default function App() {
     try {
       await signOut(auth);
       setIsAdminPortal(false);
+      setCurrentView("landing");   // ← fuerza la vista de login/landing
+      setUser(null);               // ← limpia el usuario inmediatamente
     } catch (err) {
       console.error(err);
     }
