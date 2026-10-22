@@ -12,15 +12,28 @@ interface Visit {
   notes?: string;
 }
 
+interface Slot {
+  id: string;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  type: "internal" | "blocked" | "visit";
+  notes?: string;
+}
+
 interface Props {
   visits: Visit[];
+  slots: Slot[];
   onSelectVisit?: (visit: Visit) => void;
+  onSelectSlot?: (slot: Slot) => void;
+  onCreateSlot?: (date: string) => void;
 }
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const WEEKDAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
-export default function AgendaCalendar({ visits, onSelectVisit }: Props) {
+export default function AgendaCalendar({ visits, slots, onSelectVisit, onSelectSlot, onCreateSlot }: Props) {
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -35,6 +48,17 @@ export default function AgendaCalendar({ visits, onSelectVisit }: Props) {
     });
     return map;
   }, [visits]);
+
+  // Agrupar slots por fecha
+  const slotsByDate = useMemo(() => {
+    const map: Record<string, Slot[]> = {};
+    slots.forEach((s) => {
+      if (!s.date) return;
+      if (!map[s.date]) map[s.date] = [];
+      map[s.date].push(s);
+    });
+    return map;
+  }, [slots]);
 
   // Construir la cuadrícula del mes
   const calendarDays = useMemo(() => {
@@ -107,6 +131,7 @@ export default function AgendaCalendar({ visits, onSelectVisit }: Props) {
           if (!date) return <div key={key} className="min-h-[80px] rounded-lg bg-slate-50/50 dark:bg-slate-800/30" />;
           const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
           const dayVisits = visitsByDate[dateKey] || [];
+          const daySlots = slotsByDate[dateKey] || [];
           const isToday =
             date.getDate() === today.getDate() &&
             date.getMonth() === today.getMonth() &&
@@ -125,7 +150,21 @@ export default function AgendaCalendar({ visits, onSelectVisit }: Props) {
                 {date.getDate()}
               </div>
               <div className="space-y-0.5">
-                {dayVisits.slice(0, 3).map((v) => (
+                {daySlots.slice(0, 2).map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => onSelectSlot?.(s)}
+                    className={`w-full text-left text-[10px] font-bold px-1.5 py-0.5 rounded border truncate ${
+                      s.type === "blocked" ? "bg-slate-200 text-slate-700 border-slate-300" :
+                      s.type === "visit" ? "bg-indigo-100 text-indigo-800 border-indigo-300" :
+                      "bg-purple-100 text-purple-800 border-purple-300"
+                    }`}
+                    title={`${s.startTime}–${s.endTime} — ${s.title}`}
+                  >
+                    {s.startTime} {s.title}
+                  </button>
+                ))}
+                {dayVisits.slice(0, 2).map((v) => (
                   <button
                     key={v.id}
                     onClick={() => onSelectVisit?.(v)}
@@ -135,8 +174,16 @@ export default function AgendaCalendar({ visits, onSelectVisit }: Props) {
                     {v.preferTime} {v.name.split(" ")[0]}
                   </button>
                 ))}
-                {dayVisits.length > 3 && (
-                  <div className="text-[10px] font-bold text-slate-400 pl-1">+{dayVisits.length - 3} mais</div>
+                {(dayVisits.length + daySlots.length) > 4 && (
+                  <div className="text-[10px] font-bold text-slate-400 pl-1">+{dayVisits.length + daySlots.length - 4} mais</div>
+                )}
+                {onCreateSlot && (
+                  <button
+                    onClick={() => onCreateSlot(dateKey)}
+                    className="w-full text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 rounded px-1 py-0.5 text-left"
+                  >
+                    + Bloco
+                  </button>
                 )}
               </div>
             </div>
@@ -150,6 +197,9 @@ export default function AgendaCalendar({ visits, onSelectVisit }: Props) {
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-300 border border-emerald-400" /> Confirmada</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-rose-300 border border-rose-400" /> Cancelada</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-300 border border-slate-400" /> Concluída</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-purple-300 border border-purple-400" /> Cita interna</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-300" /> Hora bloqueada</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-indigo-300 border border-indigo-400" /> Visita técnica</span>
       </div>
     </div>
   );

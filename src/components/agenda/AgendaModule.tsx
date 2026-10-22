@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import AgendaCalendar from "./AgendaCalendar";
+import AgendaSlotModal from "./AgendaSlotModal";
 import { Calendar, Clock, MapPin, Phone, Mail, CheckCircle, XCircle, Trash2, RefreshCw } from "lucide-react";
 
 interface Visit {
@@ -21,7 +22,11 @@ interface Visit {
 
 export default function AgendaModule() {
   const [visits, setVisits] = useState<Visit[]>([]);
+  const [slots, setSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [slotModalOpen, setSlotModalOpen] = useState(false);
+  const [editingSlot, setEditingSlot] = useState<any>(null);
+  const [defaultSlotDate, setDefaultSlotDate] = useState<string | undefined>(undefined);
   const [filter, setFilter] = useState<"all" | "pending" | "confirmed" | "completed">("all");
 
   useEffect(() => {
@@ -35,7 +40,13 @@ export default function AgendaModule() {
       console.error("Visits listener error:", err);
       setLoading(false);
     });
-    return () => unsub();
+    const unsubSlots = onSnapshot(query(collection(db, "agenda_slots"), orderBy("date", "asc")), (snap) => {
+      const list: any[] = [];
+      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+      setSlots(list);
+    }, (err) => console.warn("Slots listener:", err));
+
+    return () => { unsub(); unsubSlots(); };
   }, []);
 
   const updateStatus = async (id: string, status: Visit["status"]) => {
@@ -87,7 +98,20 @@ export default function AgendaModule() {
         </div>
       </div>
 
-      <AgendaCalendar visits={visits} onSelectVisit={(v) => alert(`Visita: ${v.name}\nTeléfono: ${v.phone}\nServicio: ${v.service}\nFecha: ${v.preferDate} ${v.preferTime}`)} />
+      <AgendaCalendar
+        visits={visits}
+        slots={slots}
+        onSelectVisit={(v) => alert(`Visita: ${v.name}\nTeléfono: ${v.phone}\nServicio: ${v.service}\nFecha: ${v.preferDate} ${v.preferTime}`)}
+        onSelectSlot={(s) => { setEditingSlot(s); setSlotModalOpen(true); }}
+        onCreateSlot={(date) => { setEditingSlot(null); setDefaultSlotDate(date); setSlotModalOpen(true); }}
+      />
+
+      <AgendaSlotModal
+        open={slotModalOpen}
+        initial={editingSlot}
+        defaultDate={defaultSlotDate}
+        onClose={() => { setSlotModalOpen(false); setEditingSlot(null); setDefaultSlotDate(undefined); }}
+      />
 
       {loading ? (
         <div className="p-8 text-center text-slate-500">Carregando agenda...</div>

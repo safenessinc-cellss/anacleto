@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { translations, LanguageCode } from "./translations";
 import { languageMeta } from "./utils";
@@ -98,6 +98,8 @@ export default function App() {
   const [schAddress, setSchAddress] = useState("");
   const [schDate, setSchDate] = useState("");
   const [schTime, setSchTime] = useState("09:00");
+  const [availableHours, setAvailableHours] = useState<string[]>(["09:00","10:00","11:00","14:00","15:00","16:00"]);
+  const [checkingHours, setCheckingHours] = useState(false);
   const [schNotes, setSchNotes] = useState("");
   const [schIsSubmitting, setSchIsSubmitting] = useState(false);
   const [schSubmittedSuccess, setSchSubmittedSuccess] = useState(false);
@@ -255,10 +257,47 @@ export default function App() {
     setVisCustomLines(visCustomLines.filter((l) => l.id !== id));
   };
 
+  // Consulta horas ocupadas para una fecha (visits + agenda_slots)
+  const refreshAvailableHours = async (date: string) => {
+    if (!date) return;
+    setCheckingHours(true);
+    try {
+      const baseHours = ["09:00","10:00","11:00","14:00","15:00","16:00"];
+      const occupied = new Set<string>();
+
+      // Visitas ya solicitadas ese día
+      const visitsQ = query(collection(db, "visits"), where("preferDate", "==", date));
+      const visitsSnap = await getDocs(visitsQ);
+      visitsSnap.forEach((d) => {
+        const v: any = d.data();
+        if (v.status !== "cancelled") occupied.add(v.preferTime);
+      });
+
+      // Slots internos / bloqueados
+      const slotsQ = query(collection(db, "agenda_slots"), where("date", "==", date));
+      const slotsSnap = await getDocs(slotsQ);
+      slotsSnap.forEach((d) => {
+        const s: any = d.data();
+        baseHours.forEach((h) => {
+          if (h >= s.startTime && h < s.endTime) occupied.add(h);
+        });
+      });
+
+      const free = baseHours.filter((h) => !occupied.has(h));
+      setAvailableHours(free);
+      if (free.length > 0 && !free.includes(schTime)) setSchTime(free[0]);
+      if (free.length === 0) setSchTime("");
+    } catch (err) {
+      console.warn("No se pudo consultar disponibilidad:", err);
+    } finally {
+      setCheckingHours(false);
+    }
+  };
+
   const handleVisitorScheduleVisit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!schName.trim() || !schPhone.trim() || !schDate || !schTime) {
-      showToast("Por favor, preencha todos os campos obrigatórios.", "warning");
+      showToast("Por favor, selecione uma data e hora disponíveis.", "warning");
       return;
     }
     setSchIsSubmitting(true);
@@ -550,10 +589,11 @@ export default function App() {
                 <input type="email" value={schEmail} onChange={(e) => setSchEmail(e.target.value)} placeholder="Email" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
                 <input type="text" required value={schPhone} onChange={(e) => setSchPhone(e.target.value)} placeholder="Telefone/WhatsApp *" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
                 <input type="text" required value={schAddress} onChange={(e) => setSchAddress(e.target.value)} placeholder="Endereço completo *" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
-                <input type="date" required value={schDate} onChange={(e) => setSchDate(e.target.value)} className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
-                <select value={schTime} onChange={(e) => setSchTime(e.target.value)} className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold">
-                  <option value="09:00">09:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option>
-                  <option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option>
+                <input type="date" required value={schDate} onChange={(e) => { setSchDate(e.target.value); refreshAvailableHours(e.target.value); }} className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <select value={schTime} onChange={(e) => setSchTime(e.target.value)} disabled={checkingHours || availableHours.length === 0} className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold disabled:opacity-50">
+                  {checkingHours && <option>Verificando...</option>}
+                  {!checkingHours && availableHours.length === 0 && <option value="">Sin horarios disponibles</option>}
+                  {!checkingHours && availableHours.map((h) => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
               <textarea value={schNotes} onChange={(e) => setSchNotes(e.target.value)} rows={3} placeholder="Observações..." className="w-full px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold"></textarea>
