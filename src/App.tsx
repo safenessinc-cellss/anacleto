@@ -27,6 +27,7 @@ import WhatsAppButton from "./components/WhatsAppButton";
 import { useToast } from "./components/ToastContext";
 import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
 import AnacletoProApp from "./components/AnacletoProApp";
+import PendingApproval from "./components/PendingApproval";
 
 // Premium Brand Assets
 import logoImg from "./assets/images/anacleto_logo_1780594599493.png";
@@ -55,6 +56,7 @@ export default function App() {
   const { showToast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [adminStatus, setAdminStatus] = useState<"loading" | "authorized" | "unauthorized" | "no-user">("loading");
   const [animationLoading, setAnimationLoading] = useState(true);
   const [currentView, setCurrentView] = useState<"pro" | "landing">("pro");
   const [isAdminPortal, setIsAdminPortal] = useState(false);
@@ -134,12 +136,31 @@ export default function App() {
       setAnimationLoading(false);
     }, 8000);
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       setAuthLoading(false);
-      // Si no hay usuario y estamos en la vista "pro", forzar landing/login
-      if (!firebaseUser && currentView === "pro") {
+      if (!firebaseUser) {
+        setAdminStatus("no-user");
         setCurrentView("landing");
+        return;
+      }
+      // Super admin bootstrap: siempre autorizado
+      if (firebaseUser.email === "safeness.c.a@gmail.com") {
+        setAdminStatus("authorized");
+        return;
+      }
+      // Verificar si el email está en la colección admins
+      try {
+        const q = query(collection(db, "admins"), where("email", "==", firebaseUser.email));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          setAdminStatus("authorized");
+        } else {
+          setAdminStatus("unauthorized");
+        }
+      } catch (err) {
+        console.warn("Admin check error:", err);
+        setAdminStatus("unauthorized");
       }
     });
 
@@ -385,6 +406,20 @@ export default function App() {
 
   // Anacleto Pro Enterprise Full-Stack Suite (Default View)
   if (currentView === "pro") {
+    // Sin usuario → forzar login
+    if (adminStatus === "no-user") {
+      setCurrentView("landing");
+      return null;
+    }
+    // Esperando verificación
+    if (adminStatus === "loading") {
+      return <AnimatedWindowLoader onFinish={() => {}} currentLanguage={language} />;
+    }
+    // No autorizado → pantalla de espera
+    if (adminStatus === "unauthorized") {
+      return <PendingApproval userEmail={user?.email} />;
+    }
+    // Autorizado → dashboard
     return (
       <AnacletoProApp
         senderConfig={senderConfig}
