@@ -36,6 +36,21 @@ import bathImg from "./assets/images/bathroom_box_glass_1780594338585.png";
 import pergolaImg from "./assets/images/pergola_glass_1780594351717.png";
 
 
+
+// Detecta el idioma inicial: localStorage > navegador > portugués (fallback)
+const detectInitialLanguage = (): LanguageCode => {
+  const savedLang = localStorage.getItem("anacleto_language") as LanguageCode;
+  if (savedLang && translations[savedLang]) return savedLang;
+
+  const browserLang = (navigator.language || "pt").toLowerCase();
+  if (browserLang.startsWith("pt")) return "pt";
+  if (browserLang.startsWith("es")) return "es";
+  if (browserLang.startsWith("en")) return "en";
+  if (browserLang.startsWith("fr")) return "fr";
+  if (browserLang.startsWith("ar")) return "ar";
+  return "pt";
+};
+
 export default function App() {
   const { showToast } = useToast();
   const [user, setUser] = useState<any>(null);
@@ -43,7 +58,7 @@ export default function App() {
   const [animationLoading, setAnimationLoading] = useState(true);
   const [currentView, setCurrentView] = useState<"pro" | "landing">("pro");
   const [isAdminPortal, setIsAdminPortal] = useState(false);
-  const [language, setLanguage] = useState<LanguageCode>("es");
+  const [language, setLanguage] = useState<LanguageCode>(detectInitialLanguage);
   const [darkMode, setDarkMode] = useState(true);
 
   const [senderConfig, setSenderConfig] = useState<any>({
