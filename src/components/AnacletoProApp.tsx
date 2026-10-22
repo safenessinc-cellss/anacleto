@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
+import { Package,
   LayoutDashboard,
   Building,
   FileText,
@@ -28,9 +28,10 @@ import InvoicesModule from "./invoices/InvoicesModule";
 import TechnicalDrawingModule from "./technical-drawing/TechnicalDrawingModule";
 import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
+import CatalogModule from "./catalog/CatalogModule";
 import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "settings";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "settings";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -138,6 +139,7 @@ export default function AnacletoProApp({
     { id: "invoices" as NavigationTab, label: "Faturas", icon: FileCheck, badge: invoices.length },
     { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico", icon: Compass, badge: "AI CAD" },
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
+    { id: "catalog" as NavigationTab, label: "Catálogo", icon: Package, badge: null },
     { id: "settings" as NavigationTab, label: "Configuração", icon: Settings, badge: null },
   ];
 
@@ -326,7 +328,9 @@ export default function AnacletoProApp({
             <TechnicalDrawingModule language={language} senderConfig={senderConfig} />
           )}
 
-          {activeTab === "settings" && (
+          {activeTab === "catalog" && (<CatalogModule />)}
+
+        {activeTab === "settings" && (
             <SettingsModule language={language} senderConfig={senderConfig} setSenderConfig={setSenderConfig} />
           )}
         </div>
