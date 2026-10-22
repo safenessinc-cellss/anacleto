@@ -36,9 +36,9 @@ interface TechnicalDrawingModuleProps {
 // Initial sample project for instantaneous feedback
 const initialSampleDrawing: TechnicalDrawing = {
   id: "draw-sample-01",
-  title: "Mesa de Madera Maciza 120×80×75 cm",
-  description: "Estructura arquitectónica en madera de roble con ensambles tipo caja y espiga y faldones perimetrales.",
-  category: "furniture",
+  title: "Mesa de Madeira Maciça 120×80×75 cm",
+  description: "Estrutura arquitetônica em madeira de carvalho com encaixes tipo caixa e espiga e saias perimetrais.",
+  category: "móvel",
   unit: "cm",
   overallDimensions: { width: 120, height: 75, depth: 80 },
   pieces: [
@@ -48,7 +48,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       name: "Pieza 1 - Tablero superior",
       quantity: 1,
       dimensions: { width: 120, height: 4, depth: 80, unit: "cm" },
-      material: "Madera maciza de roble 40mm",
+      material: "Madeira maciça de carvalho 40mm",
       color: "#C5A850",
       cutAngle: "90° recto",
       notes: "Cantos biselados a 2mm",
@@ -59,7 +59,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       name: "Pieza 2 - Pata delantera izq.",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
-      material: "Madera maciza torneada",
+      material: "Madeira maciça torneada",
       color: "#8C6D37",
       cutAngle: "90° recto",
     },
@@ -69,7 +69,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       name: "Pieza 3 - Pata delantera der.",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
-      material: "Madera maciza torneada",
+      material: "Madeira maciça torneada",
       color: "#8C6D37",
       cutAngle: "90° recto",
     },
@@ -79,7 +79,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       name: "Pieza 4 - Pata trasera izq.",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
-      material: "Madera maciza torneada",
+      material: "Madeira maciça torneada",
       color: "#735728",
       cutAngle: "90° recto",
     },
@@ -89,7 +89,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       name: "Pieza 5 - Pata trasera der.",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
-      material: "Madera maciza torneada",
+      material: "Madeira maciça torneada",
       color: "#735728",
       cutAngle: "90° recto",
     },
@@ -99,7 +99,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       name: "Pieza 6 - Faldones de unión longitudinal",
       quantity: 2,
       dimensions: { width: 104, height: 10, depth: 3, unit: "cm" },
-      material: "Madera maciza de roble",
+      material: "Madeira maciça de carvalho",
       color: "#A88440",
       cutAngle: "90° recto",
     },
@@ -116,10 +116,10 @@ const initialSampleDrawing: TechnicalDrawing = {
   steps: [
     {
       stepNumber: 1,
-      phaseName: "Paso 1: Definición de dimensiones generales",
-      title: "Volumen Exterior y Límites Perimetrales",
-      description: "Delimitación del espacio de trabajo con ancho de 120 cm, alto de 75 cm y profundidad de 80 cm.",
-      instructions: ["Comprobar espacio físico disponible.", "Verificar escuadras y tolerancias perimetrales."],
+      phaseName: "Passo 1: Definição de dimensões gerais",
+      title: "Volume Exterior e Limites Perimetrais",
+      description: "Delimitação do espaço de trabalho com largura de 120 cm, altura de 75 cm e profundidade de 80 cm.",
+      instructions: ["Verificar espaço físico disponível.", "Verificar esquadros e tolerâncias perimetrais."],
     },
     {
       stepNumber: 2,
@@ -409,7 +409,7 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Ej: una mesa de madera de 120x80x75 cm con 4 patas..."
+                placeholder="Ex: uma mesa de madeira de 120x80x75 cm com 4 pernas..."
                 rows={3}
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-800 focus:border-amber-500/60 rounded-2xl text-xs text-white placeholder-slate-500 outline-none resize-none transition pr-12"
               />
