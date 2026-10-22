@@ -25,6 +25,8 @@ import { TechnicalDrawing, SenderConfig } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { collection, doc, setDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../../firebase";
 import { db } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -157,6 +159,13 @@ const initialSampleDrawing: TechnicalDrawing = {
 };
 
 export default function TechnicalDrawingModule({ senderConfig, language = "pt"}: TechnicalDrawingModuleProps) {
+  // Esperar autenticación antes de escuchar Firestore
+  const [authReady, setAuthReady] = useState(false);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setAuthReady(!!u));
+    return () => unsub();
+  }, []);
+
   const { showToast } = useToast();
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -182,7 +191,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       }
     );
     return () => unsub();
-  }, []);
+  }, [authReady]);
 
   const handleOpenDrawingPdf = async (targetDrawing?: TechnicalDrawing) => {
     let target = targetDrawing || drawing;
