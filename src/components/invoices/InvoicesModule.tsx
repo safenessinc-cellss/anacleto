@@ -81,7 +81,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
   };
 
   const handleToggleStatus = async (invoice: Invoice) => {
-    const nextStatus: InvoiceStatus = invoice.status === "paid" ? "pending" : "paid";
+    const nextStatus: InvoiceStatus = invoice.status === "pago" ? "pendente" : "pago";
     try {
       const baseUpdated: Invoice = { ...invoice, status: nextStatus, updatedAt: new Date().toISOString() };
       const pdfRes = buildInvoicePdf(baseUpdated, senderConfig);
@@ -95,7 +95,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
 
       await setDoc(doc(db, "invoices", invoice.id), updated);
       setSelectedInvoice(updated);
-      showToast(`Factura ${invoice.number} marcada como ${nextStatus === "paid" ? "PAGADA" : "PENDIENTE"} y PDF actualizado.`, "success");
+      showToast(`Factura ${invoice.number} marcada como ${nextStatus === "pago" ? "PAGADA" : "PENDIENTE"} y PDF actualizado.`, "success");
     } catch (err) {
       console.error(err);
       showToast("Error al actualizar estado.", "error");
@@ -135,8 +135,8 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
   });
 
   const totalInvoiced = invoices.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalPaid = invoices.filter((i) => i.status === "paid").reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalPending = invoices.filter((i) => i.status === "pending").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalPaid = invoices.filter((i) => i.status === "pago").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalPending = invoices.filter((i) => i.status === "pendente").reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -193,7 +193,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
             </div>
 
             <div className="flex gap-1.5">
-              {["all", "paid", "pending"].map((st) => (
+              {["all", "pago", "pendente"].map((st) => (
                 <button
                   key={st}
                   onClick={() => setFilterStatus(st)}
@@ -203,7 +203,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                       : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
                   }`}
                 >
-                  {st === "all" ? "Todas" : st === "paid" ? "Cobradas" : "Pendientes"}
+                  {st === "all" ? "Todas" : st === "pago" ? "Cobradas" : "Pendientes"}
                 </button>
               ))}
             </div>
@@ -234,12 +234,12 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                     </div>
                     <span
                       className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                        inv.status === "paid"
+                        inv.status === "pago"
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                           : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                       }`}
                     >
-                      {inv.status === "paid" ? "Pagada" : "Pendiente"}
+                      {inv.status === "pago" ? "Pagada" : "Pendiente"}
                     </span>
                   </div>
 
@@ -306,13 +306,13 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                   <button
                     onClick={() => handleToggleStatus(selectedInvoice)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${
-                      selectedInvoice.status === "paid"
+                      selectedInvoice.status === "pago"
                         ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
                         : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-md shadow-emerald-600/20"
                     }`}
                   >
                     <CheckCircle className="w-3.5 h-3.5" />
-                    {selectedInvoice.status === "paid" ? "Marcar Pendiente" : "Marcar como Pagada"}
+                    {selectedInvoice.status === "pago" ? "Marcar Pendiente" : "Marcar como Pagada"}
                   </button>
 
                   <button
@@ -407,7 +407,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
               <FileCheck className="w-12 h-12 text-slate-600 mx-auto mb-3" />
               <h3 className="text-sm font-bold text-white">Selecciona una factura</h3>
               <p className="text-xs text-slate-400 mt-1">
-                Puedes generar facturas directamente desde la sección "Presupuestos".
+                Puedes generar facturas directamente desde la sección "Orçamentos".
               </p>
             </div>
           )}

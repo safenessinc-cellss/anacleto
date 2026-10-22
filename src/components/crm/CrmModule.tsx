@@ -349,7 +349,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote }: CrmMod
                   disabled={isSubmitting}
                   className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition shadow-md"
                 >
-                  {isSubmitting ? "Guardando..." : "Guardar Empresa"}
+                  {isSubmitting ? "Salvando..." : "Guardar Empresa"}
                 </button>
               </div>
             </form>

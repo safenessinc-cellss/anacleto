@@ -59,7 +59,7 @@ export default function DashboardOverview({
     type: "generic",
   });
   const totalInvoiced = invoices.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalPaid = invoices.filter((i) => i.status === "paid").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalPaid = invoices.filter((i) => i.status === "pago").reduce((acc, curr) => acc + (curr.total || 0), 0);
   const totalQuotesValue = quotes.reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   return (
@@ -353,7 +353,7 @@ export default function DashboardOverview({
             ...quotes.map((q) => ({
               id: q.id,
               type: "quote" as const,
-              typeLabel: "Presupuesto",
+              typeLabel: "Orçamento",
               badgeColor: "text-amber-400 bg-amber-500/10 border-amber-500/20",
               title: `Presupuesto ${q.number}`,
               clientOrDetail: q.clientName,
@@ -369,7 +369,7 @@ export default function DashboardOverview({
             ...invoices.map((inv) => ({
               id: inv.id,
               type: "invoice" as const,
-              typeLabel: "Factura",
+              typeLabel: "Fatura",
               badgeColor: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
               title: `Factura ${inv.number}`,
               clientOrDetail: inv.clientName,

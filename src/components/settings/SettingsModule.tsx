@@ -187,7 +187,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig }: Settin
             className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase rounded-xl transition shadow-lg shadow-amber-500/20"
           >
             <Save className="w-4 h-4" />
-            {isSaving ? "Guardando..." : "Guardar Configuración"}
+            {isSaving ? "Salvando..." : "Salvar Configuração"}
           </button>
         </div>
       </form>

@@ -8,7 +8,7 @@ interface Visit {
   address: string;
   preferDate: string; // YYYY-MM-DD
   preferTime: string; // HH:mm
-  status: "pending" | "confirmed" | "cancelled" | "completed";
+  status: "pendente" | "confirmed" | "cancelado" | "concluído";
   notes?: string;
 }
 

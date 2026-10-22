@@ -15,7 +15,7 @@ interface Visit {
   preferDate: string;
   preferTime: string;
   notes?: string;
-  status: "pending" | "confirmed" | "cancelled" | "completed";
+  status: "pendente" | "confirmed" | "cancelado" | "concluído";
   createdAt: string;
   calendarEventId?: string;
 }
@@ -27,7 +27,7 @@ export default function AgendaModule() {
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<any>(null);
   const [defaultSlotDate, setDefaultSlotDate] = useState<string | undefined>(undefined);
-  const [filter, setFilter] = useState<"all" | "pending" | "confirmed" | "completed">("all");
+  const [filter, setFilter] = useState<"all" | "pendente" | "confirmed" | "concluído">("all");
 
   useEffect(() => {
     const q = query(collection(db, "visits"), orderBy("createdAt", "desc"));
@@ -91,9 +91,9 @@ export default function AgendaModule() {
             className="px-3 py-2 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
           >
             <option value="all">Todas ({visits.length})</option>
-            <option value="pending">Pendentes</option>
+            <option value="pendente">Pendentes</option>
             <option value="confirmed">Confirmadas</option>
-            <option value="completed">Concluídas</option>
+            <option value="concluído">Concluídas</option>
           </select>
         </div>
       </div>
@@ -151,13 +151,13 @@ export default function AgendaModule() {
                       <CheckCircle className="w-3.5 h-3.5" /> Confirmar
                     </button>
                   )}
-                  {visit.status !== "completed" && (
-                    <button onClick={() => updateStatus(visit.id, "completed")} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200">
+                  {visit.status !== "concluído" && (
+                    <button onClick={() => updateStatus(visit.id, "concluído")} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200">
                       <RefreshCw className="w-3.5 h-3.5" /> Concluir
                     </button>
                   )}
-                  {visit.status !== "cancelled" && (
-                    <button onClick={() => updateStatus(visit.id, "cancelled")} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100">
+                  {visit.status !== "cancelado" && (
+                    <button onClick={() => updateStatus(visit.id, "cancelado")} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100">
                       <XCircle className="w-3.5 h-3.5" /> Cancelar
                     </button>
                   )}

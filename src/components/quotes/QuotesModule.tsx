@@ -112,7 +112,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       discountAmount: 0,
       total: 919.6,
       currency: senderConfig.currency || "EUR",
-      status: "pending",
+      status: "pendente",
       notes: "Plazo de entrega estimado: 15 días laborables. Garantía de 5 años en carpintería.",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -220,7 +220,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         discountAmount: quote.discountAmount,
         total: quote.total,
         currency: quote.currency,
-        status: "pending",
+        status: "pendente",
         paymentMethod: "Transferencia Bancaria",
         notes: `Factura generada a partir del Presupuesto ${quote.number}.`,
         createdAt: new Date().toISOString(),
@@ -478,7 +478,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
             </div>
 
             <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {["all", "pending", "approved", "rejected"].map((st) => (
+              {["all", "pendente", "approved", "rejeitado"].map((st) => (
                 <button
                   key={st}
                   onClick={() => setFilterStatus(st)}
@@ -488,7 +488,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                       : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
                   }`}
                 >
-                  {st === "all" ? "Todos" : st === "pending" ? "Pendientes" : st === "approved" ? "Aprobados" : "Rechazados"}
+                  {st === "all" ? "Todos" : st === "pendente" ? "Pendientes" : st === "approved" ? "Aprobados" : "Rechazados"}
                 </button>
               ))}
             </div>
@@ -520,7 +520,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                       className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
                         q.status === "approved"
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                          : q.status === "rejected"
+                          : q.status === "rejeitado"
                           ? "bg-rose-500/20 text-rose-400"
                           : "bg-amber-500/20 text-amber-400"
                       }`}
