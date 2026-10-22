@@ -281,6 +281,32 @@ export default function App() {
 
       await setDoc(doc(db, "visits", visitId), visitDoc);
 
+      // Llamar al backend para crear el evento en Google Calendar
+      try {
+        const calRes = await fetch("/api/create-calendar-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(visitDoc),
+        });
+        if (!calRes.ok) {
+          console.warn("Calendar event not created:", await calRes.text());
+        } else {
+          const calData = await calRes.json();
+          if (calData.eventId) {
+            // Guardar el ID del evento en Firestore (opcional)
+            try {
+              const { updateDoc } = await import("firebase/firestore");
+              await updateDoc(doc(db, "visits", visitId), {
+                calendarEventId: calData.eventId,
+                calendarHtmlLink: calData.htmlLink || null,
+              });
+            } catch (e) { console.warn("No se pudo actualizar visit con calendarEventId:", e); }
+          }
+        }
+      } catch (calErr) {
+        console.warn("Error calling /api/create-calendar-event:", calErr);
+      }
+
       setSchSubmittedSuccess(true);
       showToast("Agendamento de visita solicitado com sucesso!", "success");
       setSchName("");

@@ -4,6 +4,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import { google } from "googleapis";
 
 // Load .env.local first if available, then fallback to .env
 dotenv.config({ path: ".env.local" });
@@ -440,4 +441,59 @@ const startServer = async () => {
 
 startServer().catch((err) => {
   console.error("Express startup failed:", err);
+});
+
+
+// ============ Google Calendar Endpoint ============
+app.post("/api/create-calendar-event", async (req, res) => {
+  try {
+    const { name, email, phone, service, address, preferDate, preferTime, notes } = req.body;
+    if (!name || !preferDate || !preferTime) {
+      return res.status(400).json({ success: false, error: "Faltan datos obligatorios" });
+    }
+
+    // Autenticación con cuenta de servicio (JSON en variable de entorno)
+    const credentialsJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+    if (!credentialsJson) {
+      console.warn("GOOGLE_SERVICE_ACCOUNT_JSON no configurado; se omite Calendar.");
+      return res.status(200).json({ success: false, skipped: true, reason: "No credentials" });
+    }
+
+    const auth = new google.auth.GoogleAuth({
+      credentials: JSON.parse(credentialsJson),
+      scopes: ["https://www.googleapis.com/auth/calendar"],
+    });
+    const calendar = google.calendar({ version: "v3", auth });
+
+    const startDateTime = `${preferDate}T${preferTime}:00`;
+    const endHour = String(parseInt(preferTime.split(":")[0], 10) + 1).padStart(2, "0");
+    const endDateTime = `${preferDate}T${endHour}:${preferTime.split(":")[1]}:00`;
+
+    const event = {
+      summary: `Visita Técnica — ${name}`,
+      description: [
+        `Cliente: ${name}`,
+        `Telefone: ${phone || "-"}`,
+        email ? `Email: ${email}` : null,
+        `Serviço: ${service || "-"}`,
+        `Endereço: ${address || "-"}`,
+        notes ? `Notas: ${notes}` : null,
+      ].filter(Boolean).join("\n"),
+      location: address || "",
+      start: { dateTime: startDateTime, timeZone: "America/Sao_Paulo" },
+      end: { dateTime: endDateTime, timeZone: "America/Sao_Paulo" },
+    };
+
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
+    const response = await calendar.events.insert({
+      calendarId,
+      requestBody: event,
+    });
+
+    console.log(`✅ Evento creado en Calendar: ${response.data.id}`);
+    return res.json({ success: true, eventId: response.data.id, htmlLink: response.data.htmlLink });
+  } catch (err: any) {
+    console.error("❌ Error creando evento en Calendar:", err?.message || err);
+    return res.status(500).json({ success: false, error: err?.message || "Error desconocido" });
+  }
 });
