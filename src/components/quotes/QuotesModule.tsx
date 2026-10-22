@@ -33,9 +33,10 @@ interface QuotesModuleProps {
   senderConfig: SenderConfig;
   companies: Company[];
   onConvertToInvoice?: (quote: Quote) => void;
+  language?: string;
 }
 
-export default function QuotesModule({ senderConfig, companies, onConvertToInvoice }: QuotesModuleProps) {
+export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt"}: QuotesModuleProps) {
   const { showToast } = useToast();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -51,7 +52,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [aiChatHistory, setAiChatHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([
     {
       role: "assistant",
-      text: "¡Hola! Soy tu Agente Técnico de Presupuestos de Anacleto Pro. Puedes pedirme cosas como: 'Añade 3 ventanas de aluminio de 120x100', 'cambia el IVA al 21%', 'añade un descuento del 10%' o 'genera la factura de este presupuesto'.",
+      text: "¡Hola! Soy tu Agente Técnico de Orçamentos de Anacleto Pro. Puedes pedirme cosas como: 'Añade 3 ventanas de aluminio de 120x100', 'cambia el IVA al 21%', 'añade un descuento del 10%' o 'genera la factura de este presupuesto'.",
     },
   ]);
 
@@ -445,10 +446,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
               <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
                 Gestor Comercial
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Total: {quotes.length} Presupuestos</span>
+              <span className="text-[10px] font-mono text-slate-400">Total: {quotes.length} Orçamentos</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Presupuestos Inteligentes con IA
+              Orçamentos Inteligentes con IA
             </h1>
           </div>
         </div>
@@ -457,7 +458,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           onClick={handleCreateNewQuote}
           className="flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider rounded-2xl transition shadow-lg shadow-amber-500/20"
         >
-          <Plus className="w-4 h-4" /> Nuevo Presupuesto
+          <Plus className="w-4 h-4" /> Novo Orçamento
         </button>
       </div>
 
@@ -571,7 +572,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-mono font-bold text-amber-400">{selectedQuote.number}</span>
                       <span className="text-slate-500">•</span>
-                      <span className="text-xs text-slate-400">Fecha: {selectedQuote.date}</span>
+                      <span className="text-xs text-slate-400">Data: {selectedQuote.date}</span>
                       {selectedQuote.pdfDataUri && (
                         <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
                           <CheckCircle className="w-3 h-3 text-emerald-400" />
@@ -605,7 +606,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                       onClick={() => handleSaveQuote()}
                       className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase rounded-xl transition shadow-md shadow-amber-500/20"
                     >
-                      Guardar y Almacenar PDF
+                      Salvar y Almacenar PDF
                     </button>
                   </div>
                 </div>
@@ -649,7 +650,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
-                      Descuento (%):
+                      Desconto (%):
                     </label>
                     <input
                       type="number"
@@ -706,7 +707,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                           </div>
 
                           <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-500">Precio:</span>
+                            <span className="text-[10px] text-slate-500">Preço:</span>
                             <input
                               type="number"
                               value={item.unitPrice}
@@ -738,7 +739,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                     </div>
                     {selectedQuote.discountRate ? (
                       <div className="flex justify-between w-64 text-rose-400">
-                        <span>Descuento ({selectedQuote.discountRate}%):</span>
+                        <span>Desconto ({selectedQuote.discountRate}%):</span>
                         <span className="font-mono">-{selectedQuote.discountAmount?.toFixed(2)} €</span>
                       </div>
                     ) : null}
@@ -762,7 +763,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
-                      Agente de IA para Presupuestos y Facturas (Gemini)
+                      Agente de IA para Orçamentos y Facturas (Gemini)
                     </h3>
                   </div>
                   <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">

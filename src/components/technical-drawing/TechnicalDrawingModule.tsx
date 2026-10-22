@@ -31,6 +31,7 @@ import PdfViewerModal from "../common/PdfViewerModal";
 
 interface TechnicalDrawingModuleProps {
   senderConfig: SenderConfig;
+  language?: string;
 }
 
 // Initial sample project for instantaneous feedback
@@ -45,18 +46,18 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p1",
       pieceNumber: 1,
-      name: "Pieza 1 - Tablero superior",
+      name: "Peça 1 - Tablero superior",
       quantity: 1,
       dimensions: { width: 120, height: 4, depth: 80, unit: "cm" },
       material: "Madeira maciça de carvalho 40mm",
       color: "#C5A850",
       cutAngle: "90° recto",
-      notes: "Cantos biselados a 2mm",
+      notes: "Qtdos biselados a 2mm",
     },
     {
       id: "p2",
       pieceNumber: 2,
-      name: "Pieza 2 - Pata delantera izq.",
+      name: "Peça 2 - Pata delantera izq.",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
@@ -66,7 +67,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p3",
       pieceNumber: 3,
-      name: "Pieza 3 - Pata delantera der.",
+      name: "Peça 3 - Pata delantera der.",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
@@ -76,7 +77,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p4",
       pieceNumber: 4,
-      name: "Pieza 4 - Pata trasera izq.",
+      name: "Peça 4 - Pata trasera izq.",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
@@ -86,7 +87,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p5",
       pieceNumber: 5,
-      name: "Pieza 5 - Pata trasera der.",
+      name: "Peça 5 - Pata trasera der.",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
@@ -96,7 +97,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p6",
       pieceNumber: 6,
-      name: "Pieza 6 - Faldones de unión longitudinal",
+      name: "Peça 6 - Faldones de unión longitudinal",
       quantity: 2,
       dimensions: { width: 104, height: 10, depth: 3, unit: "cm" },
       material: "Madeira maciça de carvalho",
@@ -123,28 +124,28 @@ const initialSampleDrawing: TechnicalDrawing = {
     },
     {
       stepNumber: 2,
-      phaseName: "Paso 2: Despiece",
+      phaseName: "Passo 2: Despiece",
       title: "Lista de piezas identificadas tipo puzzle",
       description: "Inventario técnico con 6 componentes rotulados, identificados y cubicados.",
       instructions: ["Inspeccionar material de origen.", "Marcar piezas con su número identificador."],
     },
     {
       stepNumber: 3,
-      phaseName: "Paso 3: Corte de cada pieza con sus cotas",
+      phaseName: "Passo 3: Corte de cada pieza con sus cotas",
       title: "Dimensionado individual y mecanizado",
       description: "Cortes con precisión milimétrica, ingletes y ranurados para fijación.",
       instructions: ["Ejecutar cortes siguiendo las cotas individuales.", "Limpiar rebabas y perfilar cantos."],
     },
     {
       stepNumber: 4,
-      phaseName: "Paso 4: Ensamblaje tipo puzzle",
+      phaseName: "Passo 4: Ensamblaje tipo puzzle",
       title: "Secuencia de montaje y unión",
       description: "Montaje secuencial con flechas de ensamble y ajuste de fijaciones.",
       instructions: ["Presentar las piezas en seco.", "Ajustar uniones mediante fijaciones ocultas."],
     },
     {
       stepNumber: 5,
-      phaseName: "Paso 5: Resultado final con vista completa y medidas totales",
+      phaseName: "Passo 5: Resultado final con vista completa y medidas totales",
       title: "Producto terminado y revisión de calidad",
       description: "Estructura final consolidada con todas las cotas y verificación de aplomo.",
       instructions: ["Comprobación de solidez mecánica.", "Limpieza final y entrega."],
@@ -155,7 +156,7 @@ const initialSampleDrawing: TechnicalDrawing = {
   updatedAt: new Date().toISOString(),
 };
 
-export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawingModuleProps) {
+export default function TechnicalDrawingModule({ senderConfig, language = "pt"}: TechnicalDrawingModuleProps) {
   const { showToast } = useToast();
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -250,7 +251,7 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
       const data = await res.json();
       const newDrawing: TechnicalDrawing = {
         id: "draw_" + Math.random().toString(36).substring(2, 9),
-        title: data.title || "Pieza Arquitectónica a Medida",
+        title: data.title || "Peça Arquitectónica a Medida",
         description: data.description || inputPrompt,
         category: data.category || "custom",
         unit: data.unit || "cm",
@@ -334,7 +335,7 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
               )}
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Dibujo Técnico & Despiece Inteligente
+              Desenho Técnico & Despiece Inteligente
             </h1>
           </div>
         </div>
@@ -345,7 +346,7 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
             className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 text-xs font-bold rounded-xl transition border border-amber-500/40 shadow-sm"
           >
             <Eye className="w-4 h-4 text-amber-400" />
-            Ver Plano PDF Almacenado
+            Ver Plano PDF Armazenado
           </button>
           <button
             onClick={handleSaveDrawing}
@@ -353,14 +354,14 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Save className="w-4 h-4 text-amber-400" />}
-            Guardar Proyecto y PDF
+            Salvar Projeto e PDF
           </button>
           <button
             onClick={handleExportPdf}
             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-lg shadow-amber-500/20"
           >
             <Download className="w-4 h-4" />
-            Descargar PDF
+            Baixar PDF
           </button>
         </div>
       </div>
@@ -375,7 +376,7 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-400" />
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
-                  Instrucciones para la IA
+                  Instruções para a IA
                 </h3>
               </div>
               <span className="text-[10px] font-mono text-slate-500">Diseño 2D + Cotas + Puzzle</span>
@@ -427,10 +428,10 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-2">
-                <Layers className="w-4 h-4" /> Proceso de Construcción (5 Fases)
+                <Layers className="w-4 h-4" /> Processo de Construção (5 Fases)
               </h3>
               <span className="text-[11px] font-mono text-slate-400 font-bold">
-                Paso {currentStep} de 5
+                Passo {currentStep} de 5
               </span>
             </div>
 
@@ -457,7 +458,7 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                 <h4 className="text-xs font-bold text-white">
-                  {currentStepData?.phaseName || `Paso ${currentStep}`}
+                  {currentStepData?.phaseName || `Passo ${currentStep}`}
                 </h4>
               </div>
               <p className="text-xs font-medium text-amber-300">
@@ -489,14 +490,14 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
                 disabled={currentStep === 1}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-slate-200 transition border border-slate-700"
               >
-                <ChevronLeft className="w-4 h-4" /> Paso Anterior
+                <ChevronLeft className="w-4 h-4" /> Passo Anterior
               </button>
               <button
                 onClick={() => setCurrentStep((s) => Math.min(s + 1, 5))}
                 disabled={currentStep === 5}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-xs font-black text-slate-950 transition shadow-md"
               >
-                Siguiente Paso <ChevronRight className="w-4 h-4" />
+                Siguiente Passo <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -506,7 +507,7 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
                 <Box className="w-4 h-4 text-amber-400" />
-                Despiece Tipo Puzzle ({drawing.pieces?.length || 0} Piezas)
+                Despiece Tipo Quebra-cabeça ({drawing.pieces?.length || 0} Peças)
               </h3>
               <span className="text-[10px] font-mono text-slate-400">BOM Técnico</span>
             </div>
@@ -534,7 +535,7 @@ export default function TechnicalDrawingModule({ senderConfig }: TechnicalDrawin
                       {piece.dimensions?.width}×{piece.dimensions?.height}
                       {piece.dimensions?.depth ? `×${piece.dimensions?.depth}` : ""} {piece.dimensions?.unit || "cm"}
                     </span>
-                    <p className="text-[10px] text-slate-500 font-bold">Cant: {piece.quantity}</p>
+                    <p className="text-[10px] text-slate-500 font-bold">Qtd: {piece.quantity}</p>
                   </div>
                 </div>
               ))}

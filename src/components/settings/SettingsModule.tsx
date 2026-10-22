@@ -19,9 +19,10 @@ import { useToast } from "../ToastContext";
 interface SettingsModuleProps {
   senderConfig: SenderConfig;
   setSenderConfig: React.Dispatch<React.SetStateAction<SenderConfig>>;
+  language?: string;
 }
 
-export default function SettingsModule({ senderConfig, setSenderConfig }: SettingsModuleProps) {
+export default function SettingsModule({ senderConfig, setSenderConfig, language = "pt"}: SettingsModuleProps) {
   const { showToast } = useToast();
   const [formData, setFormData] = useState<SenderConfig>(senderConfig);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,7 +81,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig }: Settin
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <label className="text-slate-400 block mb-1 font-bold">Razón Social de la Empresa *</label>
+              <label className="text-slate-400 block mb-1 font-bold">Razão Social de la Empresa *</label>
               <input
                 type="text"
                 required
@@ -91,7 +92,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig }: Settin
             </div>
 
             <div>
-              <label className="text-slate-400 block mb-1 font-bold">NIF / CIF / CNPJ *</label>
+              <label className="text-slate-400 block mb-1 font-bold">CNPJ / CIF / CNPJ *</label>
               <input
                 type="text"
                 required
@@ -102,7 +103,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig }: Settin
             </div>
 
             <div className="sm:col-span-2">
-              <label className="text-slate-400 block mb-1">Domicilio Fiscal / Dirección</label>
+              <label className="text-slate-400 block mb-1">Domicilio Fiscal / Endereço</label>
               <input
                 type="text"
                 value={formData.address}
@@ -139,7 +140,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig }: Settin
 
         <div className="pt-4 border-t border-slate-800 space-y-4">
           <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-2">
-            <CreditCard className="w-4 h-4" /> Datos Bancarios y Moneda
+            <CreditCard className="w-4 h-4" /> Datos Bancarios y Moeda
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -155,7 +156,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig }: Settin
             </div>
 
             <div>
-              <label className="text-slate-400 block mb-1">Moneda Principal</label>
+              <label className="text-slate-400 block mb-1">Moeda Principal</label>
               <select
                 value={formData.currency}
                 onChange={(e) => handleChange("currency", e.target.value)}

@@ -22,9 +22,10 @@ import { useToast } from "../ToastContext";
 interface CrmModuleProps {
   companies: Company[];
   onSelectCompanyForQuote?: (company: Company) => void;
+  language?: string;
 }
 
-export default function CrmModule({ companies, onSelectCompanyForQuote }: CrmModuleProps) {
+export default function CrmModule({ companies, onSelectCompanyForQuote, language = "pt"}: CrmModuleProps) {
   const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -99,7 +100,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote }: CrmMod
   };
 
   const handleDeleteCompany = async (id: string, compName: string) => {
-    if (!confirm(`¿Eliminar la empresa "${compName}" del CRM?`)) return;
+    if (!confirm(`¿Excluir la empresa "${compName}" del CRM?`)) return;
     try {
       await deleteDoc(doc(db, "companies", id));
       showToast("Empresa excluída.", "info");
@@ -179,7 +180,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote }: CrmMod
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-white">{comp.name}</h3>
-                    <span className="text-[10px] font-mono text-amber-400 font-bold">NIF/CIF: {comp.taxId}</span>
+                    <span className="text-[10px] font-mono text-amber-400 font-bold">CNPJ/CPF: {comp.taxId}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -257,7 +258,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote }: CrmMod
             <form onSubmit={handleSaveCompany} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-bold">Razón Social / Nombre *</label>
+                  <label className="text-slate-400 block mb-1 font-bold">Razón Social / Nome *</label>
                   <input
                     type="text"
                     required
@@ -292,7 +293,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote }: CrmMod
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1">Teléfono</label>
+                  <label className="text-slate-400 block mb-1">Telefone</label>
                   <input
                     type="text"
                     value={phone}
@@ -315,7 +316,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote }: CrmMod
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Dirección Fiscal / Sede</label>
+                <label className="text-slate-400 block mb-1">Endereço Fiscal / Sede</label>
                 <input
                   type="text"
                   value={address}
@@ -349,7 +350,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote }: CrmMod
                   disabled={isSubmitting}
                   className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition shadow-md"
                 >
-                  {isSubmitting ? "Salvando..." : "Guardar Empresa"}
+                  {isSubmitting ? "Salvando..." : "Salvar Empresa"}
                 </button>
               </div>
             </form>

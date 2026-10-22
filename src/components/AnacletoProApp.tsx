@@ -284,14 +284,14 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "crm" && (
-            <CrmModule
+            <CrmModule language={language}
               companies={companies}
               onSelectCompanyForQuote={handleSelectCompanyForQuote}
             />
           )}
 
           {activeTab === "quotes" && (
-            <QuotesModule
+            <QuotesModule language={language}
               senderConfig={senderConfig}
               companies={companies}
               onConvertToInvoice={() => setActiveTab("invoices")}
@@ -299,17 +299,17 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "invoices" && (
-            <InvoicesModule senderConfig={senderConfig} />
+            <InvoicesModule language={language} senderConfig={senderConfig} />
           )}
 
-          {activeTab === "agenda" && (<AgendaModule />)}
+          {activeTab === "agenda" && (<AgendaModule language={language} />)}
 
         {activeTab === "technical_drawing" && (
-            <TechnicalDrawingModule senderConfig={senderConfig} />
+            <TechnicalDrawingModule language={language} senderConfig={senderConfig} />
           )}
 
           {activeTab === "settings" && (
-            <SettingsModule senderConfig={senderConfig} setSenderConfig={setSenderConfig} />
+            <SettingsModule language={language} senderConfig={senderConfig} setSenderConfig={setSenderConfig} />
           )}
         </div>
       </main>

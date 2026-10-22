@@ -25,9 +25,10 @@ import PdfViewerModal from "../common/PdfViewerModal";
 
 interface InvoicesModuleProps {
   senderConfig: SenderConfig;
+  language?: string;
 }
 
-export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
+export default function InvoicesModule({ senderConfig, language = "pt"}: InvoicesModuleProps) {
   const { showToast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -151,10 +152,10 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
               <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                 Facturación Oficial
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Total: {invoices.length} Facturas</span>
+              <span className="text-[10px] font-mono text-slate-400">Total: {invoices.length} Faturas</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Libro de Facturas Emitidas
+              Libro de Faturas Emitidas
             </h1>
           </div>
         </div>
@@ -168,7 +169,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
             </span>
           </div>
           <div className="px-3.5 py-2 bg-slate-950 rounded-2xl border border-slate-800">
-            <span className="text-[9px] uppercase font-bold text-slate-400 block">Pendiente</span>
+            <span className="text-[9px] uppercase font-bold text-slate-400 block">Pendente</span>
             <span className="text-xs font-mono font-black text-amber-400">
               {totalPending.toFixed(2)} €
             </span>
@@ -284,7 +285,7 @@ export default function InvoicesModule({ senderConfig }: InvoicesModuleProps) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-mono font-bold text-emerald-400">{selectedInvoice.number}</span>
                     <span className="text-slate-500">•</span>
-                    <span className="text-xs text-slate-400">Fecha: {selectedInvoice.date}</span>
+                    <span className="text-xs text-slate-400">Data: {selectedInvoice.date}</span>
                     {selectedInvoice.pdfDataUri && (
                       <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
                         <CheckCircle className="w-3 h-3 text-emerald-400" />
