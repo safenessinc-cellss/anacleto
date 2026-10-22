@@ -62,6 +62,7 @@ export default function AnacletoProApp({
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
+      console.log("🔐 onAuthStateChanged fired:", u ? `user=${u.email}` : "NO USER");
       setAuthReady(!!u);
     });
     return () => unsub();
@@ -69,7 +70,9 @@ export default function AnacletoProApp({
 
   // 1. Listen for Quotes (solo cuando authReady === true)
   useEffect(() => {
+    console.log("📊 Quotes listener - authReady:", authReady);
     if (!authReady) return;
+    console.log("✅ Quotes listener ACTIVADO (usuario autenticado)");
     const unsub = onSnapshot(
       query(collection(db, "quotes"), orderBy("createdAt", "desc")),
       (snap) => {
