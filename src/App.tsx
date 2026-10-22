@@ -406,20 +406,23 @@ export default function App() {
 
   // Anacleto Pro Enterprise Full-Stack Suite (Default View)
   if (currentView === "pro") {
-    // Sin usuario → forzar login
+    // 1) Sin usuario → Login directo (sin redirigir)
     if (adminStatus === "no-user") {
-      setCurrentView("landing");
-      return null;
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
+          <Login t={t} language={language} onLoginSuccess={() => {}} />
+        </div>
+      );
     }
-    // Esperando verificación
+    // 2) Verificando admin
     if (adminStatus === "loading") {
       return <AnimatedWindowLoader onFinish={() => {}} currentLanguage={language} />;
     }
-    // No autorizado → pantalla de espera
+    // 3) Autenticado pero no autorizado
     if (adminStatus === "unauthorized") {
       return <PendingApproval userEmail={user?.email} />;
     }
-    // Autorizado → dashboard
+    // 4) Autorizado → dashboard
     return (
       <AnacletoProApp
         senderConfig={senderConfig}
