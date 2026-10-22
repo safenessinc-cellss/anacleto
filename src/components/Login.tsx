@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   signInWithPopup 
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "../firebase";
 import { Translation } from "../translations";
-import { ShieldCheck, Info, HelpCircle } from "lucide-react";
+import { ShieldCheck, Info, HelpCircle, ExternalLink, AlertTriangle } from "lucide-react";
 
 interface LoginProps {
   t: Translation;
@@ -18,12 +18,20 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
   const [errorMsg, setErrorMsg] = useState("");
   const [showConfigGuide, setShowConfigGuide] = useState(false);
   const [showDomainConfigGuide, setShowDomainConfigGuide] = useState(false);
+  const [isInIframe, setIsInIframe] = useState(false);
+
+  useEffect(() => {
+    // Detect if pages are rendered inside a sandboxed browser iframe
+    if (typeof window !== "undefined") {
+      setIsInIframe(window.self !== window.top);
+    }
+  }, []);
 
   // Label map for Google authentication trigger matching chosen language
   const googleLabelMap: Record<string, string> = {
     pt: "Entrar com o Google - Acesso Rápido",
     en: "Sign in with Google - Fast Access",
-    es: "Iniciar sesión com Google",
+    es: "Iniciar sesión con Google",
     fr: "Se connecter avec Google",
     de: "Mit Google anmelden",
     it: "Accedi con Google",
@@ -34,6 +42,12 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
   };
 
   const currentGoogleLabel = googleLabelMap[language] || googleLabelMap["pt"];
+
+  const handleOpenNewTab = () => {
+    if (typeof window !== "undefined") {
+      window.open(window.location.href, "_blank", "noopener,noreferrer");
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
@@ -74,7 +88,7 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
     } catch (err: any) {
       console.error("Google login failed:", err);
       if (err.message === "POPUP_TIMEOUT" || err.code === "auth/popup-timeout" || err.code === "auth/popup-blocked") {
-        setErrorMsg("O login com o Google expirou ou foi bloqueado devido a restrições de iframe em seu navegador. Se o pop-up não abriu, verifique se seu navegador está bloqueando janelas pop-up para este site.");
+        setErrorMsg("O login com o Google foi bloqueado ou expirou devido a restrições de iframe/popup de seu navegador. Clique no botão de 'Abrir em Nova Aba' acima para efetuar o login com sucesso!");
       } else if (err.code === "auth/operation-not-allowed") {
         setErrorMsg("O Login com o Google não está ativo. Por favor, ative o provedor 'Google' nas configurações de Authentication do console Firebase.");
         setShowConfigGuide(true);
@@ -102,9 +116,35 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
         <h1 className="text-xl font-serif font-bold text-white uppercase tracking-wider mb-2">
           {t.loginTitle}
         </h1>
-        <p className="text-slate-400 text-[11px] uppercase tracking-widest font-mono mb-8 text-luxury-gold/80">
+        <p className="text-slate-400 text-[11px] uppercase tracking-widest font-mono mb-6 text-luxury-gold/80">
           Acesso premium protegido com Google
         </p>
+
+        {/* IFRAME ENVIRONMENT WARNING & REDIRECT ACTION CARD */}
+        {isInIframe && (
+          <div className="mb-6 p-4 bg-amber-950/10 border border-amber-500/20 rounded-2xl text-left space-y-3.5">
+            <div className="flex gap-2 text-amber-400 items-start">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <div className="space-y-1">
+                <h4 className="text-xs font-black uppercase tracking-wider">
+                  Ambiente de Testes (Iframe)
+                </h4>
+                <p className="text-[10.5px] text-slate-300 leading-relaxed">
+                  Navegadores modernos impedem autenticação Google por popup em frames secundários (CORS e Sandbox).
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenNewTab}
+              className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_12px_rgba(245,158,11,0.2)] hover:scale-[1.02]"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Abrir em Nova Aba
+            </button>
+          </div>
+        )}
 
         {errorMsg && (
           <div className="mb-6 p-4 bg-rose-950/20 text-rose-400 text-xs font-semibold rounded-xl text-left border border-rose-900/40 transition-all duration-200">
@@ -193,7 +233,7 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
             type="button"
             onClick={handleGoogleLogin}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 py-3.5 bg-[#18191e] hover:bg-[#1f202a] text-white border border-luxury-border hover:border-luxury-gold/50 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-350 cursor-pointer disabled:opacity-50 shadow-md hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-3 py-3.5 bg-[#18191e] hover:bg-[#1f202a] text-[#ffffff] border border-luxury-border hover:border-luxury-gold/50 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-350 cursor-pointer disabled:opacity-50 shadow-md hover:scale-[1.02] active:scale-[0.98]"
           >
             {googleLoading ? (
               <span className="flex items-center gap-2">
@@ -236,4 +276,3 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
     </div>
   );
 }
-

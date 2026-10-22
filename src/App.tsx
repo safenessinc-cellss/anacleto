@@ -16,16 +16,17 @@ import {
   Sparkles,
   Bot,
   Landmark,
-  Plus,
   Trash,
   Award,
+  Compass,
 } from "lucide-react";
 import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
 import Chatbot from "./components/Chatbot";
 import WhatsAppButton from "./components/WhatsAppButton";
-import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
 import { useToast } from "./components/ToastContext";
+import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
+import AnacletoProApp from "./components/AnacletoProApp";
 
 // Premium Brand Assets
 import logoImg from "./assets/images/anacleto_logo_1780594599493.png";
@@ -34,13 +35,15 @@ import facadeImg from "./assets/images/corporate_facade_1780594325774.png";
 import bathImg from "./assets/images/bathroom_box_glass_1780594338585.png";
 import pergolaImg from "./assets/images/pergola_glass_1780594351717.png";
 
+
 export default function App() {
   const { showToast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [animationLoading, setAnimationLoading] = useState(true);
+  const [currentView, setCurrentView] = useState<"pro" | "landing">("pro");
   const [isAdminPortal, setIsAdminPortal] = useState(false);
-  const [language, setLanguage] = useState<LanguageCode>("pt");
+  const [language, setLanguage] = useState<LanguageCode>("es");
   const [darkMode, setDarkMode] = useState(true);
 
   const [senderConfig, setSenderConfig] = useState<any>({
@@ -57,7 +60,7 @@ export default function App() {
     websiteLogoUrl: "",
     profileName: "Anacleto Esquadrias",
     profileRole: "Diretor Comercial & Operações",
-    profileBio: "Mais de 20 anos de experiência prestando serviços qualificados em esquadrias de alumínio residenciais, prediais e corporativas de alto padrão.",
+    profileBio: "Mais de 25 anos de experiência prestando serviços qualificados em esquadrias de alumínio residenciais, prediais e corporativas de alto padrão.",
     profileAvatarUrl: "",
     profilePhone: "(51) 99311-0000",
     profileEmail: "contato@anacletoesquadrias.com.br",
@@ -94,10 +97,6 @@ export default function App() {
     { id: "1", description: "Janelas e Portas de Alumínio Customizadas", qty: 2, price: 0 }
   ]);
 
-  const [visAiPrompt, setVisAiPrompt] = useState("");
-  const [visAiIsGenerating, setVisAiIsGenerating] = useState(false);
-  const [visAiSuccessMsg, setVisAiSuccessMsg] = useState("");
-
   useEffect(() => {
     const savedLang = localStorage.getItem("anacleto_language") as LanguageCode;
     if (savedLang && translations[savedLang]) {
@@ -113,10 +112,10 @@ export default function App() {
       document.documentElement.classList.add("dark");
     }
 
-    // Tiempo de carga mínimo para mostrar animación
+    // Tiempo de carga mínimo para mostrar la animación completa de la ventana
     const timer = setTimeout(() => {
       setAnimationLoading(false);
-    }, 8000); // 8 segundos para ver toda la animación de la ventana
+    }, 8000);
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -291,32 +290,25 @@ export default function App() {
     );
   };
 
-  const handleGenerateAiEstimatePreset = async (promptText?: string) => {
-    const textToAnalyze = promptText || visAiPrompt;
-    if (!textToAnalyze.trim()) return;
-
-    setVisAiIsGenerating(true);
-    setVisAiSuccessMsg("");
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setVisAiSuccessMsg("✨ IA: Projeto otimizado com sucesso!");
-      if (!promptText) setVisAiPrompt("");
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setVisAiIsGenerating(false);
-    }
-  };
-
   const t = translations[language] || translations.pt;
   const isRtl = language === "ar";
 
-  // Mostrar animación de la ventana de aluminio
   if (authLoading || animationLoading) {
     return <AnimatedWindowLoader onFinish={() => setAnimationLoading(false)} currentLanguage={language} />;
   }
 
-  // Panel de administración
+  // Anacleto Pro Enterprise Full-Stack Suite (Default View)
+  if (currentView === "pro") {
+    return (
+      <AnacletoProApp
+        senderConfig={senderConfig}
+        setSenderConfig={setSenderConfig}
+        onSwitchToPublicLanding={() => setCurrentView("landing")}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   if (isAdminPortal) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col">
@@ -339,6 +331,9 @@ export default function App() {
                 <option key={code} value={code}>{meta.flag} {code.toUpperCase()}</option>
               ))}
             </select>
+            <button onClick={() => setCurrentView("pro")} className="text-xs font-bold text-amber-400 hover:text-amber-300">
+              ⚡ Abrir Anacleto Pro
+            </button>
             <button onClick={() => setIsAdminPortal(false)} className="text-xs font-bold hover:text-luxury-gold">
               {t.backToHome}
             </button>
@@ -358,7 +353,6 @@ export default function App() {
     );
   }
 
-  // Vista pública principal
   return (
     <div dir={isRtl ? "rtl" : "ltr"} className="min-h-screen bg-luxury-darker text-slate-100 flex flex-col">
       {senderConfig.publicity?.filter((item: any) => item.isActive).map((item: any) => (
@@ -367,7 +361,7 @@ export default function App() {
         </div>
       ))}
       
-      <nav className="sticky top-0 z-30 bg-luxury-darker/90 backdrop-blur-md border-b py-4 px-6">
+      <nav className="sticky top-0 z-30 bg-luxury-darker/90 backdrop-blur-md border-b py-4 px-6 border-luxury-border/20">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 bg-luxury-dark rounded-xl overflow-hidden border">
@@ -379,17 +373,20 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-luxury-dark border px-3 py-1.5 rounded-2xl">
+            <button
+              onClick={() => setCurrentView("pro")}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-lg shadow-amber-500/20"
+            >
+              <Compass className="w-4 h-4" /> Panel Anacleto Pro
+            </button>
+            <div className="flex items-center gap-2 bg-luxury-dark border px-3 py-1.5 rounded-2xl border-luxury-border/30">
               <Globe className="w-4 h-4 text-luxury-gold" />
-              <select value={language} onChange={(e) => handleLanguageChange(e.target.value as LanguageCode)} className="text-xs bg-transparent text-slate-300 font-bold">
-                {Object.entries(languageMeta).map(([code, meta]) => (<option key={code} value={code}>{meta.flag} {meta.name}</option>))}
+              <select value={language} onChange={(e) => handleLanguageChange(e.target.value as LanguageCode)} className="text-xs bg-transparent text-slate-300 font-bold border-none focus:outline-none">
+                {Object.entries(languageMeta).map(([code, meta]) => (<option key={code} className="bg-luxury-dark text-white" value={code}>{meta.flag} {meta.name}</option>))}
               </select>
             </div>
-            <button onClick={toggleTheme} className="p-2.5 rounded-full bg-luxury-dark text-luxury-gold border">
-              {darkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
-            </button>
-            <button onClick={() => setIsAdminPortal(true)} className="text-xs font-bold px-4 py-2.5 rounded-2xl border border-luxury-gold/30 text-luxury-gold">
-              {t.ctaAdmin}
+            <button onClick={toggleTheme} className="p-2.5 rounded-full bg-luxury-dark text-luxury-gold border border-luxury-border/30">
+              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
         </div>
@@ -402,46 +399,46 @@ export default function App() {
               <Bot className="w-4 h-4" /> SISTEMA MULTILÍNGUE
             </span>
             <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight">{t.heroTitle}</h2>
-            <p className="text-slate-350 text-base md:text-lg">{t.heroSub}</p>
+            <p className="text-slate-300 text-base md:text-lg">{t.heroSub}</p>
             <div className="flex flex-wrap gap-4">
-              <a href="#solicitar" className="flex items-center gap-2 px-6 py-3 bg-luxury-gold text-luxury-darker font-black uppercase tracking-wider rounded-2xl text-xs">
-                {t.ctaGetBudget} <ArrowRight className="w-4.5 h-4.5" />
+              <a href="#solicitar" className="flex items-center gap-2 px-6 py-3 bg-luxury-gold text-luxury-darker font-black uppercase tracking-wider rounded-2xl text-xs hover:bg-luxury-gold-light transition duration-200">
+                {t.ctaGetBudget} <ArrowRight className="w-4 h-4" />
               </a>
-              <a href="#agendar" className="px-6 py-3 bg-luxury-dark border text-slate-200 rounded-2xl text-xs font-black uppercase">
+              <a href="#agendar" className="px-6 py-3 bg-luxury-dark border text-slate-200 rounded-2xl text-xs font-black uppercase hover:bg-luxury-dark/80 transition duration-200 border-luxury-border/30">
                 Agendar Medição Grátis
               </a>
             </div>
           </div>
           <div className="lg:col-span-5">
-            <div className="relative overflow-hidden rounded-3xl shadow-2xl border">
+            <div className="relative overflow-hidden rounded-3xl shadow-2xl border border-luxury-border/30">
               <img src={heroImg} className="w-full h-80 object-cover" alt="Hero" />
             </div>
           </div>
         </div>
       </section>
 
-      <section className="py-20 px-6 bg-luxury-dark">
+      <section className="py-20 px-6 bg-luxury-dark border-b border-luxury-border/10">
         <div className="max-w-7xl mx-auto text-center mb-16">
           <h2 className="text-3xl font-black text-white uppercase">{t.servicesTitle}</h2>
         </div>
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="p-6 bg-luxury-darker rounded-3xl border hover:border-luxury-gold/40">
-            <div className="w-10 h-10 bg-luxury-dark text-luxury-gold rounded-xl flex items-center justify-center"><Landmark className="w-5 h-5" /></div>
+          <div className="p-6 bg-luxury-darker rounded-3xl border border-luxury-border/10 hover:border-luxury-gold/40 transition duration-200">
+            <div className="w-10 h-10 bg-luxury-dark text-luxury-gold rounded-xl flex items-center justify-center border border-luxury-border/30"><Landmark className="w-5 h-5" /></div>
             <h3 className="font-extrabold text-sm text-white mt-3">{t.service1Name}</h3>
             <p className="text-xs text-slate-400 mt-2">{t.service1Desc}</p>
           </div>
-          <div className="p-6 bg-luxury-darker rounded-3xl border hover:border-luxury-gold/40">
-            <div className="w-10 h-10 bg-luxury-dark text-luxury-gold rounded-xl flex items-center justify-center"><FileText className="w-5 h-5" /></div>
+          <div className="p-6 bg-luxury-darker rounded-3xl border border-luxury-border/10 hover:border-luxury-gold/40 transition duration-200">
+            <div className="w-10 h-10 bg-luxury-dark text-luxury-gold rounded-xl flex items-center justify-center border border-luxury-border/30"><FileText className="w-5 h-5" /></div>
             <h3 className="font-extrabold text-sm text-white mt-3">{t.service2Name}</h3>
             <p className="text-xs text-slate-400 mt-2">{t.service2Desc}</p>
           </div>
-          <div className="p-6 bg-luxury-darker rounded-3xl border hover:border-luxury-gold/40">
-            <div className="w-10 h-10 bg-luxury-dark text-luxury-gold rounded-xl flex items-center justify-center"><CheckCircle className="w-5 h-5" /></div>
+          <div className="p-6 bg-luxury-darker rounded-3xl border border-luxury-border/10 hover:border-luxury-gold/40 transition duration-200">
+            <div className="w-10 h-10 bg-luxury-dark text-luxury-gold rounded-xl flex items-center justify-center border border-luxury-border/30"><CheckCircle className="w-5 h-5" /></div>
             <h3 className="font-extrabold text-sm text-white mt-3">{t.service3Name}</h3>
             <p className="text-xs text-slate-400 mt-2">{t.service3Desc}</p>
           </div>
-          <div className="p-6 bg-luxury-darker rounded-3xl border hover:border-luxury-gold/40">
-            <div className="w-10 h-10 bg-luxury-dark text-luxury-gold rounded-xl flex items-center justify-center"><Users className="w-5 h-5" /></div>
+          <div className="p-6 bg-luxury-darker rounded-3xl border border-luxury-border/10 hover:border-luxury-gold/40 transition duration-200">
+            <div className="w-10 h-10 bg-luxury-dark text-luxury-gold rounded-xl flex items-center justify-center border border-luxury-border/30"><Users className="w-5 h-5" /></div>
             <h3 className="font-extrabold text-sm text-white mt-3">{t.service4Name}</h3>
             <p className="text-xs text-slate-400 mt-2">{t.service4Desc}</p>
           </div>
@@ -449,7 +446,7 @@ export default function App() {
       </section>
 
       {senderConfig.promotions?.filter((p: any) => p.isActive).length > 0 && (
-        <section className="py-12 px-6 bg-gradient-to-r from-luxury-darker via-luxury-dark to-luxury-darker">
+        <section className="py-12 px-6 bg-gradient-to-r from-luxury-darker via-luxury-dark to-luxury-darker border-b border-luxury-border/10">
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
               {senderConfig.promotions.filter((p: any) => p.isActive).map((p: any) => (
@@ -458,7 +455,7 @@ export default function App() {
                     <h3 className="font-black text-white">{p.title}</h3>
                     <span className="px-3 py-1 bg-luxury-gold text-luxury-darker text-[10px] font-black rounded-lg">{p.discountBadge}</span>
                   </div>
-                  <p className="text-xs text-slate-350">{p.description}</p>
+                  <p className="text-xs text-slate-300">{p.description}</p>
                 </div>
               ))}
             </div>
@@ -466,13 +463,13 @@ export default function App() {
         </section>
       )}
 
-      <section className="py-20 px-6 bg-luxury-darker">
+      <section className="py-20 px-6 bg-luxury-darker border-b border-luxury-border/10">
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl font-black text-white uppercase mb-12">{t.whyTitle}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div><Award className="w-12 h-12 text-luxury-gold mx-auto mb-3" /><h3 className="font-extrabold text-white">{t.why1Title}</h3><p className="text-xs text-slate-400 mt-2">{t.why1Desc}</p></div>
-            <div><Sparkles className="w-12 h-12 text-luxury-gold mx-auto mb-3" /><h3 className="font-extrabold text-white">{t.why2Title}</h3><p className="text-xs text-slate-400 mt-2">{t.why2Desc}</p></div>
-            <div><Bot className="w-12 h-12 text-luxury-gold mx-auto mb-3" /><h3 className="font-extrabold text-white">{t.why3Title}</h3><p className="text-xs text-slate-400 mt-2">{t.why3Desc}</p></div>
+            <div><Award className="w-12 h-12 text-luxury-gold mx-auto mb-3 animate-pulse" /><h3 className="font-extrabold text-white">{t.why1Title}</h3><p className="text-xs text-slate-400 mt-2">{t.why1Desc}</p></div>
+            <div><Sparkles className="w-12 h-12 text-luxury-gold mx-auto mb-3 animate-pulse" /><h3 className="font-extrabold text-white">{t.why2Title}</h3><p className="text-xs text-slate-400 mt-2">{t.why2Desc}</p></div>
+            <div><Bot className="w-12 h-12 text-luxury-gold mx-auto mb-3 animate-pulse" /><h3 className="font-extrabold text-white">{t.why3Title}</h3><p className="text-xs text-slate-400 mt-2">{t.why3Desc}</p></div>
           </div>
         </div>
       </section>
@@ -482,43 +479,43 @@ export default function App() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-black text-white uppercase">Portfólio de Sucesso</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[heroImg, facadeImg, bathImg, pergolaImg].map((img, idx) => (
-              <div key={idx} className="rounded-2xl overflow-hidden border">
-                <img src={img} className="w-full h-48 object-cover" alt={`Portfolio ${idx + 1}`} />
+              <div key={idx} className="rounded-2xl overflow-hidden border border-luxury-border/20 group hover:border-luxury-gold/50 transition duration-300">
+                <img src={img} className="w-full h-48 object-cover group-hover:scale-105 transition duration-300" alt={`Portfolio ${idx + 1}`} />
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="agendar" className="py-20 px-6 bg-luxury-darker">
+      <section id="agendar" className="py-20 px-6 bg-luxury-darker border-b border-luxury-border/10">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-black text-white uppercase">Agende sua Visita Técnica Gratuita</h2>
           </div>
           {schSubmittedSuccess ? (
-            <div className="p-8 bg-luxury-dark border rounded-3xl text-center">
+            <div className="p-8 bg-luxury-dark border border-luxury-border/30 rounded-3xl text-center">
               <CheckCircle className="w-16 h-16 text-luxury-gold mx-auto mb-4" />
               <h3 className="text-xl font-bold text-white">Visita Agendada com Sucesso!</h3>
-              <button onClick={() => setSchSubmittedSuccess(false)} className="mt-4 px-5 py-2.5 bg-luxury-gold text-luxury-darker rounded-xl text-xs font-black">Agendar Outra Visita</button>
+              <button onClick={() => setSchSubmittedSuccess(false)} className="mt-4 px-5 py-2.5 bg-luxury-gold text-luxury-darker rounded-xl text-xs font-black cursor-pointer hover:bg-luxury-gold-light transition">Agendar Outra Visita</button>
             </div>
           ) : (
-            <form onSubmit={handleVisitorScheduleVisit} className="bg-luxury-dark p-8 rounded-3xl border space-y-6">
+            <form onSubmit={handleVisitorScheduleVisit} className="bg-luxury-dark p-8 rounded-3xl border border-luxury-border/30 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input type="text" required value={schName} onChange={(e) => setSchName(e.target.value)} placeholder="Nombre completo *" className="px-3 py-2 text-xs border bg-luxury-darker text-white rounded-lg" />
-                <input type="email" value={schEmail} onChange={(e) => setSchEmail(e.target.value)} placeholder="Email" className="px-3 py-2 text-xs border bg-luxury-darker text-white rounded-lg" />
-                <input type="text" required value={schPhone} onChange={(e) => setSchPhone(e.target.value)} placeholder="Teléfono/WhatsApp *" className="px-3 py-2 text-xs border bg-luxury-darker text-white rounded-lg" />
-                <input type="text" required value={schAddress} onChange={(e) => setSchAddress(e.target.value)} placeholder="Dirección completa *" className="px-3 py-2 text-xs border bg-luxury-darker text-white rounded-lg" />
-                <input type="date" required value={schDate} onChange={(e) => setSchDate(e.target.value)} className="px-3 py-2 text-xs border bg-luxury-darker text-white rounded-lg" />
-                <select value={schTime} onChange={(e) => setSchTime(e.target.value)} className="px-3 py-2 text-xs border bg-luxury-darker text-white rounded-lg">
+                <input type="text" required value={schName} onChange={(e) => setSchName(e.target.value)} placeholder="Nome completo *" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <input type="email" value={schEmail} onChange={(e) => setSchEmail(e.target.value)} placeholder="Email" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <input type="text" required value={schPhone} onChange={(e) => setSchPhone(e.target.value)} placeholder="Telefone/WhatsApp *" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <input type="text" required value={schAddress} onChange={(e) => setSchAddress(e.target.value)} placeholder="Endereço completo *" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <input type="date" required value={schDate} onChange={(e) => setSchDate(e.target.value)} className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <select value={schTime} onChange={(e) => setSchTime(e.target.value)} className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold">
                   <option value="09:00">09:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option>
                   <option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option>
                 </select>
               </div>
-              <textarea value={schNotes} onChange={(e) => setSchNotes(e.target.value)} rows={3} placeholder="Observaciones..." className="w-full px-3 py-2 text-xs border bg-luxury-darker text-white rounded-lg"></textarea>
-              <button type="submit" disabled={schIsSubmitting} className="w-full py-3 bg-luxury-gold text-luxury-darker rounded-2xl text-xs font-black uppercase disabled:opacity-50">
-                {schIsSubmitting ? "Cadastrando..." : "Agendar Visita Gratuita"}
+              <textarea value={schNotes} onChange={(e) => setSchNotes(e.target.value)} rows={3} placeholder="Observações..." className="w-full px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold"></textarea>
+              <button type="submit" disabled={schIsSubmitting} className="w-full py-3.5 bg-luxury-gold hover:bg-luxury-gold-light text-luxury-darker rounded-2xl text-xs font-black uppercase disabled:opacity-50 transition cursor-pointer">
+                {schIsSubmitting ? "Sinalizando..." : "Agendar Visita Gratuita"}
               </button>
             </form>
           )}
@@ -531,28 +528,28 @@ export default function App() {
             <h2 className="text-3xl font-black text-white uppercase">{t.ctaGetBudget}</h2>
           </div>
           {visSubmittedSuccess ? (
-            <div className="p-8 bg-luxury-darker border rounded-3xl text-center">
+            <div className="p-8 bg-luxury-darker border border-luxury-border/30 rounded-3xl text-center">
               <CheckCircle className="w-16 h-16 text-luxury-gold mx-auto mb-4" />
               <h3 className="text-xl font-bold text-white">Solicitação Enviada com Sucesso!</h3>
-              <button onClick={() => setVisSubmittedSuccess(false)} className="mt-4 px-5 py-2.5 bg-luxury-gold text-luxury-darker rounded-xl text-xs font-black">Simular Novo Orçamento</button>
+              <button onClick={() => setVisSubmittedSuccess(false)} className="mt-4 px-5 py-2.5 bg-luxury-gold text-luxury-darker rounded-xl text-xs font-black cursor-pointer hover:bg-luxury-gold-light transition">Simular Novo Orçamento</button>
             </div>
           ) : (
-            <form onSubmit={handleVisitorSubmitEstimate} className="bg-luxury-darker p-8 rounded-3xl border space-y-6">
+            <form onSubmit={handleVisitorSubmitEstimate} className="bg-luxury-darker p-8 rounded-3xl border border-luxury-border/30 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input type="text" required value={visName} onChange={(e) => setVisName(e.target.value)} placeholder="Nombre completo *" className="px-3 py-2 text-xs border bg-luxury-dark text-white rounded-lg" />
-                <input type="email" required value={visEmail} onChange={(e) => setVisEmail(e.target.value)} placeholder="Email *" className="px-3 py-2 text-xs border bg-luxury-dark text-white rounded-lg" />
-                <input type="text" required value={visNif} onChange={(e) => setVisNif(e.target.value)} placeholder="NIF/CPF *" className="px-3 py-2 text-xs border bg-luxury-dark text-white rounded-lg" />
-                <input type="text" value={visAddress} onChange={(e) => setVisAddress(e.target.value)} placeholder="Dirección" className="px-3 py-2 text-xs border bg-luxury-dark text-white rounded-lg" />
+                <input type="text" required value={visName} onChange={(e) => setVisName(e.target.value)} placeholder="Nome completo *" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-dark text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <input type="email" required value={visEmail} onChange={(e) => setVisEmail(e.target.value)} placeholder="Email *" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-dark text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <input type="text" required value={visNif} onChange={(e) => setVisNif(e.target.value)} placeholder="NIF/CPF *" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-dark text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
+                <input type="text" value={visAddress} onChange={(e) => setVisAddress(e.target.value)} placeholder="Endereço" className="px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-dark text-white rounded-lg focus:outline-none focus:border-luxury-gold" />
               </div>
 
-              <div className="border-t pt-6">
-                <div className="flex justify-between mb-4">
-                  <h3 className="text-xs font-black uppercase text-luxury-gold">Itens do Orçamento</h3>
-                  <button type="button" onClick={addEstimateLine} className="text-xs px-3 py-1.5 bg-luxury-dark text-luxury-gold border rounded-lg">+ Adicionar Item</button>
+              <div className="border-t border-luxury-border pt-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xs font-black uppercase text-luxury-gold uppercase tracking-wider">Itens do Orçamento</h3>
+                  <button type="button" onClick={addEstimateLine} className="text-xs px-3 py-1.5 bg-luxury-dark text-luxury-gold border border-luxury-border/30 rounded-lg hover:bg-luxury-dark/70 transition cursor-pointer">+ Adicionar Item</button>
                 </div>
                 {visCustomLines.map((line) => (
                   <div key={line.id} className="flex gap-3 mb-3 items-center">
-                    <select value={line.description} onChange={(e) => updateEstimateLine(line.id, "description", e.target.value)} className="flex-1 px-3 py-2 text-xs border bg-luxury-dark text-white rounded-lg">
+                    <select value={line.description} onChange={(e) => updateEstimateLine(line.id, "description", e.target.value)} className="flex-1 px-3 py-2.5 text-xs border border-luxury-border bg-luxury-dark text-white rounded-lg focus:outline-none focus:border-luxury-gold">
                       <option>Janelas e Portas de Alumínio Customizadas</option>
                       <option>Fachadas Pele de Vidro</option>
                       <option>Vidro Temperado e Laminado</option>
@@ -560,13 +557,13 @@ export default function App() {
                       <option>Guarda-corpos e Corrimãos</option>
                       <option>Coberturas e Pergolados</option>
                     </select>
-                    <input type="number" value={line.qty} onChange={(e) => updateEstimateLine(line.id, "qty", parseInt(e.target.value) || 1)} className="w-20 px-3 py-2 text-xs border bg-luxury-dark text-white rounded-lg" placeholder="Qtd" />
-                    <button type="button" onClick={() => removeEstimateLine(line.id)} className="text-rose-500 p-2"><Trash className="w-4 h-4" /></button>
+                    <input type="number" value={line.qty} onChange={(e) => updateEstimateLine(line.id, "qty", parseInt(e.target.value) || 1)} className="w-20 px-3 py-2.5 text-xs border border-luxury-border bg-luxury-dark text-white rounded-lg focus:outline-none focus:border-luxury-gold" placeholder="Qtd" />
+                    <button type="button" onClick={() => removeEstimateLine(line.id)} className="text-rose-500 p-2 cursor-pointer hover:text-rose-450 transition"><Trash className="w-4 h-4" /></button>
                   </div>
                 ))}
               </div>
 
-              <button type="submit" disabled={visIsSubmitting} className="w-full py-3 bg-luxury-gold text-luxury-darker rounded-2xl text-xs font-black uppercase disabled:opacity-50">
+              <button type="submit" disabled={visIsSubmitting} className="w-full py-3.5 bg-luxury-gold hover:bg-luxury-gold-light text-luxury-darker rounded-2xl text-xs font-black uppercase disabled:opacity-50 transition cursor-pointer">
                 {visIsSubmitting ? "Enviando..." : "Enviar Solicitação de Orçamento"}
               </button>
             </form>
@@ -574,7 +571,7 @@ export default function App() {
         </div>
       </section>
 
-      <footer className="py-10 text-center border-t bg-luxury-darker">
+      <footer className="py-10 text-center border-t border-luxury-border/20 bg-luxury-darker">
         <p className="text-xs text-slate-400">{t.footerRights}</p>
       </footer>
 

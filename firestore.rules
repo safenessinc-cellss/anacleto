@@ -7,7 +7,7 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Admins logic
+    // Auth helpers
     function isSignedIn() {
       return request.auth != null;
     }
@@ -19,59 +19,63 @@ service cloud.firestore {
       );
     }
 
-    // Helper to validate IDs
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
     // Admins collection
     match /admins/{adminId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // Sender Config
+    // Sender & System Configuration
     match /sender_config/{configId} {
-      allow read: if true; // Clients can access sender info (required for dynamic invoice calculations)
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Budgets
+    // Companies (CRM)
+    match /companies/{companyId} {
+      allow read, write: if isSignedIn();
+    }
+    match /companies_crm/{clientId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Quotes / Presupuestos
+    match /quotes/{quoteId} {
+      allow read, write: if isSignedIn();
+    }
     match /budgets/{budgetId} {
-      allow read: if true; // Accessible by client via ID
-      allow create: if true; // Anyone can submit an estimate request
-      allow update, delete: if isAdmin();
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isSignedIn();
     }
 
-    // Invoices
+    // Invoices / Facturas
     match /invoices/{invoiceId} {
-      allow read: if true; // Accessible by client via ID
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
 
-    // Visits (Agendamentos de visitas)
+    // Technical Drawings (Dibujos Técnicos y despiece)
+    match /technical_drawings/{drawingId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Ledger / Asientos contables
+    match /ledger/{entryId} {
+      allow read, write: if isSignedIn();
+    }
+    match /ledger_entries/{entryId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Visits (Agendamento de medição)
     match /visits/{visitId} {
-      allow create: if true; // Any visitor can request a free technical visit
-      allow read, update, delete: if isAdmin();
+      allow create: if true;
+      allow read, update, delete: if isSignedIn();
     }
 
     // Chat sessions
     match /chat_sessions/{sessionId} {
-      allow read: if isAdmin() || (isSignedIn() && sessionId == request.auth.uid);
-      allow create: if true; // Floating chat assistance is available to anyone
-      allow update: if true; // Allow appending message elements
-      allow delete: if isAdmin();
-    }
-
-    // Ledger Entries (persistent business expenses)
-    match /ledger_entries/{entryId} {
-      allow read, write: if isAdmin();
-    }
-
-    // Companies CRM (customer profiles and relationship notes)
-    match /companies_crm/{clientId} {
-      allow read, write: if isAdmin();
+      allow read, write: if true;
     }
   }
 }
-

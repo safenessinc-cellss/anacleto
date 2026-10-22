@@ -1,35 +1,173 @@
-export interface BudgetLineItem {
+export interface Company {
+  id: string;
+  name: string;
+  taxId: string; // NIF, CIF, CNPJ, RFC, etc.
+  email: string;
+  phone: string;
+  address: string;
+  city?: string;
+  country?: string;
+  contactPerson?: string;
+  category?: "client" | "supplier" | "partner";
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface QuoteItem {
   id: string;
   description: string;
   quantity: number;
   unitPrice: number;
+  subtotal?: number;
+  notes?: string;
 }
 
-export type BudgetStatus = "pending" | "accepted" | "rejected" | "invoiced";
+export type QuoteStatus = "draft" | "pending" | "approved" | "accepted" | "rejected" | "invoiced";
 
-export interface Budget {
+export interface Quote {
   id: string;
   number: string;
+  companyId?: string;
   clientName: string;
   clientEmail: string;
-  clientNif: string;
+  clientTaxId: string;
   clientAddress: string;
   date: string;
-  items: BudgetLineItem[];
+  validUntil?: string;
+  items: QuoteItem[];
   subtotal: number;
   taxRate: number;
   taxAmount: number;
+  discountRate?: number;
+  discountAmount?: number;
   total: number;
-  status: BudgetStatus;
-  language: string;
-  translations?: Record<string, {
-    items: BudgetLineItem[];
-    subtotal: number;
-    taxAmount: number;
-    total: number;
-  }>;
+  currency: string;
+  status: QuoteStatus;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
+  // PDF Storage in Platform
+  pdfDataUri?: string;
+  pdfFileName?: string;
+  pdfGeneratedAt?: string;
+  pdfFileSizeKb?: number;
+  // Legacy compatibility fields
+  clientNif?: string;
+  language?: string;
+  translations?: Record<string, any>;
+}
+
+export type InvoiceStatus = "pending" | "paid" | "cancelled";
+
+export interface Invoice {
+  id: string;
+  number: string;
+  quoteId?: string;
+  budgetId?: string;
+  companyId?: string;
+  clientName: string;
+  clientEmail: string;
+  clientTaxId?: string;
+  clientNif?: string;
+  clientAddress: string;
+  date: string;
+  dueDate?: string;
+  items: QuoteItem[];
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  discountRate?: number;
+  discountAmount?: number;
+  total: number;
+  currency?: string;
+  status?: InvoiceStatus;
+  paymentMethod?: string;
+  notes?: string;
+  language?: string;
+  senderSnapshot?: SenderConfig;
+  createdAt: string;
+  updatedAt?: string;
+  // PDF Storage in Platform
+  pdfDataUri?: string;
+  pdfFileName?: string;
+  pdfGeneratedAt?: string;
+  pdfFileSizeKb?: number;
+}
+
+export interface TechnicalPiece {
+  id: string;
+  pieceNumber: number;
+  name: string;
+  quantity: number;
+  dimensions: {
+    width: number;
+    height: number;
+    thickness?: number;
+    depth?: number;
+    unit: "cm" | "mm";
+  };
+  material: string;
+  color?: string;
+  cutAngle?: string;
+  notes?: string;
+}
+
+export interface DimensionLine {
+  id: string;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  label: string;
+  value: number;
+  unit: string;
+  orientation: "horizontal" | "vertical" | "diagonal";
+  offset?: number;
+}
+
+export interface TechnicalDrawingStep {
+  stepNumber: number;
+  title: string;
+  description: string;
+  phaseName: string;
+  instructions: string[];
+  svgElementsData?: any;
+}
+
+export interface TechnicalDrawing {
+  id: string;
+  title: string;
+  description: string;
+  category: "furniture" | "architectural" | "aluminum_window" | "glass_door" | "custom";
+  unit: "cm" | "mm";
+  overallDimensions: {
+    width: number;
+    height: number;
+    depth?: number;
+  };
+  pieces: TechnicalPiece[];
+  dimensionLines: DimensionLine[];
+  assemblyInstructions: string[];
+  steps: TechnicalDrawingStep[];
+  currentStep: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  // PDF Storage in Platform
+  pdfDataUri?: string;
+  pdfFileName?: string;
+  pdfGeneratedAt?: string;
+  pdfFileSizeKb?: number;
+}
+
+export interface LedgerEntry {
+  id: string;
+  date: string;
+  description: string;
+  type: "income" | "expense";
+  category: string;
+  amount: number;
+  referenceId?: string;
+  createdAt: string;
 }
 
 export interface SenderConfig {
@@ -72,25 +210,6 @@ export interface SenderConfig {
   }[];
 }
 
-export interface Invoice {
-  id: string;
-  number: string;
-  budgetId: string;
-  clientName: string;
-  clientEmail: string;
-  clientNif: string;
-  clientAddress: string;
-  date: string;
-  items: BudgetLineItem[];
-  subtotal: number;
-  taxRate: number;
-  taxAmount: number;
-  total: number;
-  language: string;
-  senderSnapshot: SenderConfig;
-  createdAt: string;
-}
-
 export interface AdminUser {
   id: string;
   email: string;
@@ -98,13 +217,18 @@ export interface AdminUser {
   createdAt: string;
 }
 
+// Backward compatibility types
+export type BudgetLineItem = QuoteItem;
+export type BudgetStatus = QuoteStatus;
+export interface Budget extends Quote {
+  clientNif: string;
+}
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
   timestamp: string;
 }
-
 export interface ChatSession {
   id: string;
   language: string;

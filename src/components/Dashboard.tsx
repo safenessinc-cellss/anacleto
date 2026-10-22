@@ -87,7 +87,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
       },
       (err) => {
         console.warn("Budgets permission issue or offline: ", err);
-        handleFirestoreError(err, OperationType.GET, "budgets");
+        handleFirestoreError(err, OperationType.GET, "budgets", false);
       }
     );
 
@@ -103,7 +103,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
       },
       (err) => {
         console.warn("Invoices permission issue: ", err);
-        handleFirestoreError(err, OperationType.GET, "invoices");
+        handleFirestoreError(err, OperationType.GET, "invoices", false);
       }
     );
 
@@ -119,7 +119,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
       },
       (err) => {
         console.warn("Chats permission issues: ", err);
-        handleFirestoreError(err, OperationType.GET, "chat_sessions");
+        handleFirestoreError(err, OperationType.GET, "chat_sessions", false);
       }
     );
 
@@ -135,7 +135,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
       },
       (err) => {
         console.warn("Admins list issues: ", err);
-        handleFirestoreError(err, OperationType.GET, "admins");
+        handleFirestoreError(err, OperationType.GET, "admins", false);
       }
     );
 
@@ -151,7 +151,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
       },
       (err) => {
         console.warn("Visits subscription warning: ", err);
-        handleFirestoreError(err, OperationType.GET, "visits");
+        handleFirestoreError(err, OperationType.GET, "visits", false);
       }
     );
 

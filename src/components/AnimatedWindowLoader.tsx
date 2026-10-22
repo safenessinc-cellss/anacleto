@@ -13,7 +13,7 @@ export default function AnimatedWindowLoader({ onFinish, currentLanguage }: Anim
   const [showScrews, setShowScrews] = useState(false);
 
   const texts = {
-    pt: ["CORTANDO PERFIS", "MONTANDO ESTRUTURA", "INSERINDO VIDRO", "INSTALANDO HERRAJES", "FINALIZANDO...", "PRONTO!"],
+    pt: ["CORTANDO PERFIS", "MONTANDO ESTRUTURA", "INSERINDO VIDRO", "INSTALANDO FERRAGENS", "FINALIZANDO...", "PRONTO!"],
     es: ["CORTANDO PERFILES", "MONTANDO ESTRUCTURA", "INSERTANDO VIDRIO", "INSTALANDO HERRAJES", "FINALIZANDO...", "¡LISTO!"],
     en: ["CUTTING PROFILES", "ASSEMBLING STRUCTURE", "INSERTING GLASS", "INSTALLING HARDWARE", "FINALIZING...", "READY!"]
   };
@@ -21,7 +21,7 @@ export default function AnimatedWindowLoader({ onFinish, currentLanguage }: Anim
   const currentTexts = texts[currentLanguage as keyof typeof texts] || texts.pt;
 
   useEffect(() => {
-    const steps = [2000, 2500, 2500, 2000, 1500, 500];
+    const steps = [1500, 1800, 1800, 1500, 1200, 500];
     let currentStep = 0;
 
     const runSteps = () => {
@@ -46,21 +46,21 @@ export default function AnimatedWindowLoader({ onFinish, currentLanguage }: Anim
   }, [onFinish]);
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-black via-slate-900 to-black z-50 flex flex-col items-center justify-center">
-      <div className="text-center space-y-8 max-w-md px-6">
+    <div className="fixed inset-0 bg-gradient-to-br from-black via-slate-950 to-black z-50 flex flex-col items-center justify-center font-sans animate-fadeIn">
+      <div className="text-center space-y-8 max-w-md px-6 animate-fadeIn">
         
-        {/* Título en dorado */}
+        {/* Título em dourado */}
         <div className="space-y-2">
           <h1 className="text-3xl font-black tracking-[0.3em] text-white uppercase">
             ANACLETO
           </h1>
-          <p className="text-xs text-luxury-gold tracking-[0.2em] font-medium uppercase">
+          <p className="text-xs text-luxury-gold tracking-[0.2em] font-medium uppercase font-mono">
             ESQUADRIAS DE ALUMÍNIO
           </p>
         </div>
 
         {/* VENTANA ANIMADA NEGRA CON DORADO */}
-        <div className="relative w-64 h-72 mx-auto bg-black rounded-xl shadow-2xl shadow-luxury-gold/20 border-2 border-luxury-gold/50 overflow-hidden">
+        <div className="relative w-64 h-72 mx-auto bg-black rounded-xl shadow-[0_20px_50px_rgba(197,168,80,0.15)] border-2 border-luxury-gold/50 overflow-hidden">
           
           {/* Marco exterior dorado */}
           <div className="absolute inset-2 border-4 border-luxury-gold/60 rounded-lg bg-black">
@@ -107,7 +107,7 @@ export default function AnimatedWindowLoader({ onFinish, currentLanguage }: Anim
         {/* Estado actual - Dorado */}
         <div className="space-y-3">
           <div className="px-4 py-2 bg-luxury-gold/10 border border-luxury-gold/30 rounded-full inline-block mx-auto backdrop-blur-sm">
-            <p className="text-luxury-gold text-xs font-black tracking-wider animate-pulse">
+            <p className="text-luxury-gold text-xs font-black tracking-wider animate-pulse uppercase">
               {currentTexts[step]}
             </p>
           </div>
@@ -122,15 +122,15 @@ export default function AnimatedWindowLoader({ onFinish, currentLanguage }: Anim
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow-lg"></div>
               </div>
             </div>
-            <p className="text-luxury-gold/70 text-[10px] font-mono mt-2">
+            <p className="text-luxury-gold/70 text-[10px] font-mono mt-2 uppercase">
               {Math.floor(progress)}% completado
             </p>
           </div>
         </div>
 
-        <p className="text-slate-500 text-[9px] font-mono flex items-center gap-1 justify-center">
+        <p className="text-slate-500 text-[10px] font-mono flex items-center gap-1.5 justify-center uppercase tracking-widest">
           <span className="inline-block w-1.5 h-1.5 bg-luxury-gold rounded-full animate-pulse"></span>
-          Fabricación premium
+          Fabricação premium sob medida
         </p>
       </div>
 
