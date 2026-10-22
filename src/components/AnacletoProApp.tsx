@@ -15,8 +15,7 @@ import {
   X,
   ExternalLink,
   ShieldCheck,
-  ChevronRight
-} from "lucide-react";
+  ChevronRight, Calendar } from "lucide-react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import { Quote, Invoice, Company, TechnicalDrawing, SenderConfig } from "../types";
@@ -25,6 +24,7 @@ import CrmModule from "./crm/CrmModule";
 import QuotesModule from "./quotes/QuotesModule";
 import InvoicesModule from "./invoices/InvoicesModule";
 import TechnicalDrawingModule from "./technical-drawing/TechnicalDrawingModule";
+import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
 import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
 
@@ -119,6 +119,7 @@ export default function AnacletoProApp({
     { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
     { id: "invoices" as NavigationTab, label: "Faturas", icon: FileCheck, badge: invoices.length },
     { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico", icon: Compass, badge: "AI CAD" },
+    { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "settings" as NavigationTab, label: "Configuração", icon: Settings, badge: null },
   ];
 
@@ -301,7 +302,9 @@ export default function AnacletoProApp({
             <InvoicesModule senderConfig={senderConfig} />
           )}
 
-          {activeTab === "technical_drawing" && (
+          {activeTab === "agenda" && (<AgendaModule />)}
+
+        {activeTab === "technical_drawing" && (
             <TechnicalDrawingModule senderConfig={senderConfig} />
           )}
 
