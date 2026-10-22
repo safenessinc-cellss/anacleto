@@ -1,86 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Global safety catch-all
+    // Usuarios autenticados pueden leer/escribir todas las colecciones
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Auth helpers
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'safeness.c.a@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
-    }
-
-    // Admins collection
-    match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // Sender & System Configuration
-    match /sender_config/{configId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // Companies (CRM)
-    match /companies/{companyId} {
-      allow read, write: if isSignedIn();
-    }
-    match /companies_crm/{clientId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Quotes / Presupuestos
-    match /quotes/{quoteId} {
-      allow read, write: if isSignedIn();
-    }
-    match /budgets/{budgetId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if isSignedIn();
-    }
-
-    // Invoices / Facturas
-    match /invoices/{invoiceId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Technical Drawings (Dibujos Técnicos y despiece)
-    match /technical_drawings/{drawingId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Ledger / Asientos contables
-    match /ledger/{entryId} {
-      allow read, write: if isSignedIn();
-    }
-    match /ledger_entries/{entryId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Visits (Agendamento de medição)
-    match /visits/{visitId} {
-      allow create: if true;
-      allow read, update, delete: if isSignedIn();
-    }
-
-    // Chat sessions
-    match /chat_sessions/{sessionId} {
-      allow read, write: if true;
-    }
-
-    match /agenda_slots/{slotId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
   }
 }
