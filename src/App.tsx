@@ -28,6 +28,7 @@ import { useToast } from "./components/ToastContext";
 import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
 import AnacletoProApp from "./components/AnacletoProApp";
 import PendingApproval from "./components/PendingApproval";
+import { Role, SUPER_ADMIN_EMAIL } from "./utils/roles";
 
 // Premium Brand Assets
 import logoImg from "./assets/images/anacleto_logo_1780594599493.png";
@@ -57,6 +58,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [adminStatus, setAdminStatus] = useState<"loading" | "authorized" | "unauthorized" | "no-user">("loading");
+  const [userRole, setUserRole] = useState<Role | null>(null);
   const [animationLoading, setAnimationLoading] = useState(true);
   const [currentView, setCurrentView] = useState<"pro" | "landing">("pro");
   const [isAdminPortal, setIsAdminPortal] = useState(false);
@@ -157,6 +159,18 @@ export default function App() {
           setAdminStatus("authorized");
         } else {
           setAdminStatus("unauthorized");
+        // Guardar en pending_users para que el super admin lo vea
+        try {
+          await setDoc(doc(db, "pending_users", firebaseUser.uid), {
+            email: firebaseUser.email || "",
+            displayName: firebaseUser.displayName || "",
+            photoURL: firebaseUser.photoURL || "",
+            uid: firebaseUser.uid,
+            requestedAt: new Date().toISOString(),
+          }, { merge: true });
+        } catch (e) {
+          console.warn("No se pudo guardar pending_user:", e);
+        }
         }
       } catch (err) {
         console.warn("Admin check error:", err);
@@ -431,6 +445,7 @@ export default function App() {
         onLogout={handleLogout}
         language={language}
         onLanguageChange={handleLanguageChange}
+        userRole={userRole || "usuario"}
       />
     );
   }

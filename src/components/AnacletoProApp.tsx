@@ -29,6 +29,8 @@ import TechnicalDrawingModule from "./technical-drawing/TechnicalDrawingModule";
 import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
 import FinanceModule from "./finance/FinanceModule";
+import AdminModule from "./admin/AdminModule";
+import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
 import CatalogModule from "./catalog/CatalogModule";
 import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
 
@@ -41,6 +43,7 @@ interface AnacletoProAppProps {
   onLogout?: () => void;
   language?: string;
   onLanguageChange?: (lang: string) => void;
+  userRole?: Role;
 }
 
 export default function AnacletoProApp({
@@ -50,7 +53,9 @@ export default function AnacletoProApp({
   onLogout,
   language = "pt",
   onLanguageChange,
+  userRole = "usuario",
 }: AnacletoProAppProps) {
+  const roleConfig = getRoleConfig(userRole);
   const [activeTab, setActiveTab] = useState<NavigationTab>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -134,7 +139,7 @@ export default function AnacletoProApp({
 
   // Navigation Items Required in Prompt
   const navItems = [
-    { id: "dashboard" as NavigationTab, label: "Dashboard", icon: LayoutDashboard, badge: null },
+        { id: "dashboard" as NavigationTab, label: "Dashboard", icon: LayoutDashboard, badge: null },
     { id: "crm" as NavigationTab, label: "CRM (Empresas)", icon: Building, badge: companies.length },
     { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
     { id: "invoices" as NavigationTab, label: "Faturas", icon: FileCheck, badge: invoices.length },
@@ -143,7 +148,11 @@ export default function AnacletoProApp({
     { id: "catalog" as NavigationTab, label: "Catálogo", icon: Package, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
     { id: "settings" as NavigationTab, label: "Configuração", icon: Settings, badge: null },
-  ];
+    { id: "admin" as NavigationTab, label: "Administración", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
+  ].filter((item) => hasAccessToTab(userRole, item.id as RoleNavTab));
+  
+  // (el array original tenía la estructura "[ ... ]" - ahora filtramos por rol)
+  const _unused = [  ];
 
   const handleSelectCompanyForQuote = (comp: Company) => {
     setActiveTab("quotes");
@@ -333,6 +342,8 @@ export default function AnacletoProApp({
           {activeTab === "catalog" && (<CatalogModule />)}
 
         {activeTab === "finance" && (<FinanceModule language={language} />)}
+
+        {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentRole={userRole} />)}
 
         {activeTab === "settings" && (
             <SettingsModule language={language} senderConfig={senderConfig} setSenderConfig={setSenderConfig} />
