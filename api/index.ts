@@ -1,4 +1,3 @@
-import app from "../server";
+import app from "../server.js";
 
-// Vercel espera una exportación por defecto para manejar las peticiones
 export default app;
