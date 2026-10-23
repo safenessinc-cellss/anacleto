@@ -261,11 +261,13 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
       });
 
+      const responseBody = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error("Error en el servidor de IA");
+        const serverMessage = responseBody?.error || responseBody?.details;
+        throw new Error(serverMessage || `Error en el servidor de IA (${res.status})`);
       }
 
-      const data = await res.json();
+      const data = responseBody;
       const newDrawing: TechnicalDrawing = {
         id: "draw_" + Math.random().toString(36).substring(2, 9),
         title: data.title || "Peça Arquitectónica a Medida",
