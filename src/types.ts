@@ -149,6 +149,14 @@ export interface TechnicalDrawing {
   assemblyInstructions: string[];
   steps: TechnicalDrawingStep[];
   currentStep: number;
+  budget?: {
+    currency: string;
+    items: Array<{ id?: string; pieceId?: string; description: string; sku?: string; quantity: number; unitPrice: number; subtotal: number; priceSource?: string }>;
+    subtotal: number;
+    labor: number;
+    total: number;
+    notes?: string;
+  };
   notes?: string;
   createdAt: string;
   updatedAt: string;
