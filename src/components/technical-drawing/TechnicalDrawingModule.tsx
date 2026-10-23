@@ -41,7 +41,7 @@ const initialSampleDrawing: TechnicalDrawing = {
   id: "draw-sample-01",
   title: "Mesa de Madeira Maciça 120×80×75 cm",
   description: "Estrutura arquitetônica em madeira de carvalho com encaixes tipo caixa e espiga e saias perimetrais.",
-  category: "móvel",
+  category: "furniture",
   unit: "cm",
   overallDimensions: { width: 120, height: 75, depth: 80 },
   pieces: [
@@ -172,8 +172,16 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const [currentStep, setCurrentStep] = useState(1);
   const [drawing, setDrawing] = useState<TechnicalDrawing>(initialSampleDrawing);
   const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
+  const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!authReady) return;
+    return onSnapshot(collection(db, "catalog"), (snap) => {
+      setCatalogItems(snap.docs.map((item) => ({ id: item.id, ...item.data() })));
+    }, (err) => console.warn("Firestore catalog load notice:", err));
+  }, [authReady]);
 
   // Load saved drawings from Firestore
   useEffect(() => {
@@ -250,7 +258,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       const res = await fetch("/api/ai/technical-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing }),
+        body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
       });
 
       if (!res.ok) {
@@ -550,6 +558,27 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               ))}
             </div>
           </div>
+
+          {drawing.budget && (
+            <div className="bg-slate-900 border border-emerald-500/20 p-5 rounded-3xl shadow-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-300">Orçamento de materiais</h3>
+                <span className="text-sm font-black text-emerald-300">{drawing.budget.currency} {drawing.budget.total.toFixed(2)}</span>
+              </div>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {drawing.budget.items.map((item, index) => (
+                  <div key={item.id || index} className="flex justify-between gap-3 text-[11px] text-slate-300">
+                    <span className="truncate">{item.description} ({item.quantity} × {item.unitPrice.toFixed(2)})</span>
+                    <span className="font-mono text-emerald-300">{item.subtotal.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-slate-800 pt-2 flex justify-between text-[11px] font-bold text-slate-300">
+                <span>Materiais + mão de obra</span><span>{drawing.budget.total.toFixed(2)} {drawing.budget.currency}</span>
+              </div>
+              {drawing.budget.notes && <p className="text-[10px] text-slate-500">{drawing.budget.notes}</p>}
+            </div>
+          )}
         </div>
 
         {/* RIGHT PANEL: Scalable SVG Canvas (7 cols) */}

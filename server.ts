@@ -149,14 +149,44 @@ app.post("/api/ai/quote-agent", async (req, res) => {
   }
 });
 
+function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[]) {
+  const catalogRows = Array.isArray(catalog) ? catalog : [];
+  const rawItems = Array.isArray(rawBudget?.items) ? rawBudget.items : pieces.map((piece: any) => {
+    const material = String(piece.material || piece.name || "").toLowerCase();
+    const match = catalogRows.find((item: any) => {
+      const haystack = `${item.name || ""} ${item.sku || ""} ${item.category || ""}`.toLowerCase();
+      return material.split(/\s+/).some((word) => word.length > 3 && haystack.includes(word));
+    });
+    const quantity = Math.max(1, Number(piece.quantity) || 1);
+    const unitPrice = Number(match?.price) || 0;
+    return {
+      pieceId: piece.id,
+      description: piece.name || piece.material || "Componente técnico",
+      sku: match?.sku || "",
+      quantity,
+      unitPrice,
+      subtotal: quantity * unitPrice,
+      priceSource: match ? "catalogo" : "estimado",
+    };
+  });
+  const items = rawItems.map((item: any, index: number) => {
+    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const unitPrice = Math.max(0, Number(item.unitPrice) || 0);
+    return { ...item, id: item.id || `budget-${index + 1}`, quantity, unitPrice, subtotal: quantity * unitPrice };
+  });
+  const subtotal = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
+  const labor = Math.max(0, Number(rawBudget?.labor) || 0);
+  return { currency: rawBudget?.currency || "BRL", items, subtotal, labor, total: subtotal + labor, notes: rawBudget?.notes || "Valores sincronizados com o catálogo quando disponível." };
+}
+
 // ----------------------------------------------------
 // 3. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
 app.post("/api/ai/technical-drawing", async (req, res) => {
   try {
-    const { prompt, currentDrawing } = req.body;
+    const { prompt, currentDrawing, catalog = [] } = req.body;
 
-    if (!prompt) {
+    if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
       return res.status(400).json({ error: "Descripción técnica requerida" });
     }
 
@@ -166,7 +196,10 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
       El usuario describirá en lenguaje natural una pieza arquitectónica, mueble o estructura:
       (ej: "una mesa de madera de 120x80x75 cm con 4 patas", "un armario de 2 puertas de 180x60x200 cm", "una pieza en L de 90x90 cm con un corte a 45°", "ventana de aluminio corrediza de 150x120 cm con 2 hojas", etc.).
 
-      Debes generar un proyecto técnico completo con TODAS las siguientes especificaciones:
+      Debes generar un proyecto técnico completo con TODAS las siguientes especificaciones.
+      Catálogo disponible del taller (usa sus nombres, SKU y precios cuando coincidan; no inventes precios si hay coincidencia):
+      ${JSON.stringify(Array.isArray(catalog) ? catalog.slice(0, 200) : [])}
+      La salida también debe incluir presupuesto materializado con líneas, precio unitario, subtotal y total en BRL. Si no existe precio para una pieza, marca priceSource como "estimado" y usa un valor prudente.
       1. Título y categoría de la pieza.
       2. Dimensiones generales (ancho, alto, profundidad, unidad en cm o mm).
       3. Despiece detallado (BOM): Lista de componentes donde cada pieza tiene:
@@ -189,6 +222,15 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
       RESPONDE ÚNICAMENTE EN JSON con la siguiente estructura:
       {
         "title": "Nombre descriptivo de la pieza",
+        "assemblyInstructions": ["Instrucción de montaje 1"],
+        "budget": {
+          "currency": "BRL",
+          "items": [{ "pieceId": "p1", "description": "Perfil", "sku": "", "quantity": 1, "unitPrice": 0, "subtotal": 0, "priceSource": "catalogo" }],
+          "subtotal": 0,
+          "labor": 0,
+          "total": 0,
+          "notes": ""
+        },
         "description": "Descripción arquitectónica resumida",
         "category": "furniture" | "architectural" | "aluminum_window" | "glass_door" | "custom",
         "unit": "cm",
@@ -264,8 +306,15 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
       temperature: 0.2,
     });
 
-    const drawingData = JSON.parse(response.text || "{}");
-    return res.json(drawingData);
+    const rawText = response.text || "{}";
+    const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const drawingData = JSON.parse(jsonText);
+    const pieces = Array.isArray(drawingData.pieces) ? drawingData.pieces : [];
+    drawingData.assemblyInstructions = Array.isArray(drawingData.assemblyInstructions)
+      ? drawingData.assemblyInstructions
+      : drawingData.steps?.flatMap((step: any) => step.instructions || []) || [];
+    drawingData.budget = normalizeTechnicalBudget(drawingData.budget, pieces, catalog);
+    return res.status(200).json(drawingData);
   } catch (err: any) {
     console.error("Technical drawing AI error:", err);
     // Sophisticated smart fallback generator based on the prompt keywords
