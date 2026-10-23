@@ -2,7 +2,7 @@ import express from "express";
 import http from "http";
 import path from "path";
 import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
+// import estático de vite eliminado - se usa import dinámico en desarrollo
 import { generateText, gateway } from "ai";
 import { google } from "googleapis";
 
@@ -434,6 +434,7 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
 // Setup Vite Dev Server / Serve build static files
 const startServer = async () => {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     console.log("Starting server in DEVELOPMENT mode with Vite middleware...");
     const vite = await createViteServer({
       server: {
