@@ -327,7 +327,9 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
       ];
     }
 
-    return res.json({
+    // The AI service is optional: always return a valid drawing so a provider
+    // timeout, quota error, or malformed model response never becomes a 500.
+    return res.status(200).json({
       title: title,
       description: "Generado con motor técnico de arquitectura e ingeniería Anacleto Pro.",
       category: isWindow ? "aluminum_window" : isTable ? "furniture" : "architectural",
