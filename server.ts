@@ -378,6 +378,7 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
 
     // The AI service is optional: always return a valid drawing so a provider
     // timeout, quota error, or malformed model response never becomes a 500.
+    const fallbackBudget = normalizeTechnicalBudget(undefined, pieces, req.body?.catalog);
     return res.status(200).json({
       title: title,
       description: "Generado con motor técnico de arquitectura e ingeniería Anacleto Pro.",
@@ -385,6 +386,14 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
       unit: "cm",
       overallDimensions: { width, height, depth },
       pieces: pieces,
+      assemblyInstructions: [
+        "Confirmar medidas del hueco y tolerancias antes de cortar.",
+        "Identificar cada componente con su número de pieza.",
+        "Ejecutar los cortes indicados y retirar rebabas.",
+        "Presentar las piezas en seco, escuadrar y fijar.",
+        "Revisar cotas finales, funcionamiento y sellado."
+      ],
+      budget: fallbackBudget,
       dimensionLines: [
         { id: "d1", label: `${width} cm (Ancho total)`, value: width, unit: "cm", orientation: "horizontal", start: { x: 80, y: 50 }, end: { x: 520, y: 50 }, offset: 25 },
         { id: "d2", label: `${height} cm (Alto total)`, value: height, unit: "cm", orientation: "vertical", start: { x: 50, y: 80 }, end: { x: 50, y: 380 }, offset: 25 },
