@@ -46,8 +46,10 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
     const u2 = onSnapshot(collection(db, "admins"), (snap) => {
       const list: AdminUser[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as AdminUser));
-      list.sort((a, b) => (ROLES[b.role]?.level || 0) - (ROLES[a.role]?.level || 0));
-      setAdmins(list);
+      // Excluir al super admin de la lista (se detecta por email)
+      const filtered = list.filter((a) => a.email !== SUPER_ADMIN_EMAIL);
+      filtered.sort((a, b) => (ROLES[b.role]?.level || 0) - (ROLES[a.role]?.level || 0));
+      setAdmins(filtered);
     }, (err) => console.warn("Admins listener:", err));
 
     return () => { u1(); u2(); };
@@ -250,6 +252,21 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
                 </tr>
               </thead>
               <tbody>
+                {/* Super Admin siempre visible */}
+                <tr className="border-t border-slate-100 dark:border-slate-800 bg-amber-50/30 dark:bg-amber-950/10">
+                  <td className="p-3 font-mono text-xs">
+                    {SUPER_ADMIN_EMAIL}
+                    <span className="ml-2 bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded">SUPER</span>
+                  </td>
+                  <td className="p-3">
+                    <span className="inline-block px-2 py-0.5 rounded border text-xs font-bold bg-amber-100 text-amber-800 border-amber-300">
+                      Super Admin
+                    </span>
+                  </td>
+                  <td className="p-3 text-xs text-slate-500">Sistema</td>
+                  <td className="p-3 text-xs text-slate-500">-</td>
+                  <td className="p-3 text-xs text-slate-400">Protegido</td>
+                </tr>
                 {admins.map((a) => {
                   const isSuper = a.email === SUPER_ADMIN_EMAIL;
                   const canEdit = !isSuper && assignableRoles.some((r) => r.id === a.role);
@@ -262,7 +279,11 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
                         )}
                       </td>
                       <td className="p-3">
-                        {canEdit ? (
+                        {a.email === SUPER_ADMIN_EMAIL ? (
+                          <span className="inline-block px-2 py-0.5 rounded border text-xs font-bold bg-amber-100 text-amber-800 border-amber-300">
+                            Super Admin
+                          </span>
+                        ) : canEdit ? (
                           <select
                             value={a.role}
                             onChange={(e) => changeRole(a, e.target.value as Role)}
@@ -285,6 +306,9 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
                           <button onClick={() => removeAdmin(a)} className="p-1 text-rose-600 hover:text-rose-700">
                             <Trash2 className="w-4 h-4" />
                           </button>
+                        )}
+                        {isSuper && (
+                          <span className="text-xs text-slate-400">Protegido</span>
                         )}
                       </td>
                     </tr>
