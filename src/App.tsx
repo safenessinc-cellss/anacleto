@@ -141,39 +141,50 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       setAuthLoading(false);
+      setAuthReady(true);
+
       if (!firebaseUser) {
+        setUserRole(null);
         setAdminStatus("no-user");
         setCurrentView("landing");
         return;
       }
-      // Super admin bootstrap: siempre autorizado
-      if (firebaseUser.email === "safeness.c.a@gmail.com") {
+
+      // Super admin bootstrap
+      if (firebaseUser.email === SUPER_ADMIN_EMAIL) {
+        setUserRole("super_admin");
         setAdminStatus("authorized");
         return;
       }
-      // Verificar si el email está en la colección admins
+
+      // Buscar en la colección admins
       try {
-        const q = query(collection(db, "admins"), where("email", "==", firebaseUser.email));
-        const snap = await getDocs(q);
+        const email = (firebaseUser.email || "").toLowerCase();
+        const snap = await getDocs(query(collection(db, "admins"), where("email", "==", email)));
         if (!snap.empty) {
+          const data = snap.docs[0].data();
+          const role = (data.role || "usuario") as Role;
+          setUserRole(role);
           setAdminStatus("authorized");
         } else {
+          setUserRole(null);
           setAdminStatus("unauthorized");
-        // Guardar en pending_users para que el super admin lo vea
-        try {
-          await setDoc(doc(db, "pending_users", firebaseUser.uid), {
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || "",
-            photoURL: firebaseUser.photoURL || "",
-            uid: firebaseUser.uid,
-            requestedAt: new Date().toISOString(),
-          }, { merge: true });
-        } catch (e) {
-          console.warn("No se pudo guardar pending_user:", e);
-        }
+          // Guardar en pending_users
+          try {
+            await setDoc(doc(db, "pending_users", firebaseUser.uid), {
+              email: firebaseUser.email || "",
+              displayName: firebaseUser.displayName || "",
+              photoURL: firebaseUser.photoURL || "",
+              uid: firebaseUser.uid,
+              requestedAt: new Date().toISOString(),
+            }, { merge: true });
+          } catch (e) {
+            console.warn("No se pudo guardar pending_user:", e);
+          }
         }
       } catch (err) {
         console.warn("Admin check error:", err);
+        setUserRole(null);
         setAdminStatus("unauthorized");
       }
     });
