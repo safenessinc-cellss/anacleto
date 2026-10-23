@@ -53,21 +53,19 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
     setGoogleLoading(true);
     setErrorMsg("");
 
-    // Race the Google Sign-In pop-up against a timeout promise. 
-    // If running in development iframe environments, cross-origin restrictions on 'apis.google.com' (gapi)
-    // might block or hang the iframe's message handshake process.
-    const iframeTimeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        const timeoutErr = new Error("POPUP_TIMEOUT");
-        (timeoutErr as any).code = "auth/popup-timeout";
-        reject(timeoutErr);
-      }, 7000);
-    });
+    // Evita falsos timeouts: o handshake do popup pode levar mais tempo em iframes.
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     try {
       await Promise.race([
         signInWithPopup(auth, googleProvider),
-        iframeTimeoutPromise
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            const timeoutErr = new Error("POPUP_TIMEOUT");
+            (timeoutErr as any).code = "auth/popup-timeout";
+            reject(timeoutErr);
+          }, 30000);
+        }),
       ]);
       
       const user = auth.currentUser;
@@ -100,6 +98,7 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
         setErrorMsg("Erro de acesso com o Google: " + (err.message || err));
       }
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       setGoogleLoading(false);
     }
   };

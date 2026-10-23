@@ -72,7 +72,7 @@ app.post("/api/chat", async (req, res) => {
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-2.5-flash",
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
@@ -134,7 +134,7 @@ app.post("/api/ai/quote-agent", async (req, res) => {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-2.5-flash",
       contents: message,
       config: {
         systemInstruction: systemPrompt,
@@ -284,7 +284,7 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-2.5-flash",
       contents: `Diseña y despieza la siguiente pieza arquitectónica o mueble: "${prompt}"`,
       config: {
         systemInstruction: systemPrompt,
