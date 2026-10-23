@@ -58,6 +58,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [adminStatus, setAdminStatus] = useState<"loading" | "authorized" | "unauthorized" | "no-user">("loading");
+  const [authReady, setAuthReady] = useState(false);
   const [userRole, setUserRole] = useState<Role | null>(null);
   const [animationLoading, setAnimationLoading] = useState(true);
   const [currentView, setCurrentView] = useState<"pro" | "landing">("pro");
@@ -141,7 +142,6 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       setAuthLoading(false);
-      setAuthReady(true);
 
       if (!firebaseUser) {
         setUserRole(null);
