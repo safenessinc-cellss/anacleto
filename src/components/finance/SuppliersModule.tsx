@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { Plus, Trash2, Edit, Search, Building2 } from "lucide-react";
+import { Building, Building2, Edit, Plus, Search, Trash2 } from "lucide-react";
 
 interface Supplier {
   id?: string;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { Plus, Trash2, CheckCircle, AlertCircle, Clock, XCircle, DollarSign, Search, Edit, TrendingUp } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, TrendingUp, X, XCircle } from "lucide-react";
 
 interface Client { id?: string; name: string; }
 interface Receivable {

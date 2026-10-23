@@ -1,21 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Package,
-  LayoutDashboard,
-  Building,
-  FileText,
-  FileCheck,
-  Compass,
-  Settings,
-  Sparkles,
-  LogOut,
-  Globe,
-  Sun,
-  Moon,
-  Menu,
-  X,
-  ExternalLink,
-  ShieldCheck,
-  ChevronRight, Calendar, Wallet } from "lucide-react";
+import { Building, Calendar, ChevronRight, Compass, ExternalLink, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X } from "lucide-react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";

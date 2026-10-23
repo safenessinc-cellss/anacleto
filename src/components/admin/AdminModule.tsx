@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, doc, deleteDoc, setDoc, query, orderBy } from "firebase/firestore";
 import { db, auth } from "../../firebase";
-import { Shield, CheckCircle, XCircle, Mail, Clock, Trash2, Plus, UserCog } from "lucide-react";
+import { CheckCircle, Clock, Mail, Plus, Shield, Trash2, User, UserCog, X, XCircle } from "lucide-react";
 import { Role, ROLES, SUPER_ADMIN_EMAIL, getAssignableRoles, getRoleConfig } from "../../utils/roles";
 
 interface PendingUser {

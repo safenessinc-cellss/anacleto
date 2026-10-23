@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TrendingDown, TrendingUp, Building2 } from "lucide-react";
+import { Building, Building2, TrendingDown, TrendingUp } from "lucide-react";
 import SuppliersModule from "./SuppliersModule";
 import PayablesModule from "./PayablesModule";
 import ReceivablesModule from "./ReceivablesModule";
