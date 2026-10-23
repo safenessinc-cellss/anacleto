@@ -15,7 +15,7 @@ import { Package,
   X,
   ExternalLink,
   ShieldCheck,
-  ChevronRight, Calendar } from "lucide-react";
+  ChevronRight, Calendar, Wallet } from "lucide-react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
@@ -28,10 +28,11 @@ import InvoicesModule from "./invoices/InvoicesModule";
 import TechnicalDrawingModule from "./technical-drawing/TechnicalDrawingModule";
 import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
+import FinanceModule from "./finance/FinanceModule";
 import CatalogModule from "./catalog/CatalogModule";
 import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "settings";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -140,6 +141,7 @@ export default function AnacletoProApp({
     { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico", icon: Compass, badge: "AI CAD" },
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "catalog" as NavigationTab, label: "Catálogo", icon: Package, badge: null },
+    { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
     { id: "settings" as NavigationTab, label: "Configuração", icon: Settings, badge: null },
   ];
 
@@ -329,6 +331,8 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "catalog" && (<CatalogModule />)}
+
+        {activeTab === "finance" && (<FinanceModule language={language} />)}
 
         {activeTab === "settings" && (
             <SettingsModule language={language} senderConfig={senderConfig} setSenderConfig={setSenderConfig} />
