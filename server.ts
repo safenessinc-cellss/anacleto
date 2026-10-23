@@ -3,7 +3,7 @@ import http from "http";
 import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import { generateText, gateway } from "ai";
 import { google } from "googleapis";
 
 // Load .env.local first if available, then fallback to .env
@@ -17,21 +17,8 @@ app.use(express.json({ limit: "10mb" }));
 
 const PORT = 3000;
 
-// Initialize Gemini client server-side ONLY
-const apiKey = process.env.GEMINI_API_KEY;
-let ai: GoogleGenAI | null = null;
-if (apiKey) {
-  ai = new GoogleGenAI({
-    apiKey: apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
-    },
-  });
-} else {
-  console.warn("GEMINI_API_KEY environment variable is not defined in .env.local or process.env!");
-}
+// Vercel AI Gateway supplies authentication in previews and deployments.
+const aiModel = gateway("openai/gpt-4o-mini");
 
 // ----------------------------------------------------
 // 1. General AI Chat Proxy
@@ -44,11 +31,6 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    if (!ai) {
-      return res.status(500).json({
-        error: "AI service is not configured. Please define GEMINI_API_KEY in the environment.",
-      });
-    }
 
     const systemInstruction = `
       Eres el Asistente Técnico y Comercial de "Anacleto Pro", una plataforma SaaS moderna especializada en presupuestos inteligentes, facturación, CRM para empresas y Dibujo Técnico Arquitectónico para carpintería de aluminio, vidrio y mobiliario a medida.
@@ -71,13 +53,14 @@ app.post("/api/chat", async (req, res) => {
       parts: [{ text: message }],
     });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: 0.7,
-      },
+    const response = await generateText({
+      model: aiModel,
+      system: systemInstruction,
+      messages: contents.map((content) => ({
+        role: content.role === "model" ? "assistant" : content.role,
+        content: content.parts?.[0]?.text || "",
+      })),
+      temperature: 0.7,
     });
 
     const replyText = response.text || "No se pudo procesar la respuesta en este momento.";
@@ -102,9 +85,6 @@ app.post("/api/ai/quote-agent", async (req, res) => {
       return res.status(400).json({ error: "Mensaje requerido" });
     }
 
-    if (!ai) {
-      return res.status(500).json({ error: "Servicio de IA no configurado." });
-    }
 
     const systemPrompt = `
       Eres el Agente Experto de Presupuestos y Facturación de Anacleto Pro.
@@ -133,14 +113,11 @@ app.post("/api/ai/quote-agent", async (req, res) => {
       }
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: message,
-      config: {
-        systemInstruction: systemPrompt,
-        temperature: 0.3,
-        responseMimeType: "application/json",
-      },
+    const response = await generateText({
+      model: aiModel,
+      system: systemPrompt,
+      prompt: message,
+      temperature: 0.3,
     });
 
     const parsed = JSON.parse(response.text || "{}");
@@ -183,9 +160,6 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
       return res.status(400).json({ error: "Descripción técnica requerida" });
     }
 
-    if (!ai) {
-      return res.status(500).json({ error: "Servicio de IA no disponible" });
-    }
 
     const systemPrompt = `
       Eres el Arquitecto e Ingeniero de Dibujo Técnico de "Anacleto Pro".
@@ -283,14 +257,11 @@ app.post("/api/ai/technical-drawing", async (req, res) => {
       }
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Diseña y despieza la siguiente pieza arquitectónica o mueble: "${prompt}"`,
-      config: {
-        systemInstruction: systemPrompt,
-        temperature: 0.2,
-        responseMimeType: "application/json",
-      },
+    const response = await generateText({
+      model: aiModel,
+      system: systemPrompt,
+      prompt: `Diseña y despieza la siguiente pieza arquitectónica o mueble: "${prompt}"`,
+      temperature: 0.2,
     });
 
     const drawingData = JSON.parse(response.text || "{}");
