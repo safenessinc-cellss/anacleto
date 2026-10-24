@@ -131,7 +131,7 @@ export default function App() {
       document.documentElement.classList.remove("dark");
     } else {
       setDarkMode(true);
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("dark");
     }
 
     // Tiempo de carga mínimo para mostrar la animación completa de la ventana
@@ -209,7 +209,7 @@ export default function App() {
     const nextDark = !darkMode;
     setDarkMode(nextDark);
     if (nextDark) {
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("dark");
       localStorage.setItem("anacleto_theme", "dark");
     } else {
       document.documentElement.classList.remove("dark");

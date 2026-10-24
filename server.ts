@@ -521,4 +521,52 @@ app.post("/api/create-calendar-event", async (req, res) => {
   }
 });
 
+
+// ============ FINANCIAL AI: Extraer datos de boleto ============
+app.post("/api/ai/financial-extract", async (req, res) => {
+  try {
+    const { data, mimeType } = req.body;
+    if (!data) return res.status(400).json({ error: "No data" });
+    const { GoogleGenerativeAI } = await import("@google/genai");
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `Você é um assistente financeiro. Analise este documento (boleto ou conta a pagar) e extraia em JSON:
+{ "beneficiary": "nome do beneficiário", "cnpj": "CNPJ", "amount": 123.45, "dueDate": "YYYY-MM-DD", "digitableLine": "linha digitável", "description": "descrição" }
+Responda APENAS o JSON, sem texto.`;
+    const result = await model.generateContent([
+      { inlineData: { mimeType: mimeType || "application/pdf", data } },
+      prompt,
+    ]);
+    const text = result.response.text();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    res.json(parsed);
+  } catch (err: any) {
+    console.error("Financial AI error:", err);
+    res.status(500).json({ error: err?.message || "Erro" });
+  }
+});
+
+// ============ PIX: Gerar QR Code (placeholder) ============
+app.post("/api/payments/pix", async (req, res) => {
+  try {
+    const { amount, description } = req.body;
+    if (!amount) return res.status(400).json({ error: "Amount required" });
+    // Aquí integrarías Mercado Pago, Efí (Gerencianet), PagSeguro, etc.
+    // Ejemplo con API de Mercado Pago:
+    // const mp = require("mercadopago"); mp.configure({ access_token: process.env.MP_ACCESS_TOKEN });
+    // const payment = await mp.payment.create({ body: { transaction_amount: amount, description, payment_method_id: "pix" } });
+    // res.json({ qrCode: payment.body.point_of_interaction.transaction_data.qr_code_base64, copyPaste: payment.body.point_of_interaction.transaction_data.qr_code });
+    // Por enquanto, retornar placeholder:
+    res.json({
+      pending: true,
+      message: "Configure MERCADO_PAGO_ACCESS_TOKEN em Vercel para ativar PIX real.",
+      amount,
+      description,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message });
+  }
+});
+
 export default app;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Building, Calendar, ChevronRight, Compass, ExternalLink, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X } from "lucide-react";
+import { Building, Calendar, ChevronRight, Compass, ExternalLink, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X, Palette } from "lucide-react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
@@ -13,6 +13,8 @@ import TechnicalDrawingModule from "./technical-drawing/TechnicalDrawingModule";
 import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
 import FinanceModule from "./finance/FinanceModule";
+import FinancialAI from "./finance/FinancialAI";
+import ThemeModule from "./settings/ThemeModule";
 import AdminModule from "./admin/AdminModule";
 import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
 import CatalogModule from "./catalog/CatalogModule";
@@ -131,7 +133,9 @@ export default function AnacletoProApp({
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "catalog" as NavigationTab, label: "Catálogo", icon: Package, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
+    { id: "financial_ai" as NavigationTab, label: "IA Financeira", icon: Sparkles, badge: "NOVO" },
     { id: "settings" as NavigationTab, label: "Configuração", icon: Settings, badge: null },
+    { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
     { id: "admin" as NavigationTab, label: "Administración", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
   ].filter((item) => hasAccessToTab(userRole, item.id as RoleNavTab));
   
@@ -328,6 +332,8 @@ export default function AnacletoProApp({
         {activeTab === "finance" && (<FinanceModule language={language} />)}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentRole={userRole} />)}
+        {activeTab === "financial_ai" && (<FinancialAI />)}
+        {activeTab === "theme" && (<ThemeModule />)}
 
         {activeTab === "settings" && (
             <SettingsModule language={language} senderConfig={senderConfig} setSenderConfig={setSenderConfig} />

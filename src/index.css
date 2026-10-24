@@ -71,3 +71,25 @@ body {
     margin: 0 !important;
   }
 }
+
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Forzar contraste en fondos claros */
+  .bg-white, .bg-slate-50, .bg-slate-100 {
+    @apply text-slate-900;
+  }
+  /* Inputs legibles siempre */
+  input, select, textarea {
+    @apply text-slate-900 bg-white;
+  }
+  input::placeholder, textarea::placeholder {
+    @apply text-slate-400;
+  }
+}

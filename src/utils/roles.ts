@@ -4,6 +4,7 @@
 
 export type Role =
   | "super_admin"
+  | "super_usuario"
   | "ceo"
   | "admin"
   | "supervisor"
@@ -42,7 +43,18 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 100,
     color: "bg-amber-100 text-amber-800 border-amber-300",
     description: "Acceso total al sistema. Solo el propietario.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "admin", "settings"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme"],
+    canManageUsers: true,
+    canManageRolesBelow: ["ceo", "admin", "supervisor", "colaborador", "usuario"],
+  },
+  super_usuario: {
+    id: "super_usuario",
+    label: "Super Usuario",
+    labelPT: "Super Usuário",
+    level: 90,
+    color: "bg-orange-100 text-orange-800 border-orange-300",
+    description: "Acceso total excepto gestión del propietario. Puede asignar todos los roles.",
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme"],
     canManageUsers: true,
     canManageRolesBelow: ["ceo", "admin", "supervisor", "colaborador", "usuario"],
   },
@@ -53,9 +65,9 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 80,
     color: "bg-purple-100 text-purple-800 border-purple-300",
     description: "Dirección ejecutiva. Ve todo, gestiona finanzas y reportes.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "settings"],
-    canManageUsers: false,
-    canManageRolesBelow: [],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme"],
+    canManageUsers: true,
+    canManageRolesBelow: ["supervisor", "colaborador", "usuario"],
   },
   admin: {
     id: "admin",
@@ -64,7 +76,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 60,
     color: "bg-indigo-100 text-indigo-800 border-indigo-300",
     description: "Gestión completa del negocio. Puede aprobar supervisores, colaboradores y usuarios.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "admin", "settings"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme"],
     canManageUsers: true,
     canManageRolesBelow: ["supervisor", "colaborador", "usuario"],
   },
