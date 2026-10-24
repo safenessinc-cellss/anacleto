@@ -130,7 +130,7 @@ export default function App() {
       setDarkMode(false);
       document.documentElement.classList.remove("dark");
     } else {
-      setDarkMode(true);
+      setDarkMode(false);
       document.documentElement.classList.remove("dark");
     }
 

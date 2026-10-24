@@ -7,7 +7,8 @@ export interface ThemeConfig {
   accent: string;
   accentLight: string;
   bg: string;
-  radius: number;   // 0-20 px
+  cardBg: string;
+  radius: number;
   density: "compact" | "normal" | "comfortable";
 }
 
@@ -18,6 +19,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   accent: "#EA4335",
   accentLight: "#FCE8E6",
   bg: "#F8F9FA",
+  cardBg: "#FFFFFF",
   radius: 8,
   density: "normal",
 };
@@ -30,6 +32,7 @@ export function applyTheme(config: ThemeConfig): void {
   root.style.setProperty("--theme-accent", config.accent);
   root.style.setProperty("--theme-accent-light", config.accentLight);
   root.style.setProperty("--theme-bg", config.bg);
+  root.style.setProperty("--theme-card", config.cardBg);
   root.style.setProperty("--theme-radius", `${config.radius}px`);
 
   let style = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
@@ -42,7 +45,46 @@ export function applyTheme(config: ThemeConfig): void {
   const densityPad = config.density === "compact" ? "0.35rem" : config.density === "comfortable" ? "0.75rem" : "0.5rem";
 
   style.textContent = `
-    /* ===== PRIMARY ===== */
+    /* ========== BACKGROUND GLOBAL (solo en modo claro) ========== */
+    html:not(.dark) body,
+    html:not(.dark) #root,
+    html:not(.dark) #root > div,
+    html:not(.dark) .min-h-screen {
+      background-color: ${config.bg} !important;
+      color: #0f172a !important;
+    }
+
+    /* ========== DARK:bg-* NO deben aplicar en modo claro ========== */
+    html:not(.dark) .dark\\:bg-slate-950,
+    html:not(.dark) .dark\\:bg-slate-900,
+    html:not(.dark) .dark\\:bg-slate-800,
+    html:not(.dark) .dark\\:bg-slate-700 {
+      background-color: ${config.cardBg} !important;
+    }
+
+    html:not(.dark) .dark\\:text-white,
+    html:not(.dark) .dark\\:text-slate-100,
+    html:not(.dark) .dark\\:text-slate-200,
+    html:not(.dark) .dark\\:text-slate-300 {
+      color: #0f172a !important;
+    }
+
+    html:not(.dark) .dark\\:border-slate-800,
+    html:not(.dark) .dark\\:border-slate-700,
+    html:not(.dark) .dark\\:border-slate-600 {
+      border-color: #e2e8f0 !important;
+    }
+
+    /* ========== TARJETAS Y CONTENEDORES (modo claro) ========== */
+    html:not(.dark) .bg-white {
+      background-color: ${config.cardBg} !important;
+    }
+    html:not(.dark) .bg-slate-50,
+    html:not(.dark) .bg-slate-100 {
+      background-color: ${config.primaryLight} !important;
+    }
+
+    /* ========== PRIMARY ========== */
     .bg-indigo-600, .bg-indigo-500 { background-color: ${config.primary} !important; }
     .bg-indigo-700 { background-color: ${config.primaryDark} !important; }
     .bg-indigo-50, .bg-indigo-100 { background-color: ${config.primaryLight} !important; }
@@ -57,25 +99,40 @@ export function applyTheme(config: ThemeConfig): void {
     .ring-indigo-500 { --tw-ring-color: ${config.primary} !important; }
     .from-indigo-500, .from-indigo-600 { --tw-gradient-from: ${config.primary} !important; }
     .to-indigo-600, .to-indigo-700 { --tw-gradient-to: ${config.primaryDark} !important; }
-    .focus\\:border-indigo-500:focus { border-color: ${config.primary} !important; }
-    .focus\\:ring-indigo-500:focus { --tw-ring-color: ${config.primary} !important; }
 
-    /* ===== ACCENT (destructive / alerts) ===== */
+    /* ========== ACCENT ========== */
     .bg-rose-500, .bg-rose-600 { background-color: ${config.accent} !important; }
     .text-rose-600, .text-rose-500 { color: ${config.accent} !important; }
     .bg-rose-50, .bg-rose-100 { background-color: ${config.accentLight} !important; }
 
-    /* ===== BG TINT ===== */
-    body { background-color: ${config.bg} !important; }
-
-    /* ===== RADIUS ===== */
+    /* ========== RADIUS ========== */
     .rounded-lg { border-radius: ${config.radius}px !important; }
     .rounded-xl { border-radius: ${config.radius + 4}px !important; }
     .rounded-2xl { border-radius: ${config.radius + 8}px !important; }
-    .rounded-3xl { border-radius: ${config.radius + 12}px !important; }
 
-    /* ===== DENSITY ===== */
-    input, select, textarea { padding-top: ${densityPad} !important; padding-bottom: ${densityPad} !important; }
+    /* ========== DENSITY ========== */
+    html:not(.dark) input, html:not(.dark) select, html:not(.dark) textarea {
+      padding-top: ${densityPad} !important;
+      padding-bottom: ${densityPad} !important;
+      background-color: ${config.cardBg} !important;
+      color: #0f172a !important;
+      border-color: #e2e8f0 !important;
+    }
+    html:not(.dark) input::placeholder, html:not(.dark) textarea::placeholder {
+      color: #94a3b8 !important;
+    }
+
+    /* ========== SIDEBAR / MENU ========== */
+    html:not(.dark) aside {
+      background-color: ${config.cardBg} !important;
+      border-color: #e2e8f0 !important;
+    }
+
+    /* ========== TOPBAR ========== */
+    html:not(.dark) header {
+      background-color: ${config.cardBg} !important;
+      border-color: #e2e8f0 !important;
+    }
   `;
 
   localStorage.setItem("anacleto_theme", JSON.stringify(config));
@@ -96,4 +153,17 @@ export function clearTheme(): void {
   document.getElementById(STYLE_ID)?.remove();
   localStorage.removeItem("anacleto_theme");
   document.documentElement.style.removeProperty("--theme-primary");
+}
+
+/**
+ * Fuerza modo CLARO eliminando la clase 'dark' del html
+ * y limpiando localStorage relacionado.
+ */
+export function forceLightMode(): void {
+  document.documentElement.classList.remove("dark");
+  document.documentElement.style.colorScheme = "light";
+  localStorage.removeItem("anacleto_theme_mode");
+  // También eliminar preferencia antigua
+  localStorage.removeItem("anacleto_dark_mode");
+  localStorage.removeItem("darkMode");
 }
