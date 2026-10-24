@@ -1071,7 +1071,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
                       onChange={(e) => setSenderConfig({ ...senderConfig, currency: e.target.value })}
                       className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg"
                     >
-                      <option value="EUR">€ EUR (Euro)</option>
+                      <option value="BRL">R$ EUR (Euro)</option>
                       <option value="USD">$ USD (Dolar)</option>
                       <option value="BRL">R$ BRL (Real Brasileiro)</option>
                       <option value="CNY">¥ CNY (Yuan Chinês)</option>

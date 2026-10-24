@@ -187,7 +187,7 @@ export function generateBudgetTranslations(items: BudgetLineItem[]): Record<stri
 
 export function formatCurrency(value: number, currencyCode: string = "BRL", lang: string = "pt-BR"): string {
   const formatters: Record<string, string> = {
-    EUR: "EUR",
+    BRL: "BRL",
     USD: "USD",
     BRL: "BRL",
     CNY: "CNY",

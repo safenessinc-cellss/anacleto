@@ -42,7 +42,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, t }: InvoiceMod
     country: "Portugal",
     logoUrl: "",
     bankAccount: "PT50 0033 0000 12345678901 23 - BANCO BILBAO VIZCAYA",
-    currency: "EUR"
+    currency: "BRL"
   };
 
   const formattedSubtotal = formatCurrency(invoice.subtotal, sender.currency, currentLang === "pt" ? "pt-BR" : "en-US");

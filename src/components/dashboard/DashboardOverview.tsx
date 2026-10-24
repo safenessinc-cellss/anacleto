@@ -116,7 +116,7 @@ export default function DashboardOverview({
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total de Orçamentos</span>
           <div className="flex items-baseline justify-between mt-1">
             <h3 className="text-2xl font-black text-white">{quotes.length}</h3>
-            <span className="text-xs font-mono font-bold text-amber-400">{totalQuotesValue.toFixed(2)} €</span>
+            <span className="text-xs font-mono font-bold text-amber-400">{totalQuotesValue.toFixed(2)} R$</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Orçamentos criados e cotados
@@ -137,10 +137,10 @@ export default function DashboardOverview({
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Faturas Emitidas</span>
           <div className="flex items-baseline justify-between mt-1">
             <h3 className="text-2xl font-black text-white">{invoices.length}</h3>
-            <span className="text-xs font-mono font-bold text-emerald-400">{totalPaid.toFixed(2)} € cobrado</span>
+            <span className="text-xs font-mono font-bold text-emerald-400">{totalPaid.toFixed(2)} R$ cobrado</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Total Faturado: {totalInvoiced.toFixed(2)} €
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Total Faturado: {totalInvoiced.toFixed(2)} R$
           </p>
         </div>
 
@@ -218,7 +218,7 @@ export default function DashboardOverview({
                 </div>
                 <div className="text-right">
                   <span className="font-mono font-black text-xs text-white block">
-                    {q.total?.toFixed(2)} €
+                    {q.total?.toFixed(2)} R$
                   </span>
                   <span
                     className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-block mt-0.5 ${
@@ -359,7 +359,7 @@ export default function DashboardOverview({
               clientOrDetail: q.clientName,
               number: q.number,
               date: q.date,
-              metric: `${q.total?.toFixed(2)} €`,
+              metric: `${q.total?.toFixed(2)} R$`,
               pdfDataUri: q.pdfDataUri,
               pdfFileName: q.pdfFileName || `Presupuesto_${q.number}.pdf`,
               sizeKb: q.pdfFileSizeKb || 35,
@@ -375,7 +375,7 @@ export default function DashboardOverview({
               clientOrDetail: inv.clientName,
               number: inv.number,
               date: inv.date,
-              metric: `${inv.total?.toFixed(2)} €`,
+              metric: `${inv.total?.toFixed(2)} R$`,
               pdfDataUri: inv.pdfDataUri,
               pdfFileName: inv.pdfFileName || `Factura_${inv.number}.pdf`,
               sizeKb: inv.pdfFileSizeKb || 38,

@@ -162,7 +162,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
                 onChange={(e) => handleChange("currency", e.target.value)}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
               >
-                <option value="EUR">EUR (€) - Euro</option>
+                <option value="BRL">EUR (R$) - Euro</option>
                 <option value="BRL">BRL (R$) - Real Brasileño</option>
                 <option value="USD">USD ($) - Dólar Estadounidense</option>
                 <option value="MXN">MXN ($) - Peso Mexicano</option>

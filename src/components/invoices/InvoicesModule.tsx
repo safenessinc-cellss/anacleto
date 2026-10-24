@@ -165,13 +165,13 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
           <div className="px-3.5 py-2 bg-slate-950 rounded-2xl border border-slate-800">
             <span className="text-[9px] uppercase font-bold text-slate-400 block">Cobrado</span>
             <span className="text-xs font-mono font-black text-emerald-400">
-              {totalPaid.toFixed(2)} €
+              {totalPaid.toFixed(2)} R$
             </span>
           </div>
           <div className="px-3.5 py-2 bg-slate-950 rounded-2xl border border-slate-800">
             <span className="text-[9px] uppercase font-bold text-slate-400 block">Pendente</span>
             <span className="text-xs font-mono font-black text-amber-400">
-              {totalPending.toFixed(2)} €
+              {totalPending.toFixed(2)} R$
             </span>
           </div>
         </div>
@@ -255,7 +255,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-black text-white">
-                        {inv.total?.toFixed(2)} {inv.currency || "EUR"}
+                        {inv.total?.toFixed(2)} {inv.currency || "BRL"}
                       </span>
                       <button
                         onClick={(e) => {
@@ -369,10 +369,10 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                           <td className="py-3 px-3 text-white font-medium">{item.description}</td>
                           <td className="py-3 px-3 text-center text-slate-300 font-mono">{item.quantity}</td>
                           <td className="py-3 px-3 text-right text-slate-300 font-mono">
-                            {item.unitPrice?.toFixed(2)} €
+                            {item.unitPrice?.toFixed(2)} R$
                           </td>
                           <td className="py-3 px-3 text-right text-emerald-400 font-mono font-bold">
-                            {(item.subtotal || item.quantity * item.unitPrice)?.toFixed(2)} €
+                            {(item.subtotal || item.quantity * item.unitPrice)?.toFixed(2)} R$
                           </td>
                         </tr>
                       ))}
@@ -384,21 +384,21 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                 <div className="mt-4 p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-end space-y-1.5 text-xs">
                   <div className="flex justify-between w-64 text-slate-400">
                     <span>Base Imponible:</span>
-                    <span className="font-mono text-white">{selectedInvoice.subtotal?.toFixed(2)} €</span>
+                    <span className="font-mono text-white">{selectedInvoice.subtotal?.toFixed(2)} R$</span>
                   </div>
                   {selectedInvoice.discountRate ? (
                     <div className="flex justify-between w-64 text-rose-400">
                       <span>Descuento ({selectedInvoice.discountRate}%):</span>
-                      <span className="font-mono">-{selectedInvoice.discountAmount?.toFixed(2)} €</span>
+                      <span className="font-mono">-{selectedInvoice.discountAmount?.toFixed(2)} R$</span>
                     </div>
                   ) : null}
                   <div className="flex justify-between w-64 text-slate-400">
                     <span>IVA ({selectedInvoice.taxRate}%):</span>
-                    <span className="font-mono text-white">{selectedInvoice.taxAmount?.toFixed(2)} €</span>
+                    <span className="font-mono text-white">{selectedInvoice.taxAmount?.toFixed(2)} R$</span>
                   </div>
                   <div className="flex justify-between w-64 pt-2 border-t border-slate-800 text-sm font-black text-emerald-400">
                     <span>TOTAL FACTURA:</span>
-                    <span className="font-mono text-base">{selectedInvoice.total?.toFixed(2)} €</span>
+                    <span className="font-mono text-base">{selectedInvoice.total?.toFixed(2)} R$</span>
                   </div>
                 </div>
               </div>
@@ -420,7 +420,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
         title={`Factura ${viewerPdfInvoice?.number || ""}`}
-        subtitle={`Cliente: ${viewerPdfInvoice?.clientName || ""} • Total: ${viewerPdfInvoice?.total?.toFixed(2)} ${viewerPdfInvoice?.currency || "EUR"}`}
+        subtitle={`Cliente: ${viewerPdfInvoice?.clientName || ""} • Total: ${viewerPdfInvoice?.total?.toFixed(2)} ${viewerPdfInvoice?.currency || "BRL"}`}
         pdfDataUri={viewerPdfInvoice?.pdfDataUri}
         fileName={viewerPdfInvoice?.pdfFileName || `Factura_${viewerPdfInvoice?.number}.pdf`}
         fileSizeKb={viewerPdfInvoice?.pdfFileSizeKb}

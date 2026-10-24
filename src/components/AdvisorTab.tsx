@@ -38,7 +38,7 @@ export default function AdvisorTab({ budgets, invoices, visits, senderConfig, cu
       companyName: senderConfig.name || "Esquadrias Anacleto",
       city: senderConfig.city || "Lisboa",
       country: senderConfig.country || "Portugal",
-      currency: senderConfig.currency || "EUR",
+      currency: senderConfig.currency || "BRL",
     };
 
     try {

@@ -68,7 +68,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [aiChatHistory, setAiChatHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([
     {
       role: "assistant",
-      text: "¡Hola! Soy tu Agente Técnico de Orçamentos de Anacleto Pro. Puedes pedirme cosas como: 'Añade 3 ventanas de aluminio de 120x100', 'cambia el IVA al 21%', 'añade un descuento del 10%' o 'genera la factura de este presupuesto'.",
+      text: "Olá! Sou seu Agente Técnico de Orçamentos da Anacleto Pro. Você pode me pedir coisas como: 'Adicione 3 janelas de alumínio de 120x100', 'mude o IVA para 21%', 'adicione um desconto de 10%' ou 'gere a fatura deste orçamento'.",
     },
   ]);
 
@@ -123,12 +123,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         },
       ],
       subtotal: 760,
-      taxRate: 21,
+      taxRate: 0,
       taxAmount: 159.6,
       discountRate: 0,
       discountAmount: 0,
       total: 919.6,
-      currency: senderConfig.currency || "EUR",
+      currency: senderConfig.currency || "BRL",
       status: "pendente",
       notes: "Prazo de entrega estimado: 15 dias úteis. Garantia de 5 anos em carpintaria.",
       createdAt: new Date().toISOString(),
@@ -149,7 +149,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     const subtotal = Number(updatedItems.reduce((acc, curr) => acc + curr.subtotal, 0).toFixed(2));
     const discountAmount = Number(((subtotal * (current.discountRate || 0)) / 100).toFixed(2));
     const taxableBase = Math.max(0, subtotal - discountAmount);
-    const taxAmount = Number(((taxableBase * (current.taxRate || 21)) / 100).toFixed(2));
+    const taxAmount = Number(((taxableBase * (current.taxRate || 0)) / 100).toFixed(2));
     const total = Number((taxableBase + taxAmount).toFixed(2));
 
     return {
@@ -306,7 +306,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           ...prev,
           {
             role: "assistant",
-            text: `He aprobado el presupuesto ${selectedQuote.number} y generado la factura correlativa correspondiente.`,
+            text: `Aprovei o orçamento ${selectedQuote.number} e gerei a fatura correspondente.`,
           },
         ]);
         setIsAiLoading(false);
@@ -356,7 +356,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         reply = "IVA alterado para 21%. Totais recalculados.";
       } else if (lower.includes("iva") && lower.includes("10")) {
         updated.taxRate = 10;
-        reply = "IVA reduzido alterado para 10%. Totais recalculados.";
+        reply = "IVA reduzido para 10%. Totais recalculados.";
       } else if (lower.includes("descuento") && lower.includes("10")) {
         updated.discountRate = 10;
         reply = "Aplicado desconto comercial de 10% sobre a base tributável.";
@@ -571,7 +571,7 @@ const handleAddItem = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-black text-white">
-                        {q.total?.toFixed(2)} {q.currency || "EUR"}
+                        {q.total?.toFixed(2)} {q.currency || "BRL"}
                       </span>
                       <button
                         onClick={(e) => {
@@ -804,7 +804,7 @@ const handleAddItem = () => {
                           </div>
 
                           <span className="w-24 text-right font-mono font-bold text-xs text-amber-400">
-                            {item.subtotal?.toFixed(2)} €
+                            {item.subtotal?.toFixed(2)} R$
                           </span>
 
                           <button
@@ -822,21 +822,21 @@ const handleAddItem = () => {
                   <div className="mt-4 p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-end space-y-1.5 text-xs">
                     <div className="flex justify-between w-64 text-slate-400">
                       <span>Base Imponible:</span>
-                      <span className="font-mono text-white">{selectedQuote.subtotal?.toFixed(2)} €</span>
+                      <span className="font-mono text-white">{selectedQuote.subtotal?.toFixed(2)} R$</span>
                     </div>
                     {selectedQuote.discountRate ? (
                       <div className="flex justify-between w-64 text-rose-400">
                         <span>Desconto ({selectedQuote.discountRate}%):</span>
-                        <span className="font-mono">-{selectedQuote.discountAmount?.toFixed(2)} €</span>
+                        <span className="font-mono">-{selectedQuote.discountAmount?.toFixed(2)} R$</span>
                       </div>
                     ) : null}
                     <div className="flex justify-between w-64 text-slate-400">
                       <span>IVA ({selectedQuote.taxRate}%):</span>
-                      <span className="font-mono text-white">{selectedQuote.taxAmount?.toFixed(2)} €</span>
+                      <span className="font-mono text-white">{selectedQuote.taxAmount?.toFixed(2)} R$</span>
                     </div>
                     <div className="flex justify-between w-64 pt-2 border-t border-slate-800 text-sm font-black text-amber-400">
                       <span>TOTAL:</span>
-                      <span className="font-mono text-base">{selectedQuote.total?.toFixed(2)} €</span>
+                      <span className="font-mono text-base">{selectedQuote.total?.toFixed(2)} R$</span>
                     </div>
                   </div>
                 </div>
@@ -883,7 +883,7 @@ const handleAddItem = () => {
                 {/* Prompt Suggestions */}
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    "cambia el IVA al 21%",
+                    "mude o IVA para 21%",
                     "añade un descuento del 10%",
                     "genera la factura de este presupuesto",
                     "añade 2 ventanas correderas de 150x120",
@@ -934,7 +934,7 @@ const handleAddItem = () => {
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
         title={`Presupuesto ${viewerPdfQuote?.number || ""}`}
-        subtitle={`Cliente: ${viewerPdfQuote?.clientName || ""} • Total: ${viewerPdfQuote?.total?.toFixed(2)} ${viewerPdfQuote?.currency || "EUR"}`}
+        subtitle={`Cliente: ${viewerPdfQuote?.clientName || ""} • Total: ${viewerPdfQuote?.total?.toFixed(2)} ${viewerPdfQuote?.currency || "BRL"}`}
         pdfDataUri={viewerPdfQuote?.pdfDataUri}
         fileName={viewerPdfQuote?.pdfFileName || `Presupuesto_${viewerPdfQuote?.number}.pdf`}
         fileSizeKb={viewerPdfQuote?.pdfFileSizeKb}

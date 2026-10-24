@@ -253,7 +253,7 @@ export default function App() {
       }));
 
       const subtotal = formattedLines.reduce((acc, current) => acc + (current.quantity * current.unitPrice), 0);
-      const taxRate = 23;
+      const taxRate = 0;
       const taxAmount = Number(((subtotal * taxRate) / 100).toFixed(2));
       const total = Number((subtotal + taxAmount).toFixed(2));
 

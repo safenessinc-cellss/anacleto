@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import { Quote, Invoice, TechnicalDrawing, SenderConfig } from "../types";
 
 // Format helper
-const formatMoney = (amount: number, currency: string = "EUR") => {
+const formatMoney = (amount: number, currency: string = "BRL") => {
   return new Intl.NumberFormat("es-ES", {
     style: "currency",
     currency: currency,
@@ -21,7 +21,7 @@ export interface PdfDocumentResult {
 export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
-  const currency = quote.currency || "EUR";
+  const currency = quote.currency || "BRL";
 
   // Gold / Dark Luxury Header
   doc.setFillColor(15, 23, 42); // Slate 900
@@ -186,7 +186,7 @@ export const exportQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocument
 export const buildInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
-  const currency = invoice.currency || "EUR";
+  const currency = invoice.currency || "BRL";
 
   // Gold / Dark Luxury Header
   doc.setFillColor(15, 23, 42); // Slate 900
