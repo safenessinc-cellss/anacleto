@@ -1,5 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Sparkles, Upload, CheckCircle, Loader2, FileText, QrCode } from "lucide-react";
+import { collection, addDoc } from "firebase/firestore";
+import { db, auth } from "../../firebase";
 
 export default function FinancialAI() {
   const [file, setFile] = useState<File | null>(null);
@@ -29,6 +31,24 @@ export default function FinancialAI() {
         if (!res.ok) throw new Error("Erro ao extrair dados");
         const data = await res.json();
         setResult(data);
+        // Guardar en pending_boletos para que el usuario revise y acepte
+        try {
+          await addDoc(collection(db, "pending_boletos"), {
+            fileName: file.name,
+            beneficiary: data.beneficiary || "",
+            cnpj: data.cnpj || "",
+            amount: Number(data.amount) || 0,
+            dueDate: data.dueDate || "",
+            digitableLine: data.digitableLine || "",
+            description: data.description || "",
+            status: "pending",
+            createdAt: new Date().toISOString(),
+            extractedBy: auth.currentUser?.email || "",
+          });
+          console.log("✅ Boleto guardado em pending_boletos");
+        } catch (e) {
+          console.warn("Não foi possível salvar em pending_boletos:", e);
+        }
       };
       reader.readAsDataURL(file);
     } catch (e) {
@@ -102,6 +122,7 @@ export default function FinancialAI() {
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle className="w-5 h-5 text-emerald-600" />
             <h3 className="font-bold text-slate-900">Dados extraídos</h3>
+            <p className="text-xs text-emerald-600 font-bold">Salvo em "Boletos a Revisar" — aceite lá para importar</p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div><span className="text-slate-500">Beneficiário:</span> <strong>{result.beneficiary || "-"}</strong></div>

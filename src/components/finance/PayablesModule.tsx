@@ -100,7 +100,18 @@ export default function PayablesModule() {
   };
 
   const filtered = items.filter((i) => {
-    if (search && !i.description.toLowerCase().includes(search.toLowerCase()) && !i.supplierName.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const q = search.toLowerCase().trim();
+      const supplier = suppliers.find((s) => s.id === i.supplierId);
+      const supplierCnpj = supplier?.nif?.replace(/\D/g, "") || "";
+      const cleanQ = q.replace(/\D/g, "");
+      const match =
+        i.description.toLowerCase().includes(q) ||
+        i.supplierName.toLowerCase().includes(q) ||
+        (cleanQ.length >= 3 && supplierCnpj.includes(cleanQ)) ||
+        (i as any).digitableLine?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
     if (filter === "pending") return i.status === "pending";
     if (filter === "paid") return i.status === "paid";
     if (filter === "overdue") return isOverdue(i);
@@ -158,7 +169,7 @@ export default function PayablesModule() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por descrição ou fornecedor..." className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por fornecedor, CNPJ, descrição ou linha digitável..." className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800" />
         </div>
         <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800">
           <option value="all">Todos</option>

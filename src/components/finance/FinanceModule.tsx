@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { Building, Building2, TrendingDown, TrendingUp } from "lucide-react";
+import {   Building, Building2, TrendingDown, TrendingUp, FileText, Sparkles, CreditCard, DollarSign } from "lucide-react";
 import SuppliersModule from "./SuppliersModule";
 import PayablesModule from "./PayablesModule";
 import ReceivablesModule from "./ReceivablesModule";
+import PendingBoletosModule from "./PendingBoletosModule";
+import PaymentsModule from "./PaymentsModule";
 
-type FinanceTab = "payables" | "receivables" | "suppliers";
+type FinanceTab = "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments";
 
 export default function FinanceModule({ language = "pt" }: { language?: string }) {
   const [tab, setTab] = useState<FinanceTab>("payables");
@@ -13,7 +15,9 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
     { id: "payables" as FinanceTab, label: "Contas a Pagar", icon: TrendingDown },
     { id: "receivables" as FinanceTab, label: "Contas a Receber", icon: TrendingUp },
     { id: "suppliers" as FinanceTab, label: "Fornecedores", icon: Building2 },
-  ];
+    { id: "pending_boletos" as FinanceTab, label: "Boletos a Revisar", icon: FileText },
+    { id: "payments" as FinanceTab, label: "Pagos", icon: CreditCard },
+    ];
 
   return (
     <div className="space-y-6">
@@ -43,6 +47,8 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
       {tab === "payables" && <PayablesModule />}
       {tab === "receivables" && <ReceivablesModule />}
       {tab === "suppliers" && <SuppliersModule />}
+      {tab === "pending_boletos" && <PendingBoletosModule />}
+      {tab === "payments" && <PaymentsModule />}
     </div>
   );
 }
