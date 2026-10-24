@@ -9,6 +9,14 @@ import { applyTheme, loadSavedTheme } from './utils/applyTheme';
 const savedTheme = loadSavedTheme();
 if (savedTheme) applyTheme(savedTheme);
 
+// Respetar preferencia de modo guardada (light/dark)
+const savedMode = localStorage.getItem("anacleto_theme_mode") || "light";
+if (savedMode === "dark") {
+  document.documentElement.classList.add("dark");
+} else {
+  document.documentElement.classList.remove("dark");
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ToastProvider>

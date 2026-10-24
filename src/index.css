@@ -93,3 +93,91 @@ body {
     @apply text-slate-400;
   }
 }
+
+/* ============================================
+   FORCE CLEAN LIGHT MODE - ANACLETO
+   ============================================ */
+html { color-scheme: light !important; }
+
+html:not(.dark) body,
+html:not(.dark) #root {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark) aside,
+html:not(.dark) nav,
+html:not(.dark) header {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* dark:* variantes → siempre claras */
+html:not(.dark) .dark\:bg-slate-900,
+html:not(.dark) .dark\:bg-slate-950 {
+  background-color: #ffffff !important;
+}
+html:not(.dark) .dark\:bg-slate-800,
+html:not(.dark) .dark\:bg-slate-700 {
+  background-color: #f1f5f9 !important;
+}
+html:not(.dark) .dark\:text-white,
+html:not(.dark) .dark\:text-slate-50,
+html:not(.dark) .dark\:text-slate-100 {
+  color: #0f172a !important;
+}
+html:not(.dark) .dark\:text-slate-200,
+html:not(.dark) .dark\:text-slate-300,
+html:not(.dark) .dark\:text-slate-400 {
+  color: #334155 !important;
+}
+html:not(.dark) .dark\:border-slate-800,
+html:not(.dark) .dark\:border-slate-700,
+html:not(.dark) .dark\:border-slate-600 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Contenedores con bg oscuro hardcodeado (no botones) */
+html:not(.dark) aside.bg-slate-900,
+html:not(.dark) aside.bg-slate-950,
+html:not(.dark) aside.bg-slate-800,
+html:not(.dark) nav.bg-slate-900,
+html:not(.dark) nav.bg-slate-950,
+html:not(.dark) header.bg-slate-900,
+html:not(.dark) header.bg-slate-950,
+html:not(.dark) [role="dialog"].bg-slate-900,
+html:not(.dark) [role="dialog"].bg-slate-950 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Inputs siempre legibles */
+html:not(.dark) input,
+html:not(.dark) select,
+html:not(.dark) textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Botones primarios mantienen texto blanco */
+html:not(.dark) button.bg-indigo-600,
+html:not(.dark) button.bg-indigo-700,
+html:not(.dark) button.bg-emerald-600,
+html:not(.dark) button.bg-emerald-500,
+html:not(.dark) button.bg-rose-600,
+html:not(.dark) button.bg-rose-500,
+html:not(.dark) button.bg-amber-500,
+html:not(.dark) button.bg-blue-600,
+html:not(.dark) a.bg-indigo-600 {
+  color: #ffffff !important;
+}
+html:not(.dark) button.bg-indigo-600 *,
+html:not(.dark) button.bg-emerald-600 *,
+html:not(.dark) button.bg-rose-600 * {
+  color: #ffffff !important;
+}

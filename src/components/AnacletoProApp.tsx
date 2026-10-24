@@ -44,6 +44,16 @@ export default function AnacletoProApp({
   const roleConfig = getRoleConfig(userRole);
   const [activeTab, setActiveTab] = useState<NavigationTab>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isDark, setIsDark] = useState(() =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+  );
+  const toggleThemeQuick = () => {
+    const next = !isDark;
+    setIsDark(next);
+    if (next) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+    localStorage.setItem("anacleto_theme_mode", next ? "dark" : "light");
+  };
 
   // Firestore Shared Collections State
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -262,6 +272,14 @@ export default function AnacletoProApp({
           )}
 
           {/* Selector de idioma */}
+          <button
+            onClick={toggleThemeQuick}
+            className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+            title={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+          >
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
           {onLanguageChange && (
             <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5">
               <span className="text-sm">🌐</span>
