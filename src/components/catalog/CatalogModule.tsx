@@ -118,12 +118,12 @@ export default function CatalogModule() {
         <h3 className="font-bold mb-3">{editing ? "Editar Producto" : "Añadir Producto"}</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <input placeholder="SKU" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="p-2 border rounded text-sm" />
-          <input placeholder="Nombre" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="p-2 border rounded text-sm md:col-span-2" />
+          <input placeholder="Nome" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="p-2 border rounded text-sm md:col-span-2" />
           <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="p-2 border rounded text-sm">
             <option>Perfil</option><option>Accesorio</option><option>Vidrio</option><option>Herraje</option>
           </select>
           <input placeholder="Unidad" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="p-2 border rounded text-sm" />
-          <input type="number" placeholder="Precio" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} className="p-2 border rounded text-sm" />
+          <input type="number" placeholder="Preço" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} className="p-2 border rounded text-sm" />
         </div>
         <button onClick={handleSave} className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold">Guardar</button>
       </div>

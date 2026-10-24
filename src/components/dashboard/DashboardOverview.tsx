@@ -222,7 +222,7 @@ export default function DashboardOverview({
                   </span>
                   <span
                     className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md inline-block mt-0.5 ${
-                      q.status === "approved"
+                      q.status === "aprovado"
                         ? "bg-emerald-500/20 text-emerald-400"
                         : "bg-amber-500/20 text-amber-400"
                     }`}
@@ -385,7 +385,7 @@ export default function DashboardOverview({
             ...drawings.map((d) => ({
               id: d.id,
               type: "drawing" as const,
-              typeLabel: "Plano CAD 2D",
+              typeLabel: "Planta CAD 2D",
               badgeColor: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20",
               title: d.title,
               clientOrDetail: `${d.overallDimensions?.width}×${d.overallDimensions?.height} ${d.unit} • ${d.pieces?.length || 0} piezas`,
