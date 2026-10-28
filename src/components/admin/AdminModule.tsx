@@ -25,7 +25,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
   const [pending, setPending] = useState<PendingUser[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [tab, setTab] = useState<"pending" | "admins">("pending");
-  const [newAdminE-mail, setNewAdminE-mail] = useState("");
+  const [newAdminEmail, setNewAdminE-mail] = useState("");
   const [newAdminPerfile, setNewAdminPerfile] = useState<Perfile>("colaborador");
   const [loading, setLoading] = useState(true);
 
@@ -125,7 +125,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
   };
 
   const addAdminManually = async () => {
-    const email = newAdminE-mail.trim().toLowerCase();
+    const email = newAdminEmail.trim().toLowerCase();
     if (!email || !email.includes("@")) return alert("E-mail inválido");
     if (!assignablePerfiles.some((r) => r.id === newAdminPerfile)) {
       return alert("Você não tem permissão para atribuir esse perfil.");
@@ -217,7 +217,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
             <div className="flex gap-2 flex-wrap">
               <input
                 type="email"
-                value={newAdminE-mail}
+                value={newAdminEmail}
                 onChange={(e) => setNewAdminE-mail(e.target.value)}
                 placeholder="email@ejemplo.com"
                 className="flex-1 min-w-[200px] p-2 border rounded text-sm bg-white dark:bg-slate-800"
