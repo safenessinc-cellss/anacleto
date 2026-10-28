@@ -25,7 +25,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
   const [pending, setPending] = useState<PendingUser[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [tab, setTab] = useState<"pending" | "admins">("pending");
-  const [newAdminEmail, setNewAdminE-mail] = useState("");
+  const [newAdminEmail, setNewAdminEmail] = useState("");
   const [newAdminPerfile, setNewAdminPerfile] = useState<Perfile>("colaborador");
   const [loading, setLoading] = useState(true);
 
@@ -77,7 +77,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
   };
 
   const rejectUser = async (user: PendingUser) => {
-    if (!confirm(`¿Rechazar la solicitud de ${user.email}?`)) return;
+    if (!confirm(`Rejeitar a solicitação de ${user.email}?`)) return;
     try {
       await deleteDoc(doc(db, "pending_users", user.id));
     } catch (e) {
@@ -97,7 +97,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
       alert(`Não é possível excluir um usuário com perfil igual ou superior ao seu (${config.label}).`);
       return;
     }
-    if (!confirm(`¿Quitar permisos de ${config.label} a ${admin.email}?`)) return;
+    if (!confirm(`Remover as permissões de ${config.label} a ${admin.email}?`)) return;
     try {
       await deleteDoc(doc(db, "admins", admin.id));
     } catch (e) {
@@ -120,7 +120,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
       alert(`✅ ${admin.email} agora é ${ROLES[newPerfile].label}.`);
     } catch (e) {
       console.error(e);
-      alert("Error al cambiar rol: " + (e as Error).message);
+      alert("Erro ao alterar o perfil: " + (e as Error).message);
     }
   };
 
@@ -133,11 +133,11 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
     try {
       const pendingEntry = pending.find((p) => p.email.toLowerCase() === email);
       await saveAdmin(email, newAdminPerfile, pendingEntry?.id);
-      setNewAdminE-mail("");
+      setNewAdminEmail("");
       alert(`✅ ${email} agora é ${ROLES[newAdminPerfile].label}.`);
     } catch (e) {
       console.error(e);
-      alert("Error al añadir admin: " + (e as Error).message);
+      alert("Erro ao adicionar administrador: " + (e as Error).message);
     }
   };
 
@@ -145,10 +145,10 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-          <Shield className="w-6 h-6 text-indigo-600" /> Administración de Usuarios y Perfiles
+          <Shield className="w-6 h-6 text-indigo-600" /> Administração de usuários e perfis
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Tu rol actual:{" "}
+          Seu perfil atual:{" "}
           <span className={`inline-block px-2 py-0.5 rounded border text-xs font-black ${getPerfileConfig(currentPerfile).color}`}>
             {getPerfileConfig(currentPerfile).label}
           </span>
@@ -165,7 +165,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
               : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <Clock className="w-4 h-4" /> Pendientes
+          <Clock className="w-4 h-4" /> Pendentes
           {pending.length > 0 && (
             <span className="bg-rose-500 text-white text-[10px] font-black rounded-full px-2 py-0.5">
               {pending.length}
@@ -218,8 +218,8 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
               <input
                 type="email"
                 value={newAdminEmail}
-                onChange={(e) => setNewAdminE-mail(e.target.value)}
-                placeholder="email@ejemplo.com"
+                onChange={(e) => setNewAdminEmail(e.target.value)}
+                placeholder="email@exemplo.com"
                 className="flex-1 min-w-[200px] p-2 border rounded text-sm bg-white dark:bg-slate-800"
               />
               <select
@@ -232,11 +232,11 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
                 ))}
               </select>
               <button onClick={addAdminManually} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700">
-                Añadir
+                Adicionar
               </button>
             </div>
             <p className="text-xs text-slate-400 mt-2">
-              Puedes asignar: {assignablePerfiles.map((r) => r.label).join(", ") || "ninguno"}.
+              Você pode atribuir: {assignablePerfiles.map((r) => r.label).join(", ") || "nenhum"}.
             </p>
           </div>
 
@@ -252,7 +252,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
                 </tr>
               </thead>
               <tbody>
-                {/* Super Admin siempre visible */}
+                {/* Superadministrador sempre visível */}
                 <tr className="border-t border-slate-100 dark:border-slate-800 bg-amber-50/30 dark:bg-amber-950/10">
                   <td className="p-3 font-mono text-xs">
                     {SUPER_ADMIN_EMAIL}
@@ -371,13 +371,13 @@ function PendingRow({
           onClick={() => onApprove(user, role)}
           className="flex items-center gap-1 px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700"
         >
-          <CheckCircle className="w-3.5 h-3.5" /> Aprobar
+          <CheckCircle className="w-3.5 h-3.5" /> Aprovar
         </button>
         <button
           onClick={() => onReject(user)}
           className="flex items-center gap-1 px-3 py-2 bg-rose-50 text-rose-700 rounded-lg text-xs font-bold hover:bg-rose-100"
         >
-          <XCircle className="w-3.5 h-3.5" /> Rechazar
+          <XCircle className="w-3.5 h-3.5" /> Rejeitar
         </button>
       </div>
     </div>
