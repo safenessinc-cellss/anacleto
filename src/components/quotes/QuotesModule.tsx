@@ -44,12 +44,21 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   // Cargar catálogo
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "catalog"), (snap) => {
-      const list: any[] = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      setCatalogItems(list);
-    }, (err) => console.warn("Catalog listener (quotes):", err));
-    return () => unsub();
+    const unsubs = [
+      onSnapshot(collection(db, "catalog"), (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data(), source: "catalog" }));
+        setCatalogItems((current) => [...current.filter((item) => item.source !== "catalog"), ...list]);
+      }, (err) => console.warn("Catalog listener (quotes):", err)),
+      onSnapshot(collection(db, "supplier_catalog"), (snap) => {
+        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), supplier: data.supplier || "", category: data.category || "", unit: data.unit || "un", source: "supplier_catalog" }; });
+        setCatalogItems((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...list]);
+      }, (err) => console.warn("Supplier catalog listener (quotes):", err)),
+      onSnapshot(collection(db, "registry_items"), (snap) => {
+        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", source: "registry_items" }; });
+        setCatalogItems((current) => [...current.filter((item) => item.source !== "registry_items"), ...list]);
+      }, (err) => console.warn("Items registry listener (quotes):", err)),
+    ];
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, []);
 
 
@@ -406,7 +415,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const addFromCatalog = (item: any, quoteItems: any[], setQuoteItems: any) => {
     const newItem = {
       id: Math.random().toString(36).substring(2),
-      description: `${item.name} (${item.sku})`,
+      description: `${item.name}${item.sku ? ` (${item.sku})` : ""}${item.supplier ? ` — ${item.supplier}` : ""}`,
       quantity: 1,
       unitPrice: item.price,
       unit: item.unit || "UN",
@@ -749,7 +758,7 @@ const handleAddItem = () => {
                       }}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 rounded flex justify-between"
                     >
-                      <span><strong>{item.sku}</strong> — {item.name}</span>
+                      <span><strong>{item.sku || "Sem código"}</strong> — {item.name}{item.supplier ? " · " + item.supplier : ""}</span>
                       <span className="font-bold text-indigo-600">R$ {item.price?.toFixed(2)}</span>
                     </button>
                   ))}
