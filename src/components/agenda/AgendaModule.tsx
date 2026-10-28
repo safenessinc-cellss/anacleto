@@ -78,7 +78,7 @@ export default function AgendaModule() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white">Agenda de Visitas Técnicas</h2>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">Agenda de visitas técnicas</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Solicitações recebidas pelo site comercial. Sincronizadas com Google Calendar.
           </p>
@@ -101,7 +101,7 @@ export default function AgendaModule() {
       <AgendaCalendar
         visits={visits}
         slots={slots}
-        onSelectVisit={(v) => alert(`Visita: ${v.name}\nTeléfono: ${v.phone}\nServicio: ${v.service}\nFecha: ${v.preferDate} ${v.preferTime}`)}
+        onSelectVisit={(v) => alert(`Visita: ${v.name}\nTelefone: ${v.phone}\nServiço: ${v.service}\nData: ${v.preferDate} ${v.preferTime}`)}
         onSelectSlot={(s) => { setEditingSlot(s); setSlotModalOpen(true); }}
         onCreateSlot={(date) => { setEditingSlot(null); setDefaultSlotDate(date); setSlotModalOpen(true); }}
       />
