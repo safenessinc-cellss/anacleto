@@ -114,7 +114,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
   };
 
   const handleDeleteInvoice = async (id: string) => {
-    if (!confirm("¿Deseas eliminar esta factura del sistema?")) return;
+    if (!confirm("Deseja excluir esta fatura do sistema?")) return;
     try {
       await deleteDoc(doc(db, "invoices", id));
       if (selectedInvoice?.id === id) {
