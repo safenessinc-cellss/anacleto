@@ -159,6 +159,59 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     doc.text(splitNotes, 14, finalY + 17);
   }
 
+  // Desenho ilustrativo 2D para esquadrias no orçamento
+  const windowItem = quote.items.find((item) => /janela|porta|esquadria|window|door|box de banheiro|box banheiro/i.test(item.description || ""));
+  if (windowItem) {
+    doc.addPage();
+    const desc = windowItem.description || "Esquadria";
+    const dimensions = desc.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
+    const widthMm = dimensions ? Number(dimensions[1]) * (Number(dimensions[1]) < 20 ? 100 : 10) : 1200;
+    const heightMm = dimensions ? Number(dimensions[2]) * (Number(dimensions[2]) < 20 ? 100 : 10) : 1000;
+    const isDoor = /porta|door/i.test(desc);
+    const frameX = 45, frameY = 72, frameW = 120, frameH = 105;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text("DESENHO ILUSTRATIVO 2D DA ESQUADRIA", 14, 22);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text(desc.substring(0, 90), 14, 31);
+    doc.setDrawColor(71, 85, 105);
+    doc.setLineWidth(2.5);
+    doc.rect(frameX, frameY, frameW, frameH);
+    doc.setLineWidth(1.2);
+    doc.rect(frameX + 4, frameY + 4, frameW - 8, frameH - 8);
+    if (/2\s*folhas|duas folhas|2 folhas|corrediça|correr|sliding/i.test(desc)) {
+      doc.line(frameX + frameW / 2, frameY + 4, frameX + frameW / 2, frameY + frameH - 4);
+      doc.setDrawColor(148, 163, 184);
+      doc.line(frameX + 9, frameY + 9, frameX + frameW / 2 - 4, frameY + frameH - 9);
+      doc.line(frameX + frameW / 2 + 4, frameY + 9, frameX + frameW - 9, frameY + frameH - 9);
+    } else if (!isDoor) {
+      doc.line(frameX + frameW / 2, frameY + 4, frameX + frameW / 2, frameY + frameH - 4);
+      doc.line(frameX + 4, frameY + frameH / 2, frameX + frameW - 4, frameY + frameH / 2);
+    } else {
+      doc.setDrawColor(148, 163, 184);
+      doc.line(frameX + 8, frameY + 8, frameX + frameW - 8, frameY + frameH - 8);
+    }
+    doc.setDrawColor(197, 168, 80);
+    doc.setLineWidth(0.6);
+    doc.line(frameX, frameY - 10, frameX + frameW, frameY - 10);
+    doc.line(frameX, frameY - 13, frameX, frameY - 7);
+    doc.line(frameX + frameW, frameY - 13, frameX + frameW, frameY - 7);
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Largura: ${widthMm} mm`, frameX + frameW / 2, frameY - 14, { align: "center" });
+    doc.line(frameX - 12, frameY, frameX - 12, frameY + frameH);
+    doc.line(frameX - 15, frameY, frameX - 9, frameY);
+    doc.line(frameX - 15, frameY + frameH, frameX - 9, frameY + frameH);
+    doc.text(`Altura: ${heightMm} mm`, frameX - 16, frameY + frameH / 2, { angle: 90, align: "center" });
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text("Representação visual ilustrativa; confirmar medidas e abertura antes da fabricação.", 14, 205);
+    doc.text(`Quantidade no orçamento: ${windowItem.quantity}`, 14, 214);
+  }
+
   // Footer
   const footerY = doc.internal.pageSize.height - 15;
   doc.setFontSize(8);
