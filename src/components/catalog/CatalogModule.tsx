@@ -39,7 +39,7 @@ export default function CatalogModule() {
   }, [authReady]);
 
   const handleSave = async () => {
-    if (!form.sku || !form.name) return alert("SKU y Nombre son obligatorios");
+    if (!form.sku || !form.name) return alert("Código e nome são obrigatórios");
     if (editing?.id) {
       await updateDoc(doc(db, "catalog", editing.id), { ...form });
     } else {
@@ -70,7 +70,7 @@ export default function CatalogModule() {
         })).filter(item => item.sku && item.name);
 
         if (itemsToSave.length === 0) {
-          alert("No se encontraron filas válidas.");
+          alert("Nenhuma linha válida foi encontrada.");
           return;
         }
 
@@ -81,7 +81,7 @@ export default function CatalogModule() {
           batch.set(newDocRef, item);
         });
         await batch.commit();
-        alert(`✅ ${itemsToSave.length} productos importados.`);
+        alert(`✅ ${itemsToSave.length} itens importados.`);
       },
     });
   };
@@ -94,12 +94,12 @@ export default function CatalogModule() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Catálogo de Productos</h2>
+        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Catálogo de Itens</h2>
         <div className="flex gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input 
-              placeholder="Buscar por SKU o nombre..." 
+              placeholder="Buscar por código ou nome..." 
               value={search} onChange={e => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800"
             />
@@ -120,9 +120,9 @@ export default function CatalogModule() {
           <input placeholder="SKU" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="p-2 border rounded text-sm" />
           <input placeholder="Nome" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="p-2 border rounded text-sm md:col-span-2" />
           <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="p-2 border rounded text-sm">
-            <option>Perfil</option><option>Accesorio</option><option>Vidrio</option><option>Herraje</option>
+            <option>Perfil</option><option>Acessório</option><option>Vidro</option><option>Ferragem</option>
           </select>
-          <input placeholder="Unidad" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="p-2 border rounded text-sm" />
+          <input placeholder="Unidade" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="p-2 border rounded text-sm" />
           <input type="number" placeholder="Preço" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} className="p-2 border rounded text-sm" />
         </div>
         <button onClick={handleSave} className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold">Guardar</button>
@@ -131,7 +131,7 @@ export default function CatalogModule() {
       <div className="bg-white dark:bg-slate-900 rounded-xl border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800 text-left">
-            <tr><th className="p-3">SKU</th><th className="p-3">Nombre</th><th className="p-3">Categoría</th><th className="p-3">Precio</th><th className="p-3">Acciones</th></tr>
+            <tr><th className="p-3">SKU</th><th className="p-3">Nome</th><th className="p-3">Categoria</th><th className="p-3">Preço</th><th className="p-3">Ações</th></tr>
           </thead>
           <tbody>
             {filtered.map(item => (
