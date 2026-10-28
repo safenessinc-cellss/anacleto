@@ -133,24 +133,36 @@ export default function AnacletoProApp({
     return () => unsub();
   }, [authReady]);
 
-  // Navigation Items Required in Prompt
-  const navItems = [
-        { id: "dashboard" as NavigationTab, label: "Dashboard", icon: LayoutDashboard, badge: null },
-    { id: "crm" as NavigationTab, label: "CRM (Empresas)", icon: Building, badge: companies.length },
+  // Navegação organizada como no fluxo de trabalho de esquadrias.
+  const [cadastrosOpen, setCadastrosOpen] = useState(true);
+  const [gestaoOpen, setGestaoOpen] = useState(true);
+  const homeItems = [
+    { id: "dashboard" as NavigationTab, label: "Home", icon: LayoutDashboard, badge: null },
+  ];
+  const cadastroItems = [
+    { id: "crm" as NavigationTab, label: "Clientes", icon: Building, badge: companies.length },
+    { id: "catalog" as NavigationTab, label: "Cadastro de Itens", icon: Package, badge: null },
+    { id: "catalog" as NavigationTab, label: "Produtos", icon: Package, badge: null },
+    { id: "catalog" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
+    { id: "finance" as NavigationTab, label: "Formas de Pagamento", icon: Wallet, badge: null },
+  ];
+  const gestaoItems = [
     { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
-    { id: "invoices" as NavigationTab, label: "Faturas", icon: FileCheck, badge: invoices.length },
-    { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico", icon: Compass, badge: "AI CAD" },
+    { id: "technical_drawing" as NavigationTab, label: "Ficha de Medição", icon: Calendar, badge: null },
+    { id: "invoices" as NavigationTab, label: "Contratos", icon: FileCheck, badge: null },
+    { id: "technical_drawing" as NavigationTab, label: "Plano de Corte", icon: Compass, badge: null },
+    { id: "technical_drawing" as NavigationTab, label: "Aproveitamento de Perfis", icon: Package, badge: null },
+    { id: "catalog" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
+  ];
+  const utilityItems = [
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
-    { id: "catalog" as NavigationTab, label: "Catálogo", icon: Package, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
     { id: "financial_ai" as NavigationTab, label: "IA Financeira", icon: Sparkles, badge: "NOVO" },
+    { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico 3D", icon: Compass, badge: "CAD" },
     { id: "settings" as NavigationTab, label: "Configuração", icon: Settings, badge: null },
     { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
-    { id: "admin" as NavigationTab, label: "Administración", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
+    { id: "admin" as NavigationTab, label: "Administração", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
   ].filter((item) => hasAccessToTab(userRole, item.id as RoleNavTab));
-  
-  // (el array original tenía la estructura "[ ... ]" - ahora filtramos por rol)
-  const _unused = [  ];
 
   const handleSelectCompanyForQuote = (comp: Company) => {
     setActiveTab("quotes");
@@ -205,45 +217,60 @@ export default function AnacletoProApp({
             </div>
           </div>
 
-          {/* Navigation Items */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-3 block mb-2">
-              Menú Principal
-            </span>
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition ${
-                    isActive
-                      ? "bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20"
-                      : "text-slate-400 hover:text-white hover:bg-slate-900"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 ${isActive ? "text-slate-950" : "text-amber-400"}`} />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge !== null && (
-                    <span
-                      className={`text-[9px] font-mono px-2 py-0.5 rounded-md ${
-                        isActive
-                          ? "bg-slate-950 text-amber-400 font-bold"
-                          : "bg-slate-900 text-slate-400 border border-slate-800"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          {/* Navigation grouped by the user's reference screenshots */}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-3 block mb-2">Principal</span>
+              {homeItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition ${isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:text-white hover:bg-slate-900"}`}>
+                  <span className="flex items-center gap-3"><Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-blue-400"}`} /><span>{item.label}</span></span>
+                </button>;
+              })}
+            </div>
+            <div className="space-y-1">
+              <button onClick={() => setCadastrosOpen(!cadastrosOpen)} aria-expanded={cadastrosOpen}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-200">
+                <span>Cadastros</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${cadastrosOpen ? "rotate-90" : ""}`} />
+              </button>
+              {cadastrosOpen && cadastroItems.map((item, index) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-600/10 text-blue-300 border border-blue-500/20" : "text-slate-400 hover:text-white hover:bg-slate-900"}`}>
+                  <span className="flex items-center gap-3"><Icon className="w-4 h-4" /><span>{item.label}</span></span>
+                  {item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">{item.badge}</span>}
+                </button>;
+              })}
+            </div>
+            <div className="space-y-1">
+              <button onClick={() => setGestaoOpen(!gestaoOpen)} aria-expanded={gestaoOpen}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-200">
+                <span>Gestão</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${gestaoOpen ? "rotate-90" : ""}`} />
+              </button>
+              {gestaoOpen && gestaoItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-600/10 text-blue-300 border border-blue-500/20" : "text-slate-400 hover:text-white hover:bg-slate-900"}`}>
+                  <span className="flex items-center gap-3"><Icon className="w-4 h-4" /><span>{item.label}</span></span>
+                  {item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">{item.badge}</span>}
+                </button>;
+              })}
+            </div>
+            <div className="space-y-1 pt-2 border-t border-slate-800/80">
+              {utilityItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-600/10 text-blue-300" : "text-slate-400 hover:text-white hover:bg-slate-900"}`}>
+                  <span className="flex items-center gap-3"><Icon className="w-4 h-4" /><span>{item.label}</span></span>
+                  {item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">{item.badge}</span>}
+                </button>;
+              })}
+            </div>
           </div>
 
           {/* Quick AI CAD Promotion Pill */}
