@@ -13,7 +13,7 @@ import {
   Layers,
   Users,
   Eye,
-  Download,
+  Baixar,
   CheckCircle,
   HardDrive,
   ShieldCheck,
@@ -43,7 +43,7 @@ export default function DashboardOverview({
   const [pdfFilter, setPdfFilter] = useState<"all" | "quotes" | "invoices" | "drawings">("all");
   const [pdfSearch, setPdfSearch] = useState("");
   const [activePdfModal, setActivePdfModal] = useState<{
-    isOpen: boolean;
+    isAbrir: boolean;
     title: string;
     subtitle?: string;
     dataUri: string;
@@ -52,15 +52,15 @@ export default function DashboardOverview({
     storedAt?: string;
     type: "quote" | "invoice" | "drawing" | "generic";
   }>({
-    isOpen: false,
+    isAbrir: false,
     title: "",
     dataUri: "",
     fileName: "",
     type: "generic",
   });
   const totalInvoiced = invoices.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalPaid = invoices.filter((i) => i.status === "pago").reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalQuotesValue = quotes.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalPago = invoices.filter((i) => i.status === "pago").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalOrçamentosValue = quotes.reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -69,7 +69,7 @@ export default function DashboardOverview({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-xl">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-full">
-              <Sparkles className="w-3.5 h-3.5" /> Anacleto Pro Enterprise OS
+              <Sparkles className="w-3.5 h-3.5" /> ANACLETO ESQUADRIAS
             </span>
             <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">
               Bem-vindo ao Painel de Controle
@@ -116,10 +116,10 @@ export default function DashboardOverview({
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total de Orçamentos</span>
           <div className="flex items-baseline justify-between mt-1">
             <h3 className="text-2xl font-black text-white">{quotes.length}</h3>
-            <span className="text-xs font-mono font-bold text-amber-400">{totalQuotesValue.toFixed(2)} R$</span>
+            <span className="text-xs font-mono font-bold text-amber-400">{totalOrçamentosValue.toFixed(2)} R$</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Orçamentos criados e cotados
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Orçamentos criados e calculados
           </p>
         </div>
 
@@ -137,10 +137,10 @@ export default function DashboardOverview({
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Faturas Emitidas</span>
           <div className="flex items-baseline justify-between mt-1">
             <h3 className="text-2xl font-black text-white">{invoices.length}</h3>
-            <span className="text-xs font-mono font-bold text-emerald-400">{totalPaid.toFixed(2)} R$ cobrado</span>
+            <span className="text-xs font-mono font-bold text-emerald-400">{totalPago.toFixed(2)} R$ recebidos</span>
           </div>
           <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Total Faturado: {totalInvoiced.toFixed(2)} R$
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Total faturado: {totalInvoiced.toFixed(2)} R$
           </p>
         </div>
 
@@ -187,9 +187,9 @@ export default function DashboardOverview({
         </div>
       </div>
 
-      {/* Two Column Section: Recent Quotes & Recent Technical Drawings */}
+      {/* Two Column Section: Recent Orçamentos & Recent Technical Desenhos técnicos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Quotes */}
+        {/* Recent Orçamentos */}
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -238,7 +238,7 @@ export default function DashboardOverview({
           </div>
         </div>
 
-        {/* Recent Technical Drawings */}
+        {/* Recent Technical Desenhos técnicos */}
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -363,7 +363,7 @@ export default function DashboardOverview({
               pdfDataUri: q.pdfDataUri,
               pdfFileName: q.pdfFileName || `Presupuesto_${q.number}.pdf`,
               sizeKb: q.pdfFileSizeKb || 35,
-              storedAt: q.pdfGeneratedAt || q.updatedAt,
+              storedAt: q.pdfGeradoAt || q.updatedAt,
               raw: q,
             })),
             ...invoices.map((inv) => ({
@@ -379,7 +379,7 @@ export default function DashboardOverview({
               pdfDataUri: inv.pdfDataUri,
               pdfFileName: inv.pdfFileName || `Factura_${inv.number}.pdf`,
               sizeKb: inv.pdfFileSizeKb || 38,
-              storedAt: inv.pdfGeneratedAt || inv.updatedAt,
+              storedAt: inv.pdfGeradoAt || inv.updatedAt,
               raw: inv,
             })),
             ...drawings.map((d) => ({
@@ -395,7 +395,7 @@ export default function DashboardOverview({
               pdfDataUri: d.pdfDataUri,
               pdfFileName: d.pdfFileName || `Plano_Tecnico_${(d.title || "Proyecto").replace(/\s+/g, "_")}.pdf`,
               sizeKb: d.pdfFileSizeKb || 42,
-              storedAt: d.pdfGeneratedAt || d.updatedAt,
+              storedAt: d.pdfGeradoAt || d.updatedAt,
               raw: d,
             })),
           ];
@@ -416,7 +416,7 @@ export default function DashboardOverview({
             return matchesTab && matchesSearch;
           });
 
-          const handleOpenVaultPdf = (item: any) => {
+          const handleAbrirVaultPdf = (item: any) => {
             let uri = item.pdfDataUri;
             let fileName = item.pdfFileName;
             let sizeKb = item.sizeKb;
@@ -440,7 +440,7 @@ export default function DashboardOverview({
             }
 
             setActivePdfModal({
-              isOpen: true,
+              isAbrir: true,
               title: item.title,
               subtitle: `${item.number} • ${item.clientOrDetail} • ${item.metric}`,
               dataUri: uri,
@@ -451,7 +451,7 @@ export default function DashboardOverview({
             });
           };
 
-          const handleDownloadDirect = (item: any) => {
+          const handleBaixarDirect = (item: any) => {
             let uri = item.pdfDataUri;
             let fileName = item.pdfFileName;
             if (!uri) {
@@ -507,17 +507,17 @@ export default function DashboardOverview({
 
                     <div className="flex items-center gap-2 mt-3 pt-2">
                       <button
-                        onClick={() => handleOpenVaultPdf(item)}
+                        onClick={() => handleAbrirVaultPdf(item)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[11px] font-bold rounded-xl border border-amber-500/30 transition"
                       >
                         <Eye className="w-3.5 h-3.5 text-amber-400" /> Ver PDF
                       </button>
                       <button
-                        onClick={() => handleDownloadDirect(item)}
+                        onClick={() => handleBaixarDirect(item)}
                         title="Descargar archivo PDF"
                         className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-800 transition"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Baixar className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -537,8 +537,8 @@ export default function DashboardOverview({
 
       {/* Global Dashboard PDF Viewer Modal */}
       <PdfViewerModal
-        isOpen={activePdfModal.isOpen}
-        onClose={() => setActivePdfModal((prev) => ({ ...prev, isOpen: false }))}
+        isAbrir={activePdfModal.isAbrir}
+        onClose={() => setActivePdfModal((prev) => ({ ...prev, isAbrir: false }))}
         title={activePdfModal.title}
         subtitle={activePdfModal.subtitle}
         pdfDataUri={activePdfModal.dataUri}
