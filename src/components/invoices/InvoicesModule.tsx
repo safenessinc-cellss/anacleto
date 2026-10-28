@@ -150,7 +150,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                Facturación Oficial
+                Faturación Oficial
               </span>
               <span className="text-[10px] font-mono text-slate-400">Total: {invoices.length} Faturas</span>
             </div>
@@ -246,7 +246,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
 
                   <div className="flex items-center justify-between mt-3 text-[11px]">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-slate-500">{inv.items?.length || 0} ítems</span>
+                      <span className="text-slate-500">{inv.items?.length || 0} itens</span>
                       {inv.pdfDataUri && (
                         <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
                           PDF
@@ -289,7 +289,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                     {selectedInvoice.pdfDataUri && (
                       <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
                         <CheckCircle className="w-3 h-3 text-emerald-400" />
-                        PDF Almacenado ({selectedInvoice.pdfFileSizeKb || 35} KB)
+                        PDF armazenado ({selectedInvoice.pdfFileSizeKb || 35} KB)
                       </span>
                     )}
                   </div>
@@ -301,7 +301,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                     onClick={() => handleOpenInvoicePdf(selectedInvoice)}
                     className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 text-xs font-bold rounded-xl transition border border-emerald-500/40 shadow-sm"
                   >
-                    <Eye className="w-3.5 h-3.5 text-emerald-400" /> Ver PDF Almacenado
+                    <Eye className="w-3.5 h-3.5 text-emerald-400" /> Ver PDF armazenado
                   </button>
 
                   <button
@@ -313,14 +313,14 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                     }`}
                   >
                     <CheckCircle className="w-3.5 h-3.5" />
-                    {selectedInvoice.status === "pago" ? "Marcar Pendente" : "Marcar como Paga"}
+                    {selectedInvoice.status === "pago" ? "Marcar como pendente" : "Marcar como paga"}
                   </button>
 
                   <button
                     onClick={() => handleExportPdf(selectedInvoice)}
                     className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
                   >
-                    <Download className="w-3.5 h-3.5 text-slate-300" /> Descargar PDF
+                    <Download className="w-3.5 h-3.5 text-slate-300" /> Baixar PDF
                   </button>
 
                   <button
@@ -351,7 +351,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
               {/* Items Table */}
               <div className="space-y-3">
                 <h3 className="text-xs font-black uppercase tracking-wider text-emerald-400">
-                  Conceptos Facturados
+                  Itens faturados
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -408,7 +408,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
               <FileCheck className="w-12 h-12 text-slate-600 mx-auto mb-3" />
               <h3 className="text-sm font-bold text-white">Selecione uma fatura</h3>
               <p className="text-xs text-slate-400 mt-1">
-                Puedes generar facturas directamente desde la sección "Orçamentos".
+                Você pode gerar faturas diretamente na seção "Orçamentos".
               </p>
             </div>
           )}
@@ -419,10 +419,10 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
       <PdfViewerModal
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
-        title={`Factura ${viewerPdfInvoice?.number || ""}`}
+        title={`Fatura ${viewerPdfInvoice?.number || ""}`}
         subtitle={`Cliente: ${viewerPdfInvoice?.clientName || ""} • Total: ${viewerPdfInvoice?.total?.toFixed(2)} ${viewerPdfInvoice?.currency || "BRL"}`}
         pdfDataUri={viewerPdfInvoice?.pdfDataUri}
-        fileName={viewerPdfInvoice?.pdfFileName || `Factura_${viewerPdfInvoice?.number}.pdf`}
+        fileName={viewerPdfInvoice?.pdfFileName || `Fatura_${viewerPdfInvoice?.number}.pdf`}
         fileSizeKb={viewerPdfInvoice?.pdfFileSizeKb}
         storedAt={viewerPdfInvoice?.pdfGeneratedAt || viewerPdfInvoice?.updatedAt}
         type="invoice"
