@@ -483,9 +483,9 @@ const handleAddItem = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                Gestor Comercial
+                Gestor comercial
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Total: {quotes.length} Orçamentos</span>
+              <span className="text-[10px] font-mono text-slate-400">Total: {quotes.length} orçamentos</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
               Orçamentos Inteligentes com IA
@@ -571,7 +571,7 @@ const handleAddItem = () => {
 
                   <div className="flex items-center justify-between mt-3 text-[11px]">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-slate-400">{q.items.length} ítems</span>
+                      <span className="text-slate-400">{q.items.length} itens</span>
                       {q.pdfDataUri ? (
                         <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
                           PDF
@@ -615,7 +615,7 @@ const handleAddItem = () => {
                       {selectedQuote.pdfDataUri && (
                         <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
                           <CheckCircle className="w-3 h-3 text-emerald-400" />
-                          PDF Almacenado ({selectedQuote.pdfFileSizeKb || 35} KB)
+                          PDF armazenado ({selectedQuote.pdfFileSizeKb || 35} KB)
                         </span>
                       )}
                     </div>
@@ -627,25 +627,25 @@ const handleAddItem = () => {
                       onClick={() => handleOpenQuotePdf(selectedQuote)}
                       className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 text-xs font-bold rounded-xl transition border border-amber-500/40 shadow-sm"
                     >
-                      <Eye className="w-3.5 h-3.5 text-amber-400" /> Ver PDF Almacenado
+                      <Eye className="w-3.5 h-3.5 text-amber-400" /> Visualizar PDF armazenado
                     </button>
                     <button
                       onClick={() => exportQuotePdf(selectedQuote, senderConfig)}
                       className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
                     >
-                      <Download className="w-3.5 h-3.5 text-slate-300" /> Descargar PDF
+                      <Download className="w-3.5 h-3.5 text-slate-300" /> Baixar PDF
                     </button>
                     <button
                       onClick={() => handleConvertQuoteToInvoice(selectedQuote)}
                       className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-md shadow-emerald-600/20"
                     >
-                      <FileCheck className="w-3.5 h-3.5" /> Convertir a Factura
+                      <FileCheck className="w-3.5 h-3.5" /> Converter em fatura
                     </button>
                     <button
                       onClick={() => handleSaveQuote()}
                       className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase rounded-xl transition shadow-md shadow-amber-500/20"
                     >
-                      Salvar y Almacenar PDF
+                      Salvar orçamento e armazenar PDF
                     </button>
                   </div>
                 </div>
@@ -654,7 +654,7 @@ const handleAddItem = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
-                      Seleccionar Cliente (CRM):
+                      Selecionar cliente (CRM):
                     </label>
                     <select
                       value={selectedQuote.companyId || ""}
@@ -710,7 +710,7 @@ const handleAddItem = () => {
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-black uppercase tracking-wider text-amber-400">
-                      Ítems y Conceptos del Trabajo
+                      Itens e conceitos do trabalho
                     </h3>
                     
         {/* Botón para abrir catálogo */}
@@ -720,7 +720,7 @@ const handleAddItem = () => {
             onClick={() => setShowCatalog(!showCatalog)}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100"
           >
-            🛒 {showCatalog ? "Cerrar catálogo" : "Buscar en catálogo"}
+            🛒 {showCatalog ? "Fechar catálogo" : "Buscar no catálogo"}
           </button>
           
           {showCatalog && (
@@ -743,14 +743,14 @@ const handleAddItem = () => {
                       key={item.id}
                       type="button"
                       onClick={() => {
-                        // Añadir el producto al orçamento
+                        // Adicionar o produto ao orçamento
                         const newItem = {
                           id: Math.random().toString(36).substring(2),
                           description: `${item.name} (${item.sku})`,
                           quantity: 1,
                           unitPrice: item.price,
                         };
-                        // Asumiendo que el state se llama items o quoteItems
+                        // Considerando que o estado se chama items ou quoteItems
                         if (typeof setItems !== "undefined") setItems([...items, newItem]);
                         else if (typeof setQuoteItems !== "undefined") setQuoteItems([...quoteItems, newItem]);
                         setShowCatalog(false);
@@ -773,7 +773,7 @@ const handleAddItem = () => {
                       onClick={handleAddItem}
                       className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Añadir Fila
+                      <Plus className="w-3.5 h-3.5" /> Adicionar linha
                     </button>
                   </div>
 
