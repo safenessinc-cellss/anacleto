@@ -18,9 +18,10 @@ import ThemeModule from "./settings/ThemeModule";
 import AdminModule from "./admin/AdminModule";
 import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
 import CatalogModule from "./catalog/CatalogModule";
+import RegistryModule from "./registry/RegistryModule";
 import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -141,18 +142,18 @@ export default function AnacletoProApp({
   ];
   const cadastroItems = [
     { id: "crm" as NavigationTab, label: "Clientes", icon: Building, badge: companies.length },
-    { id: "catalog" as NavigationTab, label: "Cadastro de Itens", icon: Package, badge: null },
-    { id: "catalog" as NavigationTab, label: "Produtos", icon: Package, badge: null },
-    { id: "catalog" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
-    { id: "finance" as NavigationTab, label: "Formas de Pagamento", icon: Wallet, badge: null },
+    { id: "cadastro_items" as NavigationTab, label: "Cadastro de Itens", icon: Package, badge: null },
+    { id: "products" as NavigationTab, label: "Produtos", icon: Package, badge: null },
+    { id: "services" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
+    { id: "payment_methods" as NavigationTab, label: "Formas de Pagamento", icon: Wallet, badge: null },
   ];
   const gestaoItems = [
     { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
-    { id: "technical_drawing" as NavigationTab, label: "Ficha de Medição", icon: Calendar, badge: null },
-    { id: "invoices" as NavigationTab, label: "Contratos", icon: FileCheck, badge: null },
-    { id: "technical_drawing" as NavigationTab, label: "Plano de Corte", icon: Compass, badge: null },
-    { id: "technical_drawing" as NavigationTab, label: "Aproveitamento de Perfis", icon: Package, badge: null },
-    { id: "catalog" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
+    { id: "measurement" as NavigationTab, label: "Ficha de Medição", icon: Calendar, badge: null },
+    { id: "contracts" as NavigationTab, label: "Contratos", icon: FileCheck, badge: null },
+    { id: "cut_plan" as NavigationTab, label: "Plano de Corte", icon: Compass, badge: null },
+    { id: "profile_optimization" as NavigationTab, label: "Aproveitamento de Perfis", icon: Package, badge: null },
+    { id: "materials" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
   ];
   const utilityItems = [
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
@@ -373,6 +374,15 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "catalog" && (<CatalogModule />)}
+          {activeTab === "cadastro_items" && <RegistryModule kind="items" />}
+          {activeTab === "products" && <RegistryModule kind="products" />}
+          {activeTab === "services" && <RegistryModule kind="services" />}
+          {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
+          {activeTab === "measurement" && <RegistryModule kind="measurement" />}
+          {activeTab === "contracts" && <RegistryModule kind="contracts" />}
+          {activeTab === "cut_plan" && <RegistryModule kind="cut_plan" />}
+          {activeTab === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
+          {activeTab === "materials" && <RegistryModule kind="materials" />}
 
         {activeTab === "finance" && (<FinanceModule language={language} />)}
 
