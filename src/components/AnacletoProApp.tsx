@@ -66,7 +66,7 @@ export default function AnacletoProApp({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
 
-  // 0. Esperar a que el usuario esté autenticado antes de escuchar Firestore
+  // 0. Aguarda a autenticação antes de iniciar a escuta do Firestore
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -76,7 +76,7 @@ export default function AnacletoProApp({
     return () => unsub();
   }, []);
 
-  // 1. Listen for Quotes (solo cuando authReady === true)
+  // 1. Escuta os orçamentos somente após a autenticação
   useEffect(() => {
     console.log("📊 Quotes listener - authReady:", authReady);
     if (!authReady) return;
@@ -93,7 +93,7 @@ export default function AnacletoProApp({
     return () => unsub();
   }, [authReady]);
 
-  // 2. Listen for Invoices (solo cuando authReady === true)
+  // 2. Escuta as faturas somente após a autenticação
   useEffect(() => {
     if (!authReady) return;
     const unsub = onSnapshot(
@@ -123,7 +123,7 @@ export default function AnacletoProApp({
     return () => unsub();
   }, [authReady]);
 
-  // 4. Listen for Technical Drawings (solo cuando authReady)
+  // 4. Escuta os desenhos técnicos somente após a autenticação
   useEffect(() => {
     if (!authReady) return;
     const unsub = onSnapshot(
@@ -142,7 +142,7 @@ export default function AnacletoProApp({
   const [cadastrosOpen, setCadastrosOpen] = useState(true);
   const [gestaoOpen, setGestaoOpen] = useState(true);
   const homeItems = [
-    { id: "dashboard" as NavigationTab, label: "Home", icon: LayoutDashboard, badge: null },
+    { id: "dashboard" as NavigationTab, label: "Início", icon: LayoutDashboard, badge: null },
   ];
   const cadastroItems = [
     { id: "crm" as NavigationTab, label: "Clientes", icon: Building, badge: companies.length },
@@ -164,8 +164,8 @@ export default function AnacletoProApp({
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
     { id: "financial_ai" as NavigationTab, label: "IA Financeira", icon: Sparkles, badge: "NOVO" },
-    { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico 3D", icon: Compass, badge: "CAD" },
-    { id: "settings" as NavigationTab, label: "Configuração", icon: Settings, badge: null },
+    { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico 2D", icon: Compass, badge: "CAD" },
+    { id: "settings" as NavigationTab, label: "Configurações", icon: Settings, badge: null },
     { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
     { id: "admin" as NavigationTab, label: "Administração", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
   ].filter((item) => hasAccessToTab(userRole, item.id as RoleNavTab));
@@ -206,9 +206,9 @@ export default function AnacletoProApp({
             <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-11 h-11 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
               <div className="w-full h-full bg-[#0b0e17] rounded-[14px] flex items-center justify-center overflow-hidden">
                 {customLogo ? <img src={customLogo} alt="Logotipo personalizado" className="h-full w-full object-contain" /> : <span className="text-base font-black text-amber-400">A</span>}
-              </div><span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/60 text-[9px] font-bold text-white">EDITAR</span>
+              </div><span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/60 text-[9px] font-bold text-white">ALTERAR</span>
             </button>
-            <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" aria-label="Subir logotipo" />
+            <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" aria-label="Enviar logotipo" />
             <div>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-base font-black tracking-[0.2em] text-white uppercase">ANACLETO</h1>
@@ -217,7 +217,7 @@ export default function AnacletoProApp({
                 </span>
               </div>
               <p className="text-[9px] text-slate-400 tracking-wider font-mono uppercase mt-0.5">
-                Presupuestos • CAD • Facturas
+                Orçamentos • Desenhos • Faturas
               </p>
             </div>
           </div>
