@@ -100,7 +100,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
   };
 
   const handleDeleteCompany = async (id: string, compName: string) => {
-    if (!confirm(`¿Excluir la empresa "${compName}" del CRM?`)) return;
+    if (!confirm(`Deseja excluir a empresa "${compName}" do CRM?`)) return;
     try {
       await deleteDoc(doc(db, "companies", id));
       showToast("Empresa excluída.", "info");
@@ -135,7 +135,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
               <span className="text-[10px] font-mono text-slate-400">Total: {companies.length} Empresas</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Directorio de Empresas & Clientes
+              Diretório de Empresas e Clientes
             </h1>
           </div>
         </div>
@@ -144,7 +144,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
           onClick={openCreateModal}
           className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition shadow-lg shadow-indigo-600/20"
         >
-          <Plus className="w-4 h-4" /> Registrar Empresa
+          <Plus className="w-4 h-4" /> Cadastrar Empresa
         </button>
       </div>
 
@@ -233,7 +233,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
                     onClick={() => onSelectCompanyForQuote(comp)}
                     className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-950 hover:bg-indigo-600 text-slate-300 hover:text-white text-xs font-bold transition border border-slate-800 hover:border-indigo-500"
                   >
-                    <FileText className="w-3.5 h-3.5" /> Crear Presupuesto
+                    <FileText className="w-3.5 h-3.5" /> Criar Orçamento
                   </button>
                 </div>
               )}
@@ -310,7 +310,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
                   type="text"
                   value={contactPerson}
                   onChange={(e) => setContactPerson(e.target.value)}
-                  placeholder="Director de Obra, Arquitecto, Administrador..."
+                  placeholder="Diretor de obra, arquiteto, administrador..."
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500"
                 />
               </div>
