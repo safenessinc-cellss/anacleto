@@ -48,7 +48,7 @@ export default function AnacletoProApp({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [customLogo, setCustomLogo] = useState<string>(() => { try { return localStorage.getItem("anacleto_custom_logo") || ""; } catch { return ""; } });
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (!file.type.startsWith("image/")) { window.alert("Selecione um arquivo de imagem."); return; } if (file.size > 2 * 1024 * 1024) { window.alert("A imagem deve ter no máximo 2 MB."); return; } const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ""); setCustomLogo(value); try { localStorage.setItem("anacleto_custom_logo", value); } catch { window.alert("Imagem grande demais para guardar neste navegador."); } }; reader.readAsDataURL(file); event.target.value = ""; };
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (!file.type.startsWith("image/")) { window.alert("Selecione um arquivo de imagem."); return; } if (file.size > 2 * 1024 * 1024) { window.alert("A imagem deve ter no máximo 2 MB."); return; } const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ""); setCustomLogo(value); try { localStorage.setItem("anacleto_custom_logo", value); } catch { window.alert("Imagem grande demais para salvar neste navegador."); } }; reader.readAsDataURL(file); event.target.value = ""; };
   const [isDark, setIsDark] = useState(() =>
     typeof document !== "undefined" && document.documentElement.classList.contains("dark")
   );
@@ -332,7 +332,7 @@ export default function AnacletoProApp({
               onClick={onLogout}
               className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs text-slate-500 hover:text-rose-400 transition"
             >
-              <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
+              <LogOut className="w-3.5 h-3.5" /> Sair da conta
             </button>
           )}
         </div>
