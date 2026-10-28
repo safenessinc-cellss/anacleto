@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, doc, deleteDoc, setDoc, query, orderBy } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { CheckCircle, Clock, Mail, Plus, Shield, Trash2, User, UserCog, X, XCircle } from "lucide-react";
-import { Role, ROLES, SUPER_ADMIN_EMAIL, getAssignableRoles, getRoleConfig } from "../../utils/roles";
+import { Perfile, ROLES, SUPER_ADMIN_EMAIL, getAssignablePerfiles, getPerfileConfig } from "../../utils/roles";
 
 interface PendingUser {
   id: string;
@@ -16,20 +16,20 @@ interface PendingUser {
 interface AdminUser {
   id: string;
   email: string;
-  role: Role;
+  role: Perfile;
   addedBy?: string;
   addedAt?: string;
 }
 
-export default function AdminModule({ currentRole }: { currentRole: Role }) {
+export default function AdminModule({ currentPerfile }: { currentPerfile: Perfile }) {
   const [pending, setPending] = useState<PendingUser[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [tab, setTab] = useState<"pending" | "admins">("pending");
-  const [newAdminEmail, setNewAdminEmail] = useState("");
-  const [newAdminRole, setNewAdminRole] = useState<Role>("colaborador");
+  const [newAdminE-mail, setNewAdminE-mail] = useState("");
+  const [newAdminPerfile, setNewAdminPerfile] = useState<Perfile>("colaborador");
   const [loading, setLoading] = useState(true);
 
-  const assignableRoles = getAssignableRoles(currentRole);
+  const assignablePerfiles = getAssignablePerfiles(currentPerfile);
 
   useEffect(() => {
     const u1 = onSnapshot(
@@ -55,7 +55,7 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
     return () => { u1(); u2(); };
   }, []);
 
-  const saveAdmin = async (email: string, role: Role, removeFromPending?: string) => {
+  const saveAdmin = async (email: string, role: Perfile, removeFromPending?: string) => {
     await setDoc(doc(db, "admins", email.toLowerCase()), {
       email: email.toLowerCase(),
       role,
@@ -67,12 +67,12 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
     }
   };
 
-  const approveUser = async (user: PendingUser, role: Role) => {
+  const approveUser = async (user: PendingUser, role: Perfile) => {
     try {
       await saveAdmin(user.email, role, user.id);
     } catch (e) {
       console.error(e);
-      alert("Error al aprobar usuario: " + (e as Error).message);
+      alert("Erro ao aprovar usuário: " + (e as Error).message);
     }
   };
 
@@ -82,19 +82,19 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
       await deleteDoc(doc(db, "pending_users", user.id));
     } catch (e) {
       console.error(e);
-      alert("Error al rechazar: " + (e as Error).message);
+      alert("Erro ao rejeitar: " + (e as Error).message);
     }
   };
 
   const removeAdmin = async (admin: AdminUser) => {
     if (admin.email === SUPER_ADMIN_EMAIL) {
-      alert("No puedes eliminar al super administrador.");
+      alert("Não é possível excluir o superadministrador.");
       return;
     }
-    const config = getRoleConfig(admin.role);
-    const currentLevel = getRoleConfig(currentRole).level;
+    const config = getPerfileConfig(admin.role);
+    const currentLevel = getPerfileConfig(currentPerfile).level;
     if (config.level >= currentLevel) {
-      alert(`No puedes eliminar a un usuario con rol igual o superior al tuyo (${config.label}).`);
+      alert(`Não é possível excluir um usuário com perfil igual ou superior ao seu (${config.label}).`);
       return;
     }
     if (!confirm(`¿Quitar permisos de ${config.label} a ${admin.email}?`)) return;
@@ -102,22 +102,22 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
       await deleteDoc(doc(db, "admins", admin.id));
     } catch (e) {
       console.error(e);
-      alert("Error al eliminar admin: " + (e as Error).message);
+      alert("Erro ao excluir administrador: " + (e as Error).message);
     }
   };
 
-  const changeRole = async (admin: AdminUser, newRole: Role) => {
+  const changePerfile = async (admin: AdminUser, newPerfile: Perfile) => {
     if (admin.email === SUPER_ADMIN_EMAIL) {
-      alert("No puedes cambiar el rol del super administrador.");
+      alert("Não é possível alterar o perfil do superadministrador.");
       return;
     }
-    if (!assignableRoles.some((r) => r.id === newRole)) {
-      alert("No tienes permiso para asignar ese rol.");
+    if (!assignablePerfiles.some((r) => r.id === newPerfile)) {
+      alert("Você não tem permissão para atribuir esse perfil.");
       return;
     }
     try {
-      await saveAdmin(admin.email, newRole);
-      alert(`✅ ${admin.email} ahora es ${ROLES[newRole].label}.`);
+      await saveAdmin(admin.email, newPerfile);
+      alert(`✅ ${admin.email} agora é ${ROLES[newPerfile].label}.`);
     } catch (e) {
       console.error(e);
       alert("Error al cambiar rol: " + (e as Error).message);
@@ -125,16 +125,16 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
   };
 
   const addAdminManually = async () => {
-    const email = newAdminEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) return alert("Email inválido");
-    if (!assignableRoles.some((r) => r.id === newAdminRole)) {
-      return alert("No tienes permiso para asignar ese rol.");
+    const email = newAdminE-mail.trim().toLowerCase();
+    if (!email || !email.includes("@")) return alert("E-mail inválido");
+    if (!assignablePerfiles.some((r) => r.id === newAdminPerfile)) {
+      return alert("Você não tem permissão para atribuir esse perfil.");
     }
     try {
       const pendingEntry = pending.find((p) => p.email.toLowerCase() === email);
-      await saveAdmin(email, newAdminRole, pendingEntry?.id);
-      setNewAdminEmail("");
-      alert(`✅ ${email} ahora es ${ROLES[newAdminRole].label}.`);
+      await saveAdmin(email, newAdminPerfile, pendingEntry?.id);
+      setNewAdminE-mail("");
+      alert(`✅ ${email} agora é ${ROLES[newAdminPerfile].label}.`);
     } catch (e) {
       console.error(e);
       alert("Error al añadir admin: " + (e as Error).message);
@@ -145,14 +145,14 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-          <Shield className="w-6 h-6 text-indigo-600" /> Administración de Usuarios y Roles
+          <Shield className="w-6 h-6 text-indigo-600" /> Administración de Usuarios y Perfiles
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           Tu rol actual:{" "}
-          <span className={`inline-block px-2 py-0.5 rounded border text-xs font-black ${getRoleConfig(currentRole).color}`}>
-            {getRoleConfig(currentRole).label}
+          <span className={`inline-block px-2 py-0.5 rounded border text-xs font-black ${getPerfileConfig(currentPerfile).color}`}>
+            {getPerfileConfig(currentPerfile).label}
           </span>
-          {" "}— {getRoleConfig(currentRole).description}
+          {" "}— {getPerfileConfig(currentPerfile).description}
         </p>
       </div>
 
@@ -191,8 +191,8 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
           ) : pending.length === 0 ? (
             <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-dashed">
               <CheckCircle className="w-12 h-12 mx-auto text-emerald-500 mb-3" />
-              <h3 className="font-bold text-slate-700 dark:text-slate-200">Sin solicitudes pendientes</h3>
-              <p className="text-sm text-slate-500 mt-1">Los usuarios que intenten acceder sin permiso aparecerán aquí.</p>
+              <h3 className="font-bold text-slate-700 dark:text-slate-200">Nenhuma solicitação pendente</h3>
+              <p className="text-sm text-slate-500 mt-1">Os usuários que tentarem acessar sem permissão aparecerão aqui.</p>
             </div>
           ) : (
             <div className="grid gap-3">
@@ -200,7 +200,7 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
                 <PendingRow
                   key={u.id}
                   user={u}
-                  assignableRoles={assignableRoles}
+                  assignablePerfiles={assignablePerfiles}
                   onApprove={approveUser}
                   onReject={rejectUser}
                 />
@@ -213,21 +213,21 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
       {tab === "admins" && (
         <div className="space-y-4">
           <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
-            <h3 className="font-bold mb-3 flex items-center gap-2"><Plus className="w-4 h-4" /> Añadir usuario manualmente</h3>
+            <h3 className="font-bold mb-3 flex items-center gap-2"><Plus className="w-4 h-4" /> Adicionar usuário manualmente</h3>
             <div className="flex gap-2 flex-wrap">
               <input
                 type="email"
-                value={newAdminEmail}
-                onChange={(e) => setNewAdminEmail(e.target.value)}
+                value={newAdminE-mail}
+                onChange={(e) => setNewAdminE-mail(e.target.value)}
                 placeholder="email@ejemplo.com"
                 className="flex-1 min-w-[200px] p-2 border rounded text-sm bg-white dark:bg-slate-800"
               />
               <select
-                value={newAdminRole}
-                onChange={(e) => setNewAdminRole(e.target.value as Role)}
+                value={newAdminPerfile}
+                onChange={(e) => setNewAdminPerfile(e.target.value as Perfile)}
                 className="p-2 border rounded text-sm bg-white dark:bg-slate-800"
               >
-                {assignableRoles.map((r) => (
+                {assignablePerfiles.map((r) => (
                   <option key={r.id} value={r.id}>{r.label}</option>
                 ))}
               </select>
@@ -236,7 +236,7 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
               </button>
             </div>
             <p className="text-xs text-slate-400 mt-2">
-              Puedes asignar: {assignableRoles.map((r) => r.label).join(", ") || "ninguno"}.
+              Puedes asignar: {assignablePerfiles.map((r) => r.label).join(", ") || "ninguno"}.
             </p>
           </div>
 
@@ -244,11 +244,11 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-800 text-left text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="p-3">Email</th>
-                  <th className="p-3">Rol</th>
-                  <th className="p-3">Añadido por</th>
-                  <th className="p-3">Fecha</th>
-                  <th className="p-3">Acciones</th>
+                  <th className="p-3">E-mail</th>
+                  <th className="p-3">Perfil</th>
+                  <th className="p-3">Adicionado por</th>
+                  <th className="p-3">Data</th>
+                  <th className="p-3">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -269,7 +269,7 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
                 </tr>
                 {admins.map((a) => {
                   const isSuper = a.email === SUPER_ADMIN_EMAIL;
-                  const canEdit = !isSuper && assignableRoles.some((r) => r.id === a.role);
+                  const canEdit = !isSuper && assignablePerfiles.some((r) => r.id === a.role);
                   return (
                     <tr key={a.id} className="border-t border-slate-100 dark:border-slate-800">
                       <td className="p-3 font-mono text-xs">
@@ -286,16 +286,16 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
                         ) : canEdit ? (
                           <select
                             value={a.role}
-                            onChange={(e) => changeRole(a, e.target.value as Role)}
+                            onChange={(e) => changePerfile(a, e.target.value as Perfile)}
                             className="p-1 border rounded text-xs bg-white dark:bg-slate-800"
                           >
-                            {assignableRoles.map((r) => (
+                            {assignablePerfiles.map((r) => (
                               <option key={r.id} value={r.id}>{r.label}</option>
                             ))}
                           </select>
                         ) : (
-                          <span className={`inline-block px-2 py-0.5 rounded border text-xs font-bold ${getRoleConfig(a.role).color}`}>
-                            {getRoleConfig(a.role).label}
+                          <span className={`inline-block px-2 py-0.5 rounded border text-xs font-bold ${getPerfileConfig(a.role).color}`}>
+                            {getPerfileConfig(a.role).label}
                           </span>
                         )}
                       </td>
@@ -328,16 +328,16 @@ export default function AdminModule({ currentRole }: { currentRole: Role }) {
 
 function PendingRow({
   user,
-  assignableRoles,
+  assignablePerfiles,
   onApprove,
   onReject,
 }: {
   user: PendingUser;
-  assignableRoles: { id: Role; label: string }[];
-  onApprove: (user: PendingUser, role: Role) => void;
+  assignablePerfiles: { id: Perfile; label: string }[];
+  onApprove: (user: PendingUser, role: Perfile) => void;
   onReject: (user: PendingUser) => void;
 }) {
-  const [role, setRole] = useState<Role>(assignableRoles[0]?.id || "usuario");
+  const [role, setPerfile] = useState<Perfile>(assignablePerfiles[0]?.id || "usuario");
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border p-4 flex items-center justify-between gap-4 flex-wrap">
@@ -360,10 +360,10 @@ function PendingRow({
       <div className="flex items-center gap-2 flex-wrap">
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value as Role)}
+          onChange={(e) => setPerfile(e.target.value as Perfile)}
           className="px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-800"
         >
-          {assignableRoles.map((r) => (
+          {assignablePerfiles.map((r) => (
             <option key={r.id} value={r.id}>{r.label}</option>
           ))}
         </select>
