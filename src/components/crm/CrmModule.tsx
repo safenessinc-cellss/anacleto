@@ -89,7 +89,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
       };
 
       await setDoc(doc(db, "companies", companyId), companyData);
-      showToast(`Empresa "${name}" guardada con éxito.`, "success");
+      showToast(`Empresa "${name}" salva com sucesso.`, "success");
       setIsModalOpen(false);
     } catch (err) {
       console.error(err);
@@ -166,8 +166,8 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
       {filtered.length === 0 ? (
         <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-3xl">
           <Building className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-sm font-bold text-white">No hay empresas registradas en el CRM</h3>
-          <p className="text-xs text-slate-400 mt-1">Registra la primera empresa cliente para vincularla a tus presupuestos.</p>
+          <h3 className="text-sm font-bold text-white">Nenhuma empresa cadastrada no CRM</h3>
+          <p className="text-xs text-slate-400 mt-1">Cadastre a primeira empresa cliente para vinculá-la aos orçamentos.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -258,7 +258,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
             <form onSubmit={handleSaveCompany} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1 font-bold">Razón Social / Nome *</label>
+                  <label className="text-slate-400 block mb-1 font-bold">Razão social / Nome *</label>
                   <input
                     type="text"
                     required
@@ -269,13 +269,13 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
                   />
                 </div>
                 <div>
-                  <label className="text-slate-400 block mb-1 font-bold">NIF / CIF / CNPJ *</label>
+                  <label className="text-slate-400 block mb-1 font-bold">CNPJ *</label>
                   <input
                     type="text"
                     required
                     value={taxId}
                     onChange={(e) => setTaxId(e.target.value)}
-                    placeholder="Ej: B-12345678"
+                    placeholder="Ex.: 12.345.678/0001-90"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
@@ -283,12 +283,12 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-400 block mb-1">Email de Contacto</label>
+                  <label className="text-slate-400 block mb-1">E-mail de contato</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="contacto@empresa.com"
+                    placeholder="contato@empresa.com"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500"
                   />
                 </div>
@@ -298,14 +298,14 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+34 600 000 000"
+                    placeholder="+55 (51) 99999-9999"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Persona de Contacto</label>
+                <label className="text-slate-400 block mb-1">Pessoa de contato</label>
                 <input
                   type="text"
                   value={contactPerson}
@@ -316,23 +316,23 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Endereço Fiscal / Sede</label>
+                <label className="text-slate-400 block mb-1">Endereço fiscal / sede</label>
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Calle, Número, Ciudad, CP"
+                  placeholder="Rua, número, cidade, CEP"
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="text-slate-400 block mb-1">Notas Comerciales</label>
+                <label className="text-slate-400 block mb-1">Observações comerciais</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  placeholder="Condiciones de pago, tipo de proyectos..."
+                  placeholder="Condições de pagamento, tipos de projeto..."
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-indigo-500 resize-none"
                 />
               </div>
