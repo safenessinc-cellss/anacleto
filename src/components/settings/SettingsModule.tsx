@@ -41,10 +41,10 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
       };
       await setDoc(doc(db, "sender_config", "default"), updated);
       setSenderConfig(updated);
-      showToast("Configuración fiscal y corporativa guardada.", "success");
+      showToast("Configurações fiscais e corporativas salvas.", "success");
     } catch (err) {
       console.error(err);
-      showToast("Error al guardar configuración.", "error");
+      showToast("Erro ao salvar as configurações.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -81,7 +81,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <label className="text-slate-400 block mb-1 font-bold">Razão Social de la Empresa *</label>
+              <label className="text-slate-400 block mb-1 font-bold">Razão social da empresa *</label>
               <input
                 type="text"
                 required
@@ -103,7 +103,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
             </div>
 
             <div className="sm:col-span-2">
-              <label className="text-slate-400 block mb-1">Domicilio Fiscal / Endereço</label>
+              <label className="text-slate-400 block mb-1">Endereço fiscal</label>
               <input
                 type="text"
                 value={formData.address}
@@ -113,7 +113,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
             </div>
 
             <div>
-              <label className="text-slate-400 block mb-1">Código Postal</label>
+              <label className="text-slate-400 block mb-1">CEP</label>
               <input
                 type="text"
                 value={formData.postalCode}
@@ -123,7 +123,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
             </div>
 
             <div>
-              <label className="text-slate-400 block mb-1">Ciudad y País</label>
+              <label className="text-slate-400 block mb-1">Cidade e país</label>
               <input
                 type="text"
                 value={`${formData.city} - ${formData.country}`}
@@ -145,12 +145,12 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div className="sm:col-span-2">
-              <label className="text-slate-400 block mb-1 font-bold">Cuenta Bancaria para Transferencias (IBAN / PIX)</label>
+              <label className="text-slate-400 block mb-1 font-bold">Conta bancária para transferências (PIX / IBAN)</label>
               <input
                 type="text"
                 value={formData.bankAccount}
                 onChange={(e) => handleChange("bankAccount", e.target.value)}
-                placeholder="ES00 0000 0000 0000 0000 0000"
+                placeholder="Chave PIX ou IBAN"
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono outline-none focus:border-amber-500/60"
               />
             </div>
@@ -162,15 +162,15 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
                 onChange={(e) => handleChange("currency", e.target.value)}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
               >
-                <option value="BRL">EUR (R$) - Euro</option>
-                <option value="BRL">BRL (R$) - Real Brasileño</option>
-                <option value="USD">USD ($) - Dólar Estadounidense</option>
-                <option value="MXN">MXN ($) - Peso Mexicano</option>
+                <option value="BRL">BRL (R$) - Real brasileiro</option>
+                <option value="BRL">BRL (R$) - Real brasileiro</option>
+                <option value="USD">USD ($) - Dólar americano</option>
+                <option value="MXN">MXN ($) - Peso mexicano</option>
               </select>
             </div>
 
             <div>
-              <label className="text-slate-400 block mb-1">Email de Facturación</label>
+              <label className="text-slate-400 block mb-1">E-mail para faturamento</label>
               <input
                 type="email"
                 value={formData.profileEmail || ""}
