@@ -19,6 +19,7 @@ import AdminModule from "./admin/AdminModule";
 import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
 import CatalogModule from "./catalog/CatalogModule";
 import RegistryModule from "./registry/RegistryModule";
+import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
 import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
 
 type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials";
@@ -144,6 +145,7 @@ export default function AnacletoProApp({
     { id: "crm" as NavigationTab, label: "Clientes", icon: Building, badge: companies.length },
     { id: "cadastro_items" as NavigationTab, label: "Cadastro de Itens", icon: Package, badge: null },
     { id: "products" as NavigationTab, label: "Produtos", icon: Package, badge: null },
+    { id: "supplier_catalog" as NavigationTab, label: "Super Catálogo de Fornecedores", icon: Package, badge: "NOVO" },
     { id: "services" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
     { id: "payment_methods" as NavigationTab, label: "Formas de Pagamento", icon: Wallet, badge: null },
   ];
@@ -374,6 +376,7 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "catalog" && (<CatalogModule />)}
+          {activeTab === "supplier_catalog" && <SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} />}
           {activeTab === "cadastro_items" && <RegistryModule kind="items" />}
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
