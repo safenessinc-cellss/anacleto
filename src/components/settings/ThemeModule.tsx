@@ -87,7 +87,7 @@ export default function ThemeModule() {
             <Palette className="w-6 h-6 text-indigo-600" /> Aparência e Tema
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Escolha uma paleta ou personalize. Os cambios aplicam-se <strong>automaticamente</strong>.
+            Escolha uma paleta ou personalize. As alterações são aplicadas <strong>automaticamente</strong>.
           </p>
         </div>
         <label className="flex items-center gap-2 text-sm font-bold bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 cursor-pointer">
@@ -100,15 +100,15 @@ export default function ThemeModule() {
       <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-sm flex items-center gap-2"><Sparkles className="w-4 h-4" /> Pré-visualização em tempo real</h3>
-          <span className="text-[10px] font-black uppercase text-slate-400">Live</span>
+          <span className="text-[10px] font-black uppercase text-slate-400">Ao vivo</span>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
-          <button className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">Botão primário</button>
+          <button className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">Botão principal</button>
           <button className="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200">Botão secundário</button>
-          <span className="text-indigo-600 font-bold text-xs">Texto primário</span>
-          <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-[10px] font-black border border-indigo-200">BADGE</span>
-          <div className="bg-white border-2 border-indigo-600 rounded-lg px-2 py-1 text-[10px] font-bold text-indigo-600">Card ativo</div>
-          <div className="bg-rose-50 text-rose-700 px-2 py-1 rounded-full text-[10px] font-black border border-rose-200">Alerta (accent)</div>
+          <span className="text-indigo-600 font-bold text-xs">Texto principal</span>
+          <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-[10px] font-black border border-indigo-200">ETIQUETA</span>
+          <div className="bg-white border-2 border-indigo-600 rounded-lg px-2 py-1 text-[10px] font-bold text-indigo-600">Cartão ativo</div>
+          <div className="bg-rose-50 text-rose-700 px-2 py-1 rounded-full text-[10px] font-black border border-rose-200">Alerta (destaque)</div>
         </div>
       </div>
 
@@ -199,7 +199,7 @@ export default function ThemeModule() {
             <RotateCcw className="w-4 h-4" /> Restaurar padrão
           </button>
           <button onClick={save} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-black transition ${saved ? "bg-emerald-600 text-white" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}>
-            {saved ? <><Check className="w-4 h-4" /> Tema guardado!</> : <><Save className="w-4 h-4" /> Guardar tema</>}
+            {saved ? <><Check className="w-4 h-4" /> Tema salvo!</> : <><Save className="w-4 h-4" /> Salvar tema</>}
           </button>
         </div>
       </div>
