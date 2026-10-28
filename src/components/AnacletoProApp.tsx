@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Building, Calendar, ChevronRight, Compass, ExternalLink, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X, Palette } from "lucide-react";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -46,6 +46,9 @@ export default function AnacletoProApp({
   const roleConfig = getRoleConfig(userRole);
   const [activeTab, setActiveTab] = useState<NavigationTab>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [customLogo, setCustomLogo] = useState<string>(() => { try { return localStorage.getItem("anacleto_custom_logo") || ""; } catch { return ""; } });
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (!file.type.startsWith("image/")) { window.alert("Selecione um arquivo de imagem."); return; } if (file.size > 2 * 1024 * 1024) { window.alert("A imagem deve ter no máximo 2 MB."); return; } const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ""); setCustomLogo(value); try { localStorage.setItem("anacleto_custom_logo", value); } catch { window.alert("Imagem grande demais para guardar neste navegador."); } }; reader.readAsDataURL(file); event.target.value = ""; };
   const [isDark, setIsDark] = useState(() =>
     typeof document !== "undefined" && document.documentElement.classList.contains("dark")
   );
@@ -143,9 +146,9 @@ export default function AnacletoProApp({
   ];
   const cadastroItems = [
     { id: "crm" as NavigationTab, label: "Clientes", icon: Building, badge: companies.length },
-    { id: "cadastro_items" as NavigationTab, label: "Cadastro de Itens", icon: Package, badge: null },
+    { id: "cadastro_items" as NavigationTab, label: "Itens", icon: Package, badge: null },
     { id: "products" as NavigationTab, label: "Produtos", icon: Package, badge: null },
-    { id: "supplier_catalog" as NavigationTab, label: "Super Catálogo de Fornecedores", icon: Package, badge: "NOVO" },
+
     { id: "services" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
     { id: "payment_methods" as NavigationTab, label: "Formas de Pagamento", icon: Wallet, badge: null },
   ];
@@ -176,9 +179,7 @@ export default function AnacletoProApp({
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-            <Compass className="w-5 h-5" />
-          </div>
+          <button type="button" onClick={() => logoInputRef.current?.click()} className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 overflow-hidden" title="Alterar logotipo">{customLogo ? <img src={customLogo} alt="Logotipo" className="w-full h-full object-contain" /> : <Compass className="w-5 h-5" />}</button>
           <div>
             <h1 className="text-sm font-black text-white tracking-widest uppercase">ANACLETO PRO</h1>
             <p className="text-[9px] text-amber-400 font-mono">Enterprise Suite</p>
@@ -202,11 +203,12 @@ export default function AnacletoProApp({
         <div className="p-6 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
           {/* Brand Logo & Title */}
           <div className="flex items-center gap-3.5 pb-6 border-b border-slate-800/80">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
-              <div className="w-full h-full bg-[#0b0e17] rounded-[14px] flex items-center justify-center">
-                <span className="text-base font-black text-amber-400">A</span>
-              </div>
-            </div>
+            <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-11 h-11 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
+              <div className="w-full h-full bg-[#0b0e17] rounded-[14px] flex items-center justify-center overflow-hidden">
+                {customLogo ? <img src={customLogo} alt="Logotipo personalizado" className="h-full w-full object-contain" /> : <span className="text-base font-black text-amber-400">A</span>}
+              </div><span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/60 text-[9px] font-bold text-white">EDITAR</span>
+            </button>
+            <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" aria-label="Subir logotipo" />
             <div>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-base font-black tracking-[0.2em] text-white uppercase">ANACLETO</h1>
@@ -376,8 +378,7 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "catalog" && (<CatalogModule />)}
-          {activeTab === "supplier_catalog" && <SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} />}
-          {activeTab === "cadastro_items" && <RegistryModule kind="items" />}
+          {activeTab === "cadastro_items" && <div className="space-y-8"><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
           {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
