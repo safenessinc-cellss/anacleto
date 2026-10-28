@@ -132,7 +132,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
               <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full border border-indigo-500/20">
                 CRM Corporativo
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Total: {companies.length} Empresas</span>
+              <span className="text-[10px] font-mono text-slate-400">Total: {companies.length} empresas</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
               Diretório de Empresas e Clientes
@@ -248,7 +248,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
           <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-5 animate-fadeIn">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-base font-bold text-white">
-                {editingCompany ? "Editar Empresa" : "Registrar Nova Empresa"}
+                {editingCompany ? "Editar empresa" : "Cadastrar nova empresa"}
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
