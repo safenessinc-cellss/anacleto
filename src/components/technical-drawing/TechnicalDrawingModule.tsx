@@ -237,10 +237,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       };
       setDrawing(updated);
       await setDoc(doc(db, "technical_drawings", drawing.id), updated);
-      showToast("Plano técnico y PDF almacenados con éxito en la plataforma.", "success");
+      showToast("Desenho técnico e PDF salvos com sucesso na plataforma.", "success");
     } catch (err) {
       console.error(err);
-      showToast("Error al guardar en Firestore.", "error");
+      showToast("Erro ao salvar no Firestore.", "error");
     } finally {
       setIsSaving(false);
     }
@@ -249,7 +249,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const handleGenerate = async (presetPrompt?: string) => {
     const inputPrompt = presetPrompt || prompt;
     if (!inputPrompt.trim()) {
-      showToast("Por favor describe la pieza o mueble a diseñar.", "warning");
+      showToast("Descreva a peça ou o móvel que deseja projetar.", "warning");
       return;
     }
 
@@ -286,7 +286,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
       setDrawing(newDrawing);
       setCurrentStep(1);
-      showToast("¡Plano técnico y despiece generado con éxito!", "success");
+      showToast("Desenho técnico e lista de peças gerados com sucesso!", "success");
 
       // Auto-save to Firestore with persistent PDF
       try {
@@ -307,7 +307,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (!presetPrompt) setPrompt("");
     } catch (err: any) {
       console.error(err);
-      showToast("No se pudo contactar con la IA técnica. Usando generador inteligente local.", "info");
+      showToast("Não foi possível acessar a IA técnica. Usando o gerador inteligente local.", "info");
     } finally {
       setIsLoading(false);
     }
@@ -316,7 +316,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const handleExportPdf = () => {
     try {
       exportTechnicalDrawingPdf(drawing, senderConfig);
-      showToast("Plano técnico y memoria exportados a PDF.", "success");
+      showToast("Desenho técnico e memorial exportados para PDF.", "success");
     } catch (err) {
       console.error(err);
       showToast("Error al exportar PDF.", "error");
@@ -398,7 +398,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                   Instruções para a IA
                 </h3>
               </div>
-              <span className="text-[10px] font-mono text-slate-500">Diseño 2D + Cotas + Puzzle</span>
+              <span className="text-[10px] font-mono text-slate-500">Desenho 2D + medidas + encaixes</span>
             </div>
 
             <p className="text-xs text-slate-400 mb-3 leading-relaxed">
@@ -554,7 +554,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                       {piece.dimensions?.width}×{piece.dimensions?.height}
                       {piece.dimensions?.depth ? `×${piece.dimensions?.depth}` : ""} {piece.dimensions?.unit || "cm"}
                     </span>
-                    <p className="text-[10px] text-slate-500 font-bold">Qtd: {piece.quantity}</p>
+                    <p className="text-[10px] text-slate-500 font-bold">Qtd.: {piece.quantity}</p>
                   </div>
                 </div>
               ))}
@@ -627,7 +627,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                   <FolderOpen className="w-4 h-4 text-amber-400" />
                   Proyectos Técnicos Guardados ({savedDrawings.length})
                 </h4>
-                <span className="text-[10px] font-mono text-slate-500">Cargar en un clic</span>
+                <span className="text-[10px] font-mono text-slate-500">Carregar com um clique</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
@@ -681,7 +681,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
         title={drawing.title}
-        subtitle={`Dimensiones: ${drawing.overallDimensions?.width || 0}×${drawing.overallDimensions?.height || 0} cm • ${drawing.pieces?.length || 0} piezas tipo puzzle • Memoria Técnica`}
+        subtitle={`Dimensões: ${drawing.overallDimensions?.width || 0}×${drawing.overallDimensions?.height || 0} cm • ${drawing.pieces?.length || 0} peças tipo encaixe • Memorial técnico`}
         pdfDataUri={drawing.pdfDataUri}
         fileName={drawing.pdfFileName || `Plano_Tecnico_${(drawing.title || "Proyecto").replace(/\s+/g, "_")}.pdf`}
         fileSizeKb={drawing.pdfFileSizeKb}
