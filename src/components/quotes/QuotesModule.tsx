@@ -214,7 +214,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       await setDoc(doc(db, "quotes", target.id), target);
       setSelectedQuote(target);
       setIsEditing(false);
-      showToast(`Presupuesto ${target.number} y PDF almacenados en la plataforma.`, "success");
+      showToast(`Orçamento ${target.number} e PDF salvos na plataforma.`, "success");
     } catch (err) {
       console.error(err);
       showToast("Erro ao salvar orçamento no Firestore.", "error");
@@ -270,7 +270,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       await setDoc(doc(db, "quotes", quote.id), updatedQuote);
       setSelectedQuote(updatedQuote);
 
-      showToast(`¡Factura ${invoiceNumber} generada y almacenada en PDF en la plataforma!`, "success");
+      showToast(`Fatura ${invoiceNumber} gerada e salva em PDF na plataforma!`, "success");
 
       if (onConvertToInvoice) {
         onConvertToInvoice(updatedQuote);
@@ -510,7 +510,7 @@ const handleAddItem = () => {
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder="Buscar por nº ou cliente..."
+                placeholder="Buscar por número ou cliente..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500/50"
@@ -538,7 +538,7 @@ const handleAddItem = () => {
             {filteredQuotes.length === 0 ? (
               <div className="p-8 text-center bg-slate-900/60 border border-slate-800 rounded-3xl">
                 <FileText className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-xs text-slate-400">No hay presupuestos registrados.</p>
+                <p className="text-xs text-slate-400">Nenhum orçamento cadastrado.</p>
               </div>
             ) : (
               filteredQuotes.map((q) => (
@@ -587,7 +587,7 @@ const handleAddItem = () => {
                           e.stopPropagation();
                           handleOpenQuotePdf(q);
                         }}
-                        title="Ver PDF armazenado na plataforma"
+                        title="Ver PDF salvo na plataforma"
                         className="p-1 hover:bg-slate-700 text-slate-400 hover:text-amber-400 rounded-lg transition"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -619,7 +619,7 @@ const handleAddItem = () => {
                         </span>
                       )}
                     </div>
-                    <h2 className="text-lg font-black text-white mt-1">Presupuesto para: {selectedQuote.clientName}</h2>
+                    <h2 className="text-lg font-black text-white mt-1">Orçamento para: {selectedQuote.clientName}</h2>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -671,7 +671,7 @@ const handleAddItem = () => {
 
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
-                      IVA (%):
+                      Imposto (%):
                     </label>
                     <input
                       type="number"
@@ -726,7 +726,7 @@ const handleAddItem = () => {
           {showCatalog && (
             <div className="mt-3 p-4 bg-slate-50 rounded-lg border">
               <input
-                placeholder="Buscar por SKU o nombre..."
+                placeholder="Buscar por código ou nome..."
                 value={catalogSearch}
                 onChange={(e) => setCatalogSearch(e.target.value)}
                 className="w-full px-3 py-2 text-sm border rounded-lg mb-3"
@@ -763,7 +763,7 @@ const handleAddItem = () => {
                     </button>
                   ))}
                 {catalogItems.length === 0 && (
-                  <p className="text-xs text-slate-400 text-center py-4">No hay productos en el catálogo. Añádelos en Configuración → Catálogo.</p>
+                  <p className="text-xs text-slate-400 text-center py-4">Não há itens no catálogo. Cadastre-os em Itens.</p>
                 )}
               </div>
             </div>
@@ -792,7 +792,7 @@ const handleAddItem = () => {
                         />
                         <div className="flex items-center gap-2 w-full sm:w-auto">
                           <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-500">Cant:</span>
+                            <span className="text-[10px] text-slate-500">Qtd.:</span>
                             <input
                               type="number"
                               min="1"
@@ -830,7 +830,7 @@ const handleAddItem = () => {
                   {/* Totals Summary */}
                   <div className="mt-4 p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-end space-y-1.5 text-xs">
                     <div className="flex justify-between w-64 text-slate-400">
-                      <span>Base Imponible:</span>
+                      <span>Base de cálculo:</span>
                       <span className="font-mono text-white">{selectedQuote.subtotal?.toFixed(2)} R$</span>
                     </div>
                     {selectedQuote.discountRate ? (
@@ -840,7 +840,7 @@ const handleAddItem = () => {
                       </div>
                     ) : null}
                     <div className="flex justify-between w-64 text-slate-400">
-                      <span>IVA ({selectedQuote.taxRate}%):</span>
+                      <span>Imposto ({selectedQuote.taxRate}%):</span>
                       <span className="font-mono text-white">{selectedQuote.taxAmount?.toFixed(2)} R$</span>
                     </div>
                     <div className="flex justify-between w-64 pt-2 border-t border-slate-800 text-sm font-black text-amber-400">
@@ -884,7 +884,7 @@ const handleAddItem = () => {
                   {isAiLoading && (
                     <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl text-xs text-amber-400 flex items-center gap-2">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>El agente está analizando y recalculando el presupuesto...</span>
+                      <span>O assistente está analisando e recalculando o orçamento...</span>
                     </div>
                   )}
                 </div>
@@ -915,7 +915,7 @@ const handleAddItem = () => {
                     type="text"
                     value={aiMessage}
                     onChange={(e) => setAiMessage(e.target.value)}
-                    placeholder="Escreva uma instrução ao agente (ex: 'mude o IVA para 21%')..."
+                    placeholder="Digite uma instrução para o assistente (ex.: 'altere o imposto para 0%')..."
                     className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500/50"
                   />
                   <button
@@ -931,8 +931,8 @@ const handleAddItem = () => {
           ) : (
             <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-3xl">
               <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-white">Selecciona o crea un presupuesto</h3>
-              <p className="text-xs text-slate-400 mt-1">Usa el botón superior para crear uno nuevo.</p>
+              <h3 className="text-sm font-bold text-white">Selecione ou crie um orçamento</h3>
+              <p className="text-xs text-slate-400 mt-1">Use o botão acima para criar um novo orçamento.</p>
             </div>
           )}
         </div>
