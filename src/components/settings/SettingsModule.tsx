@@ -66,7 +66,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
               <span className="text-[10px] font-mono text-slate-400">Anacleto Pro v2.6</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Datos Fiscales de Empresa & Emisión
+              Dados fiscais da empresa e emissão
             </h1>
           </div>
         </div>
