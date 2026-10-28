@@ -96,7 +96,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
 
       await setDoc(doc(db, "invoices", invoice.id), updated);
       setSelectedInvoice(updated);
-      showToast(`Factura ${invoice.number} marcada como ${nextStatus === "pago" ? "PAGADA" : "PENDIENTE"} y PDF actualizado.`, "success");
+      showToast(`Fatura ${invoice.number} marcada como ${nextStatus === "pago" ? "PAGA" : "PENDENTE"} e PDF atualizado.`, "success");
     } catch (err) {
       console.error(err);
       showToast("Erro ao atualizar status.", "error");
@@ -106,7 +106,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
   const handleExportPdf = (inv: Invoice) => {
     try {
       exportInvoicePdf(inv, senderConfig);
-      showToast(`Factura ${inv.number} exportada a PDF.`, "success");
+      showToast(`Fatura ${inv.number} exportada para PDF.`, "success");
     } catch (err) {
       console.error(err);
       showToast("Erro ao exportar fatura para PDF.", "error");
@@ -186,7 +186,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder="Buscar por nº ou cliente..."
+                placeholder="Buscar por número ou cliente..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-emerald-500/50"
@@ -214,7 +214,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
             {filtered.length === 0 ? (
               <div className="p-8 text-center bg-slate-900/60 border border-slate-800 rounded-3xl">
                 <FileCheck className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-xs text-slate-400">No hay facturas registradas.</p>
+                <p className="text-xs text-slate-400">Nenhuma fatura cadastrada.</p>
               </div>
             ) : (
               filtered.map((inv) => (
@@ -293,7 +293,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                       </span>
                     )}
                   </div>
-                  <h2 className="text-lg font-black text-white mt-1">Factura para: {selectedInvoice.clientName}</h2>
+                  <h2 className="text-lg font-black text-white mt-1">Fatura para: {selectedInvoice.clientName}</h2>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -335,13 +335,13 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
               {/* Fiscal Data Banner */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-950 rounded-2xl border border-slate-800 text-xs">
                 <div>
-                  <span className="text-[10px] font-black uppercase text-slate-500 block mb-1">Emisor (Empresa):</span>
+                  <span className="text-[10px] font-black uppercase text-slate-500 block mb-1">Emitente (empresa):</span>
                   <p className="font-bold text-white">{senderConfig.name}</p>
                   <p className="text-slate-400 font-mono">NIF: {senderConfig.nif}</p>
                   <p className="text-slate-400">{senderConfig.address}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-black uppercase text-slate-500 block mb-1">Receptor (Cliente):</span>
+                  <span className="text-[10px] font-black uppercase text-slate-500 block mb-1">Destinatário (cliente):</span>
                   <p className="font-bold text-white">{selectedInvoice.clientName}</p>
                   <p className="text-slate-400 font-mono">NIF/DNI: {selectedInvoice.clientTaxId}</p>
                   <p className="text-slate-400">{selectedInvoice.clientAddress || "Domicílio fiscal do cliente"}</p>
@@ -357,9 +357,9 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-800 text-[10px] font-black uppercase text-slate-400">
-                        <th className="py-2 px-3">Descripción</th>
-                        <th className="py-2 px-3 text-center">Cant.</th>
-                        <th className="py-2 px-3 text-right">Precio Unit.</th>
+                        <th className="py-2 px-3">Descrição</th>
+                        <th className="py-2 px-3 text-center">Qtd.</th>
+                        <th className="py-2 px-3 text-right">Preço unitário</th>
                         <th className="py-2 px-3 text-right">Subtotal</th>
                       </tr>
                     </thead>
@@ -383,21 +383,21 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                 {/* Totals */}
                 <div className="mt-4 p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-end space-y-1.5 text-xs">
                   <div className="flex justify-between w-64 text-slate-400">
-                    <span>Base Imponible:</span>
+                    <span>Base de cálculo:</span>
                     <span className="font-mono text-white">{selectedInvoice.subtotal?.toFixed(2)} R$</span>
                   </div>
                   {selectedInvoice.discountRate ? (
                     <div className="flex justify-between w-64 text-rose-400">
-                      <span>Descuento ({selectedInvoice.discountRate}%):</span>
+                      <span>Desconto ({selectedInvoice.discountRate}%):</span>
                       <span className="font-mono">-{selectedInvoice.discountAmount?.toFixed(2)} R$</span>
                     </div>
                   ) : null}
                   <div className="flex justify-between w-64 text-slate-400">
-                    <span>IVA ({selectedInvoice.taxRate}%):</span>
+                    <span>Imposto ({selectedInvoice.taxRate}%):</span>
                     <span className="font-mono text-white">{selectedInvoice.taxAmount?.toFixed(2)} R$</span>
                   </div>
                   <div className="flex justify-between w-64 pt-2 border-t border-slate-800 text-sm font-black text-emerald-400">
-                    <span>TOTAL FACTURA:</span>
+                    <span>TOTAL DA FATURA:</span>
                     <span className="font-mono text-base">{selectedInvoice.total?.toFixed(2)} R$</span>
                   </div>
                 </div>
@@ -406,7 +406,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
           ) : (
             <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-3xl">
               <FileCheck className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-white">Selecciona una factura</h3>
+              <h3 className="text-sm font-bold text-white">Selecione uma fatura</h3>
               <p className="text-xs text-slate-400 mt-1">
                 Puedes generar facturas directamente desde la sección "Orçamentos".
               </p>
