@@ -248,7 +248,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         currency: quote.currency,
         status: "pendente",
         paymentMethod: "Transferência Bancária",
-        notes: `Factura generada a partir del Presupuesto ${quote.number}.`,
+        notes: `Fatura gerada a partir do orçamento ${quote.number}.`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -366,10 +366,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       } else if (lower.includes("iva") && lower.includes("10")) {
         updated.taxRate = 10;
         reply = "IVA reduzido para 10%. Totais recalculados.";
-      } else if (lower.includes("descuento") && lower.includes("10")) {
+      } else if ((lower.includes("desconto") || lower.includes("descuento")) && lower.includes("10")) {
         updated.discountRate = 10;
         reply = "Aplicado desconto comercial de 10% sobre a base tributável.";
-      } else if (lower.includes("descuento") && lower.includes("15")) {
+      } else if ((lower.includes("desconto") || lower.includes("descuento")) && lower.includes("15")) {
         updated.discountRate = 15;
         reply = "Aplicado desconto de 15% sobre o orçamento.";
       } else if (lower.includes("factura")) {
@@ -384,7 +384,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           unitPrice: 450,
           subtotal: 450,
         });
-        reply = `Añadido el concepto "${userText}" con precio estimado.`;
+        reply = `Conceito "${userText}" adicionado com preço estimado.`;
       }
 
       updated = recalculateQuote(updated);
@@ -488,7 +488,7 @@ const handleAddItem = () => {
               <span className="text-[10px] font-mono text-slate-400">Total: {quotes.length} Orçamentos</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Orçamentos Inteligentes con IA
+              Orçamentos Inteligentes com IA
             </h1>
           </div>
         </div>
@@ -743,7 +743,7 @@ const handleAddItem = () => {
                       key={item.id}
                       type="button"
                       onClick={() => {
-                        // Añadir el producto al presupuesto
+                        // Añadir el producto al orçamento
                         const newItem = {
                           id: Math.random().toString(36).substring(2),
                           description: `${item.name} (${item.sku})`,
@@ -893,9 +893,9 @@ const handleAddItem = () => {
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     "mude o IVA para 21%",
-                    "añade un descuento del 10%",
-                    "genera la factura de este presupuesto",
-                    "añade 2 ventanas correderas de 150x120",
+                    "adicione um desconto de 10%",
+                    "gere a fatura deste orçamento",
+                    "adicione 2 janelas de correr de 150x120",
                   ].map((sug, i) => (
                     <button
                       key={i}
@@ -942,10 +942,10 @@ const handleAddItem = () => {
       <PdfViewerModal
         isOpen={isPdfModalOpen}
         onClose={() => setIsPdfModalOpen(false)}
-        title={`Presupuesto ${viewerPdfQuote?.number || ""}`}
+        title={`Orçamento ${viewerPdfQuote?.number || ""}`}
         subtitle={`Cliente: ${viewerPdfQuote?.clientName || ""} • Total: ${viewerPdfQuote?.total?.toFixed(2)} ${viewerPdfQuote?.currency || "BRL"}`}
         pdfDataUri={viewerPdfQuote?.pdfDataUri}
-        fileName={viewerPdfQuote?.pdfFileName || `Presupuesto_${viewerPdfQuote?.number}.pdf`}
+        fileName={viewerPdfQuote?.pdfFileName || `Orcamento_${viewerPdfQuote?.number}.pdf`}
         fileSizeKb={viewerPdfQuote?.pdfFileSizeKb}
         storedAt={viewerPdfQuote?.pdfGeneratedAt || viewerPdfQuote?.updatedAt}
         type="quote"
