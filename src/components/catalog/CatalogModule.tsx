@@ -50,7 +50,7 @@ export default function CatalogModule() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("¿Eliminar este producto?")) await deleteDoc(doc(db, "catalog", id));
+    if (confirm("Excluir este produto?")) await deleteDoc(doc(db, "catalog", id));
   };
 
   const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +105,7 @@ export default function CatalogModule() {
             />
           </div>
           <button onClick={() => { setEditing(null); setForm({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" }); }} className="flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold">
-            <Plus className="w-4 h-4" /> Nuevo
+            <Plus className="w-4 h-4" /> Novo item
           </button>
           <label className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-emerald-700">
             <FileUp className="w-4 h-4" /> Importar CSV
@@ -115,7 +115,7 @@ export default function CatalogModule() {
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
-        <h3 className="font-bold mb-3">{editing ? "Editar Producto" : "Añadir Producto"}</h3>
+        <h3 className="font-bold mb-3">{editing ? "Editar produto" : "Adicionar produto"}</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <input placeholder="SKU" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="p-2 border rounded text-sm" />
           <input placeholder="Nome" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="p-2 border rounded text-sm md:col-span-2" />
@@ -125,7 +125,7 @@ export default function CatalogModule() {
           <input placeholder="Unidade" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="p-2 border rounded text-sm" />
           <input type="number" placeholder="Preço" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} className="p-2 border rounded text-sm" />
         </div>
-        <button onClick={handleSave} className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold">Guardar</button>
+        <button onClick={handleSave} className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold">Salvar</button>
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border overflow-hidden">
