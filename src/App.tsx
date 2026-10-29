@@ -64,7 +64,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<"pro" | "landing">("pro");
   const [isAdminPortal, setIsAdminPortal] = useState(false);
   const [language, setLanguage] = useState<LanguageCode>(detectInitialLanguage);
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("anacleto_theme_mode") === "dark");
 
   const [senderConfig, setSenderConfig] = useState<any>({
     name: "Anacleto Esquadrias",
@@ -125,14 +125,10 @@ export default function App() {
       setLanguage(savedLang);
     }
 
-    const savedTheme = localStorage.getItem("anacleto_theme");
-    if (savedTheme === "light") {
-      setDarkMode(false);
-      document.documentElement.classList.remove("dark");
-    } else {
-      setDarkMode(false);
-      document.documentElement.classList.remove("dark");
-    }
+    const savedMode = localStorage.getItem("anacleto_theme_mode") || "light";
+    const shouldUseDark = savedMode === "dark";
+    setDarkMode(shouldUseDark);
+    document.documentElement.classList.toggle("dark", shouldUseDark);
 
     // Tiempo de carga mínimo para mostrar la animación completa de la ventana
     const timer = setTimeout(() => {
@@ -208,13 +204,8 @@ export default function App() {
   const toggleTheme = () => {
     const nextDark = !darkMode;
     setDarkMode(nextDark);
-    if (nextDark) {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("anacleto_theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("anacleto_theme", "light");
-    }
+    document.documentElement.classList.toggle("dark", nextDark);
+    localStorage.setItem("anacleto_theme_mode", nextDark ? "dark" : "light");
   };
 
   const handleLanguageChange = (langCode: LanguageCode) => {
