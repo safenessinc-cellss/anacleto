@@ -13,7 +13,7 @@ import {
   Layers,
   Users,
   Eye,
-  Baixar,
+  Download,
   CheckCircle,
   HardDrive,
   ShieldCheck,
@@ -517,7 +517,7 @@ export default function DashboardOverview({
                         title="Descargar archivo PDF"
                         className="p-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-slate-800 transition"
                       >
-                        <Baixar className="w-3.5 h-3.5" />
+                        <Download className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
