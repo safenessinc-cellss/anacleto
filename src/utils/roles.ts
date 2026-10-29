@@ -149,3 +149,8 @@ export const getAssignableRoles = (currentUserRole: Role | undefined | null): Ro
   const config = getRoleConfig(currentUserRole);
   return config.canManageRolesBelow.map((r) => ROLES[r]);
 };
+
+// Aliases de compatibilidade usados pelo módulo de administração.
+export type Perfile = Role;
+export const getPerfileConfig = getRoleConfig;
+export const getAssignablePerfiles = getAssignableRoles;
