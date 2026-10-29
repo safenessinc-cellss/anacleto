@@ -97,7 +97,8 @@ body {
 /* ============================================
    FORCE CLEAN LIGHT MODE - ANACLETO
    ============================================ */
-html { color-scheme: light !important; }
+html:not(.dark) { color-scheme: light; }
+html.dark { color-scheme: dark; }
 
 html:not(.dark) body,
 html:not(.dark) #root {
@@ -181,3 +182,88 @@ html:not(.dark) button.bg-emerald-600 *,
 html:not(.dark) button.bg-rose-600 * {
   color: #ffffff !important;
 }
+
+
+/* ANACLETO: tema claro azul e modo escuro opcional */
+html:not(.dark) body,
+html:not(.dark) #root {
+  background: #f3f7fc;
+  color: #172b4d;
+}
+html:not(.dark) main {
+  color: #172b4d;
+}
+html:not(.dark) .bg-slate-50 { background-color: #f3f7fc !important; }
+html:not(.dark) .bg-slate-100 { background-color: #eaf1fb !important; }
+html:not(.dark) .border-slate-200,
+html:not(.dark) .border-slate-300 { border-color: #d8e4f2 !important; }
+html:not(.dark) .text-slate-900 { color: #172b4d !important; }
+html:not(.dark) .text-slate-800 { color: #233d62 !important; }
+html:not(.dark) .text-slate-600 { color: #526985 !important; }
+html:not(.dark) .text-slate-500 { color: #647b96 !important; }
+html:not(.dark) .shadow,
+html:not(.dark) .shadow-sm,
+html:not(.dark) .shadow-md,
+html:not(.dark) .shadow-lg { --tw-shadow-color: rgba(30, 64, 120, 0.08); }
+
+/* Dark mode: preserve contrast without forcing the light palette */
+html.dark { color-scheme: dark; }
+html.dark body,
+html.dark #root,
+html.dark #root > div,
+html.dark .min-h-screen {
+  background-color: #101827;
+  color: #e5edf8;
+}
+html.dark aside,
+html.dark nav,
+html.dark header,
+html.dark [role="dialog"] {
+  background-color: #172338 !important;
+  color: #e5edf8 !important;
+  border-color: #2b3d58 !important;
+}
+html.dark .bg-white,
+html.dark .bg-slate-50,
+html.dark .bg-slate-100,
+html.dark .bg-slate-200 {
+  background-color: #172338 !important;
+  color: #e5edf8 !important;
+}
+html.dark .bg-slate-800,
+html.dark .bg-slate-900,
+html.dark .bg-slate-950 {
+  background-color: #101827 !important;
+  color: #e5edf8 !important;
+}
+html.dark .text-slate-950,
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark .text-slate-500,
+html.dark .text-gray-900,
+html.dark .text-gray-800,
+html.dark .text-gray-700,
+html.dark .text-gray-600 {
+  color: #d6e2f2 !important;
+}
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark .border-slate-600,
+html.dark .border-slate-700,
+html.dark .border-slate-800 {
+  border-color: #2b3d58 !important;
+}
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #101827 !important;
+  color: #edf4ff !important;
+  border-color: #344965 !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder { color: #8fa4bf !important; }
+html.dark .hover\\:bg-slate-50:hover,
+html.dark .hover\\:bg-slate-100:hover { background-color: #22334c !important; }
