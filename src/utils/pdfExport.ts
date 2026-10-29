@@ -159,20 +159,26 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     doc.text(splitNotes, 14, finalY + 17);
   }
 
-  // Desenho ilustrativo 2D para esquadrias no orçamento
+  // Desenho 2D vinculado ao produto orçado; mantém fallback ilustrativo para esquadrias.
   const windowItem = quote.items.find((item) => /janela|porta|esquadria|window|door|box de banheiro|box banheiro/i.test(item.description || ""));
-  if (windowItem) {
+  const technicalDrawing = quote.technicalDrawing;
+  if (technicalDrawing || windowItem) {
     doc.addPage();
-    const desc = windowItem.description || "Esquadria";
+    const desc = technicalDrawing?.title || windowItem?.description || "Esquadria";
     const dimensions = desc.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
-    const widthMm = dimensions ? Number(dimensions[1]) * (Number(dimensions[1]) < 20 ? 100 : 10) : 1200;
-    const heightMm = dimensions ? Number(dimensions[2]) * (Number(dimensions[2]) < 20 ? 100 : 10) : 1000;
-    const isDoor = /porta|door/i.test(desc);
+    const unitFactor = technicalDrawing?.unit === "mm" ? 1 : 10;
+    const widthMm = technicalDrawing?.overallDimensions?.width
+      ? Math.round(technicalDrawing.overallDimensions.width * unitFactor)
+      : dimensions ? Number(dimensions[1]) * (Number(dimensions[1]) < 20 ? 100 : 10) : 1200;
+    const heightMm = technicalDrawing?.overallDimensions?.height
+      ? Math.round(technicalDrawing.overallDimensions.height * unitFactor)
+      : dimensions ? Number(dimensions[2]) * (Number(dimensions[2]) < 20 ? 100 : 10) : 1000;
+    const isDoor = /porta|door/i.test(desc) || technicalDrawing?.category === "glass_door";
     const frameX = 45, frameY = 72, frameW = 120, frameH = 105;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(15, 23, 42);
-    doc.text("DESENHO ILUSTRATIVO 2D DA ESQUADRIA", 14, 22);
+    doc.text(technicalDrawing ? "DESENHO TÉCNICO 2D DO PRODUTO ORÇADO" : "DESENHO ILUSTRATIVO 2D DA ESQUADRIA", 14, 22);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(71, 85, 105);
@@ -208,8 +214,8 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     doc.text(`Altura: ${heightMm} mm`, frameX - 16, frameY + frameH / 2, { angle: 90, align: "center" });
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text("Representação visual ilustrativa; confirmar medidas e abertura antes da fabricação.", 14, 205);
-    doc.text(`Quantidade no orçamento: ${windowItem.quantity}`, 14, 214);
+    doc.text(technicalDrawing ? "Desenho técnico vinculado; validar medidas finais antes da fabricação." : "Representação visual ilustrativa; confirmar medidas e abertura antes da fabricação.", 14, 205);
+    doc.text(`Quantidade no orçamento: ${windowItem?.quantity || quote.items.find((item) => item.description.toLowerCase().includes(desc.toLowerCase()))?.quantity || 1}`, 14, 214);
   }
 
   // Footer
