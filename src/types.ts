@@ -36,6 +36,7 @@ export interface Quote {
   date: string;
   validUntil?: string;
   items: QuoteItem[];
+  technicalDrawing?: TechnicalDrawing;
   subtotal: number;
   taxRate: number;
   taxAmount: number;
