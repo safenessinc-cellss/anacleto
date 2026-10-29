@@ -5,7 +5,7 @@ import {
 import { db, auth } from "../../firebase";
 import {
   CreditCard, QrCode, Banknote, CheckCircle, Clock, X, Search,
-  Receipt, Loader2, AlertCircle, DollarSign, Building2, Download,
+  Receipt, Loader2, AlertCircle, DollarSign, Building2, Download, ExternalLink,
 } from "lucide-react";
 
 interface Payable {
@@ -457,14 +457,23 @@ export default function PaymentsModule() {
               >
                 Cancelar
               </button>
-              <button
-                onClick={confirmPayment}
-                disabled={processing}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                {processing ? "Processando..." : "Confirmar Pagamento"}
-              </button>
+              {(method === "pix" || method === "mercadopago") ? (
+                <button
+                  onClick={() => { setSelected(null); setPixQr(null); setPixCopyPaste(""); setPaymentLink(""); }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-800"
+                >
+                  Fechar · aguardando pagamento
+                </button>
+              ) : (
+                <button
+                  onClick={confirmPayment}
+                  disabled={processing}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                  {processing ? "Processando..." : "Confirmar Pagamento"}
+                </button>
+              )}
             </div>
           </div>
         </div>
