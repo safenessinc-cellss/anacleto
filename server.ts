@@ -547,26 +547,109 @@ Responda APENAS o JSON, sem texto.`;
   }
 });
 
-// ============ PIX: Gerar QR Code (placeholder) ============
+// ============ Mercado Pago: PIX real e link de pagamento ============
+function mercadoPagoToken() {
+  return process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN;
+}
+
 app.post("/api/payments/pix", async (req, res) => {
   try {
-    const { amount, description } = req.body;
-    if (!amount) return res.status(400).json({ error: "Amount required" });
-    // Aquí integrarías Mercado Pago, Efí (Gerencianet), PagSeguro, etc.
-    // Ejemplo con API de Mercado Pago:
-    // const mp = require("mercadopago"); mp.configure({ access_token: process.env.MP_ACCESS_TOKEN });
-    // const payment = await mp.payment.create({ body: { transaction_amount: amount, description, payment_method_id: "pix" } });
-    // res.json({ qrCode: payment.body.point_of_interaction.transaction_data.qr_code_base64, copyPaste: payment.body.point_of_interaction.transaction_data.qr_code });
-    // Por enquanto, retornar placeholder:
-    res.json({
-      pending: true,
-      message: "Configure MERCADO_PAGO_ACCESS_TOKEN em Vercel para ativar PIX real.",
-      amount,
-      description,
+    const token = mercadoPagoToken();
+    if (!token) return res.status(503).json({ error: "Integração Mercado Pago não configurada no servidor. Configure MERCADO_PAGO_ACCESS_TOKEN nas variáveis de ambiente do Vercel." });
+    const amount = Number(req.body?.amount);
+    const description = String(req.body?.description || "").trim().slice(0, 250);
+    const payerEmail = String(req.body?.payerEmail || "").trim();
+    const externalReference = String(req.body?.payableId || "").trim().slice(0, 100);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 100000000) return res.status(400).json({ error: "Valor de cobrança inválido." });
+    if (!description) return res.status(400).json({ error: "Descrição obrigatória." });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) return res.status(400).json({ error: "Informe um e-mail válido do pagador para gerar o PIX." });
+
+    const response = await fetch("https://api.mercadopago.com/v1/payments", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": `anacleto-pix-${externalReference || "charge"}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      },
+      body: JSON.stringify({
+        transaction_amount: Math.round(amount * 100) / 100,
+        description,
+        payment_method_id: "pix",
+        external_reference: externalReference || undefined,
+        payer: { email: payerEmail },
+      }),
+    });
+    const payment = await response.json();
+    if (!response.ok) {
+      console.error("Mercado Pago PIX API error:", response.status, payment?.message || payment?.error);
+      return res.status(response.status >= 400 && response.status < 500 ? 422 : 502).json({ error: payment?.message || "Não foi possível gerar a cobrança PIX no Mercado Pago.", details: payment?.cause?.[0]?.description });
+    }
+    const transaction = payment?.point_of_interaction?.transaction_data;
+    if (!transaction?.qr_code || !transaction?.qr_code_base64) {
+      return res.status(502).json({ error: "O Mercado Pago não retornou os dados do QR Code PIX." });
+    }
+    return res.json({
+      paymentId: String(payment.id),
+      status: payment.status,
+      qrCode: `data:image/png;base64,${transaction.qr_code_base64}`,
+      copyPaste: transaction.qr_code,
+      ticketUrl: transaction.ticket_url || "",
     });
   } catch (err: any) {
-    res.status(500).json({ error: err?.message });
+    console.error("Mercado Pago PIX error:", err?.message || err);
+    return res.status(500).json({ error: "Falha ao comunicar com o Mercado Pago." });
   }
+});
+
+app.post("/api/payments/mercado-pago-link", async (req, res) => {
+  try {
+    const token = mercadoPagoToken();
+    if (!token) return res.status(503).json({ error: "Integração Mercado Pago não configurada no servidor. Configure MERCADO_PAGO_ACCESS_TOKEN nas variáveis de ambiente do Vercel." });
+    const amount = Number(req.body?.amount);
+    const description = String(req.body?.description || "").trim().slice(0, 250);
+    const payerEmail = String(req.body?.payerEmail || "").trim();
+    const externalReference = String(req.body?.payableId || "").trim().slice(0, 100);
+    const payerName = String(req.body?.payerName || "").trim().slice(0, 120);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 100000000) return res.status(400).json({ error: "Valor de cobrança inválido." });
+    if (!description) return res.status(400).json({ error: "Descrição obrigatória." });
+    if (payerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) return res.status(400).json({ error: "E-mail do pagador inválido." });
+
+    const baseUrl = (process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")).replace(/\/$/, "");
+    const preferenceBody: any = {
+      items: [{ id: externalReference || "anacleto-charge", title: description, quantity: 1, currency_id: "BRL", unit_price: Math.round(amount * 100) / 100 }],
+      external_reference: externalReference || undefined,
+      statement_descriptor: "ANACLETO",
+      metadata: { source: "anacleto", payable_id: externalReference || "" },
+    };
+    if (payerEmail) preferenceBody.payer = { email: payerEmail, name: payerName || undefined };
+    if (baseUrl) {
+      preferenceBody.back_urls = { success: `${baseUrl}/?payment=success`, pending: `${baseUrl}/?payment=pending`, failure: `${baseUrl}/?payment=failure` };
+      preferenceBody.notification_url = `${baseUrl}/api/payments/webhook`;
+    }
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(preferenceBody),
+    });
+    const preference = await response.json();
+    if (!response.ok) {
+      console.error("Mercado Pago preference API error:", response.status, preference?.message || preference?.error);
+      return res.status(response.status >= 400 && response.status < 500 ? 422 : 502).json({ error: preference?.message || "Não foi possível criar o link de pagamento.", details: preference?.cause?.[0]?.description });
+    }
+    const initPoint = preference.init_point || preference.sandbox_init_point;
+    if (!initPoint) return res.status(502).json({ error: "O Mercado Pago não retornou o link de checkout." });
+    return res.json({ preferenceId: preference.id, paymentUrl: initPoint });
+  } catch (err: any) {
+    console.error("Mercado Pago preference error:", err?.message || err);
+    return res.status(500).json({ error: "Falha ao comunicar com o Mercado Pago." });
+  }
+});
+
+app.post("/api/payments/webhook", async (req, res) => {
+  // Acknowledgement only. Reconciliation/signature verification should be configured
+  // before this endpoint is used to update financial records automatically.
+  console.info("Mercado Pago webhook received", req.query?.type || req.body?.type || "unknown");
+  return res.status(200).json({ received: true });
 });
 
 export default app;
