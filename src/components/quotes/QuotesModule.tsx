@@ -22,7 +22,7 @@ import {
   RefreshCw,
   FileDown
 } from "lucide-react";
-import { Quote, QuoteItem, Company, SenderConfig, Invoice } from "../../types";
+import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
@@ -39,8 +39,16 @@ interface QuotesModuleProps {
 export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt"}: QuotesModuleProps) {
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
+  const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [showCatalog, setShowCatalog] = useState(false);
+
+  // Carregar desenhos técnicos para vincular o desenho 2D ao orçamento
+  useEffect(() => {
+    return onSnapshot(collection(db, "technical_drawings"), (snap) => {
+      setSavedDrawings(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TechnicalDrawing)));
+    }, (err) => console.warn("Technical drawings listener (quotes):", err));
+  }, []);
 
   // Cargar catálogo
   useEffect(() => {
@@ -704,6 +712,37 @@ const handleAddItem = () => {
                       className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-amber-500/50"
                     />
                   </div>
+                </div>
+
+                {/* Vincular desenho técnico 2D ao orçamento */}
+                <div className="mt-5 p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5">
+                  <label className="block text-[10px] font-black uppercase tracking-wider text-amber-300 mb-2">
+                    Desenho 2D do produto orçado
+                  </label>
+                  <select
+                    value={selectedQuote.technicalDrawing?.id || ""}
+                    onChange={(e) => {
+                      const drawing = savedDrawings.find((d) => d.id === e.target.value);
+                      const updated = { ...selectedQuote, technicalDrawing: drawing || undefined, pdfDataUri: undefined, pdfFileName: undefined, pdfGeneratedAt: undefined };
+                      setSelectedQuote(updated);
+                    }}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-amber-500/50"
+                  >
+                    <option value="">Selecionar desenho técnico salvo (opcional)</option>
+                    {savedDrawings.map((drawing) => (
+                      <option key={drawing.id} value={drawing.id}>
+                        {drawing.title} — {drawing.overallDimensions?.width} × {drawing.overallDimensions?.height} {drawing.unit}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedQuote.technicalDrawing && (
+                    <p className="text-[11px] text-slate-300 mt-2">
+                      Desenho vinculado: <strong>{selectedQuote.technicalDrawing.title}</strong>. O PDF incluirá uma página 2D com as medidas do desenho selecionado.
+                    </p>
+                  )}
+                  {savedDrawings.length === 0 && (
+                    <p className="text-[11px] text-slate-500 mt-2">Nenhum desenho salvo encontrado. Crie e salve o produto no módulo Desenho Técnico.</p>
+                  )}
                 </div>
 
                 {/* Table of Items */}
