@@ -38,6 +38,7 @@ interface Payment {
 
 const METHODS = [
   { id: "pix", label: "PIX", icon: QrCode, color: "emerald" },
+  { id: "mercadopago", label: "Link Mercado Pago", icon: CreditCard, color: "sky" },
   { id: "credit_card", label: "Cartão Crédito", icon: CreditCard, color: "blue" },
   { id: "debit_card", label: "Cartão Débito", icon: CreditCard, color: "indigo" },
   { id: "transfer", label: "Transferência", icon: Building2, color: "purple" },
@@ -56,6 +57,10 @@ export default function PaymentsModule() {
   const [method, setMethod] = useState<PaymentMethod>("pix");
   const [processing, setProcessing] = useState(false);
   const [pixQr, setPixQr] = useState<string | null>(null);
+  const [pixCopyPaste, setPixCopyPaste] = useState("");
+  const [paymentLink, setPaymentLink] = useState("");
+  const [payerEmail, setPayerEmail] = useState("");
+  const [gatewayLoading, setGatewayLoading] = useState(false);
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -117,37 +122,49 @@ export default function PaymentsModule() {
     setSelected(payable);
     setMethod("pix");
     setPixQr(null);
+    setPixCopyPaste("");
+    setPaymentLink("");
+    setPayerEmail("");
     setReference("");
     setNotes("");
   };
 
   const generatePix = async () => {
     if (!selected) return;
+    if (!payerEmail.trim()) { alert("Informe o e-mail do pagador para gerar o PIX."); return; }
+    setGatewayLoading(true);
     try {
       const res = await fetch("/api/payments/pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: selected.amount,
-          description: selected.description,
-          payerName: selected.supplierName,
-        }),
+        body: JSON.stringify({ payableId: selected.id, amount: selected.amount, description: selected.description, payerName: selected.supplierName, payerEmail: payerEmail.trim() }),
       });
       const data = await res.json();
-      if (data.qrCode) {
-        setPixQr(data.qrCode);
-      } else {
-        // Placeholder si no hay Mercado Pago configurado
-        setPixQr("PIX_PLACEHOLDER");
-        alert(
-          "⚠️ PIX real no configurado.\n\n" +
-          "Añade MERCADO_PAGO_ACCESS_TOKEN en Vercel → Settings → Environment Variables.\n\n" +
-          "Mientras tanto, puedes registrar el pago manualmente con el método 'Transferência'."
-        );
-      }
+      if (!res.ok) throw new Error(data.error || "Não foi possível gerar o PIX.");
+      setPixQr(data.qrCode);
+      setPixCopyPaste(data.copyPaste || "");
+      setReference(data.paymentId || "");
     } catch (e) {
       alert("Erro ao gerar PIX: " + (e as Error).message);
-    }
+    } finally { setGatewayLoading(false); }
+  };
+
+  const generatePaymentLink = async () => {
+    if (!selected) return;
+    setGatewayLoading(true);
+    try {
+      const res = await fetch("/api/payments/mercado-pago-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payableId: selected.id, amount: selected.amount, description: selected.description, payerName: selected.supplierName, payerEmail: payerEmail.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Não foi possível criar o link de pagamento.");
+      setPaymentLink(data.paymentUrl);
+      setReference(data.preferenceId || "");
+    } catch (e) {
+      alert("Erro ao criar link Mercado Pago: " + (e as Error).message);
+    } finally { setGatewayLoading(false); }
   };
 
   const confirmPayment = async () => {
@@ -178,6 +195,8 @@ export default function PaymentsModule() {
       // 3) Cerrar modal
       setSelected(null);
       setPixQr(null);
+      setPixCopyPaste("");
+      setPaymentLink("");
       setReference("");
       setNotes("");
       alert("✅ Pagamento registrado com sucesso!");
@@ -388,27 +407,43 @@ export default function PaymentsModule() {
                 })}
               </div>
 
+              {(method === "pix" || method === "mercadopago") && (
+                <div className="mt-3">
+                  <label className="text-xs font-bold text-slate-500 uppercase">E-mail do pagador</label>
+                  <input type="email" value={payerEmail} onChange={(e) => setPayerEmail(e.target.value)} placeholder="cliente@exemplo.com" className="w-full mt-1 px-3 py-2 text-sm border rounded-lg" />
+                </div>
+              )}
+
               {/* PIX */}
               {method === "pix" && (
                 <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
                   {!pixQr ? (
-                    <button
-                      onClick={generatePix}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700"
-                    >
-                      <QrCode className="w-4 h-4" /> Gerar QR Code PIX
+                    <button disabled={gatewayLoading} onClick={generatePix} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
+                      {gatewayLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />} Gerar cobrança PIX real
                     </button>
-                  ) : pixQr === "PIX_PLACEHOLDER" ? (
-                    <div className="text-center">
-                      <AlertCircle className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-                      <p className="text-xs text-amber-800 dark:text-amber-300 font-bold">
-                        PIX real não configurado. Registre manualmente com o botão abaixo.
-                      </p>
-                    </div>
                   ) : (
-                    <div className="text-center">
-                      <img src={pixQr} alt="PIX QR" className="w-48 h-48 mx-auto" />
-                      <p className="text-xs text-slate-500 mt-2">Escaneie ou copie o código PIX</p>
+                    <div className="text-center space-y-2">
+                      <img src={pixQr} alt="QR Code PIX do Mercado Pago" className="w-48 h-48 mx-auto bg-white rounded-lg p-2" />
+                      <p className="text-xs text-slate-600 dark:text-slate-300">Escaneie o QR Code ou copie o código PIX abaixo.</p>
+                      <textarea readOnly value={pixCopyPaste} rows={3} className="w-full text-xs p-2 border rounded-lg bg-white dark:bg-slate-900 break-all" />
+                      <button onClick={() => { navigator.clipboard.writeText(pixCopyPaste); alert("Código PIX copiado."); }} className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-xs font-bold">Copiar código PIX</button>
+                      {reference && <p className="text-[11px] text-slate-500">ID Mercado Pago: {reference}</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {method === "mercadopago" && (
+                <div className="mt-3 p-3 bg-sky-50 dark:bg-sky-950/30 rounded-lg space-y-2">
+                  {!paymentLink ? (
+                    <button disabled={gatewayLoading} onClick={generatePaymentLink} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-700 text-white rounded-lg text-sm font-bold hover:bg-sky-800 disabled:opacity-50">
+                      {gatewayLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />} Criar link de pagamento Mercado Pago
+                    </button>
+                  ) : (
+                    <div className="text-center space-y-2">
+                      <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Link de pagamento criado</p>
+                      <a href={paymentLink} target="_blank" rel="noreferrer" className="block break-all text-xs text-sky-700 underline">{paymentLink}</a>
+                      <button onClick={() => { navigator.clipboard.writeText(paymentLink); alert("Link de pagamento copiado."); }} className="px-3 py-2 rounded-lg bg-sky-700 text-white text-xs font-bold">Copiar link</button>
                     </div>
                   )}
                 </div>
