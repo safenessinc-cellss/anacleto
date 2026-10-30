@@ -22,6 +22,52 @@ export default function PendingBoletosModule() {
   const [pending, setPending] = useState<PendingBoleto[]>([]);
   const [processing, setProcessing] = useState<string | null>(null);
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [companyCnpj, setCompanyCnpj] = useState("");
+  const [companyName, setCompanyName] = useState("Anacleto Esquadrias");
+  const [searching, setSearching] = useState(false);
+  const [matches, setMatches] = useState<PendingBoleto[]>([]);
+  const [searchMessage, setSearchMessage] = useState("");
+
+  const searchCompanyBoletos = async () => {
+    const cnpj = cleanCNPJ(companyCnpj);
+    if (cnpj.length !== 14) {
+      setSearchMessage("Informe um CNPJ válido da empresa em Configurações para pesquisar.");
+      return;
+    }
+    setSearching(true);
+    setSearchMessage("");
+    try {
+      // Busca somente documentos já importados/armazenados na plataforma.
+      // Boletos privados não são consultáveis em fontes públicas sem autorização.
+      const [pendingSnap, payableSnap] = await Promise.all([
+        import("firebase/firestore").then(({ getDocs }) => getDocs(collection(db, "pending_boletos"))),
+        import("firebase/firestore").then(({ getDocs }) => getDocs(collection(db, "payables"))),
+      ]);
+      const q = searchTerm.trim().toLocaleLowerCase("pt-BR");
+      const docs: PendingBoleto[] = [];
+      pendingSnap.forEach((d) => {
+        const v = d.data() as any;
+        const text = [v.beneficiary, v.cnpj, v.description, v.fileName].join(" ").toLocaleLowerCase("pt-BR");
+        if (cleanCNPJ(v.cnpj || "") === cnpj || (q && text.includes(q))) docs.push({ id: d.id, ...v });
+      });
+      payableSnap.forEach((d) => {
+        const v = d.data() as any;
+        const text = [v.supplierName, v.supplierCnpj, v.description, v.digitableLine].join(" ").toLocaleLowerCase("pt-BR");
+        if (cleanCNPJ(v.supplierCnpj || v.cnpj || "") === cnpj || (q && text.includes(q))) {
+          docs.push({ id: d.id, ...v, status: v.status === "paid" ? "approved" : "pending", beneficiary: v.supplierName || v.beneficiary });
+        }
+      });
+      setMatches(docs);
+      setSearchMessage(docs.length
+        ? `${docs.length} documento(s) encontrado(s) nos registros da plataforma para ${companyName}.`
+        : `Nenhum boleto localizado nos documentos importados para ${companyName}. Importe arquivos ou conecte uma fonte autorizada.`);
+    } catch (error) {
+      setSearchMessage("Não foi possível pesquisar os documentos: " + (error as Error).message);
+    } finally { setSearching(false); }
+  };
+
+
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "pending_boletos"), (snap) => {
       const list: PendingBoleto[] = [];
