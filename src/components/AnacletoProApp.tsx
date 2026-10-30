@@ -73,18 +73,20 @@ export default function AnacletoProApp({
   const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
   const isFullMenuRole = effectiveRole === "super_admin" || effectiveRole === "super_usuario" || effectiveRole === "ceo";
   const canSeeNavigation = (id: string) => isFullMenuRole || (userPermissions ? userPermissions.includes(id) : hasAccessToTab(effectiveRole, id as RoleNavTab));
+  // A autenticação precisa ser inicializada antes de qualquer efeito que a consulte.
+  const [authReady, setAuthReady] = useState(false);
+
   useEffect(() => {
-    const email = auth.currentUser?.email?.toLowerCase();
+    const email = signedInEmail || auth.currentUser?.email?.toLowerCase();
     if (!email || isFullMenuRole) { setUserPermissions(null); return; }
     const unsub = onSnapshot(doc(db, "admins", email), (snap) => {
       const data = snap.data();
       setUserPermissions(Array.isArray(data?.permissions) ? data.permissions : null);
     }, () => setUserPermissions(null));
     return () => unsub();
-  }, [userRole, authReady]);
+  }, [userRole, authReady, signedInEmail, isFullMenuRole]);
 
   // 0. Aguarda a autenticação antes de iniciar a escuta do Firestore
-  const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       console.log("🔐 onAuthStateChanged fired:", u ? `user=${u.email}` : "NO USER");
