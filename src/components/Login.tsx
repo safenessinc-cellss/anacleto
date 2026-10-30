@@ -68,20 +68,8 @@ export default function Login({ t, language = "pt", onLoginSuccess }: LoginProps
         }),
       ]);
       
-      const user = auth.currentUser;
-      if (user && (user.email === "safeness.c.a@gmail.com" || user.email === auth.currentUser?.email)) {
-        try {
-          await setDoc(doc(db, "admins", user.uid), {
-            id: user.uid,
-            email: user.email?.toLowerCase() || "",
-            name: user.displayName || "Safeness Admin",
-            createdAt: new Date().toISOString()
-          }, { merge: true });
-        } catch (dbErr) {
-          console.warn("Could not save admin document in Firestore during Google Sign-In. Check your collection access rules: ", dbErr);
-        }
-      }
-      
+      // El inicio de sesión solo autentica. Ninguna cuenta se autoasigna permisos:
+      // el Super Admin autoriza a cada usuario desde Administración.
       onLoginSuccess();
     } catch (err: any) {
       console.error("Google login failed:", err);
