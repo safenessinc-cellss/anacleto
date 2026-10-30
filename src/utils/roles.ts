@@ -23,7 +23,8 @@ export type NavigationTab =
   | "financial_ai"
   | "admin"
   | "settings"
-  | "theme";
+  | "theme"
+  | "payroll";
 
 export interface RoleConfig {
   id: Role;
@@ -94,7 +95,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 40,
     color: "bg-blue-100 text-blue-800 border-blue-300",
     description: "Supervisa equipos. Acceso a todos los módulos operativos y finanzas.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "theme"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "theme", "payroll"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
