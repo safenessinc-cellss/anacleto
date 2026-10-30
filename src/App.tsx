@@ -146,35 +146,6 @@ export default function App() {
         return;
       }
 
-      // La cuenta anterior puede autenticarse de nuevo, pero entra como usuario nuevo pendiente.
-      // No se consulta ni reutiliza ningún rol administrativo anterior.
-      const normalizedEmail = (firebaseUser.email || "").trim().toLowerCase();
-      if (normalizedEmail === "anacletoesquadrias@gmail.com") {
-        setUserRole(null);
-        setAdminStatus("unauthorized");
-        try {
-          await setDoc(doc(db, "pending_users", firebaseUser.uid), {
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || "",
-            photoURL: firebaseUser.photoURL || "",
-            uid: firebaseUser.uid,
-            requestedAt: new Date().toISOString(),
-            status: "pending",
-            reRegistration: true,
-          }, { merge: true });
-        } catch (e) {
-          console.warn("No se pudo registrar la nueva solicitud:", e);
-        }
-        return;
-      }
-
-      // Administrador principal: acceso total.
-      if (normalizedEmail === SUPER_ADMIN_EMAIL) {
-        setUserRole("super_admin");
-        setAdminStatus("authorized");
-        return;
-      }
-
       // Buscar en la colección admins
       try {
         const email = (firebaseUser.email || "").toLowerCase();
