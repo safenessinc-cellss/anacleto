@@ -146,14 +146,25 @@ export default function App() {
         return;
       }
 
-      // Cuenta revocada: bloquear acceso en la aplicación incluso si conserva sesión de Firebase Auth.
+      // La cuenta anterior puede autenticarse de nuevo, pero entra como usuario nuevo pendiente.
+      // No se consulta ni reutiliza ningún rol administrativo anterior.
       const normalizedEmail = (firebaseUser.email || "").trim().toLowerCase();
       if (normalizedEmail === "anacletoesquadrias@gmail.com") {
         setUserRole(null);
         setAdminStatus("unauthorized");
-        await signOut(auth);
-        setUser(null);
-        setCurrentView("landing");
+        try {
+          await setDoc(doc(db, "pending_users", firebaseUser.uid), {
+            email: firebaseUser.email || "",
+            displayName: firebaseUser.displayName || "",
+            photoURL: firebaseUser.photoURL || "",
+            uid: firebaseUser.uid,
+            requestedAt: new Date().toISOString(),
+            status: "pending",
+            reRegistration: true,
+          }, { merge: true });
+        } catch (e) {
+          console.warn("No se pudo registrar la nueva solicitud:", e);
+        }
         return;
       }
 
