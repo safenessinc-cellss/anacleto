@@ -144,7 +144,7 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
           onClick={openCreateModal}
           className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition shadow-lg shadow-indigo-600/20"
         >
-          <Plus className="w-4 h-4" /> Cadastrar Empresa
+          <Plus className="w-4 h-4" /> Cadastrar Cliente
         </button>
       </div>
 
