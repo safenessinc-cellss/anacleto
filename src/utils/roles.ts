@@ -56,7 +56,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     labelPT: "Super Administrador",
     level: 100,
     color: "bg-amber-100 text-amber-800 border-amber-300",
-    description: "Propietario del sistema. Acceso total y único que puede eliminar a otros super admins.",
+    description: "Propietario único del sistema. Acceso total; su cuenta no puede ser eliminada ni degradada por ningún otro perfil.",
     tabs: ALL_TABS,
     canManageUsers: true,
     canManageRolesBelow: ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "usuario"],
@@ -70,7 +70,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     description: "Dirección ejecutiva. 100% de acceso: puede gestionar todos los usuarios y roles.",
     tabs: ALL_TABS,
     canManageUsers: true,
-    canManageRolesBelow: ["super_admin", "super_usuario", "admin", "supervisor", "colaborador", "usuario"],
+    canManageRolesBelow: ["super_usuario", "admin", "supervisor", "colaborador", "usuario"],
   },
   super_usuario: {
     id: "super_usuario",
