@@ -10,49 +10,46 @@ export default function FinancialAI() {
   const [pixQr, setPixQr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [payerEmail, setPayerEmail] = useState("");
+  const [pixLoading, setPixLoading] = useState(false);
+  const [pixCopyPaste, setPixCopyPaste] = useState("");
+
   const handleUpload = async () => {
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { alert("O arquivo deve ter no máximo 10 MB."); return; }
     setExtracting(true);
     setResult(null);
+    setPixQr(null);
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(",")[1];
-        // Llamar al endpoint /api/ai/financial-extract
-        const res = await fetch("/api/ai/financial-extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: file.name,
-            mimeType: file.type,
-            data: base64,
-          }),
-        });
-        if (!res.ok) throw new Error("Erro ao extrair dados");
-        const data = await res.json();
-        setResult(data);
-        // Guardar en pending_boletos para que el usuario revise y acepte
-        try {
-          await addDoc(collection(db, "pending_boletos"), {
-            fileName: file.name,
-            beneficiary: data.beneficiary || "",
-            cnpj: data.cnpj || "",
-            amount: Number(data.amount) || 0,
-            dueDate: data.dueDate || "",
-            digitableLine: data.digitableLine || "",
-            description: data.description || "",
-            status: "pending",
-            createdAt: new Date().toISOString(),
-            extractedBy: auth.currentUser?.email || "",
-          });
-          console.log("✅ Boleto guardado em pending_boletos");
-        } catch (e) {
-          console.warn("Não foi possível salvar em pending_boletos:", e);
-        }
-      };
-      reader.readAsDataURL(file);
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Não foi possível ler o arquivo selecionado."));
+        reader.onload = () => {
+          const value = String(reader.result || "");
+          const encoded = value.split(",")[1];
+          if (!encoded) reject(new Error("Arquivo vazio ou formato não suportado."));
+          else resolve(encoded);
+        };
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch("/api/ai/financial-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: file.name, mimeType: file.type || "application/pdf", data: base64 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Falha ao extrair os dados do boleto.");
+      if (!data || (!data.beneficiary && !data.amount && !data.digitableLine)) throw new Error("A IA não encontrou dados suficientes. Envie um PDF ou imagem mais nítida.");
+      setResult(data);
+      await addDoc(collection(db, "pending_boletos"), {
+        fileName: file.name, beneficiary: data.beneficiary || "", cnpj: data.cnpj || "",
+        amount: Number(data.amount) || 0, dueDate: data.dueDate || "",
+        digitableLine: data.digitableLine || "", description: data.description || "",
+        status: "pending", createdAt: new Date().toISOString(),
+        extractedBy: auth.currentUser?.email || "",
+      });
     } catch (e) {
-      alert("Erro: " + (e as Error).message);
+      alert("Erro ao processar boleto: " + (e as Error).message);
     } finally {
       setExtracting(false);
     }
@@ -60,21 +57,21 @@ export default function FinancialAI() {
 
   const generatePix = async () => {
     if (!result) return;
+    if (!payerEmail.trim()) { alert("Informe o e-mail do pagador para gerar o PIX."); return; }
+    setPixLoading(true);
     try {
       const res = await fetch("/api/payments/pix", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: result.amount,
-          description: result.description || "Boleto",
-        }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: Number(result.amount), description: result.description || "Boleto", payerEmail: payerEmail.trim() }),
       });
-      const data = await res.json();
-      if (data.qrCode) setPixQr(data.qrCode);
-      else alert("Erro ao gerar PIX: " + (data.error || "desconhecido"));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Não foi possível gerar a cobrança PIX.");
+      if (!data.qrCode || !data.copyPaste) throw new Error("O Mercado Pago não devolveu o QR Code e o código PIX.");
+      setPixQr(data.qrCode);
+      setPixCopyPaste(data.copyPaste);
     } catch (e) {
       alert("Erro ao gerar PIX: " + (e as Error).message);
-    }
+    } finally { setPixLoading(false); }
   };
 
   return (
@@ -140,7 +137,7 @@ export default function FinancialAI() {
           {pixQr && (
             <div className="mt-4 p-4 bg-slate-50 rounded-xl text-center">
               <div className="text-xs text-slate-500 mb-2">Escaneie o QR Code</div>
-              <img src={pixQr} alt="PIX QR Code" className="w-48 h-48 mx-auto" />
+              <img src={pixQr} alt="PIX QR Code" className="w-48 h-48 mx-auto" /><textarea readOnly value={pixCopyPaste} rows={3} className="w-full mt-3 p-2 text-xs border rounded-lg break-all" /><button onClick={() => { navigator.clipboard.writeText(pixCopyPaste); alert("Código PIX copiado."); }} className="mt-2 px-3 py-2 rounded-lg bg-emerald-700 text-white text-xs font-bold">Copiar código PIX</button>
             </div>
           )}
         </div>
