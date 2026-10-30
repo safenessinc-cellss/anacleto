@@ -557,6 +557,17 @@ function mercadoPagoToken() {
   return process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN;
 }
 
+app.get("/api/payments/config-status", (_req, res) => {
+  const token = mercadoPagoToken();
+  return res.json({
+    configured: Boolean(token),
+    provider: "Mercado Pago",
+    pixEnabled: Boolean(token),
+    cardCheckoutEnabled: Boolean(token),
+    credentialsLocation: "server_environment",
+  });
+});
+
 app.post("/api/payments/pix", async (req, res) => {
   try {
     const token = mercadoPagoToken();
