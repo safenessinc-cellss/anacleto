@@ -45,7 +45,9 @@ export default function AnacletoProApp({
   onLanguageChange,
   userRole = "usuario",
 }: AnacletoProAppProps) {
-  const roleConfig = getRoleConfig(userRole);
+  const [signedInEmail, setSignedInEmail] = useState(auth.currentUser?.email?.toLowerCase() || "");
+  const effectiveRole: Role = signedInEmail === "anacletoesquadrias@gmail.com" ? "super_usuario" : userRole;
+  const roleConfig = getRoleConfig(effectiveRole);
   const [activeTab, setActiveTab] = useState<NavigationTab>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -69,8 +71,8 @@ export default function AnacletoProApp({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
-  const isFullMenuRole = userRole === "super_admin" || userRole === "super_usuario" || userRole === "ceo";
-  const canSeeNavigation = (id: string) => isFullMenuRole || (userPermissions ? userPermissions.includes(id) : hasAccessToTab(userRole, id as RoleNavTab));
+  const isFullMenuRole = effectiveRole === "super_admin" || effectiveRole === "super_usuario" || effectiveRole === "ceo";
+  const canSeeNavigation = (id: string) => isFullMenuRole || (userPermissions ? userPermissions.includes(id) : hasAccessToTab(effectiveRole, id as RoleNavTab));
   useEffect(() => {
     const email = auth.currentUser?.email?.toLowerCase();
     if (!email || isFullMenuRole) { setUserPermissions(null); return; }
@@ -86,6 +88,7 @@ export default function AnacletoProApp({
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       console.log("🔐 onAuthStateChanged fired:", u ? `user=${u.email}` : "NO USER");
+      setSignedInEmail(u?.email?.toLowerCase() || "");
       setAuthReady(!!u);
     });
     return () => unsub();
@@ -176,8 +179,8 @@ export default function AnacletoProApp({
     { id: "materials" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
   ];
-  const isFullMenuRole = userRole === "super_admin" || userRole === "super_usuario" || userRole === "ceo";
-  const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || item.id !== "payroll" && hasAccessToTab(userRole, item.id as RoleNavTab));
+  const isFullMenuRole = effectiveRole === "super_admin" || effectiveRole === "super_usuario" || effectiveRole === "ceo";
+  const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || item.id !== "payroll" && hasAccessToTab(effectiveRole, item.id as RoleNavTab));
   const utilityItems = [
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
     { id: "tipologias" as NavigationTab, label: "Tipologias", icon: Package, badge: null },
@@ -191,7 +194,7 @@ export default function AnacletoProApp({
     { id: "settings" as NavigationTab, label: "Configurações", icon: Settings, badge: null },
     { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
     { id: "admin" as NavigationTab, label: "Administração", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
-  ].filter((item) => hasAccessToTab(userRole, item.id as RoleNavTab));
+  ].filter((item) => hasAccessToTab(effectiveRole, item.id as RoleNavTab));
 
   const handleSelectCompanyForQuote = (comp: Company) => {
     setActiveTab("quotes");
@@ -418,9 +421,9 @@ export default function AnacletoProApp({
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
         {activeTab === "finance" && (<FinanceModule language={language} />)}
-        {activeTab === "payroll" && hasAccessToTab(userRole, "payroll") && (<PayrollModule />)}
+        {activeTab === "payroll" && hasAccessToTab(effectiveRole, "payroll") && (<PayrollModule />)}
 
-        {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={userRole} />)}
+        {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={effectiveRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI />)}
         {activeTab === "theme" && (<ThemeModule />)}
 
