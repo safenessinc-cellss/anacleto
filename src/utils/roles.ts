@@ -59,7 +59,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     description: "Propietario único del sistema. Acceso total; su cuenta no puede ser eliminada ni degradada por ningún otro perfil.",
     tabs: ALL_TABS,
     canManageUsers: true,
-    canManageRolesBelow: ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "usuario"],
+    canManageRolesBelow: ["super_usuario", "ceo", "admin", "supervisor", "colaborador", "usuario"],
   },
   ceo: {
     id: "ceo",
