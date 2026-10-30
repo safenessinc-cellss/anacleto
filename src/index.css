@@ -283,3 +283,59 @@ html:not(.dark) .text-amber-500, html:not(.dark) .text-amber-600 { color:#b77900
 html:not(.dark) .anacleto-google-accent { background:linear-gradient(90deg,var(--anacleto-blue) 0 25%,var(--anacleto-red) 25% 50%,var(--anacleto-yellow) 50% 75%,var(--anacleto-green) 75% 100%); }
 html:not(.dark) button.bg-blue-600, html:not(.dark) a.bg-blue-600 { background-color:var(--anacleto-blue)!important; }
 html:not(.dark) .ring-indigo-500 { --tw-ring-color:var(--anacleto-blue)!important; }
+
+
+/* ANACLETO · Google Pastel Harmony — applied consistently across all modules */
+:root {
+  --g-blue:#8ab4f8; --g-blue-soft:#e8f0fe; --g-blue-pale:#f3f7ff;
+  --g-red:#f4a6a0; --g-red-soft:#fce8e6;
+  --g-yellow:#fdd663; --g-yellow-soft:#fef7e0;
+  --g-green:#81c995; --g-green-soft:#e6f4ea;
+  --g-ink:#34445b; --g-muted:#718096; --g-line:#e4ebf4; --g-surface:#ffffff;
+}
+html:not(.dark) body, html:not(.dark) #root { background:#f6f9fe !important; color:var(--g-ink) !important; }
+html:not(.dark) main, html:not(.dark) section { color:var(--g-ink); }
+html:not(.dark) aside, html:not(.dark) nav, html:not(.dark) header,
+html:not(.dark) [role="dialog"] { background-color:#fff !important; border-color:var(--g-line) !important; color:var(--g-ink) !important; }
+html:not(.dark) .bg-slate-950, html:not(.dark) .bg-slate-900, html:not(.dark) .bg-slate-800,
+html:not(.dark) .bg-gray-950, html:not(.dark) .bg-gray-900, html:not(.dark) .bg-black {
+  background-color:#fff !important; color:var(--g-ink) !important;
+}
+html:not(.dark) .bg-slate-50, html:not(.dark) .bg-gray-50 { background-color:#f6f9fe !important; }
+html:not(.dark) .bg-slate-100, html:not(.dark) .bg-gray-100 { background-color:#edf3fb !important; }
+html:not(.dark) .bg-blue-50, html:not(.dark) .bg-indigo-50 { background-color:var(--g-blue-soft) !important; }
+html:not(.dark) .bg-blue-100, html:not(.dark) .bg-indigo-100 { background-color:#dce9fc !important; }
+html:not(.dark) .bg-blue-600, html:not(.dark) .bg-blue-700,
+html:not(.dark) .bg-indigo-600, html:not(.dark) .bg-indigo-700 { background-color:#6f9fe8 !important; }
+html:not(.dark) .bg-emerald-50, html:not(.dark) .bg-green-50 { background-color:var(--g-green-soft) !important; }
+html:not(.dark) .bg-emerald-100, html:not(.dark) .bg-green-100 { background-color:#d5efdc !important; }
+html:not(.dark) .bg-emerald-500, html:not(.dark) .bg-emerald-600, html:not(.dark) .bg-green-600 { background-color:#70b987 !important; }
+html:not(.dark) .bg-rose-50, html:not(.dark) .bg-red-50 { background-color:var(--g-red-soft) !important; }
+html:not(.dark) .bg-rose-100, html:not(.dark) .bg-red-100 { background-color:#f8d7d4 !important; }
+html:not(.dark) .bg-rose-500, html:not(.dark) .bg-rose-600, html:not(.dark) .bg-red-600 { background-color:#df8e88 !important; }
+/* Remove orange, amber and gold as interface colors */
+html:not(.dark) .bg-amber-50, html:not(.dark) .bg-orange-50,
+html:not(.dark) .bg-yellow-50 { background-color:var(--g-yellow-soft) !important; }
+html:not(.dark) .bg-amber-100, html:not(.dark) .bg-orange-100,
+html:not(.dark) .bg-yellow-100 { background-color:#fff0bd !important; }
+html:not(.dark) .bg-amber-500, html:not(.dark) .bg-amber-600,
+html:not(.dark) .bg-orange-500, html:not(.dark) .bg-orange-600,
+html:not(.dark) .bg-yellow-500, html:not(.dark) .bg-yellow-600 { background-color:#e9c45c !important; }
+html:not(.dark) .text-amber-500, html:not(.dark) .text-amber-600,
+html:not(.dark) .text-orange-500, html:not(.dark) .text-orange-600,
+html:not(.dark) .text-yellow-500, html:not(.dark) .text-yellow-600,
+html:not(.dark) .text-luxury-gold { color:#96751c !important; }
+html:not(.dark) .border-amber-200, html:not(.dark) .border-orange-200,
+html:not(.dark) .border-yellow-200 { border-color:#f1dfaa !important; }
+html:not(.dark) [class*="luxury-gold"] { color:#96751c !important; }
+html:not(.dark) [class*="bg-luxury-dark"], html:not(.dark) [class*="bg-luxury-darker"] {
+  background-color:#fff !important; color:var(--g-ink) !important;
+}
+html:not(.dark) .text-slate-900, html:not(.dark) .text-gray-900 { color:#34445b !important; }
+html:not(.dark) .text-slate-700, html:not(.dark) .text-gray-700 { color:#52647d !important; }
+html:not(.dark) .text-slate-500, html:not(.dark) .text-gray-500 { color:#7b8ba1 !important; }
+html:not(.dark) .border-slate-200, html:not(.dark) .border-gray-200 { border-color:var(--g-line) !important; }
+html:not(.dark) .shadow, html:not(.dark) .shadow-sm, html:not(.dark) .shadow-md,
+html:not(.dark) .shadow-lg, html:not(.dark) .shadow-xl { --tw-shadow-color:rgba(89,120,164,.09); }
+html:not(.dark) button, html:not(.dark) a { transition:background-color .18s ease,border-color .18s ease,color .18s ease; }
+html:not(.dark) .anacleto-google-accent { background:linear-gradient(90deg,#8ab4f8 0 25%,#f4a6a0 25% 50%,#fdd663 50% 75%,#81c995 75% 100%); }
