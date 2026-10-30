@@ -164,7 +164,8 @@ export default function AnacletoProApp({
     { id: "materials" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
   ];
-  const visibleGestaoItems = gestaoItems.filter((item) => item.id !== "payroll" || hasAccessToTab(userRole, "payroll"));
+  const isFullMenuRole = userRole === "super_admin" || userRole === "super_usuario" || userRole === "ceo";
+  const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || item.id !== "payroll" && hasAccessToTab(userRole, item.id as RoleNavTab));
   const utilityItems = [
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
     { id: "tipologias" as NavigationTab, label: "Tipologias", icon: Package, badge: null },
@@ -237,7 +238,7 @@ export default function AnacletoProApp({
           <div className="space-y-4">
             <div className="space-y-1.5">
               {!sidebarCollapsed && <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 block mb-2">Principal</span>}
-              {homeItems.map((item) => {
+              {homeItems.filter((item) => isFullMenuRole || hasAccessToTab(userRole, item.id as RoleNavTab)).map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
@@ -251,7 +252,7 @@ export default function AnacletoProApp({
                 className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-blue-700">
                 <span>Cadastros</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${cadastrosOpen ? "rotate-90" : ""}`} />
               </button>}
-              {(sidebarCollapsed || cadastrosOpen) && cadastroItems.map((item, index) => {
+              {(sidebarCollapsed || cadastrosOpen) && cadastroItems.filter((item) => isFullMenuRole || hasAccessToTab(userRole, item.id as RoleNavTab)).map((item, index) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
@@ -277,7 +278,7 @@ export default function AnacletoProApp({
               })}
             </div>
             <div className={`space-y-1 pt-2 border-t border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "mt-2" : ""}`}>
-              {utilityItems.map((item) => {
+              {utilityItems.filter((item) => isFullMenuRole || hasAccessToTab(userRole, item.id as RoleNavTab)).map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
@@ -407,7 +408,7 @@ export default function AnacletoProApp({
         {activeTab === "finance" && (<FinanceModule language={language} />)}
         {activeTab === "payroll" && hasAccessToTab(userRole, "payroll") && (<PayrollModule />)}
 
-        {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentRole={userRole} />)}
+        {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={userRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI />)}
         {activeTab === "theme" && (<ThemeModule />)}
 
