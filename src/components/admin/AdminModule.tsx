@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, doc, deleteDoc, setDoc, query, orderBy } from "firebase/firestore";
 import { db, auth } from "../../firebase";
-import { CheckCircle, Clock, Mail, Plus, Shield, Trash2, User, UserCog, X, XCircle } from "lucide-react";
+import { CheckCircle, Clock, Mail, Plus, Shield, Trash2, User, UserCog, X, XCircle, SlidersHorizontal } from "lucide-react";
 import { Perfile, ROLES, SUPER_ADMIN_EMAIL, getAssignablePerfiles, getPerfileConfig } from "../../utils/roles";
 
 interface PendingUser {
@@ -310,9 +310,14 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
                       <td className="p-3 text-xs text-slate-500">{a.addedAt ? new Date(a.addedAt).toLocaleDateString("pt-BR") : "-"}</td>
                       <td className="p-3">
                         {!isSuper && canEdit && (
-                          <button onClick={() => removeAdmin(a)} className="p-1 text-rose-600 hover:text-rose-700">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => openPermissions(a)} title="Atribuir módulos" className="p-2 rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100">
+                              <SlidersHorizontal className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => removeAdmin(a)} title="Remover usuário" className="p-2 rounded-lg text-rose-600 hover:bg-rose-50">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         )}
                         {isSuper && (
                           <span className="text-xs text-slate-400">Protegido</span>
@@ -326,6 +331,27 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {permissionUser && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white border border-blue-100 shadow-2xl p-6">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div><h3 className="text-lg font-black text-slate-800">Permissões por módulo</h3><p className="text-sm text-slate-500">{permissionUser.email}</p></div>
+              <button onClick={() => setPermissionUser(null)} className="p-2 rounded-lg hover:bg-slate-100" aria-label="Fechar"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">Selecione os módulos que este usuário poderá visualizar no menu.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {permissionModules.map((m) => <label key={m.id} className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <input type="checkbox" checked={permissionDraft.includes(m.id)} onChange={(e) => setPermissionDraft((prev) => e.target.checked ? [...prev,m.id] : prev.filter((id) => id !== m.id))} />
+                {m.label}
+              </label>)}
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setPermissionUser(null)} className="px-4 py-2 rounded-xl border text-sm font-semibold text-slate-600">Cancelar</button>
+              <button onClick={savePermissions} className="px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold">Salvar permissões</button>
+            </div>
           </div>
         </div>
       )}
