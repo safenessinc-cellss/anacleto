@@ -1,22 +1,16 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 
-// Initialize Firebase App
+// Use explicitly the project's default Firestore database.
+// Avoid passing a stale/custom database ID from generated configuration.
 const app = initializeApp(firebaseConfig);
-
-// Initialize Services with long-polling to prevent proxy/WebSocket timeout issues
-export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true
-}, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth();
+export const db = getFirestore(app);
+export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({
-  prompt: "select_account"
-});
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
-// Error handler specified verbatim by system instructions
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -36,11 +30,8 @@ export interface FirestoreErrorInfo {
     emailVerified?: boolean | null;
     isAnonymous?: boolean | null;
     tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
-  }
+    providerInfo?: { providerId?: string | null; email?: string | null }[];
+  };
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null, shouldThrow = true) {
@@ -61,7 +52,5 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Hardened Error Event: ', JSON.stringify(errInfo));
-  if (shouldThrow) {
-    throw new Error(JSON.stringify(errInfo));
-  }
+  if (shouldThrow) throw new Error(JSON.stringify(errInfo));
 }
