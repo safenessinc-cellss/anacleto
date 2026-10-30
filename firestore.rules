@@ -1,10 +1,40 @@
-// Forzando deploy Qui 22 Out 2026 14:43:01 -03
-// Forzando deploy Qui 22 Out 2026 14:42:40 -03
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner() { return signedIn() && request.auth.token.email == 'safeness.c.a@gmail.com'; }
+    function adminRecord() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
+    }
+    function adminData() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())).data;
+    }
+    function hasRole(roles) {
+      return isOwner() || (adminRecord() && adminData().role in roles);
+    }
+    match /admins/{email} {
+      allow read: if signedIn() && (request.auth.token.email.lower() == email || isOwner());
+      allow create, update, delete: if isOwner();
+    }
+    match /employees/{id} {
+      allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor','rh','financeiro']);
+    }
+    match /time_entries/{id} {
+      allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor','rh','financeiro']);
+    }
+    match /payroll_settings/{id} {
+      allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']);
+    }
+    match /payroll_runs/{id} {
+      allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']);
+    }
+    match /audit_logs/{id} {
+      allow read: if hasRole(['super_admin','super_usuario','ceo','admin']);
+      allow create: if signedIn();
+      allow update, delete: if isOwner();
+    }
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if signedIn();
     }
   }
 }
