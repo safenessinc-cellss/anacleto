@@ -35,7 +35,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text((sender?.name || "ANACLETO PRO").toUpperCase(), 14, 20);
+  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), 14, 20);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
@@ -64,7 +64,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.text("EMISOR:", 14, yPos);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(sender?.name || "Anacleto Pro Esquadrias", 14, yPos + 6);
+  doc.text(sender?.name || "Anacleto Esquadrias", 14, yPos + 6);
   doc.text(`NIF / CIF: ${sender?.nif || "B-50204533"}`, 14, yPos + 11);
   doc.text(`Dirección: ${sender?.address || "Av. Industrial 1069"}`, 14, yPos + 16);
   doc.text(`${sender?.postalCode || "08001"} ${sender?.city || "Barcelona"} - ${sender?.country || "España"}`, 14, yPos + 21);
@@ -223,7 +223,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    `Anacleto Pro © ${new Date().getFullYear()} • Documento comercial oficial generado electrónicamente`,
+    `Anacleto Esquadrias © ${new Date().getFullYear()} • Documento comercial oficial generado electrónicamente`,
     pageWidth / 2,
     footerY,
     { align: "center" }
@@ -259,7 +259,7 @@ export const buildInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDoc
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text((sender?.name || "ANACLETO PRO").toUpperCase(), 14, 20);
+  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), 14, 20);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
@@ -288,7 +288,7 @@ export const buildInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDoc
   doc.text("DATOS FISCALES EMISOR:", 14, yPos);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(sender?.name || "Anacleto Pro Esquadrias S.L.", 14, yPos + 6);
+  doc.text(sender?.name || "Anacleto Esquadrias S.L.", 14, yPos + 6);
   doc.text(`NIF / CIF: ${sender?.nif || "B-50204533"}`, 14, yPos + 11);
   doc.text(`Domicilio: ${sender?.address || "Av. Caxias do Sul 1069"}`, 14, yPos + 16);
   doc.text(`${sender?.postalCode || "08001"} ${sender?.city || "Barcelona"} - ${sender?.country || "España"}`, 14, yPos + 21);
@@ -386,7 +386,7 @@ export const buildInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDoc
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    `Anacleto Pro © ${new Date().getFullYear()} • Factura electrónica válida a efectos tributarios`,
+    `Anacleto Esquadrias © ${new Date().getFullYear()} • Factura electrónica válida a efectos tributarios`,
     pageWidth / 2,
     footerY,
     { align: "center" }
@@ -424,7 +424,7 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(197, 168, 80);
-  doc.text("ANACLETO PRO • DEPARTAMENTO DE INGENIERÍA Y DISEÑO 2D", 14, 26);
+  doc.text("ANACLETO ESQUADRIAS • DEPARTAMENTO TÉCNICO E DESENHO 2D", 14, 26);
 
   doc.setFontSize(10);
   doc.setTextColor(203, 213, 225);
@@ -533,7 +533,7 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    `Anacleto Pro © ${new Date().getFullYear()} • Documentación Técnica de Fabricación y Despiece Certificado`,
+    `Anacleto Esquadrias © ${new Date().getFullYear()} • Documentación Técnica de Fabricación y Despiece Certificado`,
     pageWidth / 2,
     footerY,
     { align: "center" }
