@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, setDoc, onSnapshot, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, collection, getDocs, getDoc, query, where } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { translations, LanguageCode } from "./translations";
 import { languageMeta } from "./utils";
@@ -146,12 +146,13 @@ export default function App() {
         return;
       }
 
-      // Buscar en la colección admins
+      // Buscar el documento de autorización por ID de email.
+      // Coincide con admins/{email} y evita consultas que las reglas no pueden validar.
       try {
-        const email = (firebaseUser.email || "").toLowerCase();
-        const snap = await getDocs(query(collection(db, "admins"), where("email", "==", email)));
-        if (!snap.empty) {
-          const data = snap.docs[0].data();
+        const email = (firebaseUser.email || "").trim().toLowerCase();
+        const adminSnap = await getDoc(doc(db, "admins", email));
+        if (adminSnap.exists()) {
+          const data = adminSnap.data();
           const role = (data.role || "usuario") as Role;
           setUserRole(role);
           setAdminStatus("authorized");
