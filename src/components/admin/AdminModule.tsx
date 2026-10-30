@@ -330,7 +330,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
         </div>
       )}
     </div>
-      {permissionUser && <div className="fixed inset-0 z-[100] bg-slate-950/50 flex items-center justify-center p-4"><div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-2xl p-5"><div className="flex justify-between mb-4"><div><h3 className="text-lg font-black">Permissões por módulo</h3><p className="text-xs text-slate-500">{permissionUser.email}</p></div><button onClick={() => setPermissionUser(null)}><X/></button></div><div className="grid sm:grid-cols-2 gap-3">{permissionModules.map(m => <label key={m.id} className="flex gap-2 items-center border rounded-lg p-3 text-sm"><input type="checkbox" checked={permissionDraft.includes(m.id)} onChange={e => setPermissionDraft(v => e.target.checked ? [...v,m.id] : v.filter(x => x !== m.id))}/>{m.label}</label>)}</div><div className="flex justify-between mt-5"><button onClick={() => setPermissionDraft(ROLES[permissionUser.role].tabs)} className="text-sm text-blue-700 font-bold">Restaurar padrão</button><button onClick={savePermissions} className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold">Salvar permissões</button></div></div></div>}
+
     );
 }
 
