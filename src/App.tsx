@@ -148,7 +148,7 @@ export default function App() {
 
       // Administradores principais: acesso total sem depender de cadastro manual no Firestore.
       const normalizedEmail = (firebaseUser.email || "").trim().toLowerCase();
-      if (normalizedEmail === SUPER_ADMIN_EMAIL || normalizedEmail === "anacletoesquadrias@gmail.com") {
+      if (normalizedEmail === SUPER_ADMIN_EMAIL) {
         setUserRole("super_admin");
         setAdminStatus("authorized");
         return;
