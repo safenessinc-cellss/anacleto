@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "../../firebase";
 import { Users, Clock3, Wallet, Plus, Calculator, FileSpreadsheet, UserRound, ShieldCheck } from "lucide-react";
 
@@ -42,11 +43,26 @@ export default function PayrollModule() {
   const [overtime50, setOvertime50] = useState("0"); const [overtime100, setOvertime100] = useState("0"); const [note, setNote] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
   const [error, setError] = useState("");
+  const [authReady, setAuthReady] = useState(false);
+  useEffect(() => onAuthStateChanged(auth, user => {
+    setAuthReady(!!user);
+    if (!user) {
+      setEmployees([]);
+      setEntries([]);
+      setError("");
+    }
+  }), []);
   useEffect(() => {
-    const e = onSnapshot(query(collection(db, "employees"), orderBy("name")), s => setEmployees(s.docs.map(d => ({ id:d.id, ...d.data() } as Employee))), err => setError("Não foi possível carregar os funcionários: " + err.message));
-    const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc")), s => setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))), err => setError("Não foi possível carregar os apontamentos: " + err.message));
+    if (!authReady || !auth.currentUser) return;
+    setError("");
+    const e = onSnapshot(query(collection(db, "employees"), orderBy("name")),
+      s => setEmployees(s.docs.map(d => ({ id:d.id, ...d.data() } as Employee))),
+      err => setError("Não foi possível carregar os funcionários: " + err.message));
+    const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc")),
+      s => setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))),
+      err => setError("Não foi possível carregar os apontamentos: " + err.message));
     return () => { e(); t(); };
-  }, []);
+  }, [authReady]);
   const summary = useMemo(() => employees.filter(e => e.active !== false).map(emp => {
     const rows = entries.filter(x => x.employeeId === emp.id && monthKey(x.date) === month);
     const divisor = Number(emp.monthlyHours || (emp.weeklyHours ? emp.weeklyHours * 52 / 12 : 220));
