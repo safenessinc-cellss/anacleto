@@ -179,7 +179,7 @@ export default function AnacletoProApp({
     { id: "materials" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
   ];
-  const isFullMenuRole = effectiveRole === "super_admin" || effectiveRole === "super_usuario" || effectiveRole === "ceo";
+
   const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || item.id !== "payroll" && hasAccessToTab(effectiveRole, item.id as RoleNavTab));
   const utilityItems = [
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
