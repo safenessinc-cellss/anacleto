@@ -196,21 +196,26 @@ export default function App() {
       }
     });
 
-    const unsubConfig = onSnapshot(doc(db, "sender_config", "default"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSenderConfig((prev: any) => ({ ...prev, ...data }));
-      }
-    }, () => {
-      console.warn("Could not load dynamic configuration");
-    });
-
     return () => {
       clearTimeout(timer);
       unsubscribe();
-      unsubConfig();
     };
   }, []);
+
+  // La configuración privada del negocio solo se escucha después de autorizar al usuario.
+  useEffect(() => {
+    if (!user || adminStatus !== "authorized") return;
+    const unsubscribe = onSnapshot(
+      doc(db, "sender_config", "default"),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setSenderConfig((previous: any) => ({ ...previous, ...snapshot.data() }));
+        }
+      },
+      (error) => console.warn("Erro ao carregar configuração da empresa:", error)
+    );
+    return () => unsubscribe();
+  }, [user, adminStatus]);
 
   const toggleTheme = () => {
     const nextDark = !darkMode;
