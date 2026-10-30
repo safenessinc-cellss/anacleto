@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Building, Calendar, ChevronRight, Compass, ExternalLink, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X, Palette } from "lucide-react";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 import { db } from "../firebase";
@@ -68,6 +68,18 @@ export default function AnacletoProApp({
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
+  const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
+  const isFullMenuRole = userRole === "super_admin" || userRole === "super_usuario" || userRole === "ceo";
+  const canSeeNavigation = (id: string) => isFullMenuRole || (userPermissions ? userPermissions.includes(id) : hasAccessToTab(userRole, id as RoleNavTab));
+  useEffect(() => {
+    const email = auth.currentUser?.email?.toLowerCase();
+    if (!email || isFullMenuRole) { setUserPermissions(null); return; }
+    const unsub = onSnapshot(doc(db, "admins", email), (snap) => {
+      const data = snap.data();
+      setUserPermissions(Array.isArray(data?.permissions) ? data.permissions : null);
+    }, () => setUserPermissions(null));
+    return () => unsub();
+  }, [userRole, authReady]);
 
   // 0. Aguarda a autenticação antes de iniciar a escuta do Firestore
   const [authReady, setAuthReady] = useState(false);
@@ -238,7 +250,7 @@ export default function AnacletoProApp({
           <div className="space-y-4">
             <div className="space-y-1.5">
               {!sidebarCollapsed && <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 block mb-2">Principal</span>}
-              {homeItems.filter((item) => isFullMenuRole || hasAccessToTab(userRole, item.id as RoleNavTab)).map((item) => {
+              {homeItems.filter((item) => canSeeNavigation(item.id)).map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
@@ -252,7 +264,7 @@ export default function AnacletoProApp({
                 className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-blue-700">
                 <span>Cadastros</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${cadastrosOpen ? "rotate-90" : ""}`} />
               </button>}
-              {(sidebarCollapsed || cadastrosOpen) && cadastroItems.filter((item) => isFullMenuRole || hasAccessToTab(userRole, item.id as RoleNavTab)).map((item, index) => {
+              {(sidebarCollapsed || cadastrosOpen) && cadastroItems.filter((item) => canSeeNavigation(item.id)).map((item, index) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
@@ -278,7 +290,7 @@ export default function AnacletoProApp({
               })}
             </div>
             <div className={`space-y-1 pt-2 border-t border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "mt-2" : ""}`}>
-              {utilityItems.filter((item) => isFullMenuRole || hasAccessToTab(userRole, item.id as RoleNavTab)).map((item) => {
+              {utilityItems.filter((item) => canSeeNavigation(item.id)).map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
