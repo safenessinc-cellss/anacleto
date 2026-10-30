@@ -3,11 +3,9 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Bloqueio de segurança: esta conta foi revogada. A negação é aplicada
     // também às regras genéricas abaixo, sem tocar nos dados comerciais.
-    function isRevokedAccount() {
-      return request.auth != null && request.auth.token.email != null
-        && request.auth.token.email.lower() == 'anacletoesquadrias@gmail.com';
-    }
-    function signedIn() { return request.auth != null && !isRevokedAccount(); }
+    // El acceso se controla por el documento admins y su rol; la cuenta antigua
+    // no recibe privilegios por autenticarse, solo por aprobación explícita.
+    function signedIn() { return request.auth != null; }
     function isOwner() { return signedIn() && request.auth.token.email == 'safeness.c.a@gmail.com'; }
     function adminRecord() {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
