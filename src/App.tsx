@@ -31,7 +31,7 @@ import PendingApproval from "./components/PendingApproval";
 import { Role, SUPER_ADMIN_EMAIL } from "./utils/roles";
 
 // Premium Brand Assets
-import logoImg from "./assets/images/anacleto_logo_1780594599493.png";
+import logoImg from "./assets/images/anacleto-logo-premium.svg";
 import heroImg from "./assets/images/modern_house_esquadrias_1780594310165.png";
 import facadeImg from "./assets/images/corporate_facade_1780594325774.png";
 import bathImg from "./assets/images/bathroom_box_glass_1780594338585.png";
