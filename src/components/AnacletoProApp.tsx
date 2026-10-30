@@ -162,6 +162,7 @@ export default function AnacletoProApp({
     { id: "materials" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
   ];
+  const visibleGestaoItems = gestaoItems.filter((item) => item.id !== "payroll" || hasAccessToTab(userRole, "payroll"));
   const utilityItems = [
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
@@ -257,7 +258,7 @@ export default function AnacletoProApp({
                 className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-200">
                 <span>Gestão</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${gestaoOpen ? "rotate-90" : ""}`} />
               </button>
-              {gestaoOpen && gestaoItems.map((item) => {
+              {gestaoOpen && visibleGestaoItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
@@ -391,7 +392,7 @@ export default function AnacletoProApp({
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
         {activeTab === "finance" && (<FinanceModule language={language} />)}
-        {activeTab === "payroll" && (<PayrollModule />)}
+        {activeTab === "payroll" && hasAccessToTab(userRole, "payroll") && (<PayrollModule />)}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentRole={userRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI />)}
