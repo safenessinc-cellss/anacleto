@@ -187,15 +187,15 @@ export default function AnacletoProApp({
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
     { id: "tipologias" as NavigationTab, label: "Tipologias", icon: Package, badge: null },
     { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },
-    { id: "profile" as NavigationTab, label: "Meu Perfil", icon: Building, badge: null },
-    { id: "suggestions" as NavigationTab, label: "Sugestões", icon: Sparkles, badge: null },
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
     { id: "financial_ai" as NavigationTab, label: "IA Financeira", icon: Sparkles, badge: "NOVO" },
     { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico 2D", icon: Compass, badge: "CAD" },
-    { id: "settings" as NavigationTab, label: "Configurações", icon: Settings, badge: null },
-    { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
     { id: "admin" as NavigationTab, label: "Administração", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
+    { id: "suggestions" as NavigationTab, label: "Sugestões", icon: Sparkles, badge: null },
+    { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
+    { id: "profile" as NavigationTab, label: "Meu Perfil", icon: Building, badge: null },
+    { id: "settings" as NavigationTab, label: "Configurações", icon: Settings, badge: null },
   ].filter((item) => hasAccessToTab(effectiveRole, item.id as RoleNavTab));
 
   const handleSelectCompanyForQuote = (comp: Company) => {
