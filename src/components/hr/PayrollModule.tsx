@@ -4,7 +4,7 @@ import { db } from "../../firebase";
 import { Users, Clock3, Wallet, Plus, Calculator, FileSpreadsheet } from "lucide-react";
 
 type Employee = { id: string; name: string; role: string; salary: number; weeklyHours: number; overtimeMultiplier: number; active: boolean };
-type TimeEntry = { id: string; employeeId: string; date: string; hours: number; note?: string };
+type TimeEntry = { id: string; employeeId: string; date: string; hours: number; overtimeHours?: number; note?: string };
 
 const money = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const monthKey = (date: string) => date.slice(0, 7);
@@ -20,6 +20,7 @@ export default function PayrollModule() {
   const [employeeId, setEmployeeId] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0,10));
   const [hours, setHours] = useState("8");
+  const [overtimeHours, setOvertimeHours] = useState("0");
   const [note, setNote] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
 
@@ -33,7 +34,7 @@ export default function PayrollModule() {
     const rows = entries.filter(x => x.employeeId === emp.id && monthKey(x.date) === month);
     const regularTarget = emp.weeklyHours * 52 / 12;
     const worked = rows.reduce((s,x) => s + Number(x.hours || 0), 0);
-    const overtime = Math.max(0, worked - regularTarget);
+    const overtime = rows.reduce((s, x) => s + Number(x.overtimeHours || 0), 0);
     const hourly = emp.salary / (emp.weeklyHours * 52 / 12);
     const overtimePay = overtime * hourly * (emp.overtimeMultiplier || 1.5);
     return { ...emp, worked, regularTarget, overtime, overtimePay, estimated: emp.salary + overtimePay, hourly };
@@ -49,8 +50,11 @@ export default function PayrollModule() {
   const addEntry = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!employeeId || Number(hours) <= 0) return;
-    await addDoc(collection(db, "time_entries"), { employeeId, date, hours:Number(hours), note:note.trim(), createdAt:serverTimestamp() });
+    const extra = Number(overtimeHours);
+    if (extra < 0 || extra > Number(hours)) return;
+    await addDoc(collection(db, "time_entries"), { employeeId, date, hours:Number(hours), overtimeHours:extra, note:note.trim(), createdAt:serverTimestamp() });
     setNote("");
+    setOvertimeHours("0");
   };
 
   return <div className="space-y-6 text-slate-800 dark:text-slate-100">
@@ -78,7 +82,7 @@ export default function PayrollModule() {
       <form onSubmit={addEntry} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="flex items-center gap-2 font-bold"><Clock3 className="h-4 w-4 text-blue-600"/> Lançar horas trabalhadas</h2>
         <select required value={employeeId} onChange={e=>setEmployeeId(e.target.value)} className="w-full rounded-xl border p-3 text-sm dark:bg-slate-800"><option value="">Selecione o funcionário</option>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>
-        <div className="grid grid-cols-2 gap-2"><label className="text-xs text-slate-500">Data<input type="date" value={date} onChange={e=>setDate(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label><label className="text-xs text-slate-500">Total de horas<input type="number" min=".1" step=".25" value={hours} onChange={e=>setHours(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label></div>
+        <div className="grid grid-cols-3 gap-2"><label className="text-xs text-slate-500">Data<input type="date" value={date} onChange={e=>setDate(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label><label className="text-xs text-slate-500">Horas trabalhadas<input type="number" min=".1" step=".25" value={hours} onChange={e=>setHours(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label><label className="text-xs text-slate-500">Horas extras<input type="number" min="0" step=".25" max={hours} value={overtimeHours} onChange={e=>setOvertimeHours(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label></div>
         <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Observação (opcional)" className="w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/>
         <button className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white">Registrar apontamento</button>
       </form>
@@ -87,6 +91,6 @@ export default function PayrollModule() {
       <div className="flex items-center justify-between border-b p-5 dark:border-slate-700"><h2 className="flex items-center gap-2 font-bold"><Calculator className="h-4 w-4 text-blue-600"/> Resumo da folha — {month}</h2><button onClick={()=>window.print()} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold"><FileSpreadsheet className="h-4 w-4"/> Imprimir / PDF</button></div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr>{["Funcionário","Jornada mensal","Horas lançadas","Horas extras","Salário base","Extras estimadas","Total estimado"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead><tbody>{summary.map(e=><tr key={e.id} className="border-t dark:border-slate-700"><td className="p-3"><b>{e.name}</b><div className="text-xs text-slate-500">{e.role}</div></td><td className="p-3">{e.regularTarget.toFixed(1)} h</td><td className="p-3">{e.worked.toFixed(1)} h</td><td className="p-3 font-semibold text-amber-600">{e.overtime.toFixed(1)} h</td><td className="p-3">{money(e.salary)}</td><td className="p-3">{money(e.overtimePay)}</td><td className="p-3 font-bold">{money(e.estimated)}</td></tr>)}{!summary.length&&<tr><td colSpan={7} className="p-8 text-center text-slate-500">Cadastre funcionários para iniciar a folha.</td></tr>}</tbody></table></div>
     </section>
-    <p className="text-xs leading-relaxed text-slate-500">A apuração atual é uma estimativa gerencial: compara o total de horas lançadas no mês com a jornada mensal proporcional (horas semanais × 52 ÷ 12). O fator de horas extras é configurável por funcionário. Não calcula automaticamente INSS, FGTS, IRRF, DSR, férias, 13º, adicional noturno, feriados ou regras de convenção coletiva. Antes de usar como folha oficial, valide a jornada, os apontamentos e os adicionais com a contabilidade / DP e a legislação aplicável.</p>
+    <p className="text-xs leading-relaxed text-slate-500">A apuração atual é uma estimativa gerencial: soma as horas extras informadas explicitamente em cada apontamento e calcula o adicional pelo valor-hora proporcional à jornada semanal (horas semanais × 52 ÷ 12). O fator de horas extras é configurável por funcionário. Não calcula automaticamente INSS, FGTS, IRRF, DSR, férias, 13º, adicional noturno, feriados ou regras de convenção coletiva. Antes de usar como folha oficial, valide a jornada, os apontamentos e os adicionais com a contabilidade / DP e a legislação aplicável.</p>
   </div>;
 }
