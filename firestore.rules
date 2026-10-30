@@ -34,6 +34,18 @@ service cloud.firestore {
     match /payroll_runs/{id} {
       allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']);
     }
+    // La cuenta anterior puede solicitar un alta nueva, pero no acceder a datos del negocio.
+    match /pending_users/{uid} {
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'anacletoesquadrias@gmail.com';
+      allow read: if request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'anacletoesquadrias@gmail.com';
+      allow delete: if isOwner();
+    }
     match /audit_logs/{id} {
       allow read: if hasRole(['super_admin','super_usuario','ceo','admin']);
       allow create: if signedIn();
