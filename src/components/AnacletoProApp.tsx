@@ -21,7 +21,7 @@ import PayrollModule from "./hr/PayrollModule";
 import CatalogModule from "./catalog/CatalogModule";
 import RegistryModule from "./registry/RegistryModule";
 import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
-import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
+import logoImg from "../assets/images/anacleto-logo-premium.svg";
 import BusinessWorkspace from "./workspace/BusinessWorkspace";
 
 type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions";
@@ -207,10 +207,10 @@ export default function AnacletoProApp({
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => logoInputRef.current?.click()} className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 overflow-hidden" title="Alterar logotipo">{customLogo ? <img src={customLogo} alt="Logotipo" className="w-full h-full object-contain" /> : <Compass className="w-5 h-5" />}</button>
+          <button type="button" onClick={() => logoInputRef.current?.click()} className="w-14 h-9 rounded-lg bg-slate-950 border border-amber-500/30 flex items-center justify-center overflow-hidden p-0.5" title="Alterar logotipo">{customLogo ? <img src={customLogo} alt="Logotipo" className="w-full h-full object-contain" /> : <img src={logoImg} alt="Anacleto Esquadrias" className="w-full h-full object-contain" />}</button>
           <div>
-            <h1 className="text-sm font-black text-white tracking-widest uppercase">ANACLETO PRO</h1>
-            <p className="text-[9px] text-amber-400 font-mono">Enterprise Suite</p>
+            <h1 className="text-sm font-black text-white tracking-widest uppercase">ANACLETO ESQUADRIAS</h1>
+            <p className="text-[9px] text-amber-400 font-mono">Vidraçaria e esquadrias de alumínio</p>
           </div>
         </div>
 
@@ -232,7 +232,7 @@ export default function AnacletoProApp({
           <div className={`hidden lg:flex ${sidebarCollapsed ? "justify-center" : "justify-end"}`}><button onClick={() => setSidebarCollapsed(v => !v)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-blue-50 hover:text-blue-700 transition" title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}><Menu className="h-4 w-4"/></button></div>
           {/* Brand Logo & Title */}
           <div className={`flex items-center gap-3.5 pb-6 border-b border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
-            <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-16 h-16 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-500 via-red-500 to-yellow-400 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
+            <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-24 h-16 shrink-0 rounded-xl overflow-hidden bg-slate-950 border border-amber-500/30 p-1 shadow-lg shadow-amber-500/10 flex items-center justify-center">
               <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[14px] flex items-center justify-center overflow-hidden">
                 {customLogo ? <img src={customLogo} alt="Logotipo personalizado" className="h-full w-full object-contain" /> : <img src={logoImg} alt="Anacleto" className="h-full w-full object-contain" />}
               </div><span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/60 text-[9px] font-bold text-white">ALTERAR</span>
@@ -240,7 +240,7 @@ export default function AnacletoProApp({
             <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" aria-label="Enviar logotipo" />
             {!sidebarCollapsed && <div>
               <div className="flex items-center gap-1.5">
-                <h1 className="text-base font-black tracking-[0.2em] text-slate-900 dark:text-white uppercase">ANACLETO</h1>
+                <h1 className="text-base font-black tracking-[0.12em] text-slate-900 dark:text-white uppercase">ANACLETO ESQUADRIAS</h1>
                 <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 font-black text-[9px] rounded-md tracking-wider">
                   PRO
                 </span>
