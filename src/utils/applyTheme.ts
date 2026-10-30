@@ -135,7 +135,7 @@ export function applyTheme(config: ThemeConfig): void {
     }
   `;
 
-  localStorage.setItem("anacleto_theme", JSON.stringify(config));
+  try { localStorage.setItem("anacleto_theme", JSON.stringify(config)); } catch (error) { console.warn("Tema aplicado apenas nesta sessão; armazenamento local indisponível.", error); }
 }
 
 export function loadSavedTheme(): ThemeConfig | null {
@@ -151,7 +151,7 @@ export function loadSavedTheme(): ThemeConfig | null {
 
 export function clearTheme(): void {
   document.getElementById(STYLE_ID)?.remove();
-  localStorage.removeItem("anacleto_theme");
+  try { localStorage.removeItem("anacleto_theme"); } catch (error) { console.warn("Não foi possível limpar o tema salvo.", error); }
   document.documentElement.style.removeProperty("--theme-primary");
 }
 
