@@ -282,8 +282,8 @@ export default function AnacletoProApp({
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
                   title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-100 text-blue-800 dark:bg-blue-600/10 dark:text-blue-300" : "text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900"}`}>
-                  <span className="flex items-center gap-3"><Icon className="w-4 h-4" /><span>{item.label}</span></span>
-                  {item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">{item.badge}</span>}
+                  <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}><Icon className="w-5 h-5 shrink-0 text-blue-500" />{!sidebarCollapsed && <span>{item.label}</span>}</span>
+                  {!sidebarCollapsed && item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{item.badge}</span>}
                 </button>;
               })}
             </div>
