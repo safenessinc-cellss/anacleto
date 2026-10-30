@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, doc, deleteDoc, addDoc } from "firebase/firestore";
 import { db } from "../../firebase";
-import { CheckCircle, XCircle, FileText, Loader2, AlertTriangle } from "lucide-react";
+import { CheckCircle, XCircle, FileText, Loader2, AlertTriangle, Search } from "lucide-react";
 import { lookupCNPJ, cnpjToSupplier, cleanCNPJ } from "../../utils/cnpjLookup";
 
 interface PendingBoleto {
@@ -142,6 +142,25 @@ export default function PendingBoletosModule() {
           Boletos extraídos pela IA. Aceite para adicionar em Contas a Pagar, ou rejeite para descartar.
         </p>
       </div>
+
+      <form onSubmit={(e) => { e.preventDefault(); void searchCompanyBoletos(); }} className="bg-white dark:bg-slate-900 rounded-xl border p-4 space-y-3">
+        <h3 className="font-bold text-slate-800 dark:text-white">Buscar boletos nos registros</h3>
+        <p className="text-xs text-slate-500">Pesquisa documentos já importados para a empresa. Não consulta automaticamente bancos ou sistemas privados de terceiros.</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Nome da empresa" className="border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800" />
+          <input value={companyCnpj} onChange={(e) => setCompanyCnpj(e.target.value)} placeholder="CNPJ da empresa (14 dígitos)" inputMode="numeric" className="border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800" />
+          <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Fornecedor, descrição ou arquivo" className="border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800" />
+        </div>
+        <button type="submit" disabled={searching} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold disabled:opacity-50">
+          {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} {searching ? "Pesquisando..." : "Buscar boletos"}
+        </button>
+        {searchMessage && <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{searchMessage}</p>}
+        {matches.length > 0 && <div className="space-y-2">{matches.map((item) => <div key={item.id} className="rounded-lg border p-3 text-sm flex flex-wrap justify-between gap-2">
+          <span className="font-semibold">{item.beneficiary || item.description || item.fileName || "Boleto"}</span>
+          <span>R$ {Number(item.amount || 0).toFixed(2)}</span>
+          <span className="text-slate-500">{item.dueDate || "Sem vencimento"}</span>
+        </div>)}</div>}
+      </form>
 
       {pending.length === 0 ? (
         <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-dashed">
