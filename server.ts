@@ -527,17 +527,22 @@ app.post("/api/ai/financial-extract", async (req, res) => {
   try {
     const { data, mimeType } = req.body;
     if (!data) return res.status(400).json({ error: "No data" });
-    const { GoogleGenerativeAI } = await import("@google/genai");
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const { GoogleGenAI } = await import("@google/genai");
+    const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
     const prompt = `Você é um assistente financeiro. Analise este documento (boleto ou conta a pagar) e extraia em JSON:
 { "beneficiary": "nome do beneficiário", "cnpj": "CNPJ", "amount": 123.45, "dueDate": "YYYY-MM-DD", "digitableLine": "linha digitável", "description": "descrição" }
 Responda APENAS o JSON, sem texto.`;
-    const result = await model.generateContent([
-      { inlineData: { mimeType: mimeType || "application/pdf", data } },
-      prompt,
-    ]);
-    const text = result.response.text();
+    const result = await genAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: mimeType || "application/pdf", data } },
+          { text: prompt },
+        ],
+      }],
+    });
+    const text = result.text || "";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
     res.json(parsed);
