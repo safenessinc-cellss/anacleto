@@ -170,7 +170,6 @@ export default function AnacletoProApp({
     { id: "products" as NavigationTab, label: "Produtos", icon: Package, badge: null },
 
     { id: "services" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
-    { id: "payment_methods" as NavigationTab, label: "Formas de Pagamento", icon: Wallet, badge: null },
   ];
   const gestaoItems = [
     { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
