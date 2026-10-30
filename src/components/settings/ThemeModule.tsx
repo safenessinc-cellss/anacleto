@@ -36,7 +36,7 @@ export default function ThemeModule() {
     if (savedMode === "dark") document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
     const t = loadSavedTheme();
-    if (t) setConfig(t);
+    if (t) setConfig({ ...DEFAULT_THEME, ...t });
   }, []);
 
   // ===== AUTO-APPLY: cada cambio se aplica en vivo =====
@@ -50,17 +50,26 @@ export default function ThemeModule() {
   };
 
   const selectPreset = (p: Preset) => {
-    setConfig(p.config);
+    setConfig({ ...DEFAULT_THEME, ...p.config });
     setActivePreset(p.id);
     setSaved(false);
-    if (autoApply) applyTheme(p.config);
+    if (autoApply) applyTheme({ ...DEFAULT_THEME, ...p.config });
   };
 
   const save = () => {
-    applyTheme(config);
-    localStorage.setItem("anacleto_theme_preset", activePreset);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    try {
+      const normalized: ThemeConfig = { ...DEFAULT_THEME, ...config };
+      applyTheme(normalized);
+      try { localStorage.setItem("anacleto_theme_preset", activePreset); } catch (storageError) {
+        console.warn("Não foi possível persistir a paleta neste navegador:", storageError);
+      }
+      setConfig(normalized);
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+    } catch (error) {
+      console.error("Falha ao aplicar a personalização:", error);
+      window.alert("Não foi possível salvar a personalização. Verifique se o navegador permite armazenamento local e tente novamente.");
+    }
   };
 
   const reset = () => {
