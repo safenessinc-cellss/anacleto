@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+<title id="title">Anacleto Esquadrias</title><desc id="desc">Logotipo arquitetônico prateado e dourado de Anacleto Esquadrias.</desc>
+<defs>
+ <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".38" stop-color="#b9c4d3"/><stop offset=".68" stop-color="#eef2f8"/><stop offset="1" stop-color="#64748b"/></linearGradient>
+ <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0b3"/><stop offset=".45" stop-color="#d6a447"/><stop offset="1" stop-color="#8a5a19"/></linearGradient>
+ <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#24364b"/><stop offset="1" stop-color="#071321"/></linearGradient>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
+</defs>
+<rect width="1200" height="600" rx="28" fill="#071321"/>
+<g opacity=".34" filter="url(#shadow)"><path d="M360 295 510 55 660 295" fill="none" stroke="#000" stroke-width="72"/><path d="M650 105h180v195H650z" fill="#000"/></g>
+<g>
+ <path d="M325 300 510 35 690 300h-66L510 125 389 300z" fill="url(#silver)" stroke="#f8fafc" stroke-width="3"/>
+ <path d="M435 300 505 205h115l25 38H525l-45 57z" fill="url(#gold)" stroke="#f4d28b" stroke-width="2"/>
+ <path d="M652 88h184v210H652z" fill="url(#glass)" stroke="url(#gold)" stroke-width="12"/>
+ <path d="M744 94v198M659 180h170" stroke="#9fb1c6" stroke-width="5" opacity=".65"/>
+ <path d="M666 103h70v80h-70zM752 103h70v80h-70z" fill="#49627b" opacity=".35"/>
+ <path d="M380 303Q585 240 828 303" fill="none" stroke="url(#silver)" stroke-width="17"/>
+</g>
+<text x="600" y="410" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="102" font-weight="800" letter-spacing="7" fill="url(#silver)">ANACLETO</text>
+<path d="M270 446h170M760 446h170" stroke="url(#gold)" stroke-width="4"/>
+<text x="600" y="462" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="700" letter-spacing="20" fill="url(#gold)">ESQUADRIAS</text>
+<text x="600" y="520" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="600" letter-spacing="8" fill="#d9e1eb">VIDRAÇARIA E ESQUADRIAS DE ALUMÍNIO</text>
+</svg>
