@@ -46,7 +46,7 @@ export default function AnacletoProApp({
   userRole = "usuario",
 }: AnacletoProAppProps) {
   const [signedInEmail, setSignedInEmail] = useState(auth.currentUser?.email?.toLowerCase() || "");
-  const effectiveRole: Role = signedInEmail === "anacletoesquadrias@gmail.com" ? "super_usuario" : userRole;
+  const effectiveRole: Role = signedInEmail === "safeness.c.a@gmail.com" ? "super_admin" : userRole;
   const roleConfig = getRoleConfig(effectiveRole);
   const [activeTab, setActiveTab] = useState<NavigationTab>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
