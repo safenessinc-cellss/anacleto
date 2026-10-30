@@ -28,6 +28,9 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [newAdminPerfile, setNewAdminPerfile] = useState<Perfile>("colaborador");
   const [loading, setLoading] = useState(true);
+  const [permissionUser, setPermissionUser] = useState<AdminUser | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
+  const permissionModules = [{id:"dashboard",label:"Início"},{id:"crm",label:"Clientes / CRM"},{id:"quotes",label:"Orçamentos"},{id:"invoices",label:"Faturas"},{id:"technical_drawing",label:"Desenho técnico"},{id:"agenda",label:"Agenda"},{id:"catalog",label:"Catálogo / Itens"},{id:"finance",label:"Financeiro"},{id:"financial_ai",label:"IA financeira"},{id:"payroll",label:"Folha de pagamento"},{id:"reports",label:"Relatórios"},{id:"tipologias",label:"Tipologias"},{id:"projects",label:"Projetos"},{id:"settings",label:"Configurações"},{id:"theme",label:"Aparência"},{id:"suggestions",label:"Sugestões"}];
 
   const assignablePerfiles = getAssignablePerfiles(currentPerfile);
 
@@ -105,6 +108,9 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
       alert("Erro ao excluir administrador: " + (e as Error).message);
     }
   };
+
+  const openPermissions = (admin: AdminUser) => { setPermissionUser(admin); setPermissionDraft(admin.permissions || ROLES[admin.role].tabs); };
+  const savePermissions = async () => { if (!permissionUser || permissionUser.email === SUPER_ADMIN_EMAIL) return; try { await setDoc(doc(db, "admins", permissionUser.id), { permissions: permissionDraft, permissionsUpdatedBy: auth.currentUser?.email || "", permissionsUpdatedAt: new Date().toISOString() }, { merge: true }); setPermissionUser(null); alert("Permissões atualizadas."); } catch (e) { alert("Erro ao salvar permissões: " + (e as Error).message); } };
 
   const changePerfile = async (admin: AdminUser, newPerfile: Perfile) => {
     if (admin.email === SUPER_ADMIN_EMAIL) {
@@ -323,7 +329,8 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
         </div>
       )}
     </div>
-  );
+      {permissionUser && <div className="fixed inset-0 z-[100] bg-slate-950/50 flex items-center justify-center p-4"><div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-2xl p-5"><div className="flex justify-between mb-4"><div><h3 className="text-lg font-black">Permissões por módulo</h3><p className="text-xs text-slate-500">{permissionUser.email}</p></div><button onClick={() => setPermissionUser(null)}><X/></button></div><div className="grid sm:grid-cols-2 gap-3">{permissionModules.map(m => <label key={m.id} className="flex gap-2 items-center border rounded-lg p-3 text-sm"><input type="checkbox" checked={permissionDraft.includes(m.id)} onChange={e => setPermissionDraft(v => e.target.checked ? [...v,m.id] : v.filter(x => x !== m.id))}/>{m.label}</label>)}</div><div className="flex justify-between mt-5"><button onClick={() => setPermissionDraft(ROLES[permissionUser.role].tabs)} className="text-sm text-blue-700 font-bold">Restaurar padrão</button><button onClick={savePermissions} className="px-4 py-2 rounded-lg bg-blue-600 text-white font-bold">Salvar permissões</button></div></div></div>}
+    );
 }
 
 function PendingRow({
