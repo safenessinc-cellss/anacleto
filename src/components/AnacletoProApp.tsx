@@ -170,7 +170,6 @@ export default function AnacletoProApp({
     { id: "products" as NavigationTab, label: "Produtos", icon: Package, badge: null },
 
     { id: "services" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
-    { id: "payment_methods" as NavigationTab, label: "Formas de Pagamento", icon: Wallet, badge: null },
   ];
   const gestaoItems = [
     { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
@@ -423,7 +422,7 @@ export default function AnacletoProApp({
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
         {activeTab === "finance" && (<FinanceModule language={language} />)}
-        {activeTab === "payroll" && hasAccessToTab(effectiveRole, "payroll") && (<PayrollModule />)}
+        {activeTab === "payroll" && (isFullMenuRole || hasAccessToTab(effectiveRole, "payroll")) && (<PayrollModule />)}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={effectiveRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI />)}
