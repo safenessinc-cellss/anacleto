@@ -25,6 +25,7 @@ export type NavigationTab =
   | "settings"
   | "theme"
   | "payroll"
+  | "finance"
   | "reports"
   | "tipologias"
   | "projects"
