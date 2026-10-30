@@ -211,7 +211,7 @@ export default function AnacletoProApp({
         }`}
       >
         <div className="p-4 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
-          <div className="hidden lg:flex justify-end"><button onClick={() => setSidebarCollapsed(v => !v)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-blue-50" title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}><Menu className="h-4 w-4"/></button></div>
+          <div className={`hidden lg:flex ${sidebarCollapsed ? "justify-center" : "justify-end"}`}><button onClick={() => setSidebarCollapsed(v => !v)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-blue-50 hover:text-blue-700 transition" title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}><Menu className="h-4 w-4"/></button></div>
           {/* Brand Logo & Title */}
           <div className={`flex items-center gap-3.5 pb-6 border-b border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
             <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-16 h-16 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-500 via-red-500 to-yellow-400 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
@@ -220,7 +220,7 @@ export default function AnacletoProApp({
               </div><span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/60 text-[9px] font-bold text-white">ALTERAR</span>
             </button>
             <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" aria-label="Enviar logotipo" />
-            <div>
+            {!sidebarCollapsed && <div>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-base font-black tracking-[0.2em] text-slate-900 dark:text-white uppercase">ANACLETO</h1>
                 <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 font-black text-[9px] rounded-md tracking-wider">
@@ -230,58 +230,58 @@ export default function AnacletoProApp({
               <p className="text-[9px] text-slate-400 tracking-wider font-mono uppercase mt-0.5">
                 Orçamentos • Desenhos • Faturas
               </p>
-            </div>
+            </div>}
           </div>
 
           {/* Navigation grouped by the user's reference screenshots */}
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 block mb-2">Principal</span>
+              {!sidebarCollapsed && <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 block mb-2">Principal</span>}
               {homeItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition ${isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-600 dark:text-slate-300 hover:text-blue-700 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-slate-900"}`}>
-                  <span className="flex items-center gap-3"><Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-blue-400"}`} /><span>{item.label}</span></span>
+                  title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-3 rounded-2xl text-xs font-bold transition ${isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-600 dark:text-slate-300 hover:text-blue-700 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-slate-900"}`}>
+                  <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}><Icon className={`w-5 h-5 shrink-0 ${isActive ? "text-white" : "text-blue-500"}`} />{!sidebarCollapsed && <span>{item.label}</span>}</span>
                 </button>;
               })}
             </div>
             <div className="space-y-1">
-              <button onClick={() => setCadastrosOpen(!cadastrosOpen)} aria-expanded={cadastrosOpen}
-                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-200">
+              {!sidebarCollapsed && <button onClick={() => setCadastrosOpen(!cadastrosOpen)} aria-expanded={cadastrosOpen}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-blue-700">
                 <span>Cadastros</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${cadastrosOpen ? "rotate-90" : ""}`} />
-              </button>
-              {cadastrosOpen && cadastroItems.map((item, index) => {
+              </button>}
+              {(sidebarCollapsed || cadastrosOpen) && cadastroItems.map((item, index) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-600/10 dark:text-blue-300 dark:border-blue-500/20" : "text-slate-400 hover:text-white hover:bg-slate-900"}`}>
-                  <span className="flex items-center gap-3"><Icon className="w-4 h-4" /><span>{item.label}</span></span>
-                  {item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">{item.badge}</span>}
+                  title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-600/10 dark:text-blue-300 dark:border-blue-500/20" : "text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900"}`}>
+                  <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}><Icon className="w-5 h-5 shrink-0 text-blue-500" />{!sidebarCollapsed && <span>{item.label}</span>}</span>
+                  {!sidebarCollapsed && item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{item.badge}</span>}
                 </button>;
               })}
             </div>
             <div className="space-y-1">
-              <button onClick={() => setGestaoOpen(!gestaoOpen)} aria-expanded={gestaoOpen}
-                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-200">
+              {!sidebarCollapsed && <button onClick={() => setGestaoOpen(!gestaoOpen)} aria-expanded={gestaoOpen}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-blue-700">
                 <span>Gestão</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${gestaoOpen ? "rotate-90" : ""}`} />
-              </button>
-              {gestaoOpen && visibleGestaoItems.map((item) => {
+              </button>}
+              {(sidebarCollapsed || gestaoOpen) && visibleGestaoItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-600/10 text-blue-300 border border-blue-500/20" : "text-slate-400 hover:text-white hover:bg-slate-900"}`}>
-                  <span className="flex items-center gap-3"><Icon className="w-4 h-4" /><span>{item.label}</span></span>
-                  {item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">{item.badge}</span>}
+                  title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-600/10 dark:text-blue-300 dark:border-blue-500/20" : "text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900"}`}>
+                  <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}><Icon className="w-5 h-5 shrink-0 text-blue-500" />{!sidebarCollapsed && <span>{item.label}</span>}</span>
+                  {!sidebarCollapsed && item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{item.badge}</span>}
                 </button>;
               })}
             </div>
-            <div className="space-y-1 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className={`space-y-1 pt-2 border-t border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "mt-2" : ""}`}>
               {utilityItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-50 text-blue-700 dark:bg-blue-600/10 dark:text-blue-300" : "text-slate-400 hover:text-white hover:bg-slate-900"}`}>
+                  title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-100 text-blue-800 dark:bg-blue-600/10 dark:text-blue-300" : "text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900"}`}>
                   <span className="flex items-center gap-3"><Icon className="w-4 h-4" /><span>{item.label}</span></span>
                   {item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400">{item.badge}</span>}
                 </button>;
@@ -290,7 +290,7 @@ export default function AnacletoProApp({
           </div>
 
           {/* Quick AI CAD Promotion Pill */}
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-yellow-50 border border-blue-100 dark:from-blue-950 dark:via-slate-900 dark:to-slate-900 dark:border-blue-900 space-y-2">
+          {!sidebarCollapsed && <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-yellow-50 border border-blue-100 dark:from-blue-950 dark:via-slate-900 dark:to-slate-900 dark:border-blue-900 space-y-2">
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-[10px] font-black uppercase text-blue-600 dark:text-amber-400 tracking-wider">
@@ -300,33 +300,33 @@ export default function AnacletoProApp({
             <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-tight">
               Genera dibujos 2D y despiece tipo puzzle con cotas en milisegundos.
             </p>
-          </div>
+          </div>}
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
+        <div className={`p-3 border-t border-slate-200 dark:border-slate-800 space-y-2 ${sidebarCollapsed ? "flex flex-col items-center" : ""}`}>
           {onSwitchToPublicLanding && (
             <button
               onClick={onSwitchToPublicLanding}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-700 hover:text-blue-900 transition border border-blue-100 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-white dark:border-slate-800"
+              title="Ver Web Comercial" className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-700 hover:text-blue-900 transition border border-blue-100 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-white dark:border-slate-800 ${sidebarCollapsed ? "w-11" : "w-full"}`}
             >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-400" /> Ver Web Comercial
+              <ExternalLink className="w-4 h-4 shrink-0 text-blue-500" />{!sidebarCollapsed && "Ver Web Comercial"}
             </button>
           )}
 
           {/* Selector de idioma */}
           <button
             onClick={toggleThemeQuick}
-            className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+            className="p-2.5 rounded-xl bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 hover:bg-blue-100 dark:hover:bg-slate-700 transition"
             title={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
           {onLanguageChange && (
-            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5">
+            <div className={`flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 ${sidebarCollapsed ? "justify-center w-11" : ""}`}>
               <span className="text-sm">🌐</span>
-              <select
+              {!sidebarCollapsed && <select
                 value={language}
                 onChange={(e) => onLanguageChange(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
@@ -334,16 +334,16 @@ export default function AnacletoProApp({
                 <option value="pt">🇵🇹 PT</option>
                 <option value="es">🇪🇸 ES</option>
                 <option value="en">🇬🇧 EN</option>
-              </select>
+              </select>}
             </div>
           )}
 
           {onLogout && (
             <button
               onClick={onLogout}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs text-slate-500 hover:text-rose-400 transition"
+              title="Sair da conta" className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs text-slate-500 hover:text-rose-500 hover:bg-rose-50 transition ${sidebarCollapsed ? "w-11" : "w-full"}`}
             >
-              <LogOut className="w-3.5 h-3.5" /> Sair da conta
+              <LogOut className="w-4 h-4" />{!sidebarCollapsed && "Sair da conta"}
             </button>
           )}
         </div>
