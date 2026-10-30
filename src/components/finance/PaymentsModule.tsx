@@ -243,6 +243,40 @@ export default function PaymentsModule() {
 
   return (
     <div className="space-y-4">
+      <form onSubmit={savePaymentConfig} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="font-bold text-slate-900 dark:text-white">Conta e dados de recebimento</h3>
+            <p className="text-xs text-slate-500">Edite os dados da empresa usados nas cobranças.</p>
+          </div>
+          <span className={`text-xs font-bold px-2 py-1 rounded-full ${gatewayReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+            {gatewayReady ? "Mercado Pago conectado" : "Mercado Pago ainda não configurado"}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Nome do titular
+            <input value={accountHolder} onChange={(e) => setAccountHolder(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800" placeholder="Anacleto Esquadrias" />
+          </label>
+          <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">CNPJ da empresa
+            <input value={companyCnpj} onChange={(e) => setCompanyCnpj(e.target.value)} inputMode="numeric" className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800" placeholder="00.000.000/0000-00" />
+          </label>
+          <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Tipo de chave PIX
+            <select value={pixKeyType} onChange={(e) => setPixKeyType(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800">
+              <option value="CNPJ">CNPJ</option><option value="CPF">CPF</option><option value="EMAIL">E-mail</option><option value="PHONE">Telefone</option><option value="EVP">Chave aleatória</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Chave PIX da empresa
+            <input value={pixKey} onChange={(e) => setPixKey(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-800" placeholder="Informe a chave PIX" />
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-slate-500 max-w-2xl">A chave PIX e os dados da empresa não substituem a credencial de API do Mercado Pago. A credencial privada deve ser cadastrada em Vercel como MERCADO_PAGO_ACCESS_TOKEN; nunca a coloque aqui no navegador.</p>
+          <button type="submit" disabled={configSaving || !configLoaded} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold disabled:opacity-50">
+            {configSaving ? "Salvando..." : "Salvar dados da conta"}
+          </button>
+        </div>
+      </form>
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
