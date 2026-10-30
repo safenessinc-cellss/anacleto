@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, where,
+  collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, where, setDoc, getDoc,
 } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import {
@@ -63,6 +63,35 @@ export default function PaymentsModule() {
   const [gatewayLoading, setGatewayLoading] = useState(false);
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [pixKey, setPixKey] = useState("");
+  const [pixKeyType, setPixKeyType] = useState("CNPJ");
+  const [accountHolder, setAccountHolder] = useState("Anacleto Esquadrias");
+  const [companyCnpj, setCompanyCnpj] = useState("");
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [gatewayReady, setGatewayReady] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getDoc(doc(db, "company_payment_settings", "default")).then(s => {
+      if (!alive || !s.exists()) return;
+      const v = s.data(); setPixKey(v.pixKey || ""); setPixKeyType(v.pixKeyType || "CNPJ");
+      setAccountHolder(v.accountHolder || "Anacleto Esquadrias"); setCompanyCnpj(v.companyCnpj || "");
+    }).catch(e => console.warn("Payment settings:", e)).finally(() => { if (alive) setConfigLoaded(true); });
+    fetch("/api/payments/config-status").then(r => r.json()).then(v => { if (alive) setGatewayReady(Boolean(v.configured)); }).catch(() => { if (alive) setGatewayReady(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const savePaymentConfig = async (e: React.FormEvent) => {
+    e.preventDefault(); setConfigSaving(true);
+    try {
+      await setDoc(doc(db, "company_payment_settings", "default"), {
+        pixKey: pixKey.trim(), pixKeyType, accountHolder: accountHolder.trim(), companyCnpj: companyCnpj.replace(/\\D/g, ""), updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      alert("Configuração da empresa salva. A credencial privada do Mercado Pago será adicionada no ambiente seguro do servidor.");
+    } catch (error) { alert("Erro ao salvar configuração: " + (error as Error).message); }
+    finally { setConfigSaving(false); }
+  };
 
   useEffect(() => {
     const u1 = onSnapshot(collection(db, "payables"), (snap) => {
