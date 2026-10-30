@@ -146,8 +146,18 @@ export default function App() {
         return;
       }
 
-      // Administradores principais: acesso total sem depender de cadastro manual no Firestore.
+      // Cuenta revocada: bloquear acceso en la aplicación incluso si conserva sesión de Firebase Auth.
       const normalizedEmail = (firebaseUser.email || "").trim().toLowerCase();
+      if (normalizedEmail === "anacletoesquadrias@gmail.com") {
+        setUserRole(null);
+        setAdminStatus("unauthorized");
+        await signOut(auth);
+        setUser(null);
+        setCurrentView("landing");
+        return;
+      }
+
+      // Administrador principal: acceso total.
       if (normalizedEmail === SUPER_ADMIN_EMAIL) {
         setUserRole("super_admin");
         setAdminStatus("authorized");
