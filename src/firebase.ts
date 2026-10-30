@@ -8,7 +8,7 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Services with long-polling to prevent proxy/WebSocket timeout issues
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true
+  experimentalAutoDetectLongPolling: true
 }, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth();
 export const googleProvider = new GoogleAuthProvider();
