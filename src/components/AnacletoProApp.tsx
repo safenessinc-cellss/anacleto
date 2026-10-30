@@ -423,7 +423,7 @@ export default function AnacletoProApp({
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
         {activeTab === "finance" && (<FinanceModule language={language} />)}
-        {activeTab === "payroll" && hasAccessToTab(effectiveRole, "payroll") && (<PayrollModule />)}
+        {activeTab === "payroll" && (isFullMenuRole || hasAccessToTab(effectiveRole, "payroll")) && (<PayrollModule />)}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={effectiveRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI />)}
