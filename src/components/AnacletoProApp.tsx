@@ -17,12 +17,13 @@ import FinancialAI from "./finance/FinancialAI";
 import ThemeModule from "./settings/ThemeModule";
 import AdminModule from "./admin/AdminModule";
 import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
+import PayrollModule from "./hr/PayrollModule";
 import CatalogModule from "./catalog/CatalogModule";
 import RegistryModule from "./registry/RegistryModule";
 import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
 import logoImg from "../assets/images/anacleto_logo_1780594599493.png";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -159,6 +160,7 @@ export default function AnacletoProApp({
     { id: "cut_plan" as NavigationTab, label: "Plano de Corte", icon: Compass, badge: null },
     { id: "profile_optimization" as NavigationTab, label: "Aproveitamento de Perfis", icon: Package, badge: null },
     { id: "materials" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
+    { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
   ];
   const utilityItems = [
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
@@ -175,7 +177,7 @@ export default function AnacletoProApp({
   };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col lg:flex-row font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-800 dark:bg-[#101827] dark:text-slate-100 flex flex-col lg:flex-row font-sans">
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
         <div className="flex items-center gap-3">
@@ -203,15 +205,15 @@ export default function AnacletoProApp({
         <div className="p-6 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
           {/* Brand Logo & Title */}
           <div className="flex items-center gap-3.5 pb-6 border-b border-slate-800/80">
-            <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-11 h-11 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
+            <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-16 h-16 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
               <div className="w-full h-full bg-[#0b0e17] rounded-[14px] flex items-center justify-center overflow-hidden">
-                {customLogo ? <img src={customLogo} alt="Logotipo personalizado" className="h-full w-full object-contain" /> : <span className="text-base font-black text-amber-400">A</span>}
+                {customLogo ? <img src={customLogo} alt="Logotipo personalizado" className="h-full w-full object-contain" /> : <img src={logoImg} alt="Anacleto" className="h-full w-full object-contain" />}
               </div><span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/60 text-[9px] font-bold text-white">ALTERAR</span>
             </button>
             <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" aria-label="Enviar logotipo" />
             <div>
               <div className="flex items-center gap-1.5">
-                <h1 className="text-base font-black tracking-[0.2em] text-white uppercase">ANACLETO</h1>
+                <h1 className="text-base font-black tracking-[0.2em] text-slate-900 dark:text-white uppercase">ANACLETO</h1>
                 <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 font-black text-[9px] rounded-md tracking-wider">
                   PRO
                 </span>
@@ -340,7 +342,7 @@ export default function AnacletoProApp({
 
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto rounded-[28px]">
           {activeTab === "dashboard" && (
             <DashboardOverview
               quotes={quotes}
@@ -389,6 +391,7 @@ export default function AnacletoProApp({
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
         {activeTab === "finance" && (<FinanceModule language={language} />)}
+        {activeTab === "payroll" && (<PayrollModule />)}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentRole={userRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI />)}
