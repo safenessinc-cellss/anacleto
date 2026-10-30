@@ -47,7 +47,8 @@ export default function AnacletoProApp({
 }: AnacletoProAppProps) {
   const roleConfig = getRoleConfig(userRole);
   const [activeTab, setActiveTab] = useState<NavigationTab>("dashboard");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);\n  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [customLogo, setCustomLogo] = useState<string>(() => { try { return localStorage.getItem("anacleto_custom_logo") || ""; } catch { return ""; } });
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; if (!file.type.startsWith("image/")) { window.alert("Selecione um arquivo de imagem."); return; } if (file.size > 2 * 1024 * 1024) { window.alert("A imagem deve ter no máximo 2 MB."); return; } const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ""); setCustomLogo(value); try { localStorage.setItem("anacleto_custom_logo", value); } catch { window.alert("Imagem grande demais para salvar neste navegador."); } }; reader.readAsDataURL(file); event.target.value = ""; };
@@ -164,7 +165,12 @@ export default function AnacletoProApp({
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
   ];
   const visibleGestaoItems = gestaoItems.filter((item) => item.id !== "payroll" || hasAccessToTab(userRole, "payroll"));
-  const utilityItems = [\n    { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },\n    { id: "tipologias" as NavigationTab, label: "Tipologias", icon: Package, badge: null },\n    { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },\n    { id: "profile" as NavigationTab, label: "Meu Perfil", icon: Building, badge: null },\n    { id: "suggestions" as NavigationTab, label: "Sugestões", icon: Sparkles, badge: null },
+  const utilityItems = [
+    { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
+    { id: "tipologias" as NavigationTab, label: "Tipologias", icon: Package, badge: null },
+    { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },
+    { id: "profile" as NavigationTab, label: "Meu Perfil", icon: Building, badge: null },
+    { id: "suggestions" as NavigationTab, label: "Sugestões", icon: Sparkles, badge: null },
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
     { id: "financial_ai" as NavigationTab, label: "IA Financeira", icon: Sparkles, badge: "NOVO" },
@@ -204,7 +210,8 @@ export default function AnacletoProApp({
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        <div className="p-4 space-y-6 flex-1 overflow-y-auto custom-scrollbar">\n          <div className="hidden lg:flex justify-end"><button onClick={() => setSidebarCollapsed(v => !v)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-blue-50" title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}><Menu className="h-4 w-4"/></button></div>
+        <div className="p-4 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
+          <div className="hidden lg:flex justify-end"><button onClick={() => setSidebarCollapsed(v => !v)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-blue-50" title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}><Menu className="h-4 w-4"/></button></div>
           {/* Brand Logo & Title */}
           <div className={`flex items-center gap-3.5 pb-6 border-b border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
             <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-16 h-16 shrink-0 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-500 via-red-500 to-yellow-400 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
@@ -345,7 +352,12 @@ export default function AnacletoProApp({
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-50 dark:bg-[#101827]">
         <div className="max-w-7xl mx-auto rounded-[28px]">
-          {activeTab === "reports" && <BusinessWorkspace kind="reports" quotes={quotes} invoices={invoices} />}\n          {activeTab === "tipologias" && <BusinessWorkspace kind="tipologias" />}\n          {activeTab === "projects" && <BusinessWorkspace kind="projects" />}\n          {activeTab === "profile" && <BusinessWorkspace kind="profile" />}\n          {activeTab === "suggestions" && <BusinessWorkspace kind="suggestions" />}\n          {activeTab === "dashboard" && (
+          {activeTab === "reports" && <BusinessWorkspace kind="reports" quotes={quotes} invoices={invoices} />}
+          {activeTab === "tipologias" && <BusinessWorkspace kind="tipologias" />}
+          {activeTab === "projects" && <BusinessWorkspace kind="projects" />}
+          {activeTab === "profile" && <BusinessWorkspace kind="profile" />}
+          {activeTab === "suggestions" && <BusinessWorkspace kind="suggestions" />}
+          {activeTab === "dashboard" && (
             <DashboardOverview
               quotes={quotes}
               invoices={invoices}
