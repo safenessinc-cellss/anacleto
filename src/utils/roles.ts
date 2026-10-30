@@ -24,7 +24,12 @@ export type NavigationTab =
   | "admin"
   | "settings"
   | "theme"
-  | "payroll";
+  | "payroll"
+  | "reports"
+  | "tipologias"
+  | "projects"
+  | "profile"
+  | "suggestions";
 
 export interface RoleConfig {
   id: Role;
@@ -40,7 +45,7 @@ export interface RoleConfig {
 
 const ALL_TABS: NavigationTab[] = [
   "dashboard", "crm", "quotes", "invoices", "technical_drawing",
-  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme",
+  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions",
 ];
 
 export const ROLES: Record<Role, RoleConfig> = {
@@ -95,7 +100,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 40,
     color: "bg-blue-100 text-blue-800 border-blue-300",
     description: "Supervisa equipos. Acceso a todos los módulos operativos y finanzas.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "theme", "payroll"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "theme", "payroll", "reports", "tipologias", "projects", "profile", "suggestions"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
@@ -106,7 +111,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 20,
     color: "bg-emerald-100 text-emerald-800 border-emerald-300",
     description: "Empleado. Crea presupuestos, facturas, dibujos y gestiona catálogo. Sin finanzas.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
@@ -117,7 +122,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 10,
     color: "bg-slate-100 text-slate-700 border-slate-300",
     description: "Acceso básico de solo lectura a dashboard, CRM, presupuestos y agenda.",
-    tabs: ["dashboard", "crm", "quotes", "agenda", "theme"],
+    tabs: ["dashboard", "crm", "quotes", "agenda", "theme", "profile", "suggestions"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
