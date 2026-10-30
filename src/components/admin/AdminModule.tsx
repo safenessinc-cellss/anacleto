@@ -17,6 +17,7 @@ interface AdminUser {
   id: string;
   email: string;
   role: Perfile;
+  permissions?: string[];
   addedBy?: string;
   addedAt?: string;
 }
