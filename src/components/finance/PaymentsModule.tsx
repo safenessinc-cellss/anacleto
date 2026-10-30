@@ -86,7 +86,7 @@ export default function PaymentsModule() {
     e.preventDefault(); setConfigSaving(true);
     try {
       await setDoc(doc(db, "company_payment_settings", "default"), {
-        pixKey: pixKey.trim(), pixKeyType, accountHolder: accountHolder.trim(), companyCnpj: companyCnpj.replace(/\\D/g, ""), updatedAt: new Date().toISOString(),
+        pixKey: pixKey.trim(), pixKeyType, accountHolder: accountHolder.trim(), companyCnpj: companyCnpj.replace(/\D/g, ""), updatedAt: new Date().toISOString(),
       }, { merge: true });
       alert("Configuração da empresa salva. A credencial privada do Mercado Pago será adicionada no ambiente seguro do servidor.");
     } catch (error) { alert("Erro ao salvar configuração: " + (error as Error).message); }
