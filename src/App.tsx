@@ -150,6 +150,13 @@ export default function App() {
       // Coincide con admins/{email} y evita consultas que las reglas no pueden validar.
       try {
         const email = (firebaseUser.email || "").trim().toLowerCase();
+        // La identidad verificada del propietario prevalece sobre la colección admins.
+        // El dueño siempre entra como Super Admin, aunque falte su documento en Firestore.
+        if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
+          setUserRole("super_admin");
+          setAdminStatus("authorized");
+          return;
+        }
         const adminSnap = await getDoc(doc(db, "admins", email));
         if (adminSnap.exists()) {
           const data = adminSnap.data();
