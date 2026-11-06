@@ -19,7 +19,7 @@ service firebase.storage {
     }
     function canManageFinance() {
       return owner() || (hasAdminRecord()
-        && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','financeiro']);
+        && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','financeiro','estoque','producao']);
     }
     match /purchases/{purchasePath=**} {
       allow read: if canManageFinance();
