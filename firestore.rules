@@ -83,6 +83,7 @@ service cloud.firestore {
     match /receivables/{id} { allow read, write: if canManageFinance(); }
     match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
     match /payments/{id} { allow read, write: if canManageFinance(); }
+    match /expenses/{id} { allow read, write: if canManageFinance(); }
     match /company_payment_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']); }
 
     // Proteção e segurança: ocorrências, inspeções e ações preventivas restritas à equipe autorizada.\n    match /protection_records/{id} { allow read, write: if canManageQuality(); }\n\n    // Pessoas e folha salarial: confidencialidade reforçada.
