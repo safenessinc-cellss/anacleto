@@ -168,6 +168,7 @@ export default function DeliveryModule() {
         createdAt: stamp, notes: notes.trim()
       };
       const postSaleRef = doc(collection(db, "post_sale_records"));
+      const deliveryEvidence = { deliveryId: deliveryRef.id, deliveryStatus: "Entregue", deliveredAt: stamp, photos: uploadedPhotos, signatureUrl, signaturePath, signedBy: signedBy.trim(), signedAt: stamp, latitude: location.latitude, longitude: location.longitude, locationAt: location.capturedAt, operatorName };
       const batch = writeBatch(db);
       batch.set(deliveryRef, delivery);
       batch.set(postSaleRef, {
@@ -181,8 +182,8 @@ export default function DeliveryModule() {
         photos: uploadedPhotos, latitude: location.latitude, longitude: location.longitude,
         locationAt: location.capturedAt, operatorName, createdAt: stamp
       });
-      batch.update(doc(db, "quotes", selectedQuote.id), { deliveryId: deliveryRef.id, deliveryStatus: "Entregue", deliveredAt: stamp });
-      if (selectedInvoice) batch.update(doc(db, "invoices", selectedInvoice.id), { deliveryId: deliveryRef.id, deliveryStatus: "Entregue", deliveredAt: stamp });
+      batch.update(doc(db, "quotes", selectedQuote.id), { ...deliveryEvidence, deliveryEvidence });
+      if (selectedInvoice) batch.update(doc(db, "invoices", selectedInvoice.id), { ...deliveryEvidence, deliveryEvidence });
       await batch.commit();
       resetForm();
     } catch (error) {
