@@ -69,7 +69,8 @@ service cloud.firestore {
         && request.resource.data.name is string && request.resource.data.name.size() <= 120
         && request.resource.data.phone is string && request.resource.data.phone.size() <= 30
         && request.resource.data.service is string && request.resource.data.service.size() <= 300;
-      allow read: if canOperate();\n      allow update, delete: if canManageCommercial();
+      allow read: if canOperate();
+      allow update, delete: if canManageCommercial();
     }
     match /agenda_slots/{id} { allow read: if canOperate(); allow create, update, delete: if canManageCommercial(); }
 
