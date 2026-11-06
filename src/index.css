@@ -427,3 +427,52 @@ html.dark {
 html.dark main .rounded-2xl.border, html.dark main .rounded-3xl.border, html.dark main .rounded-xl.border {
   border-color: var(--anacleto-border);
 }
+
+
+/* ANACLETO — Design System unificado inspirado no macOS Tahoe */
+:root {
+  --app-bg: #f4f6fa;
+  --surface: rgba(255,255,255,.88);
+  --surface-solid: #ffffff;
+  --ink: #172033;
+  --muted: #687386;
+  --line: rgba(113,128,150,.20);
+  --accent: #3478f6;
+  --accent-soft: #eaf1ff;
+  --radius-card: 22px;
+  --shadow-soft: 0 8px 28px rgba(30,45,75,.055), 0 1px 2px rgba(30,45,75,.04);
+}
+html:not(.dark) body, html:not(.dark) #root { background:var(--app-bg)!important; color:var(--ink); }
+html:not(.dark) body { font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",sans-serif!important; letter-spacing:-.012em; }
+html:not(.dark) aside { background:rgba(250,251,253,.94)!important; backdrop-filter:blur(24px); border-color:var(--line)!important; }
+main { background:var(--app-bg)!important; }
+.tahoe-module { color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",sans-serif; }
+.tahoe-eyebrow { color:#758198; font-size:10px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; margin-bottom:7px; }
+.tahoe-heading { color:#172033; font-size:clamp(25px,3vw,32px); line-height:1.12; letter-spacing:-.045em; font-weight:750; }
+.tahoe-subtitle { color:#758198; font-size:13px; margin-top:7px; line-height:1.55; }
+.tahoe-card { background:var(--surface)!important; border:1px solid var(--line)!important; border-radius:var(--radius-card)!important; padding:18px!important; box-shadow:var(--shadow-soft); backdrop-filter:blur(18px); min-width:0; }
+.tahoe-label { display:block; color:#7b8799; font-size:10px; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+.tahoe-kpi { display:block; color:#18243a; font-size:clamp(23px,3vw,29px); font-weight:760; letter-spacing:-.045em; margin-top:8px; }
+.tahoe-primary,.tahoe-secondary { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; padding:9px 15px; border-radius:13px; font-size:12px; font-weight:700; transition:all .18s ease; }
+.tahoe-primary { background:#3478f6; color:white; box-shadow:0 4px 12px rgba(52,120,246,.18); }
+.tahoe-primary:hover { background:#2468e8; transform:translateY(-1px); }
+.tahoe-primary:disabled { opacity:.55; cursor:not-allowed; }
+.tahoe-secondary { background:#eef2f8; color:#344054; border:1px solid var(--line); }
+.tahoe-field { display:flex; flex-direction:column; gap:6px; color:#687386; font-size:11px; font-weight:700; }
+.tahoe-field input,.tahoe-field select,.tahoe-field textarea,.tahoe-search { width:100%; min-width:0; border:1px solid rgba(113,128,150,.24)!important; border-radius:11px!important; background:rgba(255,255,255,.88)!important; color:#172033!important; padding:10px 12px!important; font-size:13px!important; outline:none; }
+.tahoe-field input:focus,.tahoe-field select:focus,.tahoe-field textarea:focus,.tahoe-search:focus { border-color:#6b9df8!important; box-shadow:0 0 0 3px rgba(52,120,246,.12); }
+.tahoe-search { width:min(100%,330px); padding-left:38px!important; }
+.tahoe-icon { width:38px; height:38px; flex:0 0 auto; display:grid; place-items:center; border-radius:13px; background:#edf3ff; color:#3478f6; }
+.tahoe-status { display:inline-flex; align-items:center; border-radius:999px; background:#eef2f7; color:#536176; padding:5px 9px; font-size:10px; font-weight:750; white-space:nowrap; }
+.tahoe-status.is-warning { background:#fff2df; color:#a85b12; }
+.tahoe-alert { border:1px solid #f4c8c8; background:#fff2f2; color:#9e3030; padding:11px 13px; border-radius:13px; font-size:12px; }
+.tahoe-module table { width:100%; border-collapse:separate; border-spacing:0; }
+.tahoe-module th { color:#7a8698; font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.07em; }
+.tahoe-module td,.tahoe-module th { padding:11px 12px; border-bottom:1px solid rgba(113,128,150,.13); }
+.tahoe-module button:focus-visible,.tahoe-module input:focus-visible,.tahoe-module select:focus-visible,.tahoe-module textarea:focus-visible { outline:3px solid rgba(52,120,246,.22); outline-offset:2px; }
+@media(max-width:640px){ .tahoe-card{padding:14px!important;border-radius:17px!important}.tahoe-module .overflow-x-auto{max-width:100%}.tahoe-primary,.tahoe-secondary{min-height:42px} }
+html.dark .tahoe-module { color:#e6eaf2; }
+html.dark .tahoe-heading,html.dark .tahoe-kpi { color:#f4f6fb; }
+html.dark .tahoe-card { background:rgba(27,35,49,.88)!important; border-color:rgba(148,163,184,.16)!important; }
+html.dark .tahoe-field input,html.dark .tahoe-field select,html.dark .tahoe-field textarea,html.dark .tahoe-search { background:#172033!important; color:#f4f6fb!important; border-color:rgba(148,163,184,.22)!important; }
+html.dark .tahoe-secondary { background:#263247; color:#e6eaf2; }
