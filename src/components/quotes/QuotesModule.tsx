@@ -27,7 +27,7 @@ import {
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "../../firebase";
+import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
@@ -375,9 +375,11 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     setAiChatHistory(newHistory);
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Entre na sua conta para usar o assistente de orçamentos.");
       const res = await fetch("/api/ai/quote-agent", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           message: userText,
           currentQuote: selectedQuote,
