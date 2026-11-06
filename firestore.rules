@@ -1,56 +1,106 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Bloqueio de segurança: esta conta foi revogada. A negação é aplicada
-    // também às regras genéricas abaixo, sem tocar nos dados comerciais.
-    // El acceso se controla por el documento admins y su rol; la cuenta antigua
-    // no recibe privilegios por autenticarse, solo por aprobación explícita.
     function signedIn() { return request.auth != null; }
-    function isOwner() { return signedIn() && request.auth.token.email == 'safeness.c.a@gmail.com'; }
-    function adminRecord() {
-      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
+    function owner() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'safeness.c.a@gmail.com';
     }
-    function adminData() {
-      return get(/databases/$(database)/documents/admins/$(request.auth.token.email.lower())).data;
+    function adminPath() {
+      return /databases/$(database)/documents/admins/$(request.auth.token.email.lower());
+    }
+    function hasAdminRecord() {
+      return signedIn() && request.auth.token.email != null && exists(adminPath());
+    }
+    function role() {
+      return hasAdminRecord() ? get(adminPath()).data.role : 'usuario';
     }
     function hasRole(roles) {
-      return isOwner() || (adminRecord() && adminData().role in roles);
+      return owner() || (hasAdminRecord() && role() in roles);
     }
+    function canOperate() {
+      return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','colaborador','usuario']);
+    }
+    function canManageCommercial() {
+      return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','colaborador']);
+    }
+    function canManageFinance() {
+      return hasRole(['super_admin','super_usuario','ceo','admin','financeiro']);
+    }
+    function canManageQuality() {
+      return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']);
+    }
+
     match /admins/{email} {
-      allow read: if signedIn() && (request.auth.token.email.lower() == email || isOwner());
-      allow create, update, delete: if isOwner();
+      allow read: if signedIn() && (request.auth.token.email.lower() == email || owner());
+      allow create, update, delete: if owner();
     }
-    match /employees/{id} {
-      allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor','rh','financeiro']);
-    }
-    match /time_entries/{id} {
-      allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor','rh','financeiro']);
-    }
-    match /payroll_settings/{id} {
-      allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']);
-    }
-    match /payroll_runs/{id} {
-      allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']);
-    }
-    // La cuenta anterior puede solicitar un alta nueva, pero no acceder a datos del negocio.
     match /pending_users/{uid} {
-      allow create, update: if request.auth != null
-        && request.auth.uid == uid
-        && request.auth.token.email != null
-        && request.auth.token.email.lower() == 'anacletoesquadrias@gmail.com';
-      allow read: if request.auth != null
-        && request.auth.uid == uid
-        && request.auth.token.email != null
-        && request.auth.token.email.lower() == 'anacletoesquadrias@gmail.com';
-      allow delete: if isOwner();
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow read: if (signedIn() && request.auth.uid == uid) || owner();
+      allow delete: if owner();
     }
+
+    // Comercial: clientes, propostas, faturação e catálogo.
+    match /companies/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /companies_crm/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /budgets/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /quotes/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /ledger_entries/{id} { allow read, write: if canManageFinance(); }
+    match /user_profiles/{uid} { allow read, write: if signedIn() && (request.auth.uid == uid || owner()); }
+    match /tipologias/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /projects/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /user_suggestions/{id} { allow read: if canOperate(); allow create: if canOperate(); allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /invoices/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /catalog/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /supplier_catalog/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /registry_items/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /registry_products/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /registry_services/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /payment_methods/{id} { allow read: if canOperate(); allow create, update, delete: if canManageFinance(); }
+    match /measurement_sheets/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /contracts/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /cut_plans/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /profile_optimization/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /material_lists/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /technical_drawings/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+
+    // Agenda pública: visitantes podem solicitar uma visita; só a equipa consulta e gere.
+    match /visits/{id} {
+      allow create: if request.resource.data.keys().hasAll(['name','phone','service','address','preferDate','preferTime'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 120
+        && request.resource.data.phone is string && request.resource.data.phone.size() <= 30
+        && request.resource.data.service is string && request.resource.data.service.size() <= 300;
+      allow read: if canOperate();
+      allow update, delete: if canManageCommercial();
+    }
+    match /agenda_slots/{id} { allow read: if canOperate(); allow create, update, delete: if canManageCommercial(); }
+
+    // Financeiro: acesso restrito a perfis financeiros e direção.
+    match /suppliers/{id} { allow read, write: if canManageFinance(); }
+    match /payables/{id} { allow read, write: if canManageFinance(); }
+    match /receivables/{id} { allow read, write: if canManageFinance(); }
+    match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
+    match /payments/{id} { allow read, write: if canManageFinance(); }
+    match /company_payment_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+
+    // Pessoas e folha salarial: confidencialidade reforçada.
+    match /employees/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']); }
+    match /time_entries/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','supervisor']); }
+    match /payroll_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']); }
+    match /payroll_runs/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']); }
+
+    // Qualidade e pós-venda: registos operacionais e rastreabilidade.
+    match /post_sale_records/{id} { allow read, write: if canManageQuality(); }
     match /audit_logs/{id} {
       allow read: if hasRole(['super_admin','super_usuario','ceo','admin']);
       allow create: if signedIn();
-      allow update, delete: if isOwner();
+      allow update, delete: if owner();
     }
-    match /{document=**} {
-      allow read, write: if signedIn();
-    }
+    match /sender_config/{id} { allow read: if canOperate(); allow create, update: if hasRole(['super_admin','super_usuario','ceo','admin']); allow delete: if owner(); }
+
+    // Negação por padrão: nenhuma coleção não declarada fica acessível por estar autenticado.
+    match /{document=**} { allow read, write: if false; }
   }
 }

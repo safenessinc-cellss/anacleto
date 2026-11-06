@@ -61,7 +61,7 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
     } finally { setSaving(false); }
   };
 
-  const importServicesCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const importRegistryCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -71,11 +71,11 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
+        const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const imported = results.data.map((raw) => {
           const row: Record<string, string> = {};
           Object.entries(raw).forEach(([key, value]) => { row[normalize(key)] = String(value ?? "").trim(); });
-          const priceText = (row.preco || row.valor || row.price || "0").replace(/R\\$\\s?/gi, "").replace(/\\./g, "").replace(",", ".");
+          const priceText = (row.preco || row.valor || row.price || "0").replace(/R\$\s?/gi, "").replace(/\./g, "").replace(",", ".");
           return {
             name: row.nome || row.descricao || row.servico || row.name || row.description || "",
             code: row.codigo || row.cod || row.code || row.sku || "",
@@ -94,14 +94,14 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
           return;
         }
         if (imported.length === 0) {
-          setError("Nenhum serviço válido encontrado. O arquivo precisa ter uma coluna Nome, Serviço ou Descrição.");
+          setError("Nenhum registo válido encontrado. O CSV precisa ter uma coluna Nome, Produto, Item, Serviço ou Descrição.");
           setSaving(false);
           return;
         }
         try {
           for (const item of imported) await addDoc(collection(db, meta.collection), item);
           setError("");
-          window.alert(`${imported.length} serviço(s) importado(s) com sucesso.`);
+          window.alert(`${imported.length} registo(s) importado(s) com sucesso.`);
         } catch (e) {
           setError(e instanceof Error ? e.message : "Falha ao importar serviços. Verifique as permissões do Firestore.");
         } finally {
@@ -124,7 +124,7 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
   return <section className="space-y-6 text-slate-900 dark:text-slate-100">
     <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">ANACLETO ESQUADRIAS</p><h2 className="mt-1 text-2xl font-black">{meta.title}</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{meta.subtitle}</p></div>
-      <div className="flex flex-wrap gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar..." className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900"/></div>{kind === "services" && <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700"><FileUp className="h-4 w-4"/>{saving ? "Importando..." : "Importar lista CSV"}<input type="file" accept=".csv,text/csv" onChange={importServicesCSV} disabled={saving} className="hidden"/></label>}<button onClick={reset} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white"><Plus className="h-4 w-4"/> Novo</button></div>
+      <div className="flex flex-wrap gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar..." className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-900"/></div><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700"><FileUp className="h-4 w-4"/>{saving ? "Importando..." : "Importar CSV"}<input type="file" accept=".csv,text/csv" onChange={importRegistryCSV} disabled={saving} className="hidden"/></label><button onClick={reset} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-bold text-white"><Plus className="h-4 w-4"/> Novo</button></div>
     </header>
     {error && <div role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
     {!authReady && <p className="rounded-lg bg-slate-100 p-3 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">Aguardando autenticação para carregar os dados.</p>}

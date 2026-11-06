@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../../firebase";
+import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Award, ClipboardCheck, MessageSquareHeart, Plus, Search, Trash2, Wrench, X } from "lucide-react";
 
 type Kind = "quality_certificate" | "satisfaction" | "service";
-type Entry = { id: string; kind: Kind; customer: string; orderNumber: string; product: string; title: string; status: string; rating?: number; notes: string; serialNumber?: string; inspection?: string; createdAt: string };
-const labels: Record<Kind, string> = { quality_certificate: "Certificado de qualidade", satisfaction: "Satisfação do cliente", service: "Atendimento e assistência" };
+type Entry = { id: string; kind: Kind; customer: string; orderNumber: string; product: string; title: string; status: string; rating?: number; installationRating?: number; recommendation?: number; serviceType?: string; priority?: string; technician?: string; resolution?: string; notes: string; serialNumber?: string; inspection?: string; createdAt: string };
+const labels: Record<Kind, string> = { quality_certificate: "Certificado de qualidade", satisfaction: "Pesquisa de satisfação", service: "Assistência técnica" };
+const escapeHtml = (value: unknown) => String(value ?? "—").replace(/[&<>"']/g, (char) => { if (char === "&") return "&amp;"; if (char === "<") return "&lt;"; if (char === ">") return "&gt;"; if (char === '"') return "&quot;"; return "&#39;"; });
 
 export default function PostSaleModule() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -21,6 +23,12 @@ export default function PostSaleModule() {
   const [rating, setRating] = useState(5);
   const [serialNumber, setSerialNumber] = useState("");
   const [inspection, setInspection] = useState("Aprovado");
+  const [installationRating, setInstallationRating] = useState(5);
+  const [recommendation, setRecommendation] = useState(10);
+  const [serviceType, setServiceType] = useState("Ajuste / regulagem");
+  const [priority, setPriority] = useState("Normal");
+  const [technician, setTechnician] = useState("");
+  const [resolution, setResolution] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -28,13 +36,13 @@ export default function PostSaleModule() {
   const visible = useMemo(() => entries.filter(e => (filter === "all" || e.kind === filter) && [e.customer, e.orderNumber, e.product, e.title].join(" ").toLowerCase().includes(search.toLowerCase())), [entries, filter, search]);
   const ratings = entries.filter(e => e.kind === "satisfaction" && e.rating);
   const average = ratings.length ? (ratings.reduce((sum, e) => sum + (e.rating || 0), 0) / ratings.length).toFixed(1) : "—";
-  const reset = () => { setOpen(false); setCustomer(""); setOrderNumber(""); setProduct(""); setTitle(""); setStatus("Em andamento"); setRating(5); setSerialNumber(""); setInspection("Aprovado"); setNotes(""); };
+  const reset = () => { setOpen(false); setCustomer(""); setOrderNumber(""); setProduct(""); setTitle(""); setStatus("Em andamento"); setRating(5); setSerialNumber(""); setInspection("Aprovado"); setInstallationRating(5); setRecommendation(10); setServiceType("Ajuste / regulagem"); setPriority("Normal"); setTechnician(""); setResolution(""); setNotes(""); };
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!customer.trim() || !title.trim()) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, "post_sale_records"), { kind, customer: customer.trim(), orderNumber: orderNumber.trim(), product: product.trim(), title: title.trim(), status, rating: kind === "satisfaction" ? rating : null, serialNumber: kind === "quality_certificate" ? serialNumber.trim() : "", inspection: kind === "quality_certificate" ? inspection : "", notes: notes.trim(), createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "post_sale_records"), { kind, customer: customer.trim(), orderNumber: orderNumber.trim(), product: product.trim(), title: title.trim(), status, rating: kind === "satisfaction" ? rating : null, serialNumber: kind === "quality_certificate" ? serialNumber.trim() : "", installationRating: kind === "satisfaction" ? installationRating : null, recommendation: kind === "satisfaction" ? recommendation : null, serviceType: kind === "service" ? serviceType : "", priority: kind === "service" ? priority : "", technician: kind === "service" ? technician.trim() : "", resolution: kind === "service" ? resolution.trim() : "", inspection: kind === "quality_certificate" ? inspection : "", notes: notes.trim(), createdAt: new Date().toISOString() });
       reset();
     } catch (error) { console.error(error); window.alert("Não foi possível salvar. Verifique as permissões do Firestore."); }
     finally { setSaving(false); }
@@ -47,7 +55,28 @@ export default function PostSaleModule() {
   const printCertificate = (entry: Entry) => {
     const popup = window.open("", "_blank");
     if (!popup) { window.alert("Permita a abertura de janelas para imprimir."); return; }
-    popup.document.write("<html lang='pt-BR'><head><meta charset='utf-8'><title>Certificado de Qualidade</title><style>body{font-family:Arial;padding:48px;color:#172033}header{border-bottom:4px solid #d6b45c;padding-bottom:18px}.box{border:1px solid #cbd5e1;border-radius:12px;padding:24px;margin-top:28px}footer{margin-top:70px;border-top:1px solid #cbd5e1;padding-top:20px}</style></head><body><header><b>ANACLETO ESQUADRIAS</b><h1>CERTIFICADO DE QUALIDADE DO PRODUTO</h1><p>Registro de inspeção e conformidade</p></header><div class='box'><p><b>Cliente:</b> " + entry.customer + "</p><p><b>Pedido:</b> " + entry.orderNumber + "</p><p><b>Produto:</b> " + (entry.product || entry.title) + "</p><p><b>Identificação:</b> " + (entry.serialNumber || "—") + "</p><p><b>Inspeção:</b> " + (entry.inspection || "—") + "</p><p><b>Observações:</b> " + (entry.notes || "—") + "</p><p><b>Data:</b> " + new Date(entry.createdAt).toLocaleDateString("pt-BR") + "</p></div><footer>Responsável técnico: ____________________ Assinatura: ____________________</footer><script>window.onload=function(){window.print()}</script></body></html>");
+    const value = (input: unknown) => escapeHtml(input);
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Certificado de Qualidade</title><style>
+      *{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:36px;color:#172033;max-width:900px;margin:auto}
+      header{display:flex;align-items:center;gap:18px;border-bottom:3px solid #c6a45c;padding-bottom:18px}
+      header img{width:116px;height:64px;object-fit:contain}h1{font-size:22px;margin:4px 0}p{line-height:1.55}
+      .eyebrow{font-size:10px;letter-spacing:2px;color:#64748b;font-weight:700}.box{border:1px solid #cbd5e1;border-radius:12px;padding:22px;margin-top:26px}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px}.field{padding:8px 0;border-bottom:1px solid #e2e8f0}
+      footer{margin-top:62px;border-top:1px solid #cbd5e1;padding-top:18px;font-size:12px}
+      @media print{body{padding:12mm}button{display:none}}
+    </style></head><body>
+      <header><img src="${logoImg}" alt="Anacleto Esquadrias"><div><div class="eyebrow">ANACLETO ESQUADRIAS · QUALIDADE</div><h1>CERTIFICADO DE QUALIDADE DO PRODUTO</h1><p>Registro de inspeção e conformidade</p></div></header>
+      <section class="box"><div class="grid">
+        <div class="field"><b>Cliente</b><br>${value(entry.customer)}</div>
+        <div class="field"><b>Pedido / orçamento</b><br>${value(entry.orderNumber)}</div>
+        <div class="field"><b>Produto</b><br>${value(entry.product || entry.title)}</div>
+        <div class="field"><b>Identificação / série</b><br>${value(entry.serialNumber)}</div>
+        <div class="field"><b>Resultado da inspeção</b><br>${value(entry.inspection)}</div>
+        <div class="field"><b>Data</b><br>${value(new Date(entry.createdAt).toLocaleDateString("pt-BR"))}</div>
+      </div><p><b>Observações:</b><br>${value(entry.notes)}</p></section>
+      <footer><b>Responsável técnico:</b> ________________________________ &nbsp; <b>Assinatura:</b> ________________________________</footer>
+      <script>window.onload=function(){window.print()}</script></body></html>`);
     popup.document.close();
   };
 
@@ -67,7 +96,17 @@ export default function PostSaleModule() {
       <label className="block text-xs font-bold">Tipo de registro<select value={kind} onChange={e=>setKind(e.target.value as Kind)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="quality_certificate">Certificado de qualidade</option><option value="satisfaction">Pesquisa de satisfação</option><option value="service">Atendimento / assistência técnica</option></select></label>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{[{label:"Cliente *",value:customer,set:setCustomer,required:true},{label:"Orçamento / pedido",value:orderNumber,set:setOrderNumber},{label:"Produto / serviço",value:product,set:setProduct},{label:"Título do registro *",value:title,set:setTitle,required:true}].map(field=><label key={field.label} className="text-xs font-bold">{field.label}<input required={!!field.required} value={field.value} onChange={e=>field.set(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label>)}
       {kind==="quality_certificate"&&<><label className="text-xs font-bold">Número de série / identificação<input value={serialNumber} onChange={e=>setSerialNumber(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label><label className="text-xs font-bold">Resultado da inspeção<select value={inspection} onChange={e=>setInspection(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950"><option>Aprovado</option><option>Aprovado com ressalvas</option><option>Reprovado</option></select></label></>}
-      {kind==="satisfaction"&&<label className="text-xs font-bold">Nota de satisfação<select value={rating} onChange={e=>setRating(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950">{[5,4,3,2,1].map(n=><option key={n} value={n}>{n} / 5</option>)}</select></label>}
+      {kind==="satisfaction"&&<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <label className="text-xs font-bold">Satisfação geral<select value={rating} onChange={e=>setRating(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950">{[5,4,3,2,1].map(n=><option key={n} value={n}>{n} / 5</option>)}</select></label>
+        <label className="text-xs font-bold">Qualidade da instalação<select value={installationRating} onChange={e=>setInstallationRating(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950">{[5,4,3,2,1].map(n=><option key={n} value={n}>{n} / 5</option>)}</select></label>
+        <label className="text-xs font-bold">Recomendaria a empresa?<select value={recommendation} onChange={e=>setRecommendation(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950">{Array.from({length:11},(_,i)=>10-i).map(n=><option key={n} value={n}>{n} / 10</option>)}</select></label>
+      </div>}
+      {kind==="service"&&<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="text-xs font-bold">Tipo de atendimento<select value={serviceType} onChange={e=>setServiceType(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950">{["Instalação","Ajuste / regulagem","Manutenção","Garantia","Reparo","Visita técnica"].map(v=><option key={v}>{v}</option>)}</select></label>
+        <label className="text-xs font-bold">Prioridade<select value={priority} onChange={e=>setPriority(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950">{["Baixa","Normal","Alta","Urgente"].map(v=><option key={v}>{v}</option>)}</select></label>
+        <label className="text-xs font-bold">Técnico responsável<input value={technician} onChange={e=>setTechnician(e.target.value)} placeholder="Nome do responsável" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label>
+        <label className="text-xs font-bold">Solução / providência<input value={resolution} onChange={e=>setResolution(e.target.value)} placeholder="Ação executada ou prevista" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label>
+      </div>}
       <label className="text-xs font-bold">Status<select value={status} onChange={e=>setStatus(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950">{["Em andamento","Concluído","Aguardando cliente","Requer retorno","Não conformidade"].map(s=><option key={s}>{s}</option>)}</select></label></div>
       <label className="block text-xs font-bold">Observações / comentários<textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={4} placeholder="Inspeções, feedback, reclamações, garantia, instalação ou providências..." className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label>
       <div className="flex justify-end gap-2"><button type="button" onClick={reset} className="rounded-xl border px-4 py-2 text-sm font-bold">Cancelar</button><button disabled={saving} className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{saving?"Salvando...":"Salvar registro"}</button></div>

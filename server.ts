@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 // import estático de vite eliminado - se usa import dinámico en desarrollo
 import { generateText, gateway } from "ai";
 import { google } from "googleapis";
+import firebaseConfig from "./firebase-applet-config.json";
 
 // Load .env.local first if available, then fallback to .env
 dotenv.config({ path: ".env.local" });
@@ -13,17 +14,66 @@ dotenv.config();
 // Create Express app and HTTP server
 const app = express();
 const httpServer = http.createServer(app);
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "16mb" }));
 
 const PORT = 3000;
 
 // Vercel AI Gateway supplies authentication in previews and deployments.
 const aiModel = gateway("openai/gpt-4o-mini");
 
+const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
+const ownerEmail = "safeness.c.a@gmail.com";
+
+const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
+  const authorization = req.headers.authorization || "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!token) return res.status(401).json({ error: "Autenticação obrigatória." });
+  if (!firebaseApiKey) return res.status(503).json({ error: "A verificação de autenticação não está configurada no servidor." });
+
+  try {
+    const identityResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: token }),
+    });
+    if (!identityResponse.ok) return res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
+    const identity = await identityResponse.json() as { users?: Array<{ localId?: string; email?: string }> };
+    const user = identity.users?.[0];
+    if (!user?.localId || !user.email) return res.status(401).json({ error: "Conta autenticada inválida." });
+
+    const email = user.email.toLowerCase();
+    if (email === ownerEmail) {
+      res.locals.firebaseUser = { uid: user.localId, email, role: "super_admin" };
+      return next();
+    }
+
+    const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
+    const documentId = encodeURIComponent(email);
+    const roleUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${databaseId}/documents/admins/${documentId}`;
+    const roleResponse = await fetch(roleUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (!roleResponse.ok) return res.status(403).json({ error: "Acesso pendente de aprovação ou perfil não autorizado." });
+    const roleDocument = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
+    const role = roleDocument.fields?.role?.stringValue;
+    if (!role) return res.status(403).json({ error: "Perfil de acesso não encontrado." });
+    res.locals.firebaseUser = { uid: user.localId, email, role };
+    return next();
+  } catch (error) {
+    console.error("Firebase API authentication error:", error);
+    return res.status(503).json({ error: "Não foi possível validar a sessão no momento." });
+  }
+};
+
+const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
+  const user = res.locals.firebaseUser as { role?: string } | undefined;
+  if (user && ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role || "")) return next();
+  return res.status(403).json({ error: "Seu perfil não tem autorização para operações financeiras." });
+};
+
+
 // ----------------------------------------------------
 // 1. General AI Chat Proxy
 // ----------------------------------------------------
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
   try {
     const { message, history, language = "es" } = req.body;
 
@@ -77,7 +127,7 @@ app.post("/api/chat", async (req, res) => {
 // ----------------------------------------------------
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
-app.post("/api/ai/quote-agent", async (req, res) => {
+app.post("/api/ai/quote-agent", requireFirebaseAuth, async (req, res) => {
   try {
     const { message, currentQuote, history = [] } = req.body;
 
@@ -182,7 +232,7 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
 // ----------------------------------------------------
 // 3. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
-app.post("/api/ai/technical-drawing", async (req, res) => {
+app.post("/api/ai/technical-drawing", requireFirebaseAuth, async (req, res) => {
   try {
     const { prompt, currentDrawing, catalog = [] } = req.body;
 
@@ -468,7 +518,7 @@ startServer().catch((err) => {
 
 
 // ============ Google Calendar Endpoint ============
-app.post("/api/create-calendar-event", async (req, res) => {
+app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => {
   try {
     const { name, email, phone, service, address, preferDate, preferTime, notes } = req.body;
     if (!name || !preferDate || !preferTime) {
@@ -523,7 +573,7 @@ app.post("/api/create-calendar-event", async (req, res) => {
 
 
 // ============ FINANCIAL AI: Extraer datos de boleto ============
-app.post("/api/ai/financial-extract", async (req, res) => {
+app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, async (req, res) => {
   try {
     const { data, mimeType } = req.body;
     if (!data) return res.status(400).json({ error: "No data" });
@@ -568,7 +618,7 @@ app.get("/api/payments/config-status", (_req, res) => {
   });
 });
 
-app.post("/api/payments/pix", async (req, res) => {
+app.post("/api/payments/pix", requireFirebaseAuth, requireFinanceRole, async (req, res) => {
   try {
     const token = mercadoPagoToken();
     if (!token) return res.status(503).json({ error: "Integração Mercado Pago não configurada no servidor. Configure MERCADO_PAGO_ACCESS_TOKEN nas variáveis de ambiente do Vercel." });
@@ -617,7 +667,7 @@ app.post("/api/payments/pix", async (req, res) => {
   }
 });
 
-app.post("/api/payments/mercado-pago-link", async (req, res) => {
+app.post("/api/payments/mercado-pago-link", requireFirebaseAuth, requireFinanceRole, async (req, res) => {
   try {
     const token = mercadoPagoToken();
     if (!token) return res.status(503).json({ error: "Integração Mercado Pago não configurada no servidor. Configure MERCADO_PAGO_ACCESS_TOKEN nas variáveis de ambiente do Vercel." });

@@ -32,9 +32,11 @@ export default function FinancialAI() {
         };
         reader.readAsDataURL(file);
       });
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Entre na sua conta para processar documentos financeiros.");
       const res = await fetch("/api/ai/financial-extract", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ fileName: file.name, mimeType: file.type || "application/pdf", data: base64 }),
       });
       const data = await res.json().catch(() => ({}));
@@ -60,8 +62,10 @@ export default function FinancialAI() {
     if (!payerEmail.trim()) { alert("Informe o e-mail do pagador para gerar o PIX."); return; }
     setPixLoading(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Entre na sua conta para gerar cobranças.");
       const res = await fetch("/api/payments/pix", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ amount: Number(result.amount), description: result.description || "Boleto", payerEmail: payerEmail.trim() }),
       });
       const data = await res.json().catch(() => ({}));

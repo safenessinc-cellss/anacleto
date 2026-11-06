@@ -5,13 +5,17 @@ const { google } = require("googleapis");
 admin.initializeApp();
 
 /**
- * Se dispara al crear un documento en la colección "visits".
- * Crea un evento en Google Calendar usando una cuenta de servicio.
+ * Se dispara cuando la equipa confirma uma visita.
+ * Pedidos públicos permanecem pendentes e não criam eventos no calendário.
  */
 exports.createCalendarEvent = functions.firestore
   .document("visits/{visitId}")
-  .onCreate(async (snap, context) => {
-    const visit = snap.data();
+  .onUpdate(async (change, context) => {
+    const previous = change.before.data();
+    const visit = change.after.data();
+    if (previous.status === "confirmed" || visit.status !== "confirmed") {
+      return null;
+    }
     if (!visit.preferDate || !visit.preferTime) {
       console.warn("Visita sin fecha/hora, se omite Calendar:", context.params.visitId);
       return null;
@@ -54,12 +58,12 @@ exports.createCalendarEvent = functions.firestore
       const res = await calendar.events.insert({ calendarId, requestBody: event });
 
       // Guardar el ID del evento en Firestore para futuras actualizaciones
-      await snap.ref.update({ calendarEventId: res.data.id, calendarSyncedAt: new Date().toISOString() });
+      await change.after.ref.update({ calendarEventId: res.data.id, calendarSyncedAt: new Date().toISOString() });
       console.log(`✅ Evento creado en Calendar para visita ${context.params.visitId}:`, res.data.id);
       return null;
     } catch (err) {
       console.error("❌ Error creando evento en Calendar:", err);
-      await snap.ref.update({ calendarSyncError: String(err) });
+      await change.after.ref.update({ calendarSyncError: String(err) });
       return null;
     }
   });

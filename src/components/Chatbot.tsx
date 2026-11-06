@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, X, Bot, User, Sparkles, Calendar, BadgePercent, Shield, TrendingUp, HelpCircle, Sliders } from "lucide-react";
 import { ChatMessage } from "../types";
 import { Translation } from "../translations";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { doc, updateDoc, setDoc, arrayUnion } from "firebase/firestore";
 
 interface ChatbotProps {
@@ -215,9 +215,11 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
 
     try {
       // Call secure server API route (Gemini API server-side bridge)
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Entre na sua conta para usar o assistente.");
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           message: txt,
           language: currentLanguage,
