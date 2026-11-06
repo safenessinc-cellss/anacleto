@@ -18,6 +18,61 @@ export interface PdfDocumentResult {
   sizeKb: number;
 }
 
+
+// Miniatura vetorial isométrica: ilustração comercial do tipo de esquadria descrito.
+const drawQuoteItemMiniature3D = (doc: jsPDF, description: string, x: number, y: number, w: number, h: number) => {
+  const d = (description || "").toLowerCase();
+  const isShower = /box|banheiro|ducha|shower/.test(d);
+  const isDoor = /porta|door/.test(d);
+  const isSliding = /corredi|correr|sliding|2 folhas|duas folhas/.test(d);
+  const isCloset = /arm[aá]rio|closet|roupeiro/.test(d);
+  const pad = 4;
+  const left = x + pad, top = y + 4, frontW = w - 2 * pad - 5, frontH = h - 9, depth = 4;
+  const right = left + frontW, bottom = top + frontH;
+  doc.setLineWidth(0.45);
+  doc.setDrawColor(100, 116, 139);
+  doc.setFillColor(239, 246, 255);
+  if (isShower) {
+    // Duas folhas de vidro em canto, com profundidade lateral.
+    doc.rect(left + 2, top + 2, frontW * 0.58, frontH - 3, "FD");
+    doc.line(left + 2, top + 2, left + frontW * 0.58 + depth, top - 1);
+    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58 + depth, top - 1);
+    doc.line(left + frontW * 0.58 + depth, top - 1, left + frontW * 0.58 + depth, bottom - 3);
+    doc.line(left + 2, bottom - 1, left + frontW * 0.58 + depth, bottom - 1);
+    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58, bottom - 3);
+    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58 + depth, top - 1);
+  } else {
+    // Marco frontal de alumínio com lateral superior/direita em perspectiva.
+    doc.rect(left, top + 2, frontW, frontH - 3, "FD");
+    doc.line(left, top + 2, left + depth, top - 1);
+    doc.line(right, top + 2, right + depth, top - 1);
+    doc.line(left + depth, top - 1, right + depth, top - 1);
+    doc.line(right, top + 2, right + depth, top - 1);
+    doc.line(right + depth, top - 1, right + depth, bottom - 4);
+    doc.line(right, bottom - 1, right + depth, bottom - 4);
+    if (isDoor || isCloset) {
+      doc.line(left + frontW * 0.72, top + 4, left + frontW * 0.72, bottom - 4);
+      doc.setDrawColor(148, 163, 184);
+      doc.line(left + frontW * 0.72 - 2, top + 4, right - 3, bottom - 4);
+      doc.setDrawColor(100, 116, 139);
+    } else if (isSliding) {
+      doc.line(left + frontW / 2, top + 3, left + frontW / 2, bottom - 3);
+      doc.setDrawColor(148, 163, 184);
+      doc.line(left + 3, top + 5, left + frontW / 2 - 2, bottom - 5);
+      doc.line(left + frontW / 2 + 2, top + 5, right - 3, bottom - 5);
+      doc.setDrawColor(100, 116, 139);
+    } else {
+      doc.line(left + frontW / 2, top + 3, left + frontW / 2, bottom - 3);
+      doc.line(left + 3, top + frontH / 2, right - 3, top + frontH / 2);
+    }
+  }
+  // Sombra/base discreta para reforçar a leitura tridimensional.
+  doc.setDrawColor(203, 213, 225);
+  doc.line(left + 1, bottom + 1, right + depth + 2, bottom + 1);
+  doc.setDrawColor(100, 116, 139);
+  doc.setLineWidth(0.2);
+};
+
 export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
@@ -93,6 +148,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   // Table of Items
   const tableData = quote.items.map((item, idx) => [
     idx + 1,
+    "",
     item.description,
     item.quantity,
     formatMoney(item.unitPrice, currency),
@@ -101,24 +157,33 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
 
   autoTable(doc, {
     startY: yPos + 35,
-    head: [["#", "Descripción del Ítem / Servicio", "Cant.", "Precio Unit.", "Subtotal"]],
+    head: [["#", "Vista 3D", "Descripción del Ítem / Servicio", "Cant.", "Precio Unit.", "Subtotal"]],
     body: tableData,
     theme: "striped",
+    didDrawCell: (data: any) => {
+      if (data.section === "body" && data.column.index === 1) {
+        const item = quote.items[data.row.index];
+        drawQuoteItemMiniature3D(doc, item?.description || "", data.cell.x, data.cell.y, data.cell.width, data.cell.height);
+      }
+    },
     headStyles: {
       fillColor: [15, 23, 42],
       textColor: [255, 255, 255],
       fontStyle: "bold",
     },
     columnStyles: {
-      0: { cellWidth: 12, halign: "center" },
-      1: { cellWidth: "auto" },
-      2: { cellWidth: 20, halign: "center" },
-      3: { cellWidth: 32, halign: "right" },
-      4: { cellWidth: 35, halign: "right" },
+      0: { cellWidth: 9, halign: "center" },
+      1: { cellWidth: 29, halign: "center" },
+      2: { cellWidth: "auto" },
+      3: { cellWidth: 15, halign: "center" },
+      4: { cellWidth: 29, halign: "right" },
+      5: { cellWidth: 30, halign: "right" },
     },
     styles: {
-      fontSize: 9,
-      cellPadding: 4,
+      fontSize: 8,
+      cellPadding: 3,
+      minCellHeight: 29,
+      valign: "middle",
     },
   });
 
