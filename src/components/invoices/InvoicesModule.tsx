@@ -110,7 +110,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
         }, { merge: true });
         tx.set(ledgerRef, {
           direction: "inflow", category: "customer_receipt", sourceType: "invoice", sourceId: invoice.id,
-          description: `Recebimento da fatura ${invoice.number}`, amount: Number(invoice.total || 0),
+          description: `Recebimento da fatura ${invoice.number}`, amount: receiptDelta,
           date: new Date().toISOString().slice(0, 10), status: "posted", createdAt: serverTimestamp(),
           createdBy: auth.currentUser?.email || ""
         });
