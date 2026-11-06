@@ -7,7 +7,7 @@ import { Award, ClipboardCheck, MessageSquareHeart, Plus, Search, Trash2, Wrench
 type Kind = "quality_certificate" | "satisfaction" | "service";
 type Entry = { id: string; kind: Kind; customer: string; orderNumber: string; product: string; title: string; status: string; rating?: number; notes: string; serialNumber?: string; inspection?: string; createdAt: string };
 const labels: Record<Kind, string> = { quality_certificate: "Certificado de qualidade", satisfaction: "Pesquisa de satisfação", service: "Assistência técnica" };
-const escapeHtml = (value: unknown) => String(value ?? "—").replace(/[&<>"\']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '" ': "&quot;", "\'": "&#39;" }[char] || char));
+const escapeHtml = (value: unknown) => String(value ?? "—").replace(/[&<>"']/g, (char) => { if (char === "&") return "&amp;"; if (char === "<") return "&lt;"; if (char === ">") return "&gt;"; if (char === '"') return "&quot;"; return "&#39;"; });
 
 export default function PostSaleModule() {
   const [entries, setEntries] = useState<Entry[]>([]);
