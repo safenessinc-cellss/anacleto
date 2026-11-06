@@ -31,7 +31,8 @@ export type NavigationTab =
   | "projects"
   | "profile"
   | "suggestions"
-  | "post_sale";
+  | "post_sale"
+  | "deliveries";
 
 export interface RoleConfig {
   id: Role;
@@ -47,7 +48,7 @@ export interface RoleConfig {
 
 const ALL_TABS: NavigationTab[] = [
   "dashboard", "crm", "quotes", "invoices", "technical_drawing",
-  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale",
+  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries",
 ];
 
 export const ROLES: Record<Role, RoleConfig> = {
@@ -102,7 +103,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 40,
     color: "bg-blue-100 text-blue-800 border-blue-300",
     description: "Supervisa equipos y operaciones. El acceso financiero y de nómina requiere un perfil autorizado.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
@@ -113,7 +114,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 20,
     color: "bg-emerald-100 text-emerald-800 border-emerald-300",
     description: "Empleado. Crea presupuestos, facturas, dibujos y gestiona catálogo. Sin finanzas.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions", "deliveries"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
