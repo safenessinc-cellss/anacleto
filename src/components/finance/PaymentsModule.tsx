@@ -163,9 +163,11 @@ export default function PaymentsModule() {
     if (!payerEmail.trim()) { alert("Informe o e-mail do pagador para gerar o PIX."); return; }
     setGatewayLoading(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Entre na sua conta para gerar cobranças.");
       const res = await fetch("/api/payments/pix", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ payableId: selected.id, amount: selected.amount, description: selected.description, payerName: selected.supplierName, payerEmail: payerEmail.trim() }),
       });
       const data = await res.json();
@@ -182,6 +184,8 @@ export default function PaymentsModule() {
     if (!selected) return;
     setGatewayLoading(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Entre na sua conta para criar links de pagamento.");
       const res = await fetch("/api/payments/mercado-pago-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
