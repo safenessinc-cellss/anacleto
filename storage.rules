@@ -17,6 +17,17 @@ service firebase.storage {
       return owner() || (hasAdminRecord()
         && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','supervisor','colaborador','qualidade']);
     }
+    function canManageFinance() {
+      return owner() || (hasAdminRecord()
+        && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','financeiro']);
+    }
+    match /purchases/{purchasePath=**} {
+      allow read: if canManageFinance();
+      allow create, update: if canManageFinance()
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType == 'application/pdf' || request.resource.contentType.matches('image/(jpeg|png|webp)'));
+      allow delete: if owner();
+    }
     match /deliveries/{deliveryId}/{fileName} {
       allow read: if canManageQuality();
       allow create, update: if canManageQuality()
