@@ -31,6 +31,12 @@ service cloud.firestore {
     function canManageQuality() {
       return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','colaborador','qualidade']);
     }
+    function canManageInventory() {
+      return hasRole(['super_admin','super_usuario','ceo','admin','financeiro','estoque','producao']);
+    }
+    function canManageProduction() {
+      return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','producao']);
+    }
 
     match /admins/{email} {
       allow read: if signedIn() && (request.auth.token.email.lower() == email || owner());
@@ -80,6 +86,9 @@ service cloud.firestore {
     // Financeiro: acesso restrito a perfis financeiros e direção.
     match /suppliers/{id} { allow read, write: if canManageFinance(); }
     match /purchase_orders/{id} { allow read, write: if canManageFinance(); }
+    match /inventory_items/{id} { allow read: if canManageInventory() || canManageProduction(); allow create, update: if canManageInventory(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /inventory_movements/{id} { allow read: if canManageInventory() || canManageProduction(); allow create: if canManageInventory(); allow update, delete: if owner(); }
+    match /production_orders/{id} { allow read: if canManageProduction() || canManageQuality(); allow create, update: if canManageProduction(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /payables/{id} { allow read, write: if canManageFinance(); }
     match /receivables/{id} { allow read, write: if canManageFinance(); }
     match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
@@ -97,7 +106,7 @@ service cloud.firestore {
     match /deliveries/{id} { allow read, write: if canManageQuality(); }
     match /audit_logs/{id} {
       allow read: if hasRole(['super_admin','super_usuario','ceo','admin']);
-      allow create: if signedIn();
+      allow create: if owner() || hasRole(['super_admin','super_usuario','ceo','admin']);
       allow update, delete: if owner();
     }
     match /sender_config/{id} { allow read: if canOperate(); allow create, update: if hasRole(['super_admin','super_usuario','ceo','admin']); allow delete: if owner(); }
