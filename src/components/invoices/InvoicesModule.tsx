@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Invoice, InvoiceStatus, SenderConfig } from "../../types";
 import { exportInvoicePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, addDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -94,9 +94,15 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
         pdfFileSizeKb: pdfRes.sizeKb,
       };
 
+      if (nextStatus === "pago") {
+        const paymentRef = await addDoc(collection(db, "payments"), { direction: "in", type: "invoice", referenceId: invoice.id, description: `Fatura ${invoice.number}`, clientName: invoice.clientName, amount: Number(invoice.total || 0), status: "completed", paidAt: new Date().toISOString(), createdAt: new Date().toISOString() });
+        (updated as any).paymentId = paymentRef.id;
+      } else if ((invoice as any).paymentId) {
+        await updateDoc(doc(db, "payments", (invoice as any).paymentId), { status: "reversed", reversedAt: new Date().toISOString() });
+      }
       await setDoc(doc(db, "invoices", invoice.id), updated);
       setSelectedInvoice(updated);
-      showToast(`Fatura ${invoice.number} marcada como ${nextStatus === "pago" ? "PAGA" : "PENDENTE"} e PDF atualizado.`, "success");
+      showToast(`Fatura ${invoice.number} marcada como ${nextStatus === "pago" ? "PAGA" : "PENDENTE"} e movimento financeiro atualizado.`, "success");
     } catch (err) {
       console.error(err);
       showToast("Erro ao atualizar status.", "error");
@@ -140,7 +146,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
   const totalPending = invoices.filter((i) => i.status === "pendente").reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="tahoe-module space-y-6">
       {/* Top Banner & Financial Metrics */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
         <div className="flex items-center gap-4">
@@ -155,7 +161,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
               <span className="text-[10px] font-mono text-slate-400">Total: {invoices.length} Faturas</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Libro de Faturas Emitidas
+              Faturas emitidas
             </h1>
           </div>
         </div>
