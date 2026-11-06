@@ -5,14 +5,16 @@ import PayablesModule from "./PayablesModule";
 import ReceivablesModule from "./ReceivablesModule";
 import PendingBoletosModule from "./PendingBoletosModule";
 import PaymentsModule from "./PaymentsModule";
+import ExpenseRegistrationModule from "./ExpenseRegistrationModule";
 
-type FinanceTab = "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments";
+type FinanceTab = "payables" | "expenses" | "receivables" | "suppliers" | "pending_boletos" | "payments";
 
 export default function FinanceModule({ language = "pt" }: { language?: string }) {
   const [tab, setTab] = useState<FinanceTab>("payables");
 
   const tabs = [
     { id: "payables" as FinanceTab, label: "Contas a Pagar", icon: TrendingDown },
+    { id: "expenses" as FinanceTab, label: "Registrar Gastos", icon: DollarSign },
     { id: "receivables" as FinanceTab, label: "Contas a Receber", icon: TrendingUp },
     { id: "suppliers" as FinanceTab, label: "Fornecedores", icon: Building2 },
     { id: "pending_boletos" as FinanceTab, label: "Boletos a Revisar", icon: FileText },
@@ -45,6 +47,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
       </div>
 
       {tab === "payables" && <PayablesModule />}
+      {tab === "expenses" && <ExpenseRegistrationModule />}
       {tab === "receivables" && <ReceivablesModule />}
       {tab === "suppliers" && <SuppliersModule />}
       {tab === "pending_boletos" && <PendingBoletosModule />}
