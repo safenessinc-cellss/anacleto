@@ -31,16 +31,24 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.setFillColor(197, 168, 80); // Luxury Gold
   doc.rect(0, 42, pageWidth, 3, "F");
 
+  // Logotipo oficial no cabeçalho e marca d'água suave no corpo do orçamento.
+  if (sender?.logoUrl?.startsWith("data:image/")) {
+    doc.addImage(sender.logoUrl, "PNG", 14, 7, 25, 25);
+  }
+  if (sender?.watermarkLogoUrl?.startsWith("data:image/")) {
+    doc.addImage(sender.watermarkLogoUrl, "PNG", pageWidth / 2 - 65, 72, 130, 130);
+  }
+
   // Brand Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), 14, 20);
+  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), sender?.logoUrl?.startsWith("data:image/") ? 44 : 14, 20);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(197, 168, 80);
-  doc.text("ESQUADRIAS DE ALUMÍNIO & SOLUÇÕES TÉCNICAS", 14, 27);
+  doc.text("ESQUADRIAS DE ALUMÍNIO & SOLUÇÕES TÉCNICAS", sender?.logoUrl?.startsWith("data:image/") ? 44 : 14, 27);
 
   // Document Type & Number
   doc.setFontSize(16);
@@ -164,6 +172,12 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   const technicalDrawing = quote.technicalDrawing;
   if (technicalDrawing || windowItem) {
     doc.addPage();
+    if (sender?.watermarkLogoUrl?.startsWith("data:image/")) {
+      doc.addImage(sender.watermarkLogoUrl, "PNG", pageWidth / 2 - 65, 72, 130, 130);
+    }
+    if (sender?.logoUrl?.startsWith("data:image/")) {
+      doc.addImage(sender.logoUrl, "PNG", 14, 7, 25, 25);
+    }
     const desc = technicalDrawing?.title || windowItem?.description || "Esquadria";
     const dimensions = desc.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
     const unitFactor = technicalDrawing?.unit === "mm" ? 1 : 10;

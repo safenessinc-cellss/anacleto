@@ -187,6 +187,7 @@ export interface SenderConfig {
   city: string;
   country: string;
   logoUrl: string;
+  watermarkLogoUrl?: string;
   bankAccount: string;
   currency: string;
   updatedAt: string;
