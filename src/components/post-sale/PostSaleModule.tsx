@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../../firebase";
+import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Award, ClipboardCheck, MessageSquareHeart, Plus, Search, Trash2, Wrench, X } from "lucide-react";
 
 type Kind = "quality_certificate" | "satisfaction" | "service";
 type Entry = { id: string; kind: Kind; customer: string; orderNumber: string; product: string; title: string; status: string; rating?: number; notes: string; serialNumber?: string; inspection?: string; createdAt: string };
-const labels: Record<Kind, string> = { quality_certificate: "Certificado de qualidade", satisfaction: "Satisfação do cliente", service: "Atendimento e assistência" };
+const labels: Record<Kind, string> = { quality_certificate: "Certificado de qualidade", satisfaction: "Pesquisa de satisfação", service: "Assistência técnica" };
+const escapeHtml = (value: unknown) => String(value ?? "—").replace(/[&<>"\']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '" ': "&quot;", "\'": "&#39;" }[char] || char));
 
 export default function PostSaleModule() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -45,9 +47,30 @@ export default function PostSaleModule() {
     catch (error) { console.error(error); window.alert("Não foi possível excluir o registro."); }
   };
   const printCertificate = (entry: Entry) => {
-    const popup = window.open("", "_blank");
+    const popup = window.open("", "_blank", "noopener,noreferrer");
     if (!popup) { window.alert("Permita a abertura de janelas para imprimir."); return; }
-    popup.document.write("<html lang='pt-BR'><head><meta charset='utf-8'><title>Certificado de Qualidade</title><style>body{font-family:Arial;padding:48px;color:#172033}header{border-bottom:4px solid #d6b45c;padding-bottom:18px}.box{border:1px solid #cbd5e1;border-radius:12px;padding:24px;margin-top:28px}footer{margin-top:70px;border-top:1px solid #cbd5e1;padding-top:20px}</style></head><body><header><b>ANACLETO ESQUADRIAS</b><h1>CERTIFICADO DE QUALIDADE DO PRODUTO</h1><p>Registro de inspeção e conformidade</p></header><div class='box'><p><b>Cliente:</b> " + entry.customer + "</p><p><b>Pedido:</b> " + entry.orderNumber + "</p><p><b>Produto:</b> " + (entry.product || entry.title) + "</p><p><b>Identificação:</b> " + (entry.serialNumber || "—") + "</p><p><b>Inspeção:</b> " + (entry.inspection || "—") + "</p><p><b>Observações:</b> " + (entry.notes || "—") + "</p><p><b>Data:</b> " + new Date(entry.createdAt).toLocaleDateString("pt-BR") + "</p></div><footer>Responsável técnico: ____________________ Assinatura: ____________________</footer><script>window.onload=function(){window.print()}</script></body></html>");
+    const value = (input: unknown) => escapeHtml(input);
+    popup.document.open();
+    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Certificado de Qualidade</title><style>
+      *{box-sizing:border-box}body{font-family:Arial,sans-serif;padding:36px;color:#172033;max-width:900px;margin:auto}
+      header{display:flex;align-items:center;gap:18px;border-bottom:3px solid #c6a45c;padding-bottom:18px}
+      header img{width:116px;height:64px;object-fit:contain}h1{font-size:22px;margin:4px 0}p{line-height:1.55}
+      .eyebrow{font-size:10px;letter-spacing:2px;color:#64748b;font-weight:700}.box{border:1px solid #cbd5e1;border-radius:12px;padding:22px;margin-top:26px}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px}.field{padding:8px 0;border-bottom:1px solid #e2e8f0}
+      footer{margin-top:62px;border-top:1px solid #cbd5e1;padding-top:18px;font-size:12px}
+      @media print{body{padding:12mm}button{display:none}}
+    </style></head><body>
+      <header><img src="${logoImg}" alt="Anacleto Esquadrias"><div><div class="eyebrow">ANACLETO ESQUADRIAS · QUALIDADE</div><h1>CERTIFICADO DE QUALIDADE DO PRODUTO</h1><p>Registro de inspeção e conformidade</p></div></header>
+      <section class="box"><div class="grid">
+        <div class="field"><b>Cliente</b><br>${value(entry.customer)}</div>
+        <div class="field"><b>Pedido / orçamento</b><br>${value(entry.orderNumber)}</div>
+        <div class="field"><b>Produto</b><br>${value(entry.product || entry.title)}</div>
+        <div class="field"><b>Identificação / série</b><br>${value(entry.serialNumber)}</div>
+        <div class="field"><b>Resultado da inspeção</b><br>${value(entry.inspection)}</div>
+        <div class="field"><b>Data</b><br>${value(new Date(entry.createdAt).toLocaleDateString("pt-BR"))}</div>
+      </div><p><b>Observações:</b><br>${value(entry.notes)}</p></section>
+      <footer><b>Responsável técnico:</b> ________________________________ &nbsp; <b>Assinatura:</b> ________________________________</footer>
+      <script>window.onload=function(){window.print()}</script></body></html>`);
     popup.document.close();
   };
 
