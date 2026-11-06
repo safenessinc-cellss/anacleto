@@ -71,7 +71,7 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
-        const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
+        const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const imported = results.data.map((raw) => {
           const row: Record<string, string> = {};
           Object.entries(raw).forEach(([key, value]) => { row[normalize(key)] = String(value ?? "").trim(); });
