@@ -189,7 +189,6 @@ export function formatCurrency(value: number, currencyCode: string = "BRL", lang
   const formatters: Record<string, string> = {
     BRL: "BRL",
     USD: "USD",
-    BRL: "BRL",
     CNY: "CNY",
     JPY: "JPY"
   };
