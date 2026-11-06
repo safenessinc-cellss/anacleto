@@ -46,6 +46,12 @@ export default function DeliveryModule() {
     return () => unsubs.forEach(unsub => unsub());
   }, []);
 
+  useEffect(() => {
+    if (cameraBusy && videoRef.current && cameraStreamRef.current) {
+      videoRef.current.srcObject = cameraStreamRef.current;
+      void videoRef.current.play().catch(error => setCameraErrorText(cameraError(error)));
+    }
+  }, [cameraBusy]);
   useEffect(() => () => stopCamera(), []);
 
   const selectedQuote = quotes.find(q => q.id === quoteId);
@@ -63,7 +69,6 @@ export default function DeliveryModule() {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("A câmera exige um navegador atualizado e conexão HTTPS.");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
       cameraStreamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
       setCameraBusy(true);
     } catch (error) { setCameraErrorText(cameraError(error)); }
   };
