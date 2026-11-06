@@ -409,7 +409,7 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "invoices" && (
-            <InvoicesModule language={language} senderConfig={senderConfig} />
+            <InvoicesModule language={language} senderConfig={senderConfig} canManageFinance={["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(effectiveRole)} />
           )}
 
           {activeTab === "agenda" && (<AgendaModule language={language} />)}
