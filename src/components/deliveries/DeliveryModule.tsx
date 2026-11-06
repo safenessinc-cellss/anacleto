@@ -135,7 +135,8 @@ export default function DeliveryModule() {
     if (!location) { setErrorText("Registre a localização GPS no local da entrega."); return; }
     if (!signedBy.trim() || !hasSignature()) { setErrorText("Informe o nome do cliente e recolha sua assinatura no quadro."); return; }
     if (!satisfied) { setErrorText("O cliente precisa confirmar expressamente que recebeu e está satisfeito com a entrega."); return; }
-    if (!auth.currentUser) { setErrorText("Sua sessão expirou. Entre novamente."); return; }
+    const currentUser = auth.currentUser;
+    if (!currentUser) { setErrorText("Sua sessão expirou. Entre novamente."); return; }
     setSaving(true); setErrorText("");
     const deliveryRef = doc(collection(db, "deliveries"));
     const stamp = new Date().toISOString();
@@ -146,7 +147,7 @@ export default function DeliveryModule() {
         const photo = photos[index];
         const path = `deliveries/${deliveryRef.id}/photo-${index + 1}.jpg`;
         const fileRef = ref(storage, path);
-        await uploadBytes(fileRef, photo.blob, { contentType: "image/jpeg", customMetadata: { deliveryId: deliveryRef.id, quoteId: selectedQuote.id, capturedAt: photo.capturedAt, operatorUid: auth.currentUser.uid } });
+        await uploadBytes(fileRef, photo.blob, { contentType: "image/jpeg", customMetadata: { deliveryId: deliveryRef.id, quoteId: selectedQuote.id, capturedAt: photo.capturedAt, operatorUid: currentUser.uid } });
         uploadedPhotos.push({ url: await getDownloadURL(fileRef), path, capturedAt: photo.capturedAt });
       }
       const signatureCanvas = signatureRef.current!;
@@ -155,7 +156,7 @@ export default function DeliveryModule() {
       const signatureRefStorage = ref(storage, signaturePath);
       await uploadBytes(signatureRefStorage, signatureBlob, { contentType: "image/png", customMetadata: { deliveryId: deliveryRef.id, quoteId: selectedQuote.id, signedBy: signedBy.trim() } });
       const signatureUrl = await getDownloadURL(signatureRefStorage);
-      const operatorName = auth.currentUser.displayName || auth.currentUser.email || "Operador";
+      const operatorName = currentUser.displayName || currentUser.email || "Operador";
       const delivery: Omit<Delivery, "id"> = {
         number: `ENT-${new Date().getFullYear()}-${deliveryRef.id.slice(0, 6).toUpperCase()}`,
         quoteId: selectedQuote.id, quoteNumber: selectedQuote.number,
