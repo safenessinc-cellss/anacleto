@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "../../firebase";
 import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, TrendingUp, X, XCircle } from "lucide-react";
 
 interface Client { id?: string; name: string; }
@@ -93,29 +93,65 @@ export default function ReceivablesModule() {
     setShowForm(false);
   };
 
-  const markReceived = async (r: Receivable) => {
-    await updateDoc(doc(db, "receivables", r.id!), {
-      status: "received",
-      receivedAmount: r.amount,
-      receivedAt: new Date().toISOString(),
+  const recordReceipt = async (r: Receivable, cumulativeAmount: number) => {
+    const receivableRef = doc(db, "receivables", r.id!);
+    const invoiceRef = r.invoiceId ? doc(db, "invoices", r.invoiceId) : null;
+    const nextCents = Math.round(cumulativeAmount * 100);
+    const previousCents = Math.round(Number(r.receivedAmount || 0) * 100);
+    const delta = Math.max(0, (nextCents - previousCents) / 100);
+    if (delta <= 0) throw new Error("Informe um valor maior que o total já recebido.");
+    const complete = nextCents >= Math.round(r.amount * 100);
+    const ledgerId = r.invoiceId
+      ? (complete ? `invoice-paid-${r.invoiceId}` : `invoice-partial-${r.invoiceId}-${nextCents}`)
+      : `receivable-${r.id}-${nextCents}`;
+    const ledgerRef = doc(db, "ledger_entries", ledgerId);
+    await runTransaction(db, async tx => {
+      const currentSnap = await tx.get(receivableRef);
+      const ledgerSnap = await tx.get(ledgerRef);
+      const invoiceSnap = invoiceRef ? await tx.get(invoiceRef) : null;
+      if (!currentSnap.exists()) throw new Error("Cobrança não encontrada.");
+      if (ledgerSnap.exists()) throw new Error("Este recebimento já foi registrado.");
+      const current = currentSnap.data();
+      const currentReceived = Number(current.receivedAmount || 0);
+      if (Math.round(currentReceived * 100) !== previousCents) throw new Error("O saldo foi atualizado por outro usuário. Atualize a tela.");
+      if (current.status === "cancelled" || current.status === "received") throw new Error("Esta cobrança já foi encerrada.");
+      tx.update(receivableRef, {
+        status: complete ? "received" : "partial",
+        receivedAmount: complete ? Number(current.amount || r.amount) : cumulativeAmount,
+        receivedAt: new Date().toISOString(), updatedAt: serverTimestamp()
+      });
+      if (invoiceRef && invoiceSnap?.exists() && complete) {
+        tx.update(invoiceRef, { status: "pago", paidAt: new Date().toISOString(), updatedAt: serverTimestamp() });
+      }
+      tx.set(ledgerRef, {
+        direction: "inflow", category: "customer_receipt", sourceType: r.invoiceId ? "invoice" : "receivable",
+        sourceId: r.invoiceId || r.id, receivableId: r.id, invoiceId: r.invoiceId || "",
+        description: `Recebimento · ${r.description}`, amount: delta, date: new Date().toISOString().slice(0, 10),
+        status: "posted", paymentMethod: r.paymentMethod, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || ""
+      });
     });
+  };
+
+  const markReceived = async (r: Receivable) => {
+    try { await recordReceipt(r, r.amount); }
+    catch (error) { alert((error as Error).message || "Não foi possível registrar o recebimento."); }
   };
   const markPartial = async (r: Receivable) => {
-    const val = prompt(`Valor recebido parcialmente (máx R$ ${r.amount}):`, String((r.receivedAmount || 0)));
+    const current = Number(r.receivedAmount || 0);
+    const val = prompt(`Valor total recebido até agora (máx R$ ${r.amount}):`, String(current));
     if (!val) return;
-    const num = parseFloat(val);
-    if (isNaN(num) || num <= 0) return alert("Valor inválido");
-    if (num >= r.amount) return markReceived(r);
-    await updateDoc(doc(db, "receivables", r.id!), {
-      status: "partial",
-      receivedAmount: num,
-      receivedAt: new Date().toISOString(),
-    });
+    const num = parseFloat(val.replace(",", "."));
+    if (!Number.isFinite(num) || num <= current || num > r.amount) return alert("Informe um valor maior que o já recebido e até o valor total.");
+    try { await recordReceipt(r, num); }
+    catch (error) { alert((error as Error).message || "Não foi possível registrar o recebimento."); }
   };
   const markPending = async (r: Receivable) => {
-    await updateDoc(doc(db, "receivables", r.id!), { status: "pending", receivedAmount: 0, receivedAt: null });
+    if (Number(r.receivedAmount || 0) > 0) return alert("Não é possível reabrir uma cobrança com recebimentos. Registre um estorno autorizado.");
+    await updateDoc(doc(db, "receivables", r.id!), { status: "pending", receivedAmount: 0, receivedAt: null, updatedAt: serverTimestamp() });
   };
   const handleDelete = async (id: string) => {
+    const target = items.find(x => x.id === id);
+    if (target?.invoiceId || Number(target?.receivedAmount || 0) > 0) return alert("Esta cobrança está vinculada a uma fatura ou possui recebimentos. Não pode ser excluída.");
     if (confirm("Excluir esta cobrança?")) await deleteDoc(doc(db, "receivables", id));
   };
 
