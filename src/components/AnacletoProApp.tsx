@@ -197,7 +197,7 @@ export default function AnacletoProApp({
     { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
     { id: "profile" as NavigationTab, label: "Meu Perfil", icon: Building, badge: null },
     { id: "settings" as NavigationTab, label: "Configurações", icon: Settings, badge: null },
-  ].filter((item) => hasAccessToTab(effectiveRole, item.id as RoleNavTab));
+  ].filter((item) => item.id === "admin" ? roleConfig.canManageUsers : hasAccessToTab(effectiveRole, item.id as RoleNavTab));
 
   const handleSelectCompanyForQuote = (comp: Company) => {
     setActiveTab("quotes");
