@@ -602,6 +602,32 @@ Responda APENAS o JSON, sem texto.`;
   }
 });
 
+// ============ COMPRAS: leitura inteligente de documentos ============
+app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, async (req, res) => {
+  try {
+    const { data, mimeType, fileName } = req.body || {};
+    if (typeof data !== "string" || !data || data.length > 14_000_000) return res.status(400).json({ error: "Envie um PDF válido de até 10 MB." });
+    const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(mimeType)) return res.status(415).json({ error: "Formato não suportado. Use PDF, JPG ou PNG." });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: "Leitura inteligente indisponível: configure GEMINI_API_KEY no servidor." });
+    const { GoogleGenAI } = await import("@google/genai");
+    const genAI = new GoogleGenAI({ apiKey });
+    const prompt = `Você é um analista de compras e documentos fiscais brasileiros. Identifique o tipo do documento e extraia somente dados visíveis, sem inventar. Responda APENAS JSON válido: {"documentType":"nfe|danfe|supplier_quote|purchase_order|boleto|receipt|other","supplierName":"","supplierCnpj":"","documentNumber":"","issueDate":"YYYY-MM-DD","dueDate":"YYYY-MM-DD","currency":"BRL","total":0,"tax":0,"description":"","items":[{"description":"","sku":"","quantity":1,"unit":"un","unitPrice":0,"total":0}],"confidence":"high|medium|low","warnings":[]}. Se ausente, use string vazia, zero ou lista vazia. Não confunda CNPJ do emitente com destinatário. Valores numéricos em reais. Arquivo: ${String(fileName || "").slice(0,160)}`;
+    const result = await genAI.models.generateContent({ model: "gemini-2.5-flash", contents: [{ role: "user", parts: [{ inlineData: { mimeType, data } }, { text: prompt }] }] });
+    const raw = result.text || "";
+    const match = raw.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(match ? match[0] : raw);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) throw new Error("A IA não retornou uma estrutura de documento válida.");
+    parsed.total = Math.max(0, Number(parsed.total) || 0);
+    parsed.items = parsed.items.slice(0, 200).map((item: any) => ({ description: String(item.description || "").slice(0, 300), sku: String(item.sku || "").slice(0, 80), quantity: Math.max(0, Number(item.quantity) || 0), unit: String(item.unit || "un").slice(0, 20), unitPrice: Math.max(0, Number(item.unitPrice) || 0), total: Math.max(0, Number(item.total) || 0) }));
+    return res.json(parsed);
+  } catch (error: any) {
+    console.error("Purchase document extraction error:", error);
+    return res.status(422).json({ error: "Não foi possível interpretar o documento com segurança. Revise o PDF ou preencha manualmente.", details: error?.message });
+  }
+});
+
 // ============ Mercado Pago: PIX real e link de pagamento ============
 function mercadoPagoToken() {
   return process.env.MERCADO_PAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN;
