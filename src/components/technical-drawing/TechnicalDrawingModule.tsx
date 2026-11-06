@@ -255,9 +255,11 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     setIsLoading(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error("Entre na sua conta para gerar projetos técnicos.");
       const res = await fetch("/api/ai/technical-drawing", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
       });
 
