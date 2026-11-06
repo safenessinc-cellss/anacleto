@@ -24,6 +24,7 @@ export default function DeliveryModule() {
   const [invoiceId, setInvoiceId] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [signedBy, setSignedBy] = useState("");
+  const [satisfied, setSatisfied] = useState(false);
   const [notes, setNotes] = useState("");
   const [location, setLocation] = useState<{ latitude: number; longitude: number; accuracy?: number; capturedAt: string } | null>(null);
   const [locationBusy, setLocationBusy] = useState(false);
@@ -120,7 +121,7 @@ export default function DeliveryModule() {
     return !!pixels && pixels.some((value, index) => index % 4 === 3 && value > 0);
   };
   const resetForm = () => {
-    stopCamera(); photos.forEach(p => URL.revokeObjectURL(p.preview)); setPhotos([]); setQuoteId(""); setInvoiceId(""); setSignedBy(""); setNotes(""); setLocation(null); setOpen(false); setErrorText(""); setCameraErrorText(""); clearSignature();
+    stopCamera(); photos.forEach(p => URL.revokeObjectURL(p.preview)); setPhotos([]); setQuoteId(""); setInvoiceId(""); setSignedBy(""); setSatisfied(false); setNotes(""); setLocation(null); setOpen(false); setErrorText(""); setCameraErrorText(""); clearSignature();
   };
   const saveDelivery = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -128,6 +129,7 @@ export default function DeliveryModule() {
     if (!photos.length) { setErrorText("Registre pelo menos uma fotografia feita no local."); return; }
     if (!location) { setErrorText("Registre a localização GPS no local da entrega."); return; }
     if (!signedBy.trim() || !hasSignature()) { setErrorText("Informe o nome do cliente e recolha sua assinatura no quadro."); return; }
+    if (!satisfied) { setErrorText("O cliente precisa confirmar expressamente que recebeu e está satisfeito com a entrega."); return; }
     if (!auth.currentUser) { setErrorText("Sua sessão expirou. Entre novamente."); return; }
     setSaving(true); setErrorText("");
     const deliveryRef = doc(collection(db, "deliveries"));
@@ -166,7 +168,7 @@ export default function DeliveryModule() {
         kind: "satisfaction", customer: selectedQuote.clientName, orderNumber: selectedQuote.number,
         product: selectedQuote.items?.map(item => item.description).join(", ") || "Entrega",
         title: `Confirmação de entrega ${delivery.number}`, status: "Concluído",
-        rating: 5, installationRating: 5, recommendation: 10, notes: notes.trim(),
+        customerDeclaredSatisfied: true, satisfactionDeclaration: "Cliente declara que recebeu os itens e está satisfeito com a entrega e instalação.", notes: notes.trim(),
         deliveryId: deliveryRef.id, quoteId: selectedQuote.id, quoteNumber: selectedQuote.number,
         invoiceId: selectedInvoice?.id || null, invoiceNumber: selectedInvoice?.number || null,
         signatureUrl, signaturePath, signedBy: signedBy.trim(), signedAt: stamp,
@@ -212,7 +214,7 @@ export default function DeliveryModule() {
         <p className="text-xs text-slate-500">{photos.length} fotografia(s) capturada(s)</p>
       </section>
       <section className="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><div className="flex items-center justify-between"><div><h3 className="font-bold text-slate-900 dark:text-white">Localização da entrega *</h3><p className="text-xs text-slate-500">GPS do dispositivo no estabelecimento.</p></div><MapPin className="h-5 w-5 text-blue-600"/></div><button type="button" disabled={locationBusy} onClick={captureLocation} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 px-4 py-2.5 text-sm font-bold text-blue-700 disabled:opacity-50"><MapPin className="h-4 w-4"/>{locationBusy?"Obtendo GPS...":location?"Atualizar localização":"Capturar localização GPS"}</button>{location&&<p className="text-xs text-emerald-700">GPS registrado: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)} (precisão ±{Math.round(location.accuracy||0)} m)</p>}</section>
-      <section className="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><div className="flex items-center justify-between"><div><h3 className="font-bold text-slate-900 dark:text-white">Aceite e assinatura do cliente *</h3><p className="text-xs text-slate-500">O cliente assina na tela para confirmar o recebimento.</p></div><PenLine className="h-5 w-5 text-blue-600"/></div><label className="block text-xs font-bold">Nome de quem recebeu<input required value={signedBy} onChange={e=>setSignedBy(e.target.value)} placeholder="Nome completo do cliente ou responsável" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label><div className="overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white"><canvas ref={signatureRef} width={900} height={240} onPointerDown={beginSignature} onPointerMove={drawSignature} onPointerUp={endSignature} onPointerCancel={endSignature} className="h-40 w-full touch-none"/></div><div className="flex justify-between text-xs text-slate-500"><span>Assinatura de confirmação de recebimento</span><button type="button" onClick={clearSignature} className="font-bold text-blue-600">Limpar assinatura</button></div><p className="text-xs text-slate-500">Ao assinar, o cliente confirma que recebeu os itens e pode registrar observações abaixo.</p></section>
+      <section className="space-y-2 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><div className="flex items-center justify-between"><div><h3 className="font-bold text-slate-900 dark:text-white">Aceite e assinatura do cliente *</h3><p className="text-xs text-slate-500">O cliente assina na tela para confirmar o recebimento.</p></div><PenLine className="h-5 w-5 text-blue-600"/></div><label className="block text-xs font-bold">Nome de quem recebeu<input required value={signedBy} onChange={e=>setSignedBy(e.target.value)} placeholder="Nome completo do cliente ou responsável" className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label><label className="flex items-start gap-2 text-xs font-medium text-slate-700 dark:text-slate-200"><input type="checkbox" required checked={satisfied} onChange={e=>setSatisfied(e.target.checked)} className="mt-0.5"/>Declaro que recebi os itens e estou satisfeito com a entrega e a instalação.</label><div className="overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white"><canvas ref={signatureRef} width={900} height={240} onPointerDown={beginSignature} onPointerMove={drawSignature} onPointerUp={endSignature} onPointerCancel={endSignature} className="h-40 w-full touch-none"/></div><div className="flex justify-between text-xs text-slate-500"><span>Assinatura de confirmação de recebimento</span><button type="button" onClick={clearSignature} className="font-bold text-blue-600">Limpar assinatura</button></div><p className="text-xs text-slate-500">Ao assinar, o cliente confirma que recebeu os itens e pode registrar observações abaixo.</p></section>
       <label className="block text-xs font-bold">Observações da entrega<textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} placeholder="Ressalvas, itens pendentes, danos ou observações..." className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label>
       {errorText&&<p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{errorText}</p>}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={resetForm} className="rounded-xl border px-4 py-3 text-sm font-bold">Cancelar</button><button disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"><CheckCircle2 className="h-4 w-4"/>{saving?"Salvando entrega...":"Confirmar entrega e enviar ao Pós-venda"}</button></div>
