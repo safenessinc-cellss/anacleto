@@ -135,9 +135,6 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     doc.addImage(sender.watermarkLogoUrl, "PNG", pageWidth / 2 - 65, 72, 130, 130);
   }
 
-  // Logotipo do CRM no cabeçalho da fatura.
-  drawDocumentLogo(doc, sender, 14, 7, 25, 25);
-
   // Brand Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
