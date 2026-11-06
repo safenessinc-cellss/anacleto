@@ -20,7 +20,7 @@ interface Visit {
   calendarEventId?: string;
 }
 
-export default function AgendaModule() {
+export default function AgendaModule({ language = "pt" }: { language?: string }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
