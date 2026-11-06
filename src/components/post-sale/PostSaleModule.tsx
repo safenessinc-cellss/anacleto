@@ -47,7 +47,7 @@ export default function PostSaleModule() {
     catch (error) { console.error(error); window.alert("Não foi possível excluir o registro."); }
   };
   const printCertificate = (entry: Entry) => {
-    const popup = window.open("", "_blank", "noopener,noreferrer");
+    const popup = window.open("", "_blank");
     if (!popup) { window.alert("Permita a abertura de janelas para imprimir."); return; }
     const value = (input: unknown) => escapeHtml(input);
     popup.document.open();
