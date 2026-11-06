@@ -30,7 +30,7 @@ import {
   Download,
   X
 } from "lucide-react";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
 import { Budget, Invoice, SenderConfig, AdminUser, ChatSession } from "../types";
 import { Translation } from "../translations";
@@ -212,14 +212,18 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         createdAt: new Date().toISOString()
       };
 
-      // Write direct invoice record to firestore
-      await setDoc(doc(db, "invoices", invoiceId), invoiceData);
-
-      // Update budget status to 'invoiced'
-      await updateDoc(doc(db, "budgets", budget.id), {
-        status: "invoiced",
-        updatedAt: new Date().toISOString()
+      const batch = writeBatch(db);
+      batch.set(doc(db, "invoices", invoiceId), invoiceData);
+      batch.set(doc(db, "receivables", invoiceId), {
+        clientId: (budget as any).companyId || (budget as any).clientId || "",
+        clientName: budget.clientName || "Cliente", description: `Fatura ${invoiceNo} · Orçamento ${budget.id}`,
+        amount: Number(budget.total || 0), receivedAmount: 0,
+        dueDate: (invoiceData as any).dueDate || new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
+        paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: budget.id,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
       });
+      batch.update(doc(db, "budgets", budget.id), { status: "invoiced", invoiceId, updatedAt: serverTimestamp() });
+      await batch.commit();
 
       showToast(t.toastInvoicedSuccess, "success");
     } catch (err) {
