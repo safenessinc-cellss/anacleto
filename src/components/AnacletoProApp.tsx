@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Building, Calendar, ChevronRight, Compass, ExternalLink, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X, Palette, Headset, Truck } from "lucide-react";
+import { Building, Calendar, ChevronRight, Compass, ExternalLink, Factory, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X, Palette, Headset, Truck } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
@@ -25,8 +25,10 @@ import logoImg from "../assets/images/anacleto-logo-premium.svg";
 import BusinessWorkspace from "./workspace/BusinessWorkspace";
 import PostSaleModule from "./post-sale/PostSaleModule";
 import DeliveryModule from "./deliveries/DeliveryModule";
+import ProductionModule from "./production/ProductionModule";
+import InventoryModule from "./inventory/InventoryModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -180,6 +182,7 @@ export default function AnacletoProApp({
     { id: "cut_plan" as NavigationTab, label: "Plano de Corte", icon: Compass, badge: null },
     { id: "profile_optimization" as NavigationTab, label: "Otimização de Perfis", icon: Package, badge: null },
     { id: "materials" as NavigationTab, label: "Materiais de Produção", icon: Package, badge: null },
+    { id: "production" as NavigationTab, label: "Ordens de Produção", icon: Factory, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
     { id: "deliveries" as NavigationTab, label: "Entregas e Instalações", icon: Truck, badge: null },
     { id: "post_sale" as NavigationTab, label: "Qualidade e Pós-venda", icon: Headset, badge: null },
@@ -190,6 +193,7 @@ export default function AnacletoProApp({
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
     { id: "tipologias" as NavigationTab, label: "Modelos de Esquadrias", icon: Package, badge: null },
     { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },
+    { id: "inventory" as NavigationTab, label: "Estoque e Almoxarifado", icon: Package, badge: null },
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
     { id: "financial_ai" as NavigationTab, label: "Assistente Financeiro", icon: Sparkles, badge: "NOVO" },
@@ -425,6 +429,8 @@ export default function AnacletoProApp({
           {activeTab === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
+        {activeTab === "production" && <ProductionModule />}
+        {activeTab === "inventory" && <InventoryModule />}
         {activeTab === "deliveries" && <DeliveryModule />}
         {activeTab === "post_sale" && <PostSaleModule />}
 
