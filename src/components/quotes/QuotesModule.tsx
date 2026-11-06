@@ -703,6 +703,7 @@ const handleAddItem = () => {
                       )}
                     </div>
                     <h2 className="text-lg font-black text-white mt-1">Orçamento para: {selectedQuote.clientName}</h2>
+                    {selectedQuote.deliveryEvidence && <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200"><p className="font-bold">Entrega concluída · {selectedQuote.deliveryStatus} · Recebido por {selectedQuote.deliveryEvidence.signedBy}</p><div className="mt-2 flex flex-wrap gap-2">{selectedQuote.deliveryEvidence.photos.map(photo=><a key={photo.path} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt="Foto da entrega" className="h-14 w-20 rounded object-cover"/></a>)}<a href={selectedQuote.deliveryEvidence.signatureUrl} target="_blank" rel="noreferrer" className="rounded border border-emerald-300 px-3 py-2 font-bold">Assinatura</a><a href={`https://maps.google.com/?q=${selectedQuote.deliveryEvidence.latitude},${selectedQuote.deliveryEvidence.longitude}`} target="_blank" rel="noreferrer" className="rounded border border-emerald-300 px-3 py-2 font-bold">GPS</a></div></div>}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
