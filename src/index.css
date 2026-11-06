@@ -376,3 +376,54 @@ html:not(.dark) button.bg-emerald-600, html:not(.dark) button.bg-rose-600 {
 }
 html:not(.dark) button.bg-blue-600 *, html:not(.dark) button.bg-indigo-600 *,
 html:not(.dark) button.bg-emerald-600 *, html:not(.dark) button.bg-rose-600 * { color:#fff !important; }
+
+
+/* ANACLETO CORPORATE DESIGN SYSTEM — shared surfaces and responsive forms */
+:root {
+  --anacleto-accent: #2563eb;
+  --anacleto-accent-strong: #1d4ed8;
+  --anacleto-surface: #ffffff;
+  --anacleto-surface-muted: #f7f9fc;
+  --anacleto-border: #dce5f0;
+  --anacleto-text: #172b4d;
+  --anacleto-muted: #64748b;
+  --anacleto-radius: 18px;
+}
+main h1, main h2, main h3 { letter-spacing: -0.025em; }
+main .rounded-2xl.border, main .rounded-3xl.border, main .rounded-xl.border {
+  border-color: var(--anacleto-border);
+  border-radius: var(--anacleto-radius);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.045);
+}
+main input:not([type="checkbox"]):not([type="radio"]),
+main select, main textarea {
+  border-radius: 12px;
+  border-color: var(--anacleto-border);
+  min-width: 0;
+  max-width: 100%;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+main input:focus, main select:focus, main textarea:focus {
+  outline: none;
+  border-color: var(--anacleto-accent) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+main button { transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease; }
+main table { min-width: 640px; }
+main .overflow-x-auto { max-width: 100%; -webkit-overflow-scrolling: touch; }
+@media (max-width: 640px) {
+  main { padding: 1rem !important; }
+  main .rounded-3xl, main .rounded-2xl { border-radius: 16px; }
+  main .overflow-x-auto { margin-inline: -0.25rem; }
+  main button { min-height: 38px; }
+}
+html.dark {
+  --anacleto-surface: #172235;
+  --anacleto-surface-muted: #101827;
+  --anacleto-border: #334155;
+  --anacleto-text: #e2e8f0;
+  --anacleto-muted: #94a3b8;
+}
+html.dark main .rounded-2xl.border, html.dark main .rounded-3xl.border, html.dark main .rounded-xl.border {
+  border-color: var(--anacleto-border);
+}
