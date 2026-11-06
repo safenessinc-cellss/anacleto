@@ -69,6 +69,21 @@ const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
   return res.status(403).json({ error: "Seu perfil não tem autorização para operações financeiras." });
 };
 
+const requestWindows = new Map<string, { startedAt: number; count: number }>();
+const rateLimitByUser = (bucket: string, limit: number, windowMs: number): express.RequestHandler => (req, res, next) => {
+  const user = res.locals.firebaseUser as { uid?: string } | undefined;
+  const key = `${bucket}:${user?.uid || req.ip}`;
+  const now = Date.now();
+  const current = requestWindows.get(key);
+  if (!current || now - current.startedAt >= windowMs) {
+    requestWindows.set(key, { startedAt: now, count: 1 });
+    return next();
+  }
+  if (current.count >= limit) return res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente." });
+  current.count += 1;
+  return next();
+};
+
 
 // ----------------------------------------------------
 // 1. General AI Chat Proxy
@@ -573,12 +588,16 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
 
 
 // ============ FINANCIAL AI: Extraer datos de boleto ============
-app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, async (req, res) => {
+app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("financial-ai", 8, 60_000), async (req, res) => {
   try {
-    const { data, mimeType } = req.body;
-    if (!data) return res.status(400).json({ error: "No data" });
+    const { data, mimeType } = req.body || {};
+    const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (typeof data !== "string" || !data || data.length > 14_000_000) return res.status(400).json({ error: "Envie um documento de até 10 MB." });
+    if (!allowedMimeTypes.includes(mimeType)) return res.status(415).json({ error: "Formato não suportado. Use PDF, JPG, PNG ou WEBP." });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: "Leitura inteligente indisponível: configure GEMINI_API_KEY no servidor." });
     const { GoogleGenAI } = await import("@google/genai");
-    const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+    const genAI = new GoogleGenAI({ apiKey });
     const prompt = `Você é um assistente financeiro. Analise este documento (boleto ou conta a pagar) e extraia em JSON:
 { "beneficiary": "nome do beneficiário", "cnpj": "CNPJ", "amount": 123.45, "dueDate": "YYYY-MM-DD", "digitableLine": "linha digitável", "description": "descrição" }
 Responda APENAS o JSON, sem texto.`;
@@ -603,7 +622,7 @@ Responda APENAS o JSON, sem texto.`;
 });
 
 // ============ COMPRAS: leitura inteligente de documentos ============
-app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, async (req, res) => {
+app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("purchase-ai", 8, 60_000), async (req, res) => {
   try {
     const { data, mimeType, fileName } = req.body || {};
     if (typeof data !== "string" || !data || data.length > 14_000_000) return res.status(400).json({ error: "Envie um PDF válido de até 10 MB." });
@@ -644,7 +663,7 @@ app.get("/api/payments/config-status", (_req, res) => {
   });
 });
 
-app.post("/api/payments/pix", requireFirebaseAuth, requireFinanceRole, async (req, res) => {
+app.post("/api/payments/pix", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("payment-pix", 5, 60_000), async (req, res) => {
   try {
     const token = mercadoPagoToken();
     if (!token) return res.status(503).json({ error: "Integração Mercado Pago não configurada no servidor. Configure MERCADO_PAGO_ACCESS_TOKEN nas variáveis de ambiente do Vercel." });
@@ -693,7 +712,7 @@ app.post("/api/payments/pix", requireFirebaseAuth, requireFinanceRole, async (re
   }
 });
 
-app.post("/api/payments/mercado-pago-link", requireFirebaseAuth, requireFinanceRole, async (req, res) => {
+app.post("/api/payments/mercado-pago-link", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("payment-link", 5, 60_000), async (req, res) => {
   try {
     const token = mercadoPagoToken();
     if (!token) return res.status(503).json({ error: "Integração Mercado Pago não configurada no servidor. Configure MERCADO_PAGO_ACCESS_TOKEN nas variáveis de ambiente do Vercel." });
@@ -716,7 +735,6 @@ app.post("/api/payments/mercado-pago-link", requireFirebaseAuth, requireFinanceR
     if (payerEmail) preferenceBody.payer = { email: payerEmail, name: payerName || undefined };
     if (baseUrl) {
       preferenceBody.back_urls = { success: `${baseUrl}/?payment=success`, pending: `${baseUrl}/?payment=pending`, failure: `${baseUrl}/?payment=failure` };
-      preferenceBody.notification_url = `${baseUrl}/api/payments/webhook`;
     }
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
