@@ -30,6 +30,7 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "
 import { db } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
+import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
 
 interface QuotesModuleProps {
   senderConfig: SenderConfig;
@@ -182,17 +183,20 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     };
   };
 
-  // Prepara o logotipo para ser incorporado no PDF (cabeçalho e marca d'água).
+  // Prioriza o logotipo configurado; usa o ativo oficial do projeto como fallback.
   const preparePdfSender = async () => {
-    if (!senderConfig.logoUrl) return senderConfig;
-    try {
+    const configuredLogo = senderConfig.logoUrl || senderConfig.websiteLogoUrl || "";
+    const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
-      image.crossOrigin = "anonymous";
-      image.src = senderConfig.logoUrl;
-      await new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = () => reject(new Error("Não foi possível carregar o logotipo"));
-      });
+      if (/^https?:\\/\\//i.test(src)) image.crossOrigin = "anonymous";
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Não foi possível carregar o logotipo"));
+      image.src = src;
+    });
+    try {
+      let image: HTMLImageElement;
+      try { image = await loadImage(configuredLogo || defaultCompanyLogo); }
+      catch { image = await loadImage(defaultCompanyLogo); }
       const canvas = document.createElement("canvas");
       canvas.width = image.naturalWidth || 600;
       canvas.height = image.naturalHeight || 600;
