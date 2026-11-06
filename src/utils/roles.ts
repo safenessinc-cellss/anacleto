@@ -9,7 +9,12 @@ export type Role =
   | "admin"
   | "supervisor"
   | "colaborador"
-  | "usuario";
+  | "usuario"
+  | "financeiro"
+  | "rh"
+  | "qualidade"
+  | "estoque"
+  | "producao";
 
 export type NavigationTab =
   | "dashboard"
@@ -32,7 +37,9 @@ export type NavigationTab =
   | "profile"
   | "suggestions"
   | "post_sale"
-  | "deliveries";
+  | "deliveries"
+  | "inventory"
+  | "production";
 
 export interface RoleConfig {
   id: Role;
@@ -48,7 +55,7 @@ export interface RoleConfig {
 
 const ALL_TABS: NavigationTab[] = [
   "dashboard", "crm", "quotes", "invoices", "technical_drawing",
-  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries",
+  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries", "inventory", "production",
 ];
 
 export const ROLES: Record<Role, RoleConfig> = {
@@ -61,7 +68,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     description: "Propietario único del sistema. Acceso total; su cuenta no puede ser eliminada ni degradada por ningún otro perfil.",
     tabs: ALL_TABS,
     canManageUsers: true,
-    canManageRolesBelow: ["super_usuario", "ceo", "admin", "supervisor", "colaborador", "usuario"],
+    canManageRolesBelow: ["super_usuario", "ceo", "admin", "supervisor", "colaborador", "usuario", "financeiro", "rh", "qualidade", "estoque", "producao"],
   },
   ceo: {
     id: "ceo",
@@ -103,7 +110,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 40,
     color: "bg-blue-100 text-blue-800 border-blue-300",
     description: "Supervisa equipos y operaciones. El acceso financiero y de nómina requiere un perfil autorizado.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries", "production"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
@@ -114,9 +121,44 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 20,
     color: "bg-emerald-100 text-emerald-800 border-emerald-300",
     description: "Empleado. Crea presupuestos, facturas, dibujos y gestiona catálogo. Sin finanzas.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions", "deliveries"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions", "deliveries", "production"],
     canManageUsers: false,
     canManageRolesBelow: [],
+  },
+  financeiro: {
+    id: "financeiro", label: "Financeiro", labelPT: "Financeiro", level: 35,
+    color: "bg-cyan-100 text-cyan-800 border-cyan-300",
+    description: "Contas a pagar e receber, compras, fornecedores, pagamentos e relatórios financeiros.",
+    tabs: ["dashboard", "finance", "financial_ai", "reports", "profile", "suggestions"],
+    canManageUsers: false, canManageRolesBelow: [],
+  },
+  rh: {
+    id: "rh", label: "Recursos Humanos", labelPT: "Recursos Humanos", level: 35,
+    color: "bg-pink-100 text-pink-800 border-pink-300",
+    description: "Gestão confidencial de colaboradores, ponto e folha salarial.",
+    tabs: ["dashboard", "payroll", "profile", "suggestions"],
+    canManageUsers: false, canManageRolesBelow: [],
+  },
+  qualidade: {
+    id: "qualidade", label: "Qualidade", labelPT: "Qualidade", level: 30,
+    color: "bg-teal-100 text-teal-800 border-teal-300",
+    description: "Inspeções, entregas, garantias e pós-venda.",
+    tabs: ["dashboard", "post_sale", "deliveries", "reports", "profile", "suggestions"],
+    canManageUsers: false, canManageRolesBelow: [],
+  },
+  estoque: {
+    id: "estoque", label: "Estoque", labelPT: "Estoque", level: 25,
+    color: "bg-lime-100 text-lime-800 border-lime-300",
+    description: "Movimentações, recebimento, reservas e inventário de materiais.",
+    tabs: ["dashboard", "inventory", "profile", "suggestions"],
+    canManageUsers: false, canManageRolesBelow: [],
+  },
+  producao: {
+    id: "producao", label: "Produção", labelPT: "Produção", level: 25,
+    color: "bg-violet-100 text-violet-800 border-violet-300",
+    description: "Ordens de produção, etapas, consumo de materiais e apontamentos.",
+    tabs: ["dashboard", "production", "technical_drawing", "projects", "inventory", "profile", "suggestions"],
+    canManageUsers: false, canManageRolesBelow: [],
   },
   usuario: {
     id: "usuario",
