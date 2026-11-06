@@ -24,6 +24,8 @@ import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
 import logoImg from "../assets/images/anacleto-logo-premium.svg";
 import BusinessWorkspace from "./workspace/BusinessWorkspace";
 import PostSaleModule from "./post-sale/PostSaleModule";
+import ProtectionModule from "./protection/ProtectionModule";
+import IntegratedReportsModule from "./reports/IntegratedReportsModule";
 
 type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale";
 
@@ -180,6 +182,8 @@ export default function AnacletoProApp({
     { id: "profile_optimization" as NavigationTab, label: "Otimização de Perfis", icon: Package, badge: null },
     { id: "materials" as NavigationTab, label: "Materiais de Produção", icon: Package, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
+    { id: "invoices" as NavigationTab, label: "Faturação", icon: FileCheck, badge: invoices.length },
+    { id: "protection" as NavigationTab, label: "Proteção e Segurança", icon: ShieldCheck, badge: null },
     { id: "post_sale" as NavigationTab, label: "Qualidade e Pós-venda", icon: Headset, badge: null },
   ];
 
@@ -371,7 +375,7 @@ export default function AnacletoProApp({
       {/* MAIN CONTENT AREA */}
       <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-50 dark:bg-[#101827]">
         <div className="max-w-7xl mx-auto rounded-[28px]">
-          {activeTab === "reports" && <BusinessWorkspace kind="reports" quotes={quotes} invoices={invoices} />}
+          {activeTab === "reports" && <IntegratedReportsModule />}
           {activeTab === "tipologias" && <BusinessWorkspace kind="tipologias" />}
           {activeTab === "projects" && <BusinessWorkspace kind="projects" />}
           {activeTab === "profile" && <BusinessWorkspace kind="profile" />}
@@ -423,7 +427,7 @@ export default function AnacletoProApp({
           {activeTab === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
-        {activeTab === "post_sale" && <PostSaleModule />}
+        {activeTab === "post_sale" && <PostSaleModule />}\n\n        {activeTab === "protection" && <ProtectionModule />}
 
          {activeTab === "finance" && (<FinanceModule language={language} />)}
         {activeTab === "payroll" && (isFullMenuRole || hasAccessToTab(effectiveRole, "payroll")) && (<PayrollModule />)}
