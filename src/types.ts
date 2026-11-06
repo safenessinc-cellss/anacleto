@@ -38,7 +38,7 @@ export interface DeliveryEvidence {
   operatorName: string;
 }
 
-export type QuoteStatus = "draft" | "pending" | "approved" | "accepted" | "rejected" | "invoiced";
+export type QuoteStatus = "draft" | "pending" | "approved" | "accepted" | "rejected" | "invoiced" | "pendente" | "aprovado" | "rejeitado";
 
 export interface Quote {
   id: string;
@@ -78,7 +78,7 @@ export interface Quote {
   deliveryEvidence?: DeliveryEvidence;
 }
 
-export type InvoiceStatus = "pending" | "paid" | "cancelled";
+export type InvoiceStatus = "pending" | "paid" | "cancelled" | "pendente" | "pago";
 
 export interface Invoice {
   id: string;
