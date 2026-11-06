@@ -363,7 +363,7 @@ export default function DashboardOverview({
               pdfDataUri: q.pdfDataUri,
               pdfFileName: q.pdfFileName || `Presupuesto_${q.number}.pdf`,
               sizeKb: q.pdfFileSizeKb || 35,
-              storedAt: q.pdfGeradoAt || q.updatedAt,
+              storedAt: q.pdfGeneratedAt || q.updatedAt,
               raw: q,
             })),
             ...invoices.map((inv) => ({
@@ -379,7 +379,7 @@ export default function DashboardOverview({
               pdfDataUri: inv.pdfDataUri,
               pdfFileName: inv.pdfFileName || `Factura_${inv.number}.pdf`,
               sizeKb: inv.pdfFileSizeKb || 38,
-              storedAt: inv.pdfGeradoAt || inv.updatedAt,
+              storedAt: inv.pdfGeneratedAt || inv.updatedAt,
               raw: inv,
             })),
             ...drawings.map((d) => ({
@@ -395,7 +395,7 @@ export default function DashboardOverview({
               pdfDataUri: d.pdfDataUri,
               pdfFileName: d.pdfFileName || `Plano_Tecnico_${(d.title || "Proyecto").replace(/\s+/g, "_")}.pdf`,
               sizeKb: d.pdfFileSizeKb || 42,
-              storedAt: d.pdfGeradoAt || d.updatedAt,
+              storedAt: d.pdfGeneratedAt || d.updatedAt,
               raw: d,
             })),
           ];
@@ -537,7 +537,7 @@ export default function DashboardOverview({
 
       {/* Global Dashboard PDF Viewer Modal */}
       <PdfViewerModal
-        isAbrir={activePdfModal.isAbrir}
+        isOpen={activePdfModal.isAbrir}
         onClose={() => setActivePdfModal((prev) => ({ ...prev, isAbrir: false }))}
         title={activePdfModal.title}
         subtitle={activePdfModal.subtitle}
