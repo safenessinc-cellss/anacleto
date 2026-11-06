@@ -31,7 +31,8 @@ export type NavigationTab =
   | "projects"
   | "profile"
   | "suggestions"
-  | "post_sale"\n  | "protection";
+  | "post_sale"
+  | "protection";
 
 export interface RoleConfig {
   id: Role;
