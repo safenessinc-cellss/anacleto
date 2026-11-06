@@ -79,6 +79,7 @@ service cloud.firestore {
 
     // Financeiro: acesso restrito a perfis financeiros e direção.
     match /suppliers/{id} { allow read, write: if canManageFinance(); }
+    match /purchase_orders/{id} { allow read, write: if canManageFinance(); }
     match /payables/{id} { allow read, write: if canManageFinance(); }
     match /receivables/{id} { allow read, write: if canManageFinance(); }
     match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
