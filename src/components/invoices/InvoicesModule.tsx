@@ -294,6 +294,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                     )}
                   </div>
                   <h2 className="text-lg font-black text-white mt-1">Fatura para: {selectedInvoice.clientName}</h2>
+                  {selectedInvoice.deliveryEvidence && <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200"><p className="font-bold">Entrega concluída · {selectedInvoice.deliveryStatus} · Recebido por {selectedInvoice.deliveryEvidence.signedBy}</p><div className="mt-2 flex flex-wrap gap-2">{selectedInvoice.deliveryEvidence.photos.map(photo=><a key={photo.path} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt="Foto da entrega" className="h-14 w-20 rounded object-cover"/></a>)}<a href={selectedInvoice.deliveryEvidence.signatureUrl} target="_blank" rel="noreferrer" className="rounded border border-emerald-300 px-3 py-2 font-bold">Assinatura</a><a href={`https://maps.google.com/?q=${selectedInvoice.deliveryEvidence.latitude},${selectedInvoice.deliveryEvidence.longitude}`} target="_blank" rel="noreferrer" className="rounded border border-emerald-300 px-3 py-2 font-bold">GPS</a></div></div>}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
