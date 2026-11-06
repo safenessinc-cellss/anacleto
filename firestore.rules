@@ -37,12 +37,8 @@ service cloud.firestore {
       allow create, update, delete: if owner();
     }
     match /pending_users/{uid} {
-      allow create, update: if signedIn() && request.auth.uid == uid
-        && request.auth.token.email != null
-        && request.auth.token.email.lower() == 'anacletoesquadrias@gmail.com';
-      allow read: if signedIn() && request.auth.uid == uid
-        && request.auth.token.email != null
-        && request.auth.token.email.lower() == 'anacletoesquadrias@gmail.com' || owner();
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow read: if (signedIn() && request.auth.uid == uid) || owner();
       allow delete: if owner();
     }
 
