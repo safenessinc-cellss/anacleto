@@ -26,13 +26,24 @@ const drawQuoteItemMiniature3D = (doc: jsPDF, description: string, x: number, y:
   const isDoor = /porta|door/.test(d);
   const isSliding = /corredi|correr|sliding|2 folhas|duas folhas/.test(d);
   const isCloset = /arm[aá]rio|closet|roupeiro/.test(d);
+  const isWindow = /janela|esquadria|window|frame/.test(d);
+  const isGeneric = !isShower && !isDoor && !isCloset && !isWindow && !isSliding;
   const pad = 4;
   const left = x + pad, top = y + 4, frontW = w - 2 * pad - 5, frontH = h - 9, depth = 4;
   const right = left + frontW, bottom = top + frontH;
   doc.setLineWidth(0.45);
   doc.setDrawColor(100, 116, 139);
   doc.setFillColor(239, 246, 255);
-  if (isShower) {
+  if (isGeneric) {
+    // Objeto genérico em perspectiva para itens/serviços sem tipologia de esquadria identificável.
+    doc.rect(left + 5, top + 7, frontW - 11, frontH - 13, "FD");
+    doc.line(left + 5, top + 7, left + 10, top + 3);
+    doc.line(left + frontW - 6, top + 7, left + frontW - 1, top + 3);
+    doc.line(left + 10, top + 3, left + frontW - 1, top + 3);
+    doc.line(left + frontW - 6, bottom - 6, left + frontW - 1, bottom - 10);
+    doc.line(left + frontW - 1, top + 3, left + frontW - 1, bottom - 10);
+    doc.line(left + 5, top + 7, left + 10, top + 3);
+  } else if (isShower) {
     // Duas folhas de vidro em canto, com profundidade lateral.
     doc.rect(left + 2, top + 2, frontW * 0.58, frontH - 3, "FD");
     doc.line(left + 2, top + 2, left + frontW * 0.58 + depth, top - 1);
