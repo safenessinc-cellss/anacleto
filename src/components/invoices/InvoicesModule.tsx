@@ -18,8 +18,8 @@ import {
 } from "lucide-react";
 import { Invoice, InvoiceStatus, SenderConfig } from "../../types";
 import { exportInvoicePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "../../firebase";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
 
@@ -82,24 +82,43 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
   };
 
   const handleToggleStatus = async (invoice: Invoice) => {
-    const nextStatus: InvoiceStatus = invoice.status === "pago" ? "pendente" : "pago";
+    if (invoice.status === "pago") {
+      showToast("Uma fatura recebida não pode ser reaberta por este botão. Registre um estorno com autorização financeira.", "info");
+      return;
+    }
     try {
+      const nextStatus: InvoiceStatus = "pago";
       const baseUpdated: Invoice = { ...invoice, status: nextStatus, updatedAt: new Date().toISOString() };
       const pdfRes = buildInvoicePdf(baseUpdated, senderConfig);
-      const updated: Invoice = {
-        ...baseUpdated,
-        pdfDataUri: pdfRes.dataUri,
-        pdfFileName: pdfRes.fileName,
-        pdfGeneratedAt: new Date().toISOString(),
-        pdfFileSizeKb: pdfRes.sizeKb,
-      };
-
-      await setDoc(doc(db, "invoices", invoice.id), updated);
+      const updated: Invoice = { ...baseUpdated, pdfDataUri: pdfRes.dataUri, pdfFileName: pdfRes.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdfRes.sizeKb };
+      const invoiceRef = doc(db, "invoices", invoice.id);
+      const receivableRef = doc(db, "receivables", invoice.id);
+      const ledgerRef = doc(db, "ledger_entries", `invoice-paid-${invoice.id}`);
+      await runTransaction(db, async tx => {
+        const invoiceSnap = await tx.get(invoiceRef);
+        const ledgerSnap = await tx.get(ledgerRef);
+        if (!invoiceSnap.exists() || invoiceSnap.data().status === "pago") throw new Error("A fatura já foi processada por outro usuário.");
+        if (ledgerSnap.exists()) throw new Error("Já existe um lançamento financeiro para esta fatura.");
+        tx.set(invoiceRef, updated);
+        tx.set(receivableRef, {
+          clientId: invoice.companyId || "", clientName: invoice.clientName || "Cliente",
+          description: `Recebimento da fatura ${invoice.number}`, amount: Number(invoice.total || 0),
+          receivedAmount: Number(invoice.total || 0), dueDate: invoice.dueDate || invoice.date,
+          paymentMethod: "transferencia", status: "received", invoiceId: invoice.id,
+          receivedAt: new Date().toISOString(), updatedAt: serverTimestamp()
+        }, { merge: true });
+        tx.set(ledgerRef, {
+          direction: "inflow", category: "customer_receipt", sourceType: "invoice", sourceId: invoice.id,
+          description: `Recebimento da fatura ${invoice.number}`, amount: Number(invoice.total || 0),
+          date: new Date().toISOString().slice(0, 10), status: "posted", createdAt: serverTimestamp(),
+          createdBy: auth.currentUser?.email || ""
+        });
+      });
       setSelectedInvoice(updated);
-      showToast(`Fatura ${invoice.number} marcada como ${nextStatus === "pago" ? "PAGA" : "PENDENTE"} e PDF atualizado.`, "success");
+      showToast(`Fatura ${invoice.number} recebida e conciliada no Financeiro.`, "success");
     } catch (err) {
       console.error(err);
-      showToast("Erro ao atualizar status.", "error");
+      showToast("Erro ao conciliar o recebimento: " + ((err as Error).message || "erro desconhecido"), "error");
     }
   };
 
