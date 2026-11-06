@@ -19,6 +19,8 @@ const emptyForm: Supplier = { name: "", nif: "", email: "", phone: "", address: 
 
 export default function SuppliersModule() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [purchaseRecords, setPurchaseRecords] = useState<any[]>([]);
+  const [payableRecords, setPayableRecords] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [cnpjSearch, setCnpjSearch] = useState("");
   const [editing, setEditing] = useState<Supplier | null>(null);
@@ -34,7 +36,9 @@ export default function SuppliersModule() {
       list.sort((a, b) => a.name.localeCompare(b.name));
       setSuppliers(list);
     }, (err) => console.warn("Suppliers listener:", err));
-    return () => unsub();
+    const u2 = onSnapshot(collection(db, "purchase_orders"), snap => setPurchaseRecords(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u3 = onSnapshot(collection(db, "payables"), snap => setPayableRecords(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => { unsub(); u2(); u3(); };
   }, []);
 
   const handleLookupCNPJ = async () => {
@@ -172,7 +176,7 @@ export default function SuppliersModule() {
       <div className="bg-white dark:bg-slate-900 rounded-xl border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800 text-left text-xs uppercase text-slate-500">
-            <tr><th className="p-3">Nome</th><th className="p-3">CNPJ/CPF</th><th className="p-3">Email</th><th className="p-3">Telefone</th><th className="p-3">Ações</th></tr>
+            <tr><th className="p-3">Nome</th><th className="p-3">CNPJ/CPF</th><th className="p-3">Email</th><th className="p-3">Telefone</th><th className="p-3">Compras</th><th className="p-3">Em aberto</th><th className="p-3">Ações</th></tr>
           </thead>
           <tbody>
             {filtered.map((s) => (
@@ -188,7 +192,7 @@ export default function SuppliersModule() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={5} className="p-8 text-center text-slate-400">
+              <tr><td colSpan={7} className="p-8 text-center text-slate-400">
                 {search ? `Nenhum fornecedor encontrado para "${search}"` : "Nenhum fornecedor cadastrado"}
               </td></tr>
             )}
