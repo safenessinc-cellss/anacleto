@@ -17,6 +17,10 @@ type Expense = {
   notes?: string;
   source: "manual" | "csv" | "ofx" | "nfe";
   importKey?: string;
+  companyId?: string;
+  companyName?: string;
+  quoteId?: string;
+  quoteNumber?: string;
   createdAt?: string;
 };
 type DraftExpense = Omit<Expense, "id" | "createdAt">;
@@ -120,7 +124,9 @@ export default function ExpenseRegistrationModule() {
   const duplicateKeys = useMemo(() => new Set(items.map(i => i.importKey || makeKey(i))), [items]);
 
   const saveOne = async (entry: DraftExpense) => {
-    await addDoc(collection(db, "expenses"), { ...entry, importKey: makeKey(entry), createdAt: new Date().toISOString() });
+    const company = companies.find(c => c.id === entry.companyId);
+    const quote = quotes.find(q => q.id === entry.quoteId);
+    await addDoc(collection(db, "expenses"), { ...entry, companyName: company?.name || entry.companyName || "", quoteNumber: quote?.number || entry.quoteNumber || "", importKey: makeKey(entry), createdAt: new Date().toISOString() });
   };
   const saveManual = async () => {
     if (!form.description.trim() || !form.supplier.trim() || form.amount <= 0 || !form.date) {
@@ -181,7 +187,8 @@ export default function ExpenseRegistrationModule() {
         <input className="rounded-lg border p-2.5 bg-transparent text-sm" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
         <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{["Materiais","Serviços","Frete","Energia e água","Aluguel","Folha de pagamento","Impostos e taxas","Manutenção","Administrativo","Outros"].map(v=><option key={v}>{v}</option>)}</select>
         <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.paymentMethod} onChange={e=>setForm({...form,paymentMethod:e.target.value})}>{["Não informado","PIX","Boleto","Transferência","Cartão","Dinheiro","Débito automático"].map(v=><option key={v}>{v}</option>)}</select>
-        <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.companyId || ""} onChange={e=>setForm({...form,companyId:e.target.value,quoteId:""})}><option value="">Vincular cliente (opcional)</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>\n        <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.quoteId || ""} onChange={e=>setForm({...form,quoteId:e.target.value})}><option value="">Vincular orçamento/projeto (opcional)</option>{quotes.filter(q=>!form.companyId||q.companyId===form.companyId).map(q=><option key={q.id} value={q.id}>{q.number} · {q.clientName}</option>)}</select>\n        <input className="rounded-lg border p-2.5 bg-transparent text-sm" placeholder="Nº documento / nota fiscal" value={form.documentNumber} onChange={e=>setForm({...form,documentNumber:e.target.value})}/>
+        <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.companyId || ""} onChange={e=>setForm({...form,companyId:e.target.value,quoteId:""})}><option value="">Vincular cliente (opcional)</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+        <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.quoteId || ""} onChange={e=>setForm({...form,quoteId:e.target.value})}><option value="">Vincular orçamento/projeto (opcional)</option>{quotes.filter(q=>!form.companyId||q.companyId===form.companyId).map(q=><option key={q.id} value={q.id}>{q.number} · {q.clientName}</option>)}</select>\n        <input className="rounded-lg border p-2.5 bg-transparent text-sm" placeholder="Nº documento / nota fiscal" value={form.documentNumber} onChange={e=>setForm({...form,documentNumber:e.target.value})}/>
         <input className="rounded-lg border p-2.5 bg-transparent text-sm sm:col-span-2" placeholder="Observações" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/>
       </div>
       <div className="flex justify-end"><button disabled={busy} onClick={saveManual} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm disabled:opacity-50">{busy ? "Salvando..." : "Salvar gasto"}</button></div>
