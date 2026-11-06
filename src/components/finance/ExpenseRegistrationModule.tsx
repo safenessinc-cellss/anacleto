@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import Papa from "papaparse";
 import { db } from "../../firebase";
+import type { Company, Quote } from "../../types";
 import { AlertCircle, CheckCircle2, FileUp, Plus, Upload, X } from "lucide-react";
 
 type Expense = {
@@ -24,7 +25,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const blank: DraftExpense = {
   description: "", supplier: "", category: "Materiais", amount: 0,
   date: today(), paymentMethod: "Não informado", documentNumber: "",
-  notes: "", source: "manual",
+  notes: "", source: "manual", companyId: "", quoteId: "",
 };
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const clean = (value: unknown) => String(value ?? "").trim();
@@ -99,7 +100,7 @@ function parseNfe(text: string): DraftExpense[] {
 }
 
 export default function ExpenseRegistrationModule() {
-  const [items, setItems] = useState<Expense[]>([]);
+  const [items, setItems] = useState<Expense[]>([]);\n  const [companies, setCompanies] = useState<Company[]>([]);\n  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [form, setForm] = useState<DraftExpense>(blank);
   const [showForm, setShowForm] = useState(false);
   const [staged, setStaged] = useState<DraftExpense[]>([]);
@@ -111,7 +112,7 @@ export default function ExpenseRegistrationModule() {
     setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense)).sort((a,b) => b.date.localeCompare(a.date)));
   }, err => setError("Não foi possível carregar os gastos. Verifique sua permissão de acesso.")), []);
 
-  const totalMonth = useMemo(() => {
+  useEffect(() => onSnapshot(collection(db, "companies"), snap => setCompanies(snap.docs.map(d => ({id:d.id,...d.data()} as Company)))), []);\n  useEffect(() => onSnapshot(collection(db, "quotes"), snap => setQuotes(snap.docs.map(d => ({id:d.id,...d.data()} as Quote)))), []);\n\n  const totalMonth = useMemo(() => {
     const month = today().slice(0, 7);
     return items.filter(i => i.date?.startsWith(month)).reduce((sum, i) => sum + Number(i.amount || 0), 0);
   }, [items]);
@@ -180,7 +181,7 @@ export default function ExpenseRegistrationModule() {
         <input className="rounded-lg border p-2.5 bg-transparent text-sm" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
         <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{["Materiais","Serviços","Frete","Energia e água","Aluguel","Folha de pagamento","Impostos e taxas","Manutenção","Administrativo","Outros"].map(v=><option key={v}>{v}</option>)}</select>
         <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.paymentMethod} onChange={e=>setForm({...form,paymentMethod:e.target.value})}>{["Não informado","PIX","Boleto","Transferência","Cartão","Dinheiro","Débito automático"].map(v=><option key={v}>{v}</option>)}</select>
-        <input className="rounded-lg border p-2.5 bg-transparent text-sm" placeholder="Nº documento / nota fiscal" value={form.documentNumber} onChange={e=>setForm({...form,documentNumber:e.target.value})}/>
+        <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.companyId || ""} onChange={e=>setForm({...form,companyId:e.target.value,quoteId:""})}><option value="">Vincular cliente (opcional)</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>\n        <select className="rounded-lg border p-2.5 bg-transparent text-sm" value={form.quoteId || ""} onChange={e=>setForm({...form,quoteId:e.target.value})}><option value="">Vincular orçamento/projeto (opcional)</option>{quotes.filter(q=>!form.companyId||q.companyId===form.companyId).map(q=><option key={q.id} value={q.id}>{q.number} · {q.clientName}</option>)}</select>\n        <input className="rounded-lg border p-2.5 bg-transparent text-sm" placeholder="Nº documento / nota fiscal" value={form.documentNumber} onChange={e=>setForm({...form,documentNumber:e.target.value})}/>
         <input className="rounded-lg border p-2.5 bg-transparent text-sm sm:col-span-2" placeholder="Observações" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/>
       </div>
       <div className="flex justify-end"><button disabled={busy} onClick={saveManual} className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm disabled:opacity-50">{busy ? "Salvando..." : "Salvar gasto"}</button></div>
