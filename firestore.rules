@@ -29,7 +29,7 @@ service cloud.firestore {
       return hasRole(['super_admin','super_usuario','ceo','admin','financeiro']);
     }
     function canManageQuality() {
-      return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']);
+      return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','colaborador','qualidade']);
     }
 
     match /admins/{email} {
@@ -93,6 +93,7 @@ service cloud.firestore {
 
     // Qualidade e pós-venda: registos operacionais e rastreabilidade.
     match /post_sale_records/{id} { allow read, write: if canManageQuality(); }
+    match /deliveries/{id} { allow read, write: if canManageQuality(); }
     match /audit_logs/{id} {
       allow read: if hasRole(['super_admin','super_usuario','ceo','admin']);
       allow create: if signedIn();
