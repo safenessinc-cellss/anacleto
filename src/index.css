@@ -476,3 +476,40 @@ html.dark .tahoe-heading,html.dark .tahoe-kpi { color:#f4f6fb; }
 html.dark .tahoe-card { background:rgba(27,35,49,.88)!important; border-color:rgba(148,163,184,.16)!important; }
 html.dark .tahoe-field input,html.dark .tahoe-field select,html.dark .tahoe-field textarea,html.dark .tahoe-search { background:#172033!important; color:#f4f6fb!important; border-color:rgba(148,163,184,.22)!important; }
 html.dark .tahoe-secondary { background:#263247; color:#e6eaf2; }
+
+
+/* Harmonização transversal: todos os módulos internos partilham a mesma linguagem visual */
+html:not(.dark) main .rounded-3xl,
+html:not(.dark) main .rounded-2xl,
+html:not(.dark) main .rounded-xl {
+  border-color:rgba(113,128,150,.18)!important;
+}
+html:not(.dark) main [class*="bg-slate-900"][class*="rounded"],
+html:not(.dark) main [class*="bg-slate-950"][class*="rounded"],
+html:not(.dark) main [class*="bg-indigo-950"][class*="rounded"],
+html:not(.dark) main [class*="bg-blue-950"][class*="rounded"],
+html:not(.dark) main [class*="bg-emerald-950"][class*="rounded"] {
+  background:rgba(255,255,255,.9)!important;
+  color:#172033!important;
+  border-color:rgba(113,128,150,.18)!important;
+  box-shadow:var(--shadow-soft);
+}
+html:not(.dark) main [class*="bg-slate-900"][class*="rounded"] .text-white,
+html:not(.dark) main [class*="bg-slate-950"][class*="rounded"] .text-white,
+html:not(.dark) main [class*="bg-indigo-950"][class*="rounded"] .text-white,
+html:not(.dark) main [class*="bg-blue-950"][class*="rounded"] .text-white,
+html:not(.dark) main [class*="bg-emerald-950"][class*="rounded"] .text-white { color:#172033!important; }
+html:not(.dark) main button[class*="bg-indigo-"],
+html:not(.dark) main button[class*="bg-emerald-"],
+html:not(.dark) main button[class*="bg-purple-"],
+html:not(.dark) main button[class*="bg-cyan-"] { background:#3478f6!important; color:white!important; border-color:#3478f6!important; }
+html:not(.dark) main input:not([type="checkbox"]):not([type="radio"]),
+html:not(.dark) main select,
+html:not(.dark) main textarea { border-radius:11px; border-color:rgba(113,128,150,.23); }
+html:not(.dark) main .border-slate-800,
+html:not(.dark) main .border-slate-700 { border-color:rgba(113,128,150,.18)!important; }
+html:not(.dark) main .text-slate-400 { color:#778398!important; }
+html:not(.dark) main .text-slate-300 { color:#5f6d82!important; }
+html:not(.dark) main .text-slate-200 { color:#344054!important; }
+html:not(.dark) main .shadow-xl,
+html:not(.dark) main .shadow-2xl { box-shadow:var(--shadow-soft)!important; }
