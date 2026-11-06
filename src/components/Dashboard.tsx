@@ -30,7 +30,7 @@ import {
   Download,
   X
 } from "lucide-react";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, writeBatch, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db, auth, handleFirestoreError, OperationType } from "../firebase";
 import { Budget, Invoice, SenderConfig, AdminUser, ChatSession } from "../types";
 import { Translation } from "../translations";
@@ -189,46 +189,37 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
   // Convert budget strictly directly to professional Invoice
   const handleGenerateInvoice = async (budget: Budget) => {
     try {
-      // Create a unique Invoice number sequence
-      const invoiceNo = "FT-" + new Date().getFullYear() + "-" + (invoices.length + 501);
-      const invoiceId = "inv_" + Math.random().toString(36).substring(2);
-
+      const budgetRef = doc(db, "budgets", budget.id);
+      const invoiceRef = doc(collection(db, "invoices"));
+      const invoiceId = invoiceRef.id;
+      const invoiceNo = "FT-" + new Date().getFullYear() + "-" + invoiceId.slice(-6).toUpperCase();
+      const dueDate = new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10);
       const invoiceData: Invoice = {
-        id: invoiceId,
-        number: invoiceNo,
-        budgetId: budget.id,
-        clientName: budget.clientName,
-        clientEmail: budget.clientEmail,
-        clientNif: budget.clientNif,
-        clientAddress: budget.clientAddress,
-        date: new Date().toISOString().split("T")[0],
-        items: budget.items,
-        subtotal: budget.subtotal,
-        taxRate: budget.taxRate,
-        taxAmount: budget.taxAmount,
-        total: budget.total,
-        language: budget.language,
-        senderSnapshot: senderConfig, // Capture real-time snapshot of the configuration issuer
-        createdAt: new Date().toISOString()
+        id: invoiceId, number: invoiceNo, budgetId: budget.id,
+        clientName: budget.clientName, clientEmail: budget.clientEmail, clientNif: budget.clientNif,
+        clientAddress: budget.clientAddress, date: new Date().toISOString().split("T")[0], dueDate,
+        items: budget.items, subtotal: budget.subtotal, taxRate: budget.taxRate, taxAmount: budget.taxAmount,
+        total: budget.total, language: budget.language, senderSnapshot: senderConfig,
+        status: "pending", createdAt: new Date().toISOString()
       };
-
-      const batch = writeBatch(db);
-      batch.set(doc(db, "invoices", invoiceId), invoiceData);
-      batch.set(doc(db, "receivables", invoiceId), {
-        clientId: (budget as any).companyId || (budget as any).clientId || "",
-        clientName: budget.clientName || "Cliente", description: `Fatura ${invoiceNo} · Orçamento ${budget.id}`,
-        amount: Number(budget.total || 0), receivedAmount: 0,
-        dueDate: (invoiceData as any).dueDate || new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
-        paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: budget.id,
-        createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+      await runTransaction(db, async tx => {
+        const current = await tx.get(budgetRef);
+        if (!current.exists()) throw new Error("Orçamento não encontrado.");
+        if (current.data().invoiceId || current.data().status === "invoiced") throw new Error("Este orçamento já possui uma fatura vinculada.");
+        tx.set(invoiceRef, invoiceData);
+        tx.set(doc(db, "receivables", invoiceId), {
+          clientId: (budget as any).companyId || (budget as any).clientId || "",
+          clientName: budget.clientName || "Cliente", description: `Fatura ${invoiceNo} · Orçamento ${budget.id}`,
+          amount: Number(budget.total || 0), receivedAmount: 0, dueDate,
+          paymentMethod: "transferencia", status: "pending", invoiceId, budgetId: budget.id,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+        tx.update(budgetRef, { status: "invoiced", invoiceId, updatedAt: serverTimestamp() });
       });
-      batch.update(doc(db, "budgets", budget.id), { status: "invoiced", invoiceId, updatedAt: serverTimestamp() });
-      await batch.commit();
-
       showToast(t.toastInvoicedSuccess, "success");
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, "invoices");
-      showToast("Erro ao faturar orçamento.", "error");
+      showToast("Erro ao faturar orçamento: " + ((err as Error).message || "erro desconhecido"), "error");
     }
   };
 
