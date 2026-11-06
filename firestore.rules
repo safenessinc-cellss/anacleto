@@ -85,7 +85,7 @@ service cloud.firestore {
     match /payments/{id} { allow read, write: if canManageFinance(); }
     match /company_payment_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']); }
 
-    // Pessoas e folha salarial: confidencialidade reforçada.
+    // Proteção e segurança: ocorrências, inspeções e ações preventivas restritas à equipe autorizada.\n    match /protection_records/{id} { allow read, write: if canManageQuality(); }\n\n    // Pessoas e folha salarial: confidencialidade reforçada.
     match /employees/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']); }
     match /time_entries/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','supervisor']); }
     match /payroll_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']); }
