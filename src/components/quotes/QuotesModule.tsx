@@ -188,7 +188,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     const configuredLogo = senderConfig.logoUrl || senderConfig.websiteLogoUrl || "";
     const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
-      if (/^https?:\\/\\//i.test(src)) image.crossOrigin = "anonymous";
+      if (src.startsWith("http://") || src.startsWith("https://")) image.crossOrigin = "anonymous";
       image.onload = () => resolve(image);
       image.onerror = () => reject(new Error("Não foi possível carregar o logotipo"));
       image.src = src;
