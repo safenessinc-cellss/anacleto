@@ -75,7 +75,7 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
         const imported = results.data.map((raw) => {
           const row: Record<string, string> = {};
           Object.entries(raw).forEach(([key, value]) => { row[normalize(key)] = String(value ?? "").trim(); });
-          const priceText = (row.preco || row.valor || row.price || "0").replace(/R\\$\\s?/gi, "").replace(/\\./g, "").replace(",", ".");
+          const priceText = (row.preco || row.valor || row.price || "0").replace(/R\$\s?/gi, "").replace(/\./g, "").replace(",", ".");
           return {
             name: row.nome || row.descricao || row.servico || row.name || row.description || "",
             code: row.codigo || row.cod || row.code || row.sku || "",
