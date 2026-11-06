@@ -94,11 +94,10 @@ export default function ReceivablesModule() {
   };
 
   const markReceived = async (r: Receivable) => {
-    await updateDoc(doc(db, "receivables", r.id!), {
-      status: "received",
-      receivedAmount: r.amount,
-      receivedAt: new Date().toISOString(),
-    });
+    const now = new Date().toISOString();
+    const delta = Math.max(0, Number(r.amount || 0) - Number(r.receivedAmount || 0));
+    if (delta > 0) await addDoc(collection(db, "payments"), { direction: "in", type: "receivable", referenceId: r.id, description: r.description, clientName: r.clientName, amount: delta, status: "completed", paidAt: now, createdAt: now });
+    await updateDoc(doc(db, "receivables", r.id!), { status: "received", receivedAmount: r.amount, receivedAt: now });
   };
   const markPartial = async (r: Receivable) => {
     const val = prompt(`Valor recebido parcialmente (máx R$ ${r.amount}):`, String((r.receivedAmount || 0)));
@@ -106,11 +105,10 @@ export default function ReceivablesModule() {
     const num = parseFloat(val);
     if (isNaN(num) || num <= 0) return alert("Valor inválido");
     if (num >= r.amount) return markReceived(r);
-    await updateDoc(doc(db, "receivables", r.id!), {
-      status: "partial",
-      receivedAmount: num,
-      receivedAt: new Date().toISOString(),
-    });
+    const now = new Date().toISOString();
+    const delta = Math.max(0, num - Number(r.receivedAmount || 0));
+    if (delta > 0) await addDoc(collection(db, "payments"), { direction: "in", type: "receivable", referenceId: r.id, description: r.description, clientName: r.clientName, amount: delta, status: "completed", paidAt: now, createdAt: now });
+    await updateDoc(doc(db, "receivables", r.id!), { status: "partial", receivedAmount: num, receivedAt: now });
   };
   const markPending = async (r: Receivable) => {
     await updateDoc(doc(db, "receivables", r.id!), { status: "pending", receivedAmount: 0, receivedAt: null });
