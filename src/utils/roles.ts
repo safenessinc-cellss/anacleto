@@ -30,7 +30,8 @@ export type NavigationTab =
   | "tipologias"
   | "projects"
   | "profile"
-  | "suggestions";
+  | "suggestions"
+  | "post_sale";
 
 export interface RoleConfig {
   id: Role;
@@ -46,7 +47,7 @@ export interface RoleConfig {
 
 const ALL_TABS: NavigationTab[] = [
   "dashboard", "crm", "quotes", "invoices", "technical_drawing",
-  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions",
+  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale",
 ];
 
 export const ROLES: Record<Role, RoleConfig> = {
@@ -101,7 +102,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 40,
     color: "bg-blue-100 text-blue-800 border-blue-300",
     description: "Supervisa equipos. Acceso a todos los módulos operativos y finanzas.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "theme", "payroll", "reports", "tipologias", "projects", "profile", "suggestions"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "finance", "financial_ai", "theme", "payroll", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
