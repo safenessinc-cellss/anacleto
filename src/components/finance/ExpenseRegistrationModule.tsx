@@ -119,7 +119,7 @@ export default function ExpenseRegistrationModule() {
   }, err => setError("Não foi possível carregar os gastos. Verifique sua permissão de acesso.")), []);
 
   useEffect(() => onSnapshot(collection(db, "companies"), snap => setCompanies(snap.docs.map(d => ({id:d.id,...d.data()} as Company)))), []);
-  useEffect(() => onSnapshot(collection(db, "quotes"), snap => setQuotes(snap.docs.map(d => ({id:d.id,...d.data()} as Quote)))), []);\n
+  useEffect(() => onSnapshot(collection(db, "quotes"), snap => setQuotes(snap.docs.map(d => ({id:d.id,...d.data()} as Quote)))), []);
   const totalMonth = useMemo(() => {
     const month = today().slice(0, 7);
     return items.filter(i => i.date?.startsWith(month)).reduce((sum, i) => sum + Number(i.amount || 0), 0);
