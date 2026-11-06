@@ -84,6 +84,38 @@ const drawQuoteItemMiniature3D = (doc: jsPDF, description: string, x: number, y:
   doc.setLineWidth(0.2);
 };
 
+
+/** Insere a marca oficial configurada no CRM; sem upload, usa assinatura vetorial da marca. */
+const drawDocumentLogo = (doc: jsPDF, sender: SenderConfig | undefined, x: number, y: number, w: number, h: number) => {
+  const logo = sender?.logoUrl;
+  if (logo?.startsWith("data:image/")) {
+    try {
+      const mime = logo.slice(5, logo.indexOf(";")).toLowerCase();
+      const format = mime.includes("jpeg") ? "JPEG" : mime.includes("webp") ? "WEBP" : "PNG";
+      doc.addImage(logo, format, x, y, w, h);
+      return;
+    } catch (error) {
+      console.warn("Não foi possível inserir o logotipo configurado no PDF:", error);
+    }
+  }
+  // Fallback vetorial compacto com a identidade arquitetônica prata/dourado.
+  doc.setDrawColor(197, 168, 80);
+  doc.setLineWidth(1.1);
+  doc.rect(x, y + 1, 20, h - 2);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.8);
+  doc.line(x + 10, y + 2, x + 10, y + h - 2);
+  doc.line(x + 2, y + h / 2, x + 18, y + h / 2);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(197, 168, 80);
+  doc.text("ANACLETO", x + 23, y + h / 2 - 1);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.5);
+  doc.setTextColor(203, 213, 225);
+  doc.text("ESQUADRIAS", x + 23, y + h / 2 + 4);
+};
+
 export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
@@ -97,19 +129,20 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.setFillColor(197, 168, 80); // Luxury Gold
   doc.rect(0, 42, pageWidth, 3, "F");
 
-  // Logotipo oficial no cabeçalho e marca d'água suave no corpo do orçamento.
-  if (sender?.logoUrl?.startsWith("data:image/")) {
-    doc.addImage(sender.logoUrl, "PNG", 14, 7, 25, 25);
-  }
+  // Logotipo do CRM presente em todos os documentos comerciais.
+  drawDocumentLogo(doc, sender, 14, 7, 25, 25);
   if (sender?.watermarkLogoUrl?.startsWith("data:image/")) {
     doc.addImage(sender.watermarkLogoUrl, "PNG", pageWidth / 2 - 65, 72, 130, 130);
   }
+
+  // Logotipo do CRM no cabeçalho da fatura.
+  drawDocumentLogo(doc, sender, 14, 7, 25, 25);
 
   // Brand Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), sender?.logoUrl?.startsWith("data:image/") ? 44 : 14, 20);
+  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), 44, 20);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
@@ -251,9 +284,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     if (sender?.watermarkLogoUrl?.startsWith("data:image/")) {
       doc.addImage(sender.watermarkLogoUrl, "PNG", pageWidth / 2 - 65, 72, 130, 130);
     }
-    if (sender?.logoUrl?.startsWith("data:image/")) {
-      doc.addImage(sender.logoUrl, "PNG", 14, 7, 25, 25);
-    }
+    drawDocumentLogo(doc, sender, 14, 7, 25, 25);
     const desc = technicalDrawing?.title || windowItem?.description || "Esquadria";
     const dimensions = desc.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
     const unitFactor = technicalDrawing?.unit === "mm" ? 1 : 10;
@@ -349,12 +380,12 @@ export const buildInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDoc
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), 14, 20);
+  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), 44, 20);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(197, 168, 80);
-  doc.text("SISTEMA DE FACTURACIÓN Y GESTIÓN EMPRESARIAL", 14, 27);
+  doc.text("SISTEMA DE FACTURACIÓN Y GESTIÓN EMPRESARIAL", 44, 27);
 
   // Document Type & Number
   doc.setFontSize(16);
@@ -506,15 +537,16 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
   doc.setFillColor(197, 168, 80); // Gold
   doc.rect(0, 38, pageWidth, 3, "F");
 
+  drawDocumentLogo(doc, sender, 14, 5, 25, 25);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
+  doc.setFontSize(14);
   doc.setTextColor(255, 255, 255);
-  doc.text("MEMORIA TÉCNICA Y PLANO ARQUITECTÓNICO", 14, 18);
+  doc.text("MEMORIA TÉCNICA Y PLANO ARQUITECTÓNICO", 44, 18);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(197, 168, 80);
-  doc.text("ANACLETO ESQUADRIAS • DEPARTAMENTO TÉCNICO E DESENHO 2D", 14, 26);
+  doc.text("ANACLETO ESQUADRIAS • DEPARTAMENTO TÉCNICO E DESENHO 2D", 44, 26);
 
   doc.setFontSize(10);
   doc.setTextColor(203, 213, 225);
