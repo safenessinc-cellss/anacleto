@@ -167,31 +167,31 @@ export default function AnacletoProApp({
   ];
   const cadastroItems = [
     { id: "crm" as NavigationTab, label: "Clientes", icon: Building, badge: companies.length },
-    { id: "cadastro_items" as NavigationTab, label: "Itens", icon: Package, badge: null },
+    { id: "cadastro_items" as NavigationTab, label: "Materiais e Componentes", icon: Package, badge: null },
     { id: "products" as NavigationTab, label: "Produtos", icon: Package, badge: null },
 
     { id: "services" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
   ];
   const gestaoItems = [
     { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
-    { id: "measurement" as NavigationTab, label: "Ficha de Medição", icon: Calendar, badge: null },
+    { id: "measurement" as NavigationTab, label: "Medições", icon: Calendar, badge: null },
     { id: "contracts" as NavigationTab, label: "Contratos", icon: FileCheck, badge: null },
     { id: "cut_plan" as NavigationTab, label: "Plano de Corte", icon: Compass, badge: null },
-    { id: "profile_optimization" as NavigationTab, label: "Aproveitamento de Perfis", icon: Package, badge: null },
-    { id: "materials" as NavigationTab, label: "Lista de Materiais", icon: Package, badge: null },
+    { id: "profile_optimization" as NavigationTab, label: "Otimização de Perfis", icon: Package, badge: null },
+    { id: "materials" as NavigationTab, label: "Materiais de Produção", icon: Package, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
-    { id: "post_sale" as NavigationTab, label: "Pós-venda", icon: Headset, badge: null },
+    { id: "post_sale" as NavigationTab, label: "Qualidade e Pós-venda", icon: Headset, badge: null },
   ];
 
   const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || item.id !== "payroll" && hasAccessToTab(effectiveRole, item.id as RoleNavTab));
   const utilityItems = [
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
-    { id: "tipologias" as NavigationTab, label: "Tipologias", icon: Package, badge: null },
+    { id: "tipologias" as NavigationTab, label: "Modelos de Esquadrias", icon: Package, badge: null },
     { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
-    { id: "financial_ai" as NavigationTab, label: "IA Financeira", icon: Sparkles, badge: "NOVO" },
-    { id: "technical_drawing" as NavigationTab, label: "Desenho Técnico 2D", icon: Compass, badge: "CAD" },
+    { id: "financial_ai" as NavigationTab, label: "Assistente Financeiro", icon: Sparkles, badge: "NOVO" },
+    { id: "technical_drawing" as NavigationTab, label: "Projetos Técnicos 2D", icon: Compass, badge: "CAD" },
     { id: "admin" as NavigationTab, label: "Administração", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
     { id: "suggestions" as NavigationTab, label: "Sugestões", icon: Sparkles, badge: null },
     { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
