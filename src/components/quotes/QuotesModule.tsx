@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, writeBatch, serverTimestamp } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -305,75 +305,45 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // Convert Approved Quote to Invoice (with persistent PDF attached)
   const handleConvertQuoteToInvoice = async (quote: Quote) => {
     try {
-      if ((quote as any).invoiceId) {
-        showToast("Este orçamento já possui uma fatura vinculada.", "info");
-        return;
-      }
-      const invoiceId = "inv_" + Math.random().toString(36).substring(2, 9);
+      const quoteRef = doc(db, "quotes", quote.id);
+      const invoiceRef = doc(collection(db, "invoices"));
+      const invoiceId = invoiceRef.id;
       const invoiceNumber = "FAC-" + new Date().getFullYear() + "-" + Math.floor(Math.random() * 900 + 100);
-
       const baseInvoice: Invoice = {
-        id: invoiceId,
-        number: invoiceNumber,
-        quoteId: quote.id,
-        companyId: quote.companyId,
-        clientName: quote.clientName,
-        clientEmail: quote.clientEmail,
-        clientTaxId: quote.clientTaxId,
-        clientAddress: quote.clientAddress,
-        date: new Date().toISOString().split("T")[0],
+        id: invoiceId, number: invoiceNumber, quoteId: quote.id, companyId: quote.companyId,
+        clientName: quote.clientName, clientEmail: quote.clientEmail, clientTaxId: quote.clientTaxId,
+        clientAddress: quote.clientAddress, date: new Date().toISOString().split("T")[0],
         dueDate: new Date(Date.now() + 15 * 24 * 3600 * 1000).toISOString().split("T")[0],
-        items: quote.items,
-        subtotal: quote.subtotal,
-        taxRate: quote.taxRate,
-        taxAmount: quote.taxAmount,
-        discountRate: quote.discountRate,
-        discountAmount: quote.discountAmount,
-        total: quote.total,
-        currency: quote.currency,
-        status: "pendente",
-        paymentMethod: "Transferência Bancária",
+        items: quote.items, subtotal: quote.subtotal, taxRate: quote.taxRate, taxAmount: quote.taxAmount,
+        discountRate: quote.discountRate, discountAmount: quote.discountAmount, total: quote.total,
+        currency: quote.currency, status: "pendente", paymentMethod: "Transferência Bancária",
         notes: `Fatura gerada a partir do orçamento ${quote.number}.`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
-
-      // Generate invoice PDF for immediate platform storage
-      const invPdfRes = buildInvoicePdf(baseInvoice, senderConfig);
-      const finalInvoice: Invoice = {
-        ...baseInvoice,
-        pdfDataUri: invPdfRes.dataUri,
-        pdfFileName: invPdfRes.fileName,
-        pdfGeneratedAt: new Date().toISOString(),
-        pdfFileSizeKb: invPdfRes.sizeKb,
-      };
-
-      const updatedQuote: Quote = { ...quote, status: "approved", ...( { invoiceId } as any) };
-      const batch = writeBatch(db);
-      batch.set(doc(db, "invoices", invoiceId), finalInvoice);
-      batch.set(doc(db, "receivables", invoiceId), {
-        clientId: quote.companyId || "", clientName: quote.clientName || "Cliente",
-        description: `Fatura ${invoiceNumber} · Orçamento ${quote.number}`,
-        amount: Number(quote.total || 0), receivedAmount: 0, dueDate: baseInvoice.dueDate,
-        paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: quote.id,
-        notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+      const pdf = buildInvoicePdf(baseInvoice, senderConfig);
+      const finalInvoice: Invoice = { ...baseInvoice, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdf.sizeKb };
+      await runTransaction(db, async tx => {
+        const current = await tx.get(quoteRef);
+        if (!current.exists()) throw new Error("Orçamento não encontrado.");
+        if (current.data().invoiceId) throw new Error("Este orçamento já possui uma fatura vinculada.");
+        if (!["accepted", "approved", "aprovado"].includes(String(current.data().status || ""))) throw new Error("Aprove o orçamento antes de gerar a fatura.");
+        tx.set(invoiceRef, finalInvoice);
+        tx.set(doc(db, "receivables", invoiceId), {
+          clientId: quote.companyId || "", clientName: quote.clientName || "Cliente",
+          description: `Fatura ${invoiceNumber} · Orçamento ${quote.number}`,
+          amount: Number(quote.total || 0), receivedAmount: 0, dueDate: baseInvoice.dueDate,
+          paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: quote.id,
+          notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+        tx.update(quoteRef, { status: "approved", invoiceId, invoicedAt: serverTimestamp(), updatedAt: serverTimestamp() });
       });
-      batch.update(doc(db, "quotes", quote.id), { status: "approved", invoiceId, invoicedAt: serverTimestamp() });
-      await batch.commit();
-      setSelectedQuote(updatedQuote);
-
-      showToast(`Fatura ${invoiceNumber} gerada e salva em PDF na plataforma!`, "success");
-
-      if (onConvertToInvoice) {
-        onConvertToInvoice(updatedQuote);
-      }
+      showToast(`Fatura ${invoiceNumber} gerada e vinculada ao Financeiro.`, "success");
     } catch (err) {
       console.error(err);
-      showToast("Não foi possível gerar a fatura.", "error");
+      showToast("Erro ao gerar fatura: " + ((err as Error).message || "erro desconhecido"), "error");
     }
   };
 
-  // AI Agent Message Sender
   const handleSendAiMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!aiMessage.trim() || !selectedQuote) return;
