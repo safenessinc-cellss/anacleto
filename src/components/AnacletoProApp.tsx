@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Building, Calendar, ChevronRight, Compass, ExternalLink, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X, Palette, Headset } from "lucide-react";
+import { Building, Calendar, ChevronRight, Compass, ExternalLink, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X, Palette, Headset, Truck } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
@@ -24,8 +24,9 @@ import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
 import logoImg from "../assets/images/anacleto-logo-premium.svg";
 import BusinessWorkspace from "./workspace/BusinessWorkspace";
 import PostSaleModule from "./post-sale/PostSaleModule";
+import DeliveryModule from "./deliveries/DeliveryModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -180,6 +181,7 @@ export default function AnacletoProApp({
     { id: "profile_optimization" as NavigationTab, label: "Otimização de Perfis", icon: Package, badge: null },
     { id: "materials" as NavigationTab, label: "Materiais de Produção", icon: Package, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
+    { id: "deliveries" as NavigationTab, label: "Entregas e Instalações", icon: Truck, badge: null },
     { id: "post_sale" as NavigationTab, label: "Qualidade e Pós-venda", icon: Headset, badge: null },
   ];
 
@@ -423,6 +425,7 @@ export default function AnacletoProApp({
           {activeTab === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
+        {activeTab === "deliveries" && <DeliveryModule />}
         {activeTab === "post_sale" && <PostSaleModule />}
 
          {activeTab === "finance" && (<FinanceModule language={language} />)}
