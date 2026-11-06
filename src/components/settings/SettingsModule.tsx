@@ -9,7 +9,8 @@ import {
   Globe,
   MapPin,
   CheckCircle,
-  ShieldCheck
+  ShieldCheck,
+  Image as ImageIcon
 } from "lucide-react";
 import { SenderConfig } from "../../types";
 import { doc, setDoc } from "firebase/firestore";
@@ -26,6 +27,14 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
   const { showToast } = useToast();
   const [formData, setFormData] = useState<SenderConfig>(senderConfig);
   const [isSaving, setIsSaving] = useState(false);
+  const handleLogoFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { window.alert("Selecione um arquivo de imagem."); return; }
+    if (file.size > 650 * 1024) { window.alert("O logotipo deve ter até 650 KB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => setFormData((prev) => ({ ...prev, logoUrl: String(reader.result || "") }));
+    reader.readAsDataURL(file);
+  };
 
   const handleChange = (field: keyof SenderConfig, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -134,6 +143,22 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
                 }}
                 className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
               />
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-4 border-t border-slate-800 space-y-4">
+          <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-2">
+            <ImageIcon className="w-4 h-4" /> Logotipo oficial dos documentos
+          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="w-36 h-24 rounded-xl border border-slate-700 bg-white p-2 flex items-center justify-center overflow-hidden">
+              {formData.logoUrl ? <img src={formData.logoUrl} alt="Logotipo oficial" className="max-w-full max-h-full object-contain" /> : <span className="text-xs text-slate-400">Sem logotipo configurado</span>}
+            </div>
+            <div className="space-y-2">
+              <input type="file" accept="image/*" onChange={(e) => handleLogoFile(e.target.files?.[0])} className="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-500 file:px-3 file:py-2 file:text-xs file:font-bold file:text-slate-950" />
+              <p className="text-[11px] text-slate-400">Salve aqui o logotipo usado no cabeçalho e na marca d’água dos PDFs. Limite: 650 KB.</p>
+              {formData.logoUrl && <button type="button" onClick={() => handleChange("logoUrl", "")} className="text-xs font-bold text-rose-400">Remover logotipo</button>}
             </div>
           </div>
         </div>
