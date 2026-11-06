@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -305,6 +305,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // Convert Approved Quote to Invoice (with persistent PDF attached)
   const handleConvertQuoteToInvoice = async (quote: Quote) => {
     try {
+      if ((quote as any).invoiceId) {
+        showToast("Este orçamento já possui uma fatura vinculada.", "info");
+        return;
+      }
       const invoiceId = "inv_" + Math.random().toString(36).substring(2, 9);
       const invoiceNumber = "FAC-" + new Date().getFullYear() + "-" + Math.floor(Math.random() * 900 + 100);
 
@@ -344,11 +348,18 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         pdfFileSizeKb: invPdfRes.sizeKb,
       };
 
-      await setDoc(doc(db, "invoices", invoiceId), finalInvoice);
-
-      // Update quote status to approved/invoiced
-      const updatedQuote: Quote = { ...quote, status: "approved" };
-      await setDoc(doc(db, "quotes", quote.id), updatedQuote);
+      const updatedQuote: Quote = { ...quote, status: "approved", ...( { invoiceId } as any) };
+      const batch = writeBatch(db);
+      batch.set(doc(db, "invoices", invoiceId), finalInvoice);
+      batch.set(doc(db, "receivables", invoiceId), {
+        clientId: quote.companyId || "", clientName: quote.clientName || "Cliente",
+        description: `Fatura ${invoiceNumber} · Orçamento ${quote.number}`,
+        amount: Number(quote.total || 0), receivedAmount: 0, dueDate: baseInvoice.dueDate,
+        paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: quote.id,
+        notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+      });
+      batch.update(doc(db, "quotes", quote.id), { status: "approved", invoiceId, invoicedAt: serverTimestamp() });
+      await batch.commit();
       setSelectedQuote(updatedQuote);
 
       showToast(`Fatura ${invoiceNumber} gerada e salva em PDF na plataforma!`, "success");
@@ -877,9 +888,9 @@ const handleAddItem = () => {
                           quantity: 1,
                           unitPrice: item.price,
                         };
-                        // Considerando que o estado se chama items ou quoteItems
-                        if (typeof setItems !== "undefined") setItems([...items, newItem]);
-                        else if (typeof setQuoteItems !== "undefined") setQuoteItems([...quoteItems, newItem]);
+                        if (selectedQuote) {
+                          setSelectedQuote({ ...selectedQuote, items: [...selectedQuote.items, newItem], updatedAt: new Date().toISOString() });
+                        }
                         setShowCatalog(false);
                         setCatalogSearch("");
                       }}
