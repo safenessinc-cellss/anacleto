@@ -43,12 +43,12 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), 14, 20);
+  doc.text((sender?.name || "ANACLETO ESQUADRIAS").toUpperCase(), sender?.logoUrl?.startsWith("data:image/") ? 44 : 14, 20);
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(197, 168, 80);
-  doc.text("ESQUADRIAS DE ALUMÍNIO & SOLUÇÕES TÉCNICAS", 14, 27);
+  doc.text("ESQUADRIAS DE ALUMÍNIO & SOLUÇÕES TÉCNICAS", sender?.logoUrl?.startsWith("data:image/") ? 44 : 14, 27);
 
   // Document Type & Number
   doc.setFontSize(16);
