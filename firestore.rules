@@ -49,6 +49,9 @@ service cloud.firestore {
     match /quotes/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /ledger_entries/{id} { allow read, write: if canManageFinance(); }
     match /user_profiles/{uid} { allow read, write: if signedIn() && (request.auth.uid == uid || owner()); }
+    match /tipologias/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /projects/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /user_suggestions/{id} { allow read: if canOperate(); allow create: if canOperate(); allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /invoices/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /catalog/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /supplier_catalog/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
