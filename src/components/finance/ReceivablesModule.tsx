@@ -121,7 +121,7 @@ export default function ReceivablesModule() {
         receivedAt: new Date().toISOString(), updatedAt: serverTimestamp()
       });
       if (invoiceRef && invoiceSnap?.exists() && complete) {
-        tx.update(invoiceRef, { status: "pago", paidAt: new Date().toISOString(), updatedAt: serverTimestamp() });
+        tx.update(invoiceRef, { status: "paid", paidAt: new Date().toISOString(), updatedAt: serverTimestamp() });
       }
       tx.set(ledgerRef, {
         direction: "inflow", category: "customer_receipt", sourceType: r.invoiceId ? "invoice" : "receivable",
