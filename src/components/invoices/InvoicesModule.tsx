@@ -97,9 +97,13 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
       const ledgerRef = doc(db, "ledger_entries", `invoice-paid-${invoice.id}`);
       await runTransaction(db, async tx => {
         const invoiceSnap = await tx.get(invoiceRef);
+        const receivableSnap = await tx.get(receivableRef);
         const ledgerSnap = await tx.get(ledgerRef);
         if (!invoiceSnap.exists() || ["pago", "paid"].includes(String(invoiceSnap.data().status || ""))) throw new Error("A fatura já foi processada por outro usuário.");
         if (ledgerSnap.exists()) throw new Error("Já existe um lançamento financeiro para esta fatura.");
+        const previousReceived = Number(receivableSnap.exists() ? receivableSnap.data().receivedAmount || 0 : 0);
+        const receiptDelta = Math.max(0, Number(invoice.total || 0) - previousReceived);
+        if (receiptDelta <= 0) throw new Error("Esta fatura já está totalmente recebida.");
         tx.set(invoiceRef, updated);
         tx.set(receivableRef, {
           clientId: invoice.companyId || "", clientName: invoice.clientName || "Cliente",
@@ -328,13 +332,13 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
                   {canManageFinance && <button
                     onClick={() => handleToggleStatus(selectedInvoice)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${
-                      selectedInvoice.status === "pago"
+                      ["pago", "paid"].includes(selectedInvoice.status)
                         ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
                         : "bg-emerald-600 text-white hover:bg-emerald-500 shadow-md shadow-emerald-600/20"
                     }`}
                   >
                     <CheckCircle className="w-3.5 h-3.5" />
-                    {selectedInvoice.status === "pago" ? "Fatura recebida" : "Registrar recebimento"}
+                    {(["pago", "paid"].includes(selectedInvoice.status) ? "Fatura recebida" : "Registrar recebimento")}
                   </button>}
 
                   <button
