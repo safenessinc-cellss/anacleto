@@ -6,13 +6,15 @@ import ReceivablesModule from "./ReceivablesModule";
 import PendingBoletosModule from "./PendingBoletosModule";
 import PaymentsModule from "./PaymentsModule";
 import PurchasesModule from "./PurchasesModule";
+import InventoryModule from "../inventory/InventoryModule";
 
-type FinanceTab = "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments";
+type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments";
 
 export default function FinanceModule({ language = "pt" }: { language?: string }) {
   const [tab, setTab] = useState<FinanceTab>("payables");
 
   const tabs = [
+    { id: "inventory" as FinanceTab, label: "Estoque", icon: Building2 },
     { id: "purchases" as FinanceTab, label: "Compras", icon: ShoppingCart },
     { id: "payables" as FinanceTab, label: "Despesas e Contas a Pagar", icon: TrendingDown },
     { id: "receivables" as FinanceTab, label: "Contas a Receber", icon: TrendingUp },
@@ -46,6 +48,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
         ))}
       </div>
 
+      {tab === "inventory" && <InventoryModule />}
       {tab === "purchases" && <PurchasesModule />}
       {tab === "payables" && <PayablesModule />}
       {tab === "receivables" && <ReceivablesModule />}
