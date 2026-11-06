@@ -83,12 +83,12 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
   };
 
   const handleToggleStatus = async (invoice: Invoice) => {
-    if (invoice.status === "pago") {
+    if (invoice.status === "pago" || invoice.status === "paid") {
       showToast("Uma fatura recebida não pode ser reaberta por este botão. Registre um estorno com autorização financeira.", "info");
       return;
     }
     try {
-      const nextStatus: InvoiceStatus = "pago";
+      const nextStatus: InvoiceStatus = "paid";
       const baseUpdated: Invoice = { ...invoice, status: nextStatus, updatedAt: new Date().toISOString() };
       const pdfRes = buildInvoicePdf(baseUpdated, senderConfig);
       const updated: Invoice = { ...baseUpdated, pdfDataUri: pdfRes.dataUri, pdfFileName: pdfRes.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdfRes.sizeKb };
@@ -98,7 +98,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
       await runTransaction(db, async tx => {
         const invoiceSnap = await tx.get(invoiceRef);
         const ledgerSnap = await tx.get(ledgerRef);
-        if (!invoiceSnap.exists() || invoiceSnap.data().status === "pago") throw new Error("A fatura já foi processada por outro usuário.");
+        if (!invoiceSnap.exists() || ["pago", "paid"].includes(String(invoiceSnap.data().status || ""))) throw new Error("A fatura já foi processada por outro usuário.");
         if (ledgerSnap.exists()) throw new Error("Já existe um lançamento financeiro para esta fatura.");
         tx.set(invoiceRef, updated);
         tx.set(receivableRef, {
