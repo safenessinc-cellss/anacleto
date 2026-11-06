@@ -26,8 +26,9 @@ import BusinessWorkspace from "./workspace/BusinessWorkspace";
 import PostSaleModule from "./post-sale/PostSaleModule";
 import ProtectionModule from "./protection/ProtectionModule";
 import IntegratedReportsModule from "./reports/IntegratedReportsModule";
+import ProductionModule from "./production/ProductionModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "protection";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "protection" | "production";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -183,6 +184,7 @@ export default function AnacletoProApp({
     { id: "materials" as NavigationTab, label: "Materiais de Produção", icon: Package, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
     { id: "invoices" as NavigationTab, label: "Faturação", icon: FileCheck, badge: invoices.length },
+    { id: "production" as NavigationTab, label: "Produção e Entregas", icon: Package, badge: null },
     { id: "protection" as NavigationTab, label: "Proteção e Segurança", icon: ShieldCheck, badge: null },
     { id: "post_sale" as NavigationTab, label: "Qualidade e Pós-venda", icon: Headset, badge: null },
   ];
@@ -430,6 +432,7 @@ export default function AnacletoProApp({
         {activeTab === "post_sale" && <PostSaleModule />}
 
         {activeTab === "protection" && <ProtectionModule />}
+        {activeTab === "production" && <ProductionModule />}
 
          {activeTab === "finance" && (<FinanceModule language={language} />)}
         {activeTab === "payroll" && (isFullMenuRole || hasAccessToTab(effectiveRole, "payroll")) && (<PayrollModule />)}
