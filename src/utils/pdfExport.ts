@@ -376,6 +376,9 @@ export const buildInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDoc
   doc.setFillColor(197, 168, 80); // Luxury Gold
   doc.rect(0, 42, pageWidth, 3, "F");
 
+  // Logotipo do CRM no cabeçalho da fatura.
+  drawDocumentLogo(doc, sender, 14, 7, 25, 25);
+
   // Brand Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
