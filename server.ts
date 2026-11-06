@@ -518,7 +518,7 @@ startServer().catch((err) => {
 
 
 // ============ Google Calendar Endpoint ============
-app.post("/api/create-calendar-event", async (req, res) => {
+app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => {
   try {
     const { name, email, phone, service, address, preferDate, preferTime, notes } = req.body;
     if (!name || !preferDate || !preferTime) {
