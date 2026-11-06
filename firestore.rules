@@ -52,7 +52,7 @@ service cloud.firestore {
     match /companies/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /companies_crm/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /budgets/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /quotes/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /quotes/{id} { allow read: if canOperate() || canManageProduction(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /ledger_entries/{id} { allow read, write: if canManageFinance(); }
     match /user_profiles/{uid} { allow read, write: if signedIn() && (request.auth.uid == uid || owner()); }
     match /tipologias/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
@@ -90,7 +90,7 @@ service cloud.firestore {
     match /inventory_movements/{id} { allow read: if canManageInventory() || canManageProduction(); allow create: if canManageInventory(); allow update, delete: if owner(); }
     match /production_orders/{id} { allow read: if canManageProduction() || canManageQuality(); allow create, update: if canManageProduction(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /payables/{id} { allow read, write: if canManageFinance(); }
-    match /receivables/{id} { allow read, write: if canManageFinance(); }
+    match /receivables/{id} { allow read, update, delete: if canManageFinance(); allow create: if canManageFinance() || canManageCommercial(); }
     match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
     match /payments/{id} { allow read, write: if canManageFinance(); }
     match /company_payment_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']); }
