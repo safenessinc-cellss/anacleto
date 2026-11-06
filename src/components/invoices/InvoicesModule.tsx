@@ -140,7 +140,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
   const totalPending = invoices.filter((i) => i.status === "pendente").reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="tahoe-module space-y-6">
       {/* Top Banner & Financial Metrics */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
         <div className="flex items-center gap-4">
@@ -155,7 +155,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
               <span className="text-[10px] font-mono text-slate-400">Total: {invoices.length} Faturas</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Libro de Faturas Emitidas
+              Faturas emitidas
             </h1>
           </div>
         </div>
