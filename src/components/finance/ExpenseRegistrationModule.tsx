@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, onSnapshot } from "firebase/firestore";
 import Papa from "papaparse";
 import { db } from "../../firebase";
-import { AlertCircle, CheckCircle2, FileDown, FileUp, Plus, Receipt, Trash2, Upload, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileUp, Plus, Upload, X } from "lucide-react";
 
 type Expense = {
   id?: string;
@@ -75,8 +75,9 @@ function parseOfx(text: string): DraftExpense[] {
     const description = get("MEMO") || get("NAME") || "Movimentação bancária";
     const supplier = get("NAME") || "Não identificado";
     const fitid = get("FITID");
-    return { ...blank, description, supplier, amount: Math.abs(rawAmount), date, category: "Movimentação bancária", documentNumber: fitid, paymentMethod: "Conta bancária", source: "ofx" as const, notes: rawAmount < 0 ? "Débito importado do extrato OFX" : "Crédito importado; revisar classificação" };
-  }).filter(e => e.amount > 0 && (blocks.length === 0 || !/CREDIT/i.test(e.notes || "")));
+    if (rawAmount >= 0) return null; // OFX: créditos não devem ser lançados como despesas.
+    return { ...blank, description, supplier, amount: Math.abs(rawAmount), date, category: "Movimentação bancária", documentNumber: fitid, paymentMethod: "Conta bancária", source: "ofx" as const, notes: "Débito importado do extrato OFX" };
+  }).filter((e): e is DraftExpense => e !== null && e.amount > 0);
 }
 function parseNfe(text: string): DraftExpense[] {
   const xml = new DOMParser().parseFromString(text, "application/xml");
