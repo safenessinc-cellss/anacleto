@@ -12,12 +12,14 @@ import {
   FileText,
   Save,
   X,
-  Briefcase
+  Briefcase,
+  FileUp
 } from "lucide-react";
 import { Company } from "../../types";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useToast } from "../ToastContext";
+import Papa from "papaparse";
 
 interface CrmModuleProps {
   companies: Company[];
@@ -99,6 +101,49 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
     }
   };
 
+  const handleImportClientsCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setIsSubmitting(true);
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (result) => {
+        const normalize = (value: unknown) => String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const rows = result.data.map((raw) => {
+          const values: Record<string, string> = {};
+          Object.entries(raw).forEach(([key, value]) => { values[normalize(key)] = String(value ?? "").trim(); });
+          return {
+            id: "comp_" + Math.random().toString(36).slice(2, 11),
+            name: values.nome || values.razao_social || values.empresa || values.name || "",
+            taxId: values.cnpj || values.cpf || values.documento || values.taxid || "",
+            email: values.email || values.e_mail || "",
+            phone: values.telefone || values.celular || values.phone || "",
+            address: values.endereco || values.address || "",
+            contactPerson: values.contato || values.pessoa_de_contato || values.contact || "",
+            notes: values.observacoes || values.notas || values.notes || "",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        }).filter((row) => row.name && row.taxId).slice(0, 200);
+        if (!rows.length) {
+          showToast("Nenhum cliente válido. Informe colunas Nome e CNPJ/CPF.", "warning");
+          setIsSubmitting(false);
+          return;
+        }
+        try {
+          for (const row of rows) await setDoc(doc(db, "companies", row.id), row);
+          showToast(`${rows.length} cliente(s) importado(s) com sucesso.`, "success");
+        } catch (error) {
+          console.error(error);
+          showToast("Falha ao importar clientes. Verifique as permissões e o formato do CSV.", "error");
+        } finally { setIsSubmitting(false); }
+      },
+      error: () => { showToast("Não foi possível ler o CSV.", "error"); setIsSubmitting(false); },
+    });
+  };
+
   const handleDeleteCompany = async (id: string, compName: string) => {
     if (!confirm(`Deseja excluir a empresa "${compName}" do CRM?`)) return;
     try {
@@ -140,6 +185,10 @@ export default function CrmModule({ companies, onSelectCompanyForQuote, language
           </div>
         </div>
 
+        <label className="flex cursor-pointer items-center gap-2 px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl border border-slate-200 transition">
+          <FileUp className="w-4 h-4" /> Importar clientes CSV
+          <input type="file" accept=".csv,text/csv" onChange={handleImportClientsCSV} disabled={isSubmitting} className="hidden" />
+        </label>
         <button
           onClick={openCreateModal}
           className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-wider rounded-2xl transition shadow-lg shadow-indigo-600/20"
