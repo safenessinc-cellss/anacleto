@@ -45,5 +45,8 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "*"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6"
   }
 }
