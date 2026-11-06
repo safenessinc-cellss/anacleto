@@ -26,9 +26,10 @@ import PdfViewerModal from "../common/PdfViewerModal";
 interface InvoicesModuleProps {
   senderConfig: SenderConfig;
   language?: string;
+  canManageFinance?: boolean;
 }
 
-export default function InvoicesModule({ senderConfig, language = "pt"}: InvoicesModuleProps) {
+export default function InvoicesModule({ senderConfig, language = "pt", canManageFinance = false}: InvoicesModuleProps) {
   const { showToast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -324,7 +325,7 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                     <Eye className="w-3.5 h-3.5 text-emerald-400" /> Ver PDF armazenado
                   </button>
 
-                  <button
+                  {canManageFinance && <button
                     onClick={() => handleToggleStatus(selectedInvoice)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition ${
                       selectedInvoice.status === "pago"
@@ -333,8 +334,8 @@ export default function InvoicesModule({ senderConfig, language = "pt"}: Invoice
                     }`}
                   >
                     <CheckCircle className="w-3.5 h-3.5" />
-                    {selectedInvoice.status === "pago" ? "Marcar como pendente" : "Marcar como paga"}
-                  </button>
+                    {selectedInvoice.status === "pago" ? "Fatura recebida" : "Registrar recebimento"}
+                  </button>}
 
                   <button
                     onClick={() => handleExportPdf(selectedInvoice)}
