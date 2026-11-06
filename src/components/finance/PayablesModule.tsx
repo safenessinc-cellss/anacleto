@@ -15,6 +15,11 @@ interface Payable {
   status: "pending" | "paid" | "cancelled";
   paidAt?: string;
   notes?: string;
+  purchaseId?: string;
+  purchaseNumber?: string;
+  documentUrl?: string;
+  documentName?: string;
+  supplierCnpj?: string;
 }
 
 const emptyForm: Omit<Payable, "id"> = {
@@ -190,7 +195,7 @@ export default function PayablesModule() {
             {filtered.map((p) => (
               <tr key={p.id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td className="p-3 font-bold text-slate-900 dark:text-white">{p.supplierName}</td>
-                <td className="p-3 text-slate-600 dark:text-slate-300">{p.description}</td>
+                <td className="p-3 text-slate-600 dark:text-slate-300">{p.description}{p.purchaseNumber && <span className="mt-1 block text-[10px] font-bold text-blue-600">Compra vinculada: {p.purchaseNumber}</span>}{p.documentUrl && <a href={p.documentUrl} target="_blank" rel="noreferrer" className="mt-1 block text-[10px] font-bold text-indigo-600">Abrir documento fiscal</a>}</td>
                 <td className="p-3 font-bold">R$ {p.amount.toFixed(2)}</td>
                 <td className="p-3 font-mono text-xs">{p.dueDate}</td>
                 <td className="p-3 text-xs uppercase">{METHODS.find((m) => m.v === p.paymentMethod)?.l || p.paymentMethod}</td>
