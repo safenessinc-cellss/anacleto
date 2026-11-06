@@ -20,7 +20,9 @@ import {
   Eye,
   HardDrive,
   RefreshCw,
-  FileDown
+  FileDown,
+  MessageCircle,
+  Mail
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
@@ -180,12 +182,78 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     };
   };
 
+  // Prepara o logotipo para ser incorporado no PDF (cabeçalho e marca d'água).
+  const preparePdfSender = async () => {
+    if (!senderConfig.logoUrl) return senderConfig;
+    try {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.src = senderConfig.logoUrl;
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("Não foi possível carregar o logotipo"));
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth || 600;
+      canvas.height = image.naturalHeight || 600;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return senderConfig;
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const logoData = canvas.toDataURL("image/png");
+      const watermarkCanvas = document.createElement("canvas");
+      watermarkCanvas.width = 900;
+      watermarkCanvas.height = 900;
+      const watermarkCtx = watermarkCanvas.getContext("2d");
+      if (watermarkCtx) {
+        watermarkCtx.globalAlpha = 0.075;
+        const scale = Math.min(760 / canvas.width, 760 / canvas.height);
+        const width = canvas.width * scale;
+        const height = canvas.height * scale;
+        watermarkCtx.drawImage(canvas, (900 - width) / 2, (900 - height) / 2, width, height);
+      }
+      return { ...senderConfig, logoUrl: logoData, watermarkLogoUrl: watermarkCanvas.toDataURL("image/png") };
+    } catch (error) {
+      console.warn("Não foi possível preparar o logotipo do orçamento:", error);
+      return senderConfig;
+    }
+  };
+
+  const handleSendQuote = async (channel: "whatsapp" | "email") => {
+    if (!selectedQuote) return;
+    const popup = window.open("about:blank", "_blank");
+    try {
+      const pdfSender = await preparePdfSender();
+      const pdf = buildQuotePdf(recalculateQuote(selectedQuote), pdfSender);
+      pdf.doc.save(pdf.fileName);
+      const message = `Olá, ${selectedQuote.clientName}. Segue o orçamento ${selectedQuote.number} no valor de ${formatCurrency(selectedQuote.total, selectedQuote.currency)}. O PDF foi baixado; anexe o arquivo nesta conversa.`;
+      if (channel === "whatsapp") {
+        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+        if (popup) popup.location.href = url;
+        else window.location.href = url;
+      } else {
+        const subject = encodeURIComponent(`Orçamento ${selectedQuote.number} - Anacleto Esquadrias`);
+        const body = encodeURIComponent(`${message}\n\nAtenciosamente,\nAnacleto Esquadrias\n\nAnexe o PDF baixado antes de enviar.`);
+        const url = `mailto:${encodeURIComponent(selectedQuote.clientEmail || "")}?subject=${subject}&body=${body}`;
+        if (popup) popup.location.href = url;
+        else window.location.href = url;
+      }
+      showToast("PDF baixado. Anexe o arquivo na conversa ou no e-mail antes de enviar.", "success");
+    } catch (error) {
+      if (popup) popup.close();
+      console.error(error);
+      showToast("Não foi possível preparar o PDF para envio.", "error");
+    }
+  };
+
+  const formatCurrency = (value: number, currency = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(value || 0);
+
   // Open and View Stored PDF
   const handleOpenQuotePdf = async (quote: Quote) => {
     let target = quote;
     if (!target.pdfDataUri) {
       try {
-        const pdfRes = buildQuotePdf(target, senderConfig);
+        const pdfSender = await preparePdfSender();
+        const pdfRes = buildQuotePdf(target, pdfSender);
         target = {
           ...target,
           pdfDataUri: pdfRes.dataUri,
@@ -210,7 +278,8 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     let target = recalculateQuote(quoteToSave || selectedQuote!);
     try {
       // Build PDF document and serialize as data URI
-      const pdfRes = buildQuotePdf(target, senderConfig);
+      const pdfSender = await preparePdfSender();
+      const pdfRes = buildQuotePdf(target, pdfSender);
       target = {
         ...target,
         pdfDataUri: pdfRes.dataUri,
@@ -638,10 +707,22 @@ const handleAddItem = () => {
                       <Eye className="w-3.5 h-3.5 text-amber-400" /> Visualizar PDF armazenado
                     </button>
                     <button
-                      onClick={() => exportQuotePdf(selectedQuote, senderConfig)}
+                      onClick={async () => { const pdfSender = await preparePdfSender(); exportQuotePdf(selectedQuote, pdfSender); }}
                       className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
                     >
                       <Download className="w-3.5 h-3.5 text-slate-300" /> Baixar PDF
+                    </button>
+                    <button
+                      onClick={() => handleSendQuote("whatsapp")}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" /> Enviar por WhatsApp
+                    </button>
+                    <button
+                      onClick={() => handleSendQuote("email")}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-xl transition"
+                    >
+                      <Mail className="w-3.5 h-3.5" /> Enviar por e-mail
                     </button>
                     <button
                       onClick={() => handleConvertQuoteToInvoice(selectedQuote)}
