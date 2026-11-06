@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { db } from "../../firebase";
 import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, X, XCircle } from "lucide-react";
 
@@ -14,6 +14,7 @@ interface Payable {
   paymentMethod: "boleto" | "pix" | "transferencia" | "cartao" | "dinheiro" | "cheque";
   status: "pending" | "paid" | "cancelled";
   paidAt?: string;
+  paymentId?: string;
   notes?: string;
 }
 
@@ -90,10 +91,20 @@ export default function PayablesModule() {
   };
 
   const markPaid = async (p: Payable) => {
-    await updateDoc(doc(db, "payables", p.id!), { status: "paid", paidAt: new Date().toISOString() });
+    if (!p.id || p.status === "paid") return;
+    const paidAt = new Date().toISOString();
+    const batch = writeBatch(db);
+    const paymentRef = doc(collection(db, "payments"));
+    batch.set(paymentRef, { direction: "out", type: "payable", referenceId: p.id, description: p.description, supplierName: p.supplierName, amount: Number(p.amount || 0), paymentMethod: p.paymentMethod, status: "completed", paidAt, createdAt: paidAt });
+    batch.update(doc(db, "payables", p.id), { status: "paid", paidAt, paymentId: paymentRef.id });
+    await batch.commit();
   };
   const markPending = async (p: Payable) => {
-    await updateDoc(doc(db, "payables", p.id!), { status: "pending", paidAt: null });
+    if (!p.id) return;
+    const batch = writeBatch(db);
+    batch.update(doc(db, "payables", p.id), { status: "pending", paidAt: null, paymentId: null });
+    if (p.paymentId) batch.update(doc(db, "payments", p.paymentId), { status: "reversed", reversedAt: new Date().toISOString() });
+    await batch.commit();
   };
   const handleDelete = async (id: string) => {
     if (confirm("Excluir este boleto?")) await deleteDoc(doc(db, "payables", id));
