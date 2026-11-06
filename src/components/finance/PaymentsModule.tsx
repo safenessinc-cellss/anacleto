@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, where, setDoc, getDoc,
+  collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, where, setDoc, getDoc, runTransaction,
 } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import {
@@ -38,7 +38,6 @@ interface Payment {
 
 const METHODS = [
   { id: "pix", label: "PIX", icon: QrCode, color: "emerald" },
-  { id: "mercadopago", label: "Link Mercado Pago", icon: CreditCard, color: "sky" },
   { id: "credit_card", label: "Cartão Crédito", icon: CreditCard, color: "blue" },
   { id: "debit_card", label: "Cartão Débito", icon: CreditCard, color: "indigo" },
   { id: "transfer", label: "Transferência", icon: Building2, color: "purple" },
@@ -56,11 +55,6 @@ export default function PaymentsModule() {
   const [selected, setSelected] = useState<Payable | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("pix");
   const [processing, setProcessing] = useState(false);
-  const [pixQr, setPixQr] = useState<string | null>(null);
-  const [pixCopyPaste, setPixCopyPaste] = useState("");
-  const [paymentLink, setPaymentLink] = useState("");
-  const [payerEmail, setPayerEmail] = useState("");
-  const [gatewayLoading, setGatewayLoading] = useState(false);
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [pixKey, setPixKey] = useState("");
@@ -69,7 +63,6 @@ export default function PaymentsModule() {
   const [companyCnpj, setCompanyCnpj] = useState("");
   const [configSaving, setConfigSaving] = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
-  const [gatewayReady, setGatewayReady] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -78,7 +71,6 @@ export default function PaymentsModule() {
       const v = s.data(); setPixKey(v.pixKey || ""); setPixKeyType(v.pixKeyType || "CNPJ");
       setAccountHolder(v.accountHolder || "Anacleto Esquadrias"); setCompanyCnpj(v.companyCnpj || "");
     }).catch(e => console.warn("Payment settings:", e)).finally(() => { if (alive) setConfigLoaded(true); });
-    fetch("/api/payments/config-status").then(r => r.json()).then(v => { if (alive) setGatewayReady(Boolean(v.configured)); }).catch(() => { if (alive) setGatewayReady(false); });
     return () => { alive = false; };
   }, []);
 
@@ -150,89 +142,40 @@ export default function PaymentsModule() {
   const startPayment = (payable: Payable) => {
     setSelected(payable);
     setMethod("pix");
-    setPixQr(null);
-    setPixCopyPaste("");
-    setPaymentLink("");
-    setPayerEmail("");
     setReference("");
     setNotes("");
-  };
-
-  const generatePix = async () => {
-    if (!selected) return;
-    if (!payerEmail.trim()) { alert("Informe o e-mail do pagador para gerar o PIX."); return; }
-    setGatewayLoading(true);
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) throw new Error("Entre na sua conta para gerar cobranças.");
-      const res = await fetch("/api/payments/pix", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ payableId: selected.id, amount: selected.amount, description: selected.description, payerName: selected.supplierName, payerEmail: payerEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Não foi possível gerar o PIX.");
-      setPixQr(data.qrCode);
-      setPixCopyPaste(data.copyPaste || "");
-      setReference(data.paymentId || "");
-    } catch (e) {
-      alert("Erro ao gerar PIX: " + (e as Error).message);
-    } finally { setGatewayLoading(false); }
-  };
-
-  const generatePaymentLink = async () => {
-    if (!selected) return;
-    setGatewayLoading(true);
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) throw new Error("Entre na sua conta para criar links de pagamento.");
-      const res = await fetch("/api/payments/mercado-pago-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payableId: selected.id, amount: selected.amount, description: selected.description, payerName: selected.supplierName, payerEmail: payerEmail.trim() || undefined }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Não foi possível criar o link de pagamento.");
-      setPaymentLink(data.paymentUrl);
-      setReference(data.preferenceId || "");
-    } catch (e) {
-      alert("Erro ao criar link Mercado Pago: " + (e as Error).message);
-    } finally { setGatewayLoading(false); }
   };
 
   const confirmPayment = async () => {
     if (!selected) return;
     setProcessing(true);
     try {
-      // 1) Registrar el pago
-      await addDoc(collection(db, "payments"), {
-        payableId: selected.id,
-        payableDescription: selected.description,
-        supplierName: selected.supplierName,
-        amount: selected.amount,
-        method,
-        status: "completed",
-        reference: reference || "",
-        paidBy: auth.currentUser?.email || "",
-        paidAt: new Date().toISOString(),
-        notes: notes || "",
+      const payableRef = doc(db, "payables", selected.id);
+      const paymentRef = doc(collection(db, "payments"));
+      const ledgerRef = doc(db, "ledger_entries", `payable-paid-${selected.id}`);
+      const paidAt = new Date().toISOString();
+      await runTransaction(db, async tx => {
+        const payableSnap = await tx.get(payableRef);
+        const ledgerSnap = await tx.get(ledgerRef);
+        if (!payableSnap.exists() || payableSnap.data().status !== "pending") throw new Error("Esta despesa já foi paga, cancelada ou alterada por outro usuário.");
+        if (ledgerSnap.exists()) throw new Error("Já existe um lançamento financeiro para esta despesa.");
+        tx.set(paymentRef, {
+          payableId: selected.id, payableDescription: selected.description, supplierName: selected.supplierName,
+          amount: selected.amount, method, status: "completed", reference: reference || "",
+          paidBy: auth.currentUser?.email || "", paidAt, notes: notes || "",
+        });
+        tx.update(payableRef, { status: "paid", paidAt, paidMethod: method, paymentId: paymentRef.id });
+        tx.set(ledgerRef, {
+          direction: "outflow", category: "supplier_payment", sourceType: "payable", sourceId: selected.id,
+          description: `Pagamento a fornecedor · ${selected.description}`, amount: Number(selected.amount || 0),
+          date: paidAt.slice(0, 10), status: "posted", paymentMethod: method,
+          createdAt: paidAt, createdBy: auth.currentUser?.email || ""
+        });
       });
-
-      // 2) Marcar el payable como pagado
-      await updateDoc(doc(db, "payables", selected.id), {
-        status: "paid",
-        paidAt: new Date().toISOString(),
-        paidMethod: method,
-      });
-
-      // 3) Cerrar modal
       setSelected(null);
-      setPixQr(null);
-      setPixCopyPaste("");
-      setPaymentLink("");
       setReference("");
       setNotes("");
-      alert("✅ Pagamento registrado com sucesso!");
+      alert("Pagamento registrado e conciliado no Financeiro.");
     } catch (e) {
       alert("Erro ao registrar pagamento: " + (e as Error).message);
     } finally {
@@ -253,9 +196,7 @@ export default function PaymentsModule() {
             <h3 className="font-bold text-slate-900 dark:text-white">Conta e dados de recebimento</h3>
             <p className="text-xs text-slate-500">Edite os dados da empresa usados nas cobranças.</p>
           </div>
-          <span className={`text-xs font-bold px-2 py-1 rounded-full ${gatewayReady ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
-            {gatewayReady ? "Mercado Pago conectado" : "Mercado Pago ainda não configurado"}
-          </span>
+          <span className="text-xs text-slate-500">Registre apenas pagamentos efetivamente realizados ao fornecedor.</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Nome do titular
@@ -438,7 +379,7 @@ export default function PaymentsModule() {
                 <h3 className="font-black text-lg">Pagar Boleto</h3>
                 <p className="text-xs text-slate-500">{selected.supplierName}</p>
               </div>
-              <button onClick={() => { setSelected(null); setPixQr(null); }} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
+              <button onClick={() => { setSelected(null); }} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -474,45 +415,9 @@ export default function PaymentsModule() {
                 })}
               </div>
 
-              {(method === "pix" || method === "mercadopago") && (
-                <div className="mt-3">
-                  <label className="text-xs font-bold text-slate-500 uppercase">E-mail do pagador</label>
-                  <input type="email" value={payerEmail} onChange={(e) => setPayerEmail(e.target.value)} placeholder="cliente@exemplo.com" className="w-full mt-1 px-3 py-2 text-sm border rounded-lg" />
-                </div>
-              )}
-
-              {/* PIX */}
               {method === "pix" && (
-                <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
-                  {!pixQr ? (
-                    <button disabled={gatewayLoading} onClick={generatePix} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
-                      {gatewayLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />} Gerar cobrança PIX real
-                    </button>
-                  ) : (
-                    <div className="text-center space-y-2">
-                      <img src={pixQr} alt="QR Code PIX do Mercado Pago" className="w-48 h-48 mx-auto bg-white rounded-lg p-2" />
-                      <p className="text-xs text-slate-600 dark:text-slate-300">Escaneie o QR Code ou copie o código PIX abaixo.</p>
-                      <textarea readOnly value={pixCopyPaste} rows={3} className="w-full text-xs p-2 border rounded-lg bg-white dark:bg-slate-900 break-all" />
-                      <button onClick={() => { navigator.clipboard.writeText(pixCopyPaste); alert("Código PIX copiado."); }} className="px-3 py-2 rounded-lg bg-emerald-700 text-white text-xs font-bold">Copiar código PIX</button>
-                      {reference && <p className="text-[11px] text-slate-500">ID Mercado Pago: {reference}</p>}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {method === "mercadopago" && (
-                <div className="mt-3 p-3 bg-sky-50 dark:bg-sky-950/30 rounded-lg space-y-2">
-                  {!paymentLink ? (
-                    <button disabled={gatewayLoading} onClick={generatePaymentLink} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-700 text-white rounded-lg text-sm font-bold hover:bg-sky-800 disabled:opacity-50">
-                      {gatewayLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />} Criar link de pagamento Mercado Pago
-                    </button>
-                  ) : (
-                    <div className="text-center space-y-2">
-                      <p className="text-sm font-bold text-sky-800 dark:text-sky-200">Link de pagamento criado</p>
-                      <a href={paymentLink} target="_blank" rel="noreferrer" className="block break-all text-xs text-sky-700 underline">{paymentLink}</a>
-                      <button onClick={() => { navigator.clipboard.writeText(paymentLink); alert("Link de pagamento copiado."); }} className="px-3 py-2 rounded-lg bg-sky-700 text-white text-xs font-bold">Copiar link</button>
-                    </div>
-                  )}
+                <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
+                  Realize a transferência PIX diretamente ao fornecedor e registre abaixo a referência ou o identificador da transação. Esta tela não gera cobranças ao fornecedor.
                 </div>
               )}
 
@@ -559,23 +464,14 @@ export default function PaymentsModule() {
               >
                 Cancelar
               </button>
-              {(method === "pix" || method === "mercadopago") ? (
-                <button
-                  onClick={() => { setSelected(null); setPixQr(null); setPixCopyPaste(""); setPaymentLink(""); }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 text-white rounded-lg text-sm font-bold hover:bg-slate-800"
-                >
-                  Fechar · aguardando pagamento
-                </button>
-              ) : (
-                <button
-                  onClick={confirmPayment}
-                  disabled={processing}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                  {processing ? "Processando..." : "Confirmar Pagamento"}
-                </button>
-              )}
+              <button
+                onClick={confirmPayment}
+                disabled={processing}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                {processing ? "Processando..." : "Confirmar Pagamento"}
+              </button>
             </div>
           </div>
         </div>
