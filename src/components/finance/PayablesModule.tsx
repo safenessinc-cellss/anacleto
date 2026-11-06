@@ -3,7 +3,7 @@ import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "fireb
 import { db } from "../../firebase";
 import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, X, XCircle } from "lucide-react";
 
-interface Supplier { id?: string; name: string; }
+interface Supplier { id?: string; name: string; nif?: string; }
 interface Payable {
   id?: string;
   supplierId: string;
