@@ -23,6 +23,21 @@ export interface QuoteItem {
   notes?: string;
 }
 
+export interface DeliveryEvidence {
+  deliveryId: string;
+  deliveryStatus: string;
+  deliveredAt: string;
+  photos: { url: string; path: string; capturedAt: string }[];
+  signatureUrl: string;
+  signaturePath: string;
+  signedBy: string;
+  signedAt: string;
+  latitude: number;
+  longitude: number;
+  locationAt: string;
+  operatorName: string;
+}
+
 export type QuoteStatus = "draft" | "pending" | "approved" | "accepted" | "rejected" | "invoiced";
 
 export interface Quote {
@@ -57,6 +72,10 @@ export interface Quote {
   clientNif?: string;
   language?: string;
   translations?: Record<string, any>;
+  deliveryId?: string;
+  deliveryStatus?: string;
+  deliveredAt?: string;
+  deliveryEvidence?: DeliveryEvidence;
 }
 
 export type InvoiceStatus = "pending" | "paid" | "cancelled";
@@ -94,6 +113,10 @@ export interface Invoice {
   pdfFileName?: string;
   pdfGeneratedAt?: string;
   pdfFileSizeKb?: number;
+  deliveryId?: string;
+  deliveryStatus?: string;
+  deliveredAt?: string;
+  deliveryEvidence?: DeliveryEvidence;
 }
 
 export interface TechnicalPiece {
