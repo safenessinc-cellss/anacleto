@@ -70,7 +70,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     color: "bg-purple-100 text-purple-800 border-purple-300",
     description: "Dirección ejecutiva. 100% de acceso: puede gestionar todos los usuarios y roles.",
     tabs: ALL_TABS,
-    canManageUsers: true,
+    canManageUsers: false,
     canManageRolesBelow: ["super_usuario", "admin", "supervisor", "colaborador", "usuario"],
   },
   super_usuario: {
@@ -81,7 +81,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     color: "bg-orange-100 text-orange-800 border-orange-300",
     description: "Gestión avanzada. Puede administrar admins, supervisores, colaboradores y usuarios.",
     tabs: ALL_TABS,
-    canManageUsers: true,
+    canManageUsers: false,
     canManageRolesBelow: ["admin", "supervisor", "colaborador", "usuario"],
   },
   admin: {
@@ -92,7 +92,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     color: "bg-indigo-100 text-indigo-800 border-indigo-300",
     description: "Gestión completa del negocio. Puede aprobar supervisores, colaboradores y usuarios.",
     tabs: ALL_TABS,
-    canManageUsers: true,
+    canManageUsers: false,
     canManageRolesBelow: ["supervisor", "colaborador", "usuario"],
   },
   supervisor: {
