@@ -1,18 +1,20 @@
 import React, { useState } from "react";
-import {   Building, Building2, TrendingDown, TrendingUp, FileText, Sparkles, CreditCard, DollarSign } from "lucide-react";
+import { Building2, TrendingDown, TrendingUp, FileText, CreditCard, ShoppingCart } from "lucide-react";
 import SuppliersModule from "./SuppliersModule";
 import PayablesModule from "./PayablesModule";
 import ReceivablesModule from "./ReceivablesModule";
 import PendingBoletosModule from "./PendingBoletosModule";
 import PaymentsModule from "./PaymentsModule";
+import PurchasesModule from "./PurchasesModule";
 
-type FinanceTab = "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments";
+type FinanceTab = "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments";
 
 export default function FinanceModule({ language = "pt" }: { language?: string }) {
   const [tab, setTab] = useState<FinanceTab>("payables");
 
   const tabs = [
-    { id: "payables" as FinanceTab, label: "Contas a Pagar", icon: TrendingDown },
+    { id: "purchases" as FinanceTab, label: "Compras", icon: ShoppingCart },
+    { id: "payables" as FinanceTab, label: "Despesas e Contas a Pagar", icon: TrendingDown },
     { id: "receivables" as FinanceTab, label: "Contas a Receber", icon: TrendingUp },
     { id: "suppliers" as FinanceTab, label: "Fornecedores", icon: Building2 },
     { id: "pending_boletos" as FinanceTab, label: "Boletos a Revisar", icon: FileText },
@@ -24,7 +26,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
       <div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white">Financeiro</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Gestão de fornecedores, boletos a pagar e cobranças a receber.
+          Gestão integrada de fornecedores, compras, despesas, pagamentos e recebimentos.
         </p>
       </div>
 
@@ -44,6 +46,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
         ))}
       </div>
 
+      {tab === "purchases" && <PurchasesModule />}
       {tab === "payables" && <PayablesModule />}
       {tab === "receivables" && <ReceivablesModule />}
       {tab === "suppliers" && <SuppliersModule />}
