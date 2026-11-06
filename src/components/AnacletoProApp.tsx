@@ -27,7 +27,7 @@ import PostSaleModule from "./post-sale/PostSaleModule";
 import ProtectionModule from "./protection/ProtectionModule";
 import IntegratedReportsModule from "./reports/IntegratedReportsModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "protection";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
