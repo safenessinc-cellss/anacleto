@@ -427,7 +427,9 @@ export default function AnacletoProApp({
           {activeTab === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
-        {activeTab === "post_sale" && <PostSaleModule />}\n\n        {activeTab === "protection" && <ProtectionModule />}
+        {activeTab === "post_sale" && <PostSaleModule />}
+
+        {activeTab === "protection" && <ProtectionModule />}
 
          {activeTab === "finance" && (<FinanceModule language={language} />)}
         {activeTab === "payroll" && (isFullMenuRole || hasAccessToTab(effectiveRole, "payroll")) && (<PayrollModule />)}
