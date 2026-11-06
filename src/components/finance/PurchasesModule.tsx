@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage } from "../../firebase";
 import { AlertCircle, CheckCircle2, FileText, Loader2, Plus, ScanSearch, ShoppingCart, Upload } from "lucide-react";
@@ -173,24 +173,68 @@ export default function PurchasesModule() {
     if (!confirm("Aprovar esta compra e gerar automaticamente uma conta a pagar no Financeiro?")) return;
     setError("");
     try {
-      const payable = await (await import("firebase/firestore")).addDoc(collection(db, "payables"), {
-        supplierId: purchase.supplierId, supplierName: purchase.supplierName, supplierCnpj: purchase.supplierCnpj || "",
-        description: purchase.description || "Compra " + purchase.number,
-        amount: purchase.total, dueDate: purchase.dueDate || today(), paymentMethod: "boleto",
-        status: "pending", purchaseId: purchase.id, purchaseNumber: purchase.number,
-        documentUrl: purchase.documentUrl || "", documentName: purchase.documentName || "",
-        notes: "Gerado automaticamente pela aprovação da compra " + purchase.number,
-        createdAt: new Date().toISOString()
+      const purchaseRef = doc(db, "purchase_orders", purchase.id);
+      const payableRef = doc(collection(db, "payables"));
+      await runTransaction(db, async tx => {
+        const current = await tx.get(purchaseRef);
+        if (!current.exists() || current.data().status !== "pending" || current.data().payableId) throw new Error("Esta compra já foi processada ou não está pendente.");
+        tx.set(payableRef, {
+          supplierId: purchase.supplierId, supplierName: purchase.supplierName, supplierCnpj: purchase.supplierCnpj || "",
+          description: purchase.description || "Compra " + purchase.number,
+          amount: purchase.total, dueDate: purchase.dueDate || today(), paymentMethod: "boleto",
+          status: "pending", purchaseId: purchase.id, purchaseNumber: purchase.number,
+          documentUrl: purchase.documentUrl || "", documentName: purchase.documentName || "",
+          notes: "Gerado automaticamente pela aprovação da compra " + purchase.number,
+          createdAt: new Date().toISOString(), createdBy: auth.currentUser?.uid || ""
+        });
+        tx.update(purchaseRef, { status: "approved", payableId: payableRef.id, approvedAt: serverTimestamp(), updatedAt: serverTimestamp() });
       });
-      await updateDoc(doc(db, "purchase_orders", purchase.id), { status: "approved", payableId: payable.id, updatedAt: new Date().toISOString() });
       setMessage("Compra aprovada e vinculada às Contas a Pagar do Financeiro.");
     } catch (e) { setError("Não foi possível aprovar: " + (e as Error).message); }
   };
 
   const markReceived = async (purchase: Purchase) => {
     if (purchase.status !== "approved") return;
-    try { await updateDoc(doc(db, "purchase_orders", purchase.id), { status: "received", receivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); setMessage("Recebimento registrado. A compra permanece vinculada à despesa financeira."); }
-    catch (e) { setError((e as Error).message); }
+    try {
+      const purchaseRef = doc(db, "purchase_orders", purchase.id);
+      const aggregates = new Map<string, PurchaseItem>();
+      (purchase.items || []).forEach(item => {
+        if (!item.description?.trim() || Number(item.quantity) <= 0) return;
+        const identity = (item.sku?.trim() || item.description).normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 90);
+        if (!identity) return;
+        const existing = aggregates.get(identity);
+        aggregates.set(identity, existing ? { ...existing, quantity: existing.quantity + Number(item.quantity), total: existing.total + Number(item.total || 0) } : { ...item, sku: identity, quantity: Number(item.quantity) });
+      });
+      const entries = [...aggregates.entries()];
+      const stockRefs = entries.map(([key]) => doc(db, "inventory_items", key));
+      const movementRefs = entries.map(() => doc(collection(db, "inventory_movements")));
+      await runTransaction(db, async tx => {
+        const current = await tx.get(purchaseRef);
+        if (!current.exists() || current.data().status !== "approved" || current.data().inventoryPostedAt) throw new Error("O recebimento já foi registrado ou a compra não está aprovada.");
+        const stockSnapshots = [];
+        for (const ref of stockRefs) stockSnapshots.push(await tx.get(ref));
+        for (let i = 0; i < stockRefs.length; i++) {
+          const [key, item] = entries[i];
+          const snap = stockSnapshots[i];
+          const currentQty = snap.exists() ? Number(snap.data().quantity || 0) : 0;
+          tx.set(stockRefs[i], {
+            name: item.description, sku: item.sku || key, unit: item.unit || "un",
+            quantity: currentQty + Number(item.quantity || 0),
+            reservedQuantity: Number(snap.exists() ? snap.data().reservedQuantity || 0 : 0),
+            minimumStock: Number(snap.exists() ? snap.data().minimumStock || 0 : 0),
+            updatedAt: serverTimestamp(), lastPurchaseId: purchase.id
+          }, { merge: true });
+          tx.set(movementRefs[i], {
+            itemId: stockRefs[i].id, itemName: item.description, type: "in", quantity: Number(item.quantity || 0),
+            reason: "Recebimento da compra " + purchase.number, reference: purchase.id,
+            supplierId: purchase.supplierId, supplierName: purchase.supplierName,
+            createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || ""
+          });
+        }
+        tx.update(purchaseRef, { status: "received", receivedAt: serverTimestamp(), inventoryPostedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      });
+      setMessage("Recebimento registrado: materiais lançados no Estoque e compra vinculada ao Financeiro.");
+    } catch (e) { setError((e as Error).message || "Não foi possível registrar o recebimento."); }
   };
 
   const visible = purchases.filter(p => filter === "all" || p.status === filter);
