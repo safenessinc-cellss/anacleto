@@ -189,8 +189,7 @@ export default function AnacletoProApp({
   const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || item.id !== "payroll" && hasAccessToTab(effectiveRole, item.id as RoleNavTab));
   const utilityItems = [
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
-    { id: "tipologias" as NavigationTab, label: "Modelos de Esquadrias", icon: Package, badge: null },
-    { id: "projects" as NavigationTab, label: "Projetos e Engenharia", icon: Compass, badge: null },
+    { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },
     { id: "inventory" as NavigationTab, label: "Estoque e Almoxarifado", icon: Package, badge: null },
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
