@@ -5,14 +5,15 @@ import RegistryModule from "../registry/RegistryModule";
 import TechnicalDrawingModule from "../technical-drawing/TechnicalDrawingModule";
 import { SenderConfig } from "../../types";
 
-type WorkflowTab = "projects" | "measurement" | "cut_plan" | "profile_optimization" | "technical_drawing";
+type WorkflowTab = "projects" | "measurement" | "cut_plan" | "profile_optimization" | "tipologias" | "technical_drawing";
 
 const tabs: { id: WorkflowTab; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "projects", label: "Projetos", description: "Cadastro e acompanhamento dos projetos de esquadrias.", icon: BriefcaseBusiness },
   { id: "measurement", label: "Medições", description: "Fichas de medição e conferência das dimensões em obra.", icon: Ruler },
   { id: "cut_plan", label: "Plano de Corte", description: "Organização dos planos e validação antes da fabricação.", icon: Scissors },
   { id: "profile_optimization", label: "Otimização de Perfis", description: "Análise de barras, aproveitamento e sobras de perfis.", icon: Layers3 },
-  { id: "technical_drawing", label: "Desenho Técnico 2D", description: "Desenhos técnicos vinculados ao desenvolvimento dos projetos.", icon: BriefcaseBusiness },
+  { id: "tipologias", label: "Modelos de Esquadrias", description: "Biblioteca de tipologias, modelos e dimensões padrão.", icon: BriefcaseBusiness },
+  { id: "technical_drawing", label: "Projetos Técnicos 2D", description: "Desenhos técnicos 2D vinculados ao desenvolvimento dos projetos.", icon: BriefcaseBusiness },
 ];
 
 export default function ProjectEngineeringModule({ language, senderConfig }: { language: string; senderConfig: SenderConfig }) {
@@ -29,7 +30,7 @@ export default function ProjectEngineeringModule({ language, senderConfig }: { l
         </p>
       </header>
 
-      <nav aria-label="Etapas de projetos e engenharia" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:grid-cols-5">
+      <nav aria-label="Etapas de projetos e engenharia" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-3 xl:grid-cols-6">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const selected = active === tab.id;
@@ -45,7 +46,7 @@ export default function ProjectEngineeringModule({ language, senderConfig }: { l
               <span className="min-w-0">
                 <span className="block text-sm font-bold">{tab.label}</span>
                 <span className={`mt-0.5 hidden text-[11px] sm:block ${selected ? "text-blue-100" : "text-slate-400"}`}>
-                  {tab.id === "projects" ? "Visão geral" : tab.id === "measurement" ? "Campo e dimensões" : tab.id === "cut_plan" ? "Preparação de corte" : "Barras e sobras"}
+                  {tab.id === "projects" ? "Visão geral" : tab.id === "measurement" ? "Campo e dimensões" : tab.id === "cut_plan" ? "Preparação de corte" : tab.id === "profile_optimization" ? "Barras e sobras" : tab.id === "tipologias" ? "Biblioteca de modelos" : "Desenho técnico"}
                 </span>
               </span>
             </button>
@@ -62,6 +63,7 @@ export default function ProjectEngineeringModule({ language, senderConfig }: { l
         {active === "measurement" && <RegistryModule kind="measurement" />}
         {active === "cut_plan" && <RegistryModule kind="cut_plan" />}
         {active === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
+        {active === "tipologias" && <BusinessWorkspace kind="tipologias" />}
         {active === "technical_drawing" && <TechnicalDrawingModule language={language} senderConfig={senderConfig} />}
       </div>
     </section>
