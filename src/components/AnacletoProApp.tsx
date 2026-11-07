@@ -195,7 +195,6 @@ export default function AnacletoProApp({
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
     { id: "financial_ai" as NavigationTab, label: "Assistente Financeiro", icon: Sparkles, badge: "NOVO" },
-    { id: "technical_drawing" as NavigationTab, label: "Projetos Técnicos 2D", icon: Compass, badge: "CAD" },
     { id: "admin" as NavigationTab, label: "Administração", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
     { id: "suggestions" as NavigationTab, label: "Sugestões", icon: Sparkles, badge: null },
     { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
@@ -377,7 +376,7 @@ export default function AnacletoProApp({
         <div className="max-w-7xl mx-auto rounded-[28px]">
           {activeTab === "reports" && <BusinessWorkspace kind="reports" quotes={quotes} invoices={invoices} />}
           {activeTab === "tipologias" && <BusinessWorkspace kind="tipologias" />}
-          {activeTab === "projects" && <ProjectEngineeringModule />}
+          {activeTab === "projects" && <ProjectEngineeringModule language={language} senderConfig={senderConfig} />}
           {activeTab === "profile" && <BusinessWorkspace kind="profile" />}
           {activeTab === "suggestions" && <BusinessWorkspace kind="suggestions" />}
           {activeTab === "dashboard" && (
