@@ -74,7 +74,13 @@ const rateLimitByUser = (bucket: string, limit: number, windowMs: number): expre
   const user = res.locals.firebaseUser as { uid?: string } | undefined;
   const key = `${bucket}:${user?.uid || req.ip}`;
   const now = Date.now();
+  if (requestWindows.size > 5000) {
+    for (const [entry, window] of requestWindows) {
+      if (now - window.startedAt >= windowMs) requestWindows.delete(entry);
+    }
+  }
   const current = requestWindows.get(key);
+  if (!current && requestWindows.size >= 10000) return res.status(429).json({ error: "Limite temporário de solicitações atingido. Tente novamente em instantes." });
   if (!current || now - current.startedAt >= windowMs) {
     requestWindows.set(key, { startedAt: now, count: 1 });
     return next();
