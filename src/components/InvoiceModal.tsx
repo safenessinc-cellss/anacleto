@@ -102,8 +102,12 @@ export default function InvoiceModal({ isOpen, onClose, invoice, t }: InvoiceMod
         <div
           ref={invoiceRef}
           dir={dir}
-          className="flex-1 p-8 sm:p-12 overflow-y-auto bg-white text-slate-800 print:text-black print:p-0 print:overflow-visible transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100 print:bg-white print:dark:bg-white"
+          className="relative flex-1 p-8 sm:p-12 overflow-y-auto bg-white text-slate-800 print:text-black print:p-0 print:overflow-visible transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100 print:bg-white print:dark:bg-white"
         >
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.035] print:opacity-[0.075]">
+            <img src={sender.watermarkLogoUrl || sender.logoUrl || logoImg} alt="" className="w-[min(58%,420px)] max-h-[420px] object-contain grayscale" />
+          </div>
+
           {/* Header Grid */}
           <div className="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-200 pb-8">
             <div className="space-y-3">
