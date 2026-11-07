@@ -24,7 +24,6 @@ export type NavigationTab =
   | "technical_drawing"
   | "agenda"
   | "catalog"
-  | "finance"
   | "financial_ai"
   | "admin"
   | "settings"
@@ -121,7 +120,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 20,
     color: "bg-emerald-100 text-emerald-800 border-emerald-300",
     description: "Empleado. Crea presupuestos, facturas, dibujos y gestiona catálogo. Sin finanzas.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions", "deliveries", "production"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions", "deliveries"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
