@@ -133,9 +133,9 @@ const applyDocumentWatermark = (doc: jsPDF, sender?: SenderConfig) => {
       try {
         const mime = watermark.slice(5, watermark.indexOf(";")).toLowerCase();
         const format = mime.includes("jpeg") ? "JPEG" : mime.includes("webp") ? "WEBP" : "PNG";
-        doc.setGState(new doc.GState({ opacity: 0.07 }));
+        (doc as any).setGState(new (doc as any).GState({ opacity: 0.07 }));
         doc.addImage(watermark, format, pageWidth / 2 - 42, pageHeight / 2 - 42, 84, 84, undefined, "FAST");
-        doc.setGState(new doc.GState({ opacity: 1 }));
+        (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
         continue;
       } catch (error) {
         console.warn("Não foi possível inserir a marca d'água gráfica; usando marca vetorial:", error);
