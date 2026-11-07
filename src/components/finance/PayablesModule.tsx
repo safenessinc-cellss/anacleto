@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "../../firebase";
 import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, X, XCircle } from "lucide-react";
 
 interface Supplier { id?: string; name: string; nif?: string; }
@@ -95,13 +95,30 @@ export default function PayablesModule() {
   };
 
   const markPaid = async (p: Payable) => {
-    await updateDoc(doc(db, "payables", p.id!), { status: "paid", paidAt: new Date().toISOString() });
-  };
-  const markPending = async (p: Payable) => {
-    await updateDoc(doc(db, "payables", p.id!), { status: "pending", paidAt: null });
+    if (!p.id || p.status !== "pending") return;
+    const payableRef = doc(db, "payables", p.id);
+    const paymentRef = doc(collection(db, "payments"));
+    const ledgerRef = doc(db, "ledger_entries", "payable-paid-" + p.id);
+    const paidAt = new Date().toISOString();
+    try {
+      await runTransaction(db, async tx => {
+        const current = await tx.get(payableRef);
+        const ledger = await tx.get(ledgerRef);
+        if (!current.exists() || current.data().status !== "pending") throw new Error("Esta despesa já foi processada.");
+        if (ledger.exists()) throw new Error("Já existe uma conciliação para esta despesa.");
+        tx.set(paymentRef, { payableId: p.id, payableDescription: p.description, supplierName: p.supplierName, amount: Number(p.amount || 0), method: p.paymentMethod, status: "completed", reference: "", paidBy: auth.currentUser?.email || "", paidAt, notes: "Pagamento registrado pela tela de Contas a Pagar." });
+        tx.update(payableRef, { status: "paid", paidAt, paidMethod: p.paymentMethod, paymentId: paymentRef.id });
+        tx.set(ledgerRef, { direction: "outflow", category: "supplier_payment", sourceType: "payable", sourceId: p.id, description: "Pagamento a fornecedor · " + p.description, amount: Number(p.amount || 0), date: paidAt.slice(0, 10), status: "posted", paymentMethod: p.paymentMethod, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+      });
+    } catch (err) { alert("Não foi possível conciliar o pagamento: " + ((err as Error).message || "erro desconhecido")); }
   };
   const handleDelete = async (id: string) => {
-    if (confirm("Excluir este boleto?")) await deleteDoc(doc(db, "payables", id));
+    const target = items.find(item => item.id === id);
+    if (!target || target.status !== "pending" || target.purchaseId) {
+      alert("Somente despesas pendentes criadas manualmente podem ser excluídas. Compras vinculadas e pagamentos conciliados devem ser corrigidos por estorno autorizado.");
+      return;
+    }
+    if (confirm("Excluir esta despesa pendente?")) await deleteDoc(doc(db, "payables", id));
   };
 
   const filtered = items.filter((i) => {
@@ -201,13 +218,10 @@ export default function PayablesModule() {
                 <td className="p-3 text-xs uppercase">{METHODS.find((m) => m.v === p.paymentMethod)?.l || p.paymentMethod}</td>
                 <td className="p-3">{statusBadge(p)}</td>
                 <td className="p-3">
-                  {p.status === "pending" ? (
-                    <button onClick={() => markPaid(p)} title="Marcar como Pago" className="p-1 text-emerald-600 hover:text-emerald-700"><CheckCircle className="w-4 h-4" /></button>
-                  ) : (
-                    <button onClick={() => markPending(p)} title="Marcar como Pendente" className="p-1 text-amber-600 hover:text-amber-700"><Clock className="w-4 h-4" /></button>
-                  )}
-                  <button onClick={() => { setEditing(p); setForm(p); }} className="p-1 text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4" /></button>
-                  <button onClick={() => handleDelete(p.id!)} className="p-1 text-rose-600 hover:text-rose-700"><Trash2 className="w-4 h-4" /></button>
+                  {p.status === "pending" && <button onClick={() => markPaid(p)} title="Registrar e conciliar pagamento" className="p-1 text-emerald-600 hover:text-emerald-700"><CheckCircle className="w-4 h-4" /></button>}
+                  {p.status === "pending" && !p.purchaseId && <button onClick={() => { setEditing(p); setForm(p); }} title="Editar despesa pendente" className="p-1 text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4" /></button>}
+                  {p.status === "pending" && !p.purchaseId && <button onClick={() => handleDelete(p.id!)} title="Excluir despesa pendente" className="p-1 text-rose-600 hover:text-rose-700"><Trash2 className="w-4 h-4" /></button>}
+                  {p.status === "paid" && <span className="text-[10px] font-semibold text-emerald-700">Conciliado</span>}
                 </td>
               </tr>
             ))}
