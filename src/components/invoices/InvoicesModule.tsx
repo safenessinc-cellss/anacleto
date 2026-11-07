@@ -160,7 +160,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
   });
 
   const totalInvoiced = invoices.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalPaid = invoices.filter((i) => i.status === "pago").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalPaid = invoices.filter((i) => (i.status === "pago" || i.status === "paid")).reduce((acc, curr) => acc + (curr.total || 0), 0);
   const totalPending = invoices.filter((i) => i.status === "pendente").reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   return (
@@ -259,7 +259,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
                     </div>
                     <span
                       className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                        inv.status === "pago"
+                        (inv.status === "pago" || inv.status === "paid")
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                           : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                       }`}
