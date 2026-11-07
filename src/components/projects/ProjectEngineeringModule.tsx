@@ -2,17 +2,20 @@ import React, { useState } from "react";
 import { BriefcaseBusiness, Ruler, Scissors, Layers3 } from "lucide-react";
 import BusinessWorkspace from "../workspace/BusinessWorkspace";
 import RegistryModule from "../registry/RegistryModule";
+import TechnicalDrawingModule from "../technical-drawing/TechnicalDrawingModule";
+import { SenderConfig } from "../../types";
 
-type WorkflowTab = "projects" | "measurement" | "cut_plan" | "profile_optimization";
+type WorkflowTab = "projects" | "measurement" | "cut_plan" | "profile_optimization" | "technical_drawing";
 
 const tabs: { id: WorkflowTab; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "projects", label: "Projetos", description: "Cadastro e acompanhamento dos projetos de esquadrias.", icon: BriefcaseBusiness },
   { id: "measurement", label: "Medições", description: "Fichas de medição e conferência das dimensões em obra.", icon: Ruler },
   { id: "cut_plan", label: "Plano de Corte", description: "Organização dos planos e validação antes da fabricação.", icon: Scissors },
   { id: "profile_optimization", label: "Otimização de Perfis", description: "Análise de barras, aproveitamento e sobras de perfis.", icon: Layers3 },
+  { id: "technical_drawing", label: "Desenho Técnico 2D", description: "Desenhos técnicos vinculados ao desenvolvimento dos projetos.", icon: BriefcaseBusiness },
 ];
 
-export default function ProjectEngineeringModule() {
+export default function ProjectEngineeringModule({ language, senderConfig }: { language: string; senderConfig: SenderConfig }) {
   const [active, setActive] = useState<WorkflowTab>("projects");
   const current = tabs.find((tab) => tab.id === active)!;
 
@@ -26,7 +29,7 @@ export default function ProjectEngineeringModule() {
         </p>
       </header>
 
-      <nav aria-label="Etapas de projetos e engenharia" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:grid-cols-4">
+      <nav aria-label="Etapas de projetos e engenharia" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:grid-cols-5">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const selected = active === tab.id;
@@ -59,6 +62,7 @@ export default function ProjectEngineeringModule() {
         {active === "measurement" && <RegistryModule kind="measurement" />}
         {active === "cut_plan" && <RegistryModule kind="cut_plan" />}
         {active === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
+        {active === "technical_drawing" && <TechnicalDrawingModule language={language} senderConfig={senderConfig} />}
       </div>
     </section>
   );
