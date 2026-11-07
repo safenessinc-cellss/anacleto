@@ -93,7 +93,7 @@ service cloud.firestore {
     match /receivables/{id} { allow read, update, delete: if canManageFinance(); allow create: if canManageFinance() || canManageCommercial(); }
     match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
     match /payments/{id} { allow read, write: if canManageFinance(); }
-    match /company_payment_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /company_payment_settings/{id} { allow read, write: if canManageFinance(); }
 
     // Pessoas e folha salarial: confidencialidade reforçada.
     match /employees/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']); }
