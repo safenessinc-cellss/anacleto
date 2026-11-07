@@ -98,8 +98,12 @@ export default function BudgetPreviewModal({
         <div
           ref={budgetRef}
           dir={dir}
-          className="flex-1 p-8 sm:p-12 overflow-y-auto bg-white text-slate-850 print:text-black print:p-0 print:overflow-visible transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100 print:bg-white print:dark:bg-white"
+          className="relative flex-1 p-8 sm:p-12 overflow-y-auto bg-white text-slate-850 print:text-black print:p-0 print:overflow-visible transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100 print:bg-white print:dark:bg-white"
         >
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center opacity-[0.035] print:opacity-[0.075]">
+            <img src={senderConfig.watermarkLogoUrl || senderConfig.logoUrl || logoImg} alt="" className="w-[min(58%,420px)] max-h-[420px] object-contain grayscale" />
+          </div>
+
           {/* Top Visual Accent Border */}
           <div className="h-2.5 w-full bg-gradient-to-r from-amber-500 via-yellow-400 to-indigo-650 rounded-t-lg mb-8 print:hidden"></div>
 
