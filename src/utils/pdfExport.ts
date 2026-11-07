@@ -116,6 +116,40 @@ const drawDocumentLogo = (doc: jsPDF, sender: SenderConfig | undefined, x: numbe
   doc.text("ESQUADRIAS", x + 23, y + h / 2 + 4);
 };
 
+
+
+/** Marca d'água discreta aplicada em todas as páginas dos PDFs comerciais e técnicos. */
+const applyDocumentWatermark = (doc: jsPDF, sender?: SenderConfig) => {
+  const pageCount = doc.getNumberOfPages();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const watermark = sender?.watermarkLogoUrl?.startsWith("data:image/")
+    ? sender.watermarkLogoUrl
+    : sender?.logoUrl?.startsWith("data:image/") ? sender.logoUrl : null;
+
+  for (let page = 1; page <= pageCount; page += 1) {
+    doc.setPage(page);
+    if (watermark) {
+      try {
+        const mime = watermark.slice(5, watermark.indexOf(";")).toLowerCase();
+        const format = mime.includes("jpeg") ? "JPEG" : mime.includes("webp") ? "WEBP" : "PNG";
+        doc.addImage(watermark, format, pageWidth / 2 - 42, pageHeight / 2 - 42, 84, 84, undefined, "FAST", 35);
+        continue;
+      } catch (error) {
+        console.warn("Não foi possível inserir a marca d'água gráfica; usando marca vetorial:", error);
+      }
+    }
+    // Fallback vetorial: funciona mesmo sem imagem carregada/configurada no perfil.
+    doc.setTextColor(245, 245, 245);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(25);
+    doc.text("ANACLETO", pageWidth / 2, pageHeight / 2, { align: "center", angle: 35 });
+    doc.setFontSize(11);
+    doc.text("ESQUADRIAS", pageWidth / 2, pageHeight / 2 + 10, { align: "center", angle: 35 });
+  }
+  doc.setPage(pageCount);
+};
+
 export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
@@ -347,6 +381,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     { align: "center" }
   );
 
+  applyDocumentWatermark(doc, sender);
   const fileName = `Presupuesto_${quote.number || "PRE"}.pdf`;
   const dataUri = doc.output("datauristring");
   const sizeKb = Math.max(1, Math.round((dataUri.length * 0.75) / 1024));
@@ -513,6 +548,7 @@ export const buildInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDoc
     { align: "center" }
   );
 
+  applyDocumentWatermark(doc, sender);
   const fileName = `Factura_${invoice.number || "FAC"}.pdf`;
   const dataUri = doc.output("datauristring");
   const sizeKb = Math.max(1, Math.round((dataUri.length * 0.75) / 1024));
@@ -661,6 +697,7 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
     { align: "center" }
   );
 
+  applyDocumentWatermark(doc, sender);
   const cleanTitle = (drawing.title || "Proyecto").replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = `Plano_Tecnico_${cleanTitle}.pdf`;
   const dataUri = doc.output("datauristring");
