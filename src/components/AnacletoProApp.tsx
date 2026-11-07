@@ -27,6 +27,7 @@ import PostSaleModule from "./post-sale/PostSaleModule";
 import DeliveryModule from "./deliveries/DeliveryModule";
 import ProductionModule from "./production/ProductionModule";
 import InventoryModule from "./inventory/InventoryModule";
+import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
 
 type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
 
@@ -177,10 +178,7 @@ export default function AnacletoProApp({
   ];
   const gestaoItems = [
     { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
-    { id: "measurement" as NavigationTab, label: "Medições", icon: Calendar, badge: null },
     { id: "contracts" as NavigationTab, label: "Contratos", icon: FileCheck, badge: null },
-    { id: "cut_plan" as NavigationTab, label: "Plano de Corte", icon: Compass, badge: null },
-    { id: "profile_optimization" as NavigationTab, label: "Otimização de Perfis", icon: Package, badge: null },
     { id: "materials" as NavigationTab, label: "Materiais de Produção", icon: Package, badge: null },
     { id: "production" as NavigationTab, label: "Ordens de Produção", icon: Factory, badge: null },
     { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
@@ -192,7 +190,7 @@ export default function AnacletoProApp({
   const utilityItems = [
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
     { id: "tipologias" as NavigationTab, label: "Modelos de Esquadrias", icon: Package, badge: null },
-    { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },
+    { id: "projects" as NavigationTab, label: "Projetos e Engenharia", icon: Compass, badge: null },
     { id: "inventory" as NavigationTab, label: "Estoque e Almoxarifado", icon: Package, badge: null },
     { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
     { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
@@ -379,7 +377,7 @@ export default function AnacletoProApp({
         <div className="max-w-7xl mx-auto rounded-[28px]">
           {activeTab === "reports" && <BusinessWorkspace kind="reports" quotes={quotes} invoices={invoices} />}
           {activeTab === "tipologias" && <BusinessWorkspace kind="tipologias" />}
-          {activeTab === "projects" && <BusinessWorkspace kind="projects" />}
+          {activeTab === "projects" && <ProjectEngineeringModule />}
           {activeTab === "profile" && <BusinessWorkspace kind="profile" />}
           {activeTab === "suggestions" && <BusinessWorkspace kind="suggestions" />}
           {activeTab === "dashboard" && (
@@ -423,10 +421,7 @@ export default function AnacletoProApp({
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
           {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
-          {activeTab === "measurement" && <RegistryModule kind="measurement" />}
           {activeTab === "contracts" && <RegistryModule kind="contracts" />}
-          {activeTab === "cut_plan" && <RegistryModule kind="cut_plan" />}
-          {activeTab === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
         {activeTab === "production" && <ProductionModule />}
