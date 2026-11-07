@@ -148,8 +148,10 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
   // Handle unique ChatSession on Firestore for admin auditing
   useEffect(() => {
     if (!sessionId) {
-      const activeSessionId = localStorage.getItem("anacleto_chat_session_id") || "session_" + Math.random().toString(36).substring(2);
-      localStorage.setItem("anacleto_chat_session_id", activeSessionId);
+      const uid = auth.currentUser?.uid || "anonymous";
+      const storageKey = "anacleto_chat_session_id_" + uid;
+      const activeSessionId = localStorage.getItem(storageKey) || "session_" + uid + "_" + Math.random().toString(36).substring(2);
+      localStorage.setItem(storageKey, activeSessionId);
       setSessionId(activeSessionId);
     }
   }, [sessionId]);
@@ -182,6 +184,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
         doc(db, "chat_sessions", sessionId),
         {
           id: sessionId,
+          ownerUid: auth.currentUser?.uid || "",
           language: currentLanguage,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
