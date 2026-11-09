@@ -19,13 +19,13 @@ function normalize(id:string,d:any,source:string):Row|null {
   const amount = rawAmount;
   if(!Number.isFinite(amount)||amount===0) return null;
   const date=dateOf(d.date || d.paidAt || d.paymentDate || d.dueDate || d.createdAt || d.updatedAt);
-  const isIn = source==="receivables" || d.direction==="inflow" || d.direction==="in" || source==="employee_payments" && false;
+  const isIn = source==="receivables" || d.direction==="inflow" || d.direction==="in";
   const isOut = source==="payables" || source==="purchases" || source==="employee_payments" || source==="payments" || d.direction==="outflow" || d.direction==="out";
   return {
     id, date, description:String(d.description || d.payableDescription || d.employeeName && "Pagamento de funcionário: "+d.employeeName || d.category || source),
     category:String(d.expenseCategory || d.category || source), party:String(d.supplierName || d.clientName || d.employeeName || d.name || "—"),
     direction:isIn?"in":isOut?"out":d.direction==="in"?"in":"out",
-    amount, status:String(d.status || "registrado"), source
+    amount, status:String(d.status || "registrado"), source, sourceId:String(d.sourceId || d.receivableId || d.payableId || "")
   };
 }
 export default function FinancialReportsModule(){
