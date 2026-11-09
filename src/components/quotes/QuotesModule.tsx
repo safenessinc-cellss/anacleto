@@ -301,7 +301,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         dueDate: new Date(Date.now() + 15 * 24 * 3600 * 1000).toISOString().split("T")[0],
         items: quote.items, subtotal: quote.subtotal, taxRate: quote.taxRate, taxAmount: quote.taxAmount,
         discountRate: quote.discountRate, discountAmount: quote.discountAmount, total: quote.total,
-        currency: quote.currency, status: "pendente", paymentMethod: "Transferência Bancária",
+        currency: quote.currency, senderSnapshot: senderConfig, status: "pendente", paymentMethod: "Transferência Bancária",
         notes: `Fatura gerada a partir do orçamento ${quote.number}.`,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
