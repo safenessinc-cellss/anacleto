@@ -9,9 +9,9 @@ import PurchasesModule from "./PurchasesModule";
 import InventoryModule from "../inventory/InventoryModule";
 import EmployeePaymentsModule from "./EmployeePaymentsModule";
 import FinancialReportsModule from "./FinancialReportsModule";
-import PayrollModule from "../hr/PayrollModule";
+import PayrollModule from "../hr/PayrollModule";\nimport FiscalDocumentsModule from "./FiscalDocumentsModule";
 
-type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments" | "employee_payments" | "payroll" | "reports";
+type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments" | "employee_payments" | "payroll" | "reports" | "fiscal_documents";
 
 export default function FinanceModule({ language = "pt" }: { language?: string }) {
   const [tab, setTab] = useState<FinanceTab>("payables");
@@ -26,7 +26,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
     { id: "payments" as FinanceTab, label: "Pagamentos", icon: CreditCard },
     { id: "employee_payments" as FinanceTab, label: "Pagamento funcionário", icon: CreditCard },
     { id: "payroll" as FinanceTab, label: "Folha de Pagamento", icon: Wallet },
-    { id: "reports" as FinanceTab, label: "Relatórios", icon: FileText },
+    { id: "reports" as FinanceTab, label: "Relatórios", icon: FileText },\n    { id: "fiscal_documents" as FinanceTab, label: "Notas fiscais", icon: FileText },
     ];
 
   return (
@@ -63,7 +63,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
       {tab === "payments" && <PaymentsModule />}
       {tab === "employee_payments" && <EmployeePaymentsModule />}
       {tab === "payroll" && <PayrollModule />}
-      {tab === "reports" && <FinancialReportsModule />}
+      {tab === "reports" && <FinancialReportsModule />}\n      {tab === "fiscal_documents" && <FiscalDocumentsModule />}
     </div>
   );
 }
