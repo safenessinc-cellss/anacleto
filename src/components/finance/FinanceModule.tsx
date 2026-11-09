@@ -27,7 +27,8 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
     { id: "payments" as FinanceTab, label: "Pagamentos", icon: CreditCard },
     { id: "employee_payments" as FinanceTab, label: "Pagamento funcionário", icon: CreditCard },
     { id: "payroll" as FinanceTab, label: "Folha de Pagamento", icon: Wallet },
-    { id: "reports" as FinanceTab, label: "Relatórios", icon: FileText },\n    { id: "fiscal_documents" as FinanceTab, label: "Notas fiscais", icon: FileText },
+    { id: "reports" as FinanceTab, label: "Relatórios", icon: FileText },
+    { id: "fiscal_documents" as FinanceTab, label: "Notas fiscais", icon: FileText },
     ];
 
   return (
@@ -64,7 +65,8 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
       {tab === "payments" && <PaymentsModule />}
       {tab === "employee_payments" && <EmployeePaymentsModule />}
       {tab === "payroll" && <PayrollModule />}
-      {tab === "reports" && <FinancialReportsModule />}\n      {tab === "fiscal_documents" && <FiscalDocumentsModule />}
+      {tab === "reports" && <FinancialReportsModule />}
+      {tab === "fiscal_documents" && <FiscalDocumentsModule />}
     </div>
   );
 }
