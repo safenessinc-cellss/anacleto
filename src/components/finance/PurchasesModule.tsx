@@ -7,7 +7,7 @@ import { AlertCircle, Camera, CheckCircle2, FileText, Loader2, Plus, ScanSearch,
 type Supplier = { id: string; name: string; nif?: string; email?: string; phone?: string };
 type PurchaseItem = { description: string; sku: string; quantity: number; unit: string; unitPrice: number; total: number };
 type ExtractedDocument = {
-  documentType?: string; supplierName?: string; supplierCnpj?: string; documentNumber?: string;
+  documentType?: string; supplierName?: string; supplierCnpj?: string; documentNumber?: string; accessKey?: string;
   issueDate?: string; dueDate?: string; currency?: string; total?: number; tax?: number;
   description?: string; items?: PurchaseItem[]; confidence?: string; warnings?: string[];
 };
@@ -169,7 +169,7 @@ export default function PurchasesModule() {
       const purchaseNumber = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
       const payload = {
         number: purchaseNumber, supplierId, supplierName: resolvedSupplier?.name || supplierName.trim() || "Despesa sem fornecedor",
-        supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, description: description.trim(), expenseCategory,
+        supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, accessKey: extracted?.accessKey || "", description: description.trim(), expenseCategory,
         items: items.filter(i => i.description.trim()).map(i => ({ ...i, total: i.quantity * i.unitPrice })),
         subtotal, tax, total, issueDate, dueDate, status: "pending",
         documentType: extracted?.documentType || "manual", documentName: documentFile?.name || "",
