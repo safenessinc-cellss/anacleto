@@ -98,6 +98,19 @@ service cloud.firestore {
     match /payables/{id} { allow read, write: if canManageFinance(); }
     match /receivables/{id} { allow read, update, delete: if canManageFinance(); allow create: if canManageFinance() || canManageCommercial(); }
     match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
+    // Documentos fiscais importados: Financeiro pode criar como pendentes;
+    // somente direção/admin pode autorizar ou rejeitar.
+    match /fiscal_documents/{id} {
+      allow read: if canManageFinance();
+      allow create: if canManageFinance()
+        && request.resource.data.status == 'pending_admin'
+        && request.resource.data.adminApprovalRequired == true;
+      allow update: if hasRole(['super_admin','super_usuario','ceo','admin'])
+        && resource.data.status == 'pending_admin'
+        && request.resource.data.status in ['approved','rejected']
+        && request.resource.data.approvedByUid == request.auth.uid;
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
     match /payments/{id} { allow read, write: if canManageFinance(); }
     match /company_payment_settings/{id} { allow read, write: if canManageFinance(); }
 
