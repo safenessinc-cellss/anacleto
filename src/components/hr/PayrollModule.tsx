@@ -44,7 +44,11 @@ export default function PayrollModule() {
   const [normalHours, setNormalHours] = useState("8"); const [absences, setAbsences] = useState("0"); const [delays, setDelays] = useState("0");
   const [overtime50, setOvertime50] = useState("0"); const [overtime100, setOvertime100] = useState("0"); const [note, setNote] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
-  const [error, setError] = useState("");\n  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);\n  const [editSalary, setEditSalary] = useState("");\n  const [editHours, setEditHours] = useState("");\n  const [savingSalary, setSavingSalary] = useState(false);
+  const [error, setError] = useState("");
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [editSalary, setEditSalary] = useState("");
+  const [editHours, setEditHours] = useState("");
+  const [savingSalary, setSavingSalary] = useState(false);
   useEffect(() => {
     const e = onSnapshot(query(collection(db, "employees"), orderBy("name")), s => setEmployees(s.docs.map(d => ({ id:d.id, ...d.data() } as Employee))), err => setError("Não foi possível carregar os funcionários: " + err.message));
     const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc")), s => setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))), err => setError("Não foi possível carregar os apontamentos: " + err.message));
