@@ -136,7 +136,7 @@ export default function BudgetModal({
           id: Math.random().toString(36).substring(2),
           description: item.description,
           quantity: item.qty || 1,
-          unitPrice: item.price || 100,
+          unitPrice: Number(item.price ?? 0),
         }));
         setItems(generatedItems);
         showToast("Itens do orçamento criados pela IA! Edite qualquer campo abaixo se necessário.", "success");
@@ -145,14 +145,8 @@ export default function BudgetModal({
       }
     } catch (err) {
       console.error(err);
-      setAiError("Falha na geração. Usando itens de simulação para manter o fluxo ótimo.");
-      // Fallback
-      setItems([
-        { id: Math.random().toString(36).substring(2), description: "Janela de Alumínio Suprema 1.20x1.20m (Vidro Laminado 8mm)", quantity: 2, unitPrice: 2800 },
-        { id: Math.random().toString(36).substring(2), description: "Porta de Giro Alumínio Gold 2.10x0.90m completa", quantity: 1, unitPrice: 4200 },
-        { id: Math.random().toString(36).substring(2), description: "Instalação especializada com vedação de alta performance", quantity: 1, unitPrice: 850 }
-      ]);
-      showToast("Não foi possível conectar à IA. Simulamos itens de orçamento customizados para você editar.", "info");
+      setAiError("A IA não conseguiu gerar os itens. Nenhum produto ou preço fictício foi inserido. Revise a descrição e tente novamente ou adicione as linhas manualmente.");
+      showToast("Falha ao gerar orçamento por IA. Nenhum item de simulação foi criado.", "error");
     } finally {
       setIsGeneratingAi(false);
     }
