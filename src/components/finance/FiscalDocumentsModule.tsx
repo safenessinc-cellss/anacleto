@@ -11,7 +11,7 @@ function xmlText(xml:Document,tag:string){return xml.getElementsByTagName(tag)[0
 function readNfeXml(file:File):Promise<Partial<FiscalDoc>>{
  return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("Não foi possível ler XML."));
  reader.onload=()=>{try{const xml=new DOMParser().parseFromString(String(reader.result||""),"text/xml");if(xml.querySelector("parsererror"))throw new Error("XML inválido.");
- const inf=xml.getElementsByTagName("infNFe")[0];const id=inf?.getAttribute("Id")||"";const chave=clean(id.replace(/^NFe/i,""));
+ const inf=xml.getElementsByTagName("infNFe")[0];const id=inf?.getAttribute("Id")||"";const chave=id.replace(/^NFe/i,"").replace(/\D/g,"");
  resolve({documentKind:"NF-e",accessKey:chave,number:xmlText(xml,"nNF"),supplierName:xmlText(xml,"xNome"),supplierCnpj:xmlText(xml,"CNPJ"),issueDate:xmlText(xml,"dhEmi")||xmlText(xml,"dEmi"),total:Number(xmlText(xml,"vNF"))||0});}catch(e){reject(e);}};reader.readAsText(file);});
 }
 export default function FiscalDocumentsModule(){
