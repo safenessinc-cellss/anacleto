@@ -37,7 +37,7 @@ export default function InvoiceModal({ isOpen, onClose, invoice, t }: InvoiceMod
   // Company details are captured in senderSnapshot during quote conversion.
   const sender = invoice.senderSnapshot || {
     name: "", nif: "", address: "", postalCode: "", city: "", country: "Brasil",
-    logoUrl: "", bankAccount: "", currency: invoice.currency || "BRL"
+    logoUrl: "", watermarkLogoUrl: "", bankAccount: "", currency: invoice.currency || "BRL"
   };
 
   const formattedSubtotal = formatCurrency(invoice.subtotal, sender.currency, currentLang === "pt" ? "pt-BR" : "en-US");
