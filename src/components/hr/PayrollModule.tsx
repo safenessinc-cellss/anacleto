@@ -20,10 +20,10 @@ type TimeEntry = {
 const money = (n: number) => (Number.isFinite(n) ? n : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const monthKey = (date: string) => (date || "").slice(0, 7);
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-const onlyDigits = (s: string) => s.replace(/\\D/g, "");
+const onlyDigits = (s: string) => s.replace(/\D/g, "");
 function validCPF(value: string) {
   const cpf = onlyDigits(value);
-  if (cpf.length !== 11 || /^(\\d)\\1{10}$/.test(cpf)) return false;
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
   const digit = (base: string, factor: number) => {
     let sum = 0; for (const char of base) sum += Number(char) * factor--;
     const rest = (sum * 10) % 11; return rest === 10 ? 0 : rest;
