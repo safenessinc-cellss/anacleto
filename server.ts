@@ -572,8 +572,7 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
         `Serviço: ${service || "-"}`,
         `Endereço: ${address || "-"}`,
         notes ? `Notas: ${notes}` : null,
-      ].filter(Boolean).join("
-"),
+      ].filter(Boolean).join("\n"),
       location: address || "",
       start: { dateTime: startDateTime, timeZone: "America/Sao_Paulo" },
       end: { dateTime: endDateTime, timeZone: "America/Sao_Paulo" },
