@@ -16,6 +16,7 @@ interface Receivable {
   status: "pending" | "partial" | "received" | "cancelled";
   receivedAt?: string;
   invoiceId?: string;
+  budgetId?: string;
   notes?: string;
 }
 
@@ -239,7 +240,8 @@ export default function ReceivablesModule() {
             <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value as any })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800">
               {METHODS.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
             </select>
-            <input placeholder="Nº da fatura (opcional)" value={form.invoiceId || ""} onChange={(e) => setForm({ ...form, invoiceId: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800 md:col-span-2" />
+            <input placeholder="Nº da fatura (opcional)" value={form.invoiceId || ""} onChange={(e) => setForm({ ...form, invoiceId: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
+            <input placeholder="Orçamento / serviço vinculado (opcional)" value={form.budgetId || ""} onChange={(e) => setForm({ ...form, budgetId: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
             <textarea placeholder="Notas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800 md:col-span-3" rows={2} />
           </div>
           <div className="flex gap-2 mt-3">
@@ -253,13 +255,14 @@ export default function ReceivablesModule() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800 text-left text-xs uppercase text-slate-500">
             <tr>
-              <th className="p-3">Cliente</th><th className="p-3">Descrição</th><th className="p-3">Valor</th><th className="p-3">Vencimento</th><th className="p-3">Método</th><th className="p-3">Status</th><th className="p-3">Ações</th>
+              <th className="p-3">Cliente</th><th className="p-3">Serviço / orçamento</th><th className="p-3">Descrição</th><th className="p-3">Valor</th><th className="p-3">Vencimento</th><th className="p-3">Método</th><th className="p-3">Status</th><th className="p-3">Ações</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td className="p-3 font-bold text-slate-900 dark:text-white">{r.clientName}</td>
+                <td className="p-3 text-xs text-slate-500">{r.budgetId || "—"}</td>
                 <td className="p-3 text-slate-600 dark:text-slate-300">{r.description}</td>
                 <td className="p-3 font-bold">R$ {r.amount.toFixed(2)}</td>
                 <td className="p-3 font-mono text-xs">{r.dueDate}</td>
@@ -281,7 +284,7 @@ export default function ReceivablesModule() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="p-8 text-center text-slate-400">Nenhuma cobrança encontrada</td></tr>
+              <tr><td colSpan={8} className="p-8 text-center text-slate-400">Nenhuma cobrança encontrada</td></tr>
             )}
           </tbody>
         </table>
