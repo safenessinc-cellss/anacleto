@@ -9,7 +9,8 @@ import PurchasesModule from "./PurchasesModule";
 import InventoryModule from "../inventory/InventoryModule";
 import EmployeePaymentsModule from "./EmployeePaymentsModule";
 import FinancialReportsModule from "./FinancialReportsModule";
-import PayrollModule from "../hr/PayrollModule";\nimport FiscalDocumentsModule from "./FiscalDocumentsModule";
+import PayrollModule from "../hr/PayrollModule";
+import FiscalDocumentsModule from "./FiscalDocumentsModule";
 
 type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments" | "employee_payments" | "payroll" | "reports" | "fiscal_documents";
 
