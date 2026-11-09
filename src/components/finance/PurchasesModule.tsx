@@ -29,6 +29,7 @@ export default function PurchasesModule() {
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [supplierName, setSupplierName] = useState("");
   const [supplierCnpj, setSupplierCnpj] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("materiais");
   const [documentNumber, setDocumentNumber] = useState("");
   const [description, setDescription] = useState("");
   const [issueDate, setIssueDate] = useState(today());
@@ -150,7 +151,7 @@ export default function PurchasesModule() {
       const purchaseNumber = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
       const payload = {
         number: purchaseNumber, supplierId, supplierName: resolvedSupplier?.name || supplierName.trim(),
-        supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, description: description.trim(),
+        supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, description: description.trim(), expenseCategory,
         items: items.filter(i => i.description.trim()).map(i => ({ ...i, total: i.quantity * i.unitPrice })),
         subtotal, tax, total, issueDate, dueDate, status: "pending",
         documentType: extracted?.documentType || "manual", documentName: documentFile?.name || "",
@@ -159,7 +160,7 @@ export default function PurchasesModule() {
         createdAt: now, updatedAt: now, createdBy: auth.currentUser?.email || ""
       };
       await addDoc(collection(db, "purchase_orders"), payload);
-      setSelectedSupplier(""); setSupplierName(""); setSupplierCnpj(""); setDocumentNumber(""); setDescription("");
+      setSelectedSupplier(""); setSupplierName(""); setSupplierCnpj(""); setDocumentNumber(""); setDescription(""); setExpenseCategory("materiais");
       setIssueDate(today()); setDueDate(today()); setItems([emptyItem()]); setTax(0); setNotes("");
       setDocumentFile(null); setDocumentUrl(""); setDocumentPath(""); setExtracted(null);
       if (fileRef.current) fileRef.current.value = "";
@@ -243,13 +244,13 @@ export default function PurchasesModule() {
 
   return <div className="space-y-5">
     <div className="grid gap-3 sm:grid-cols-3">
-      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Compras registradas</p><p className="mt-1 text-2xl font-black">{purchases.length}</p></div>
+      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Compras e despesas registradas</p><p className="mt-1 text-2xl font-black">{purchases.length}</p></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Em aprovação</p><p className="mt-1 text-2xl font-black">{money(pendingTotal)}</p></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Aprovadas</p><p className="mt-1 text-2xl font-black">{money(approvedTotal)}</p></div>
     </div>
 
     <section className="rounded-2xl border bg-white p-5 dark:bg-slate-900 space-y-4">
-      <div><h3 className="flex items-center gap-2 text-lg font-black"><ShoppingCart className="h-5 w-5 text-blue-600"/> Nova compra</h3><p className="text-xs text-slate-500">Anexe uma nota fiscal, orçamento, pedido ou boleto. A IA identifica o documento e preenche os campos para revisão.</p></div>
+      <div><h3 className="flex items-center gap-2 text-lg font-black"><ShoppingCart className="h-5 w-5 text-blue-600"/> Nova compra / despesa geral</h3><p className="text-xs text-slate-500">Registre compras de materiais, serviços contratados e despesas gerais da empresa. Anexe comprovantes ou notas para conferência.</p></div>
       <div className="rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/40 p-4 dark:bg-blue-950/20">
         <input ref={fileRef} type="file" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={e => void handleFile(e.target.files?.[0] || null)}/>
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-bold text-sm">Documento da compra</p><p className="text-xs text-slate-500">{documentFile?.name || "PDF, JPG, PNG ou WEBP · até 10 MB"}</p></div><button type="button" onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white"><Upload className="h-4 w-4"/> Anexar arquivo</button></div>
@@ -258,6 +259,7 @@ export default function PurchasesModule() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-bold">Categoria da despesa<select value={expenseCategory} onChange={e=>setExpenseCategory(e.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2.5 text-sm dark:bg-slate-950"><option value="materiais">Compra de materiais</option><option value="servicos">Serviços contratados</option><option value="administrativas">Despesas administrativas</option><option value="manutencao">Manutenção</option><option value="frete">Frete e transporte</option><option value="impostos">Impostos e taxas</option><option value="outros">Outras despesas</option></select></label>
         <label className="text-xs font-bold">Fornecedor cadastrado<select value={selectedSupplier} onChange={e => {setSelectedSupplier(e.target.value); const s=suppliers.find(x=>x.id===e.target.value); if(s){setSupplierName(s.name);setSupplierCnpj(s.nif||"");}}} className="mt-1 w-full rounded-lg border bg-white p-2.5 text-sm dark:bg-slate-950"><option value="">Selecionar ou cadastrar pelo documento</option>{suppliers.map(s=><option key={s.id} value={s.id}>{s.name} · {s.nif||"sem CNPJ"}</option>)}</select></label>
         <label className="text-xs font-bold">Razão social<input value={supplierName} onChange={e=>setSupplierName(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-950"/></label>
         <label className="text-xs font-bold">CNPJ / CPF<input value={supplierCnpj} onChange={e=>setSupplierCnpj(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-950"/></label>
@@ -285,7 +287,7 @@ export default function PurchasesModule() {
       <button type="button" disabled={saving||extracting} onClick={()=>void savePurchase()} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving?<Loader2 className="h-4 w-4 animate-spin"/>:<CheckCircle2 className="h-4 w-4"/>} Registrar compra para aprovação</button>
     </section>
 
-    <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-black text-lg">Histórico de compras</h3><select value={filter} onChange={e=>setFilter(e.target.value)} className="rounded-lg border bg-white px-3 py-2 text-sm dark:bg-slate-900"><option value="all">Todas</option><option value="pending">Aguardando aprovação</option><option value="approved">Aprovadas</option><option value="received">Recebidas</option><option value="cancelled">Canceladas</option></select></div>
+    <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-black text-lg">Histórico de compras e despesas</h3><select value={filter} onChange={e=>setFilter(e.target.value)} className="rounded-lg border bg-white px-3 py-2 text-sm dark:bg-slate-900"><option value="all">Todas</option><option value="pending">Aguardando aprovação</option><option value="approved">Aprovadas</option><option value="received">Recebidas</option><option value="cancelled">Canceladas</option></select></div>
       {visible.length===0?<div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma compra registrada.</div>:visible.map(p=><article key={p.id} className="rounded-xl border bg-white p-4 dark:bg-slate-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-blue-600">{p.number} · {p.documentNumber||"Sem nº fiscal"}</p><h4 className="font-bold">{p.supplierName}</h4><p className="text-xs text-slate-500">{p.description} · {p.items?.length||0} item(ns) · Vencimento {p.dueDate}</p><p className="mt-1 text-lg font-black">{money(p.total)}</p></div><span className={"rounded-full px-3 py-1 text-xs font-bold "+(statusClass[p.status]||statusClass.pending)}>{statusText[p.status]||p.status}</span></div>
         {p.documentUrl&&<a href={p.documentUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-600"><FileText className="h-3.5 w-3.5"/> Abrir documento original · {p.documentName}</a>}
         {p.payableId&&<p className="mt-2 text-xs font-semibold text-emerald-700">Vinculada ao Financeiro · Conta a pagar criada</p>}
