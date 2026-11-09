@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Building2, TrendingDown, TrendingUp, FileText, CreditCard, ShoppingCart } from "lucide-react";
+import { Building2, TrendingDown, TrendingUp, FileText, CreditCard, ShoppingCart, Wallet } from "lucide-react";
 import SuppliersModule from "./SuppliersModule";
 import PayablesModule from "./PayablesModule";
 import ReceivablesModule from "./ReceivablesModule";
@@ -9,8 +9,9 @@ import PurchasesModule from "./PurchasesModule";
 import InventoryModule from "../inventory/InventoryModule";
 import EmployeePaymentsModule from "./EmployeePaymentsModule";
 import FinancialReportsModule from "./FinancialReportsModule";
+import PayrollModule from "../hr/PayrollModule";
 
-type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments" | "employee_payments" | "reports";
+type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments" | "employee_payments" | "payroll" | "reports";
 
 export default function FinanceModule({ language = "pt" }: { language?: string }) {
   const [tab, setTab] = useState<FinanceTab>("payables");
@@ -24,6 +25,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
     { id: "pending_boletos" as FinanceTab, label: "Boletos a Revisar", icon: FileText },
     { id: "payments" as FinanceTab, label: "Pagamentos", icon: CreditCard },
     { id: "employee_payments" as FinanceTab, label: "Pagamento funcionário", icon: CreditCard },
+    { id: "payroll" as FinanceTab, label: "Folha de Pagamento", icon: Wallet },
     { id: "reports" as FinanceTab, label: "Relatórios", icon: FileText },
     ];
 
@@ -60,6 +62,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
       {tab === "pending_boletos" && <PendingBoletosModule />}
       {tab === "payments" && <PaymentsModule />}
       {tab === "employee_payments" && <EmployeePaymentsModule />}
+      {tab === "payroll" && <PayrollModule />}
       {tab === "reports" && <FinancialReportsModule />}
     </div>
   );
