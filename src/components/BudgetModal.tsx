@@ -37,7 +37,7 @@ export default function BudgetModal({
   const [clientNif, setClientNif] = useState("");
   const [clientAddress, setClientAddress] = useState("");
   const [documentLanguage, setDocumentLanguage] = useState("pt");
-  const [taxRate, setTaxRate] = useState(10); // Standard Brazil tax rate (10%)
+  const [taxRate, setTaxRate] = useState(0); // Tax rate must be configured from the company tax/accounting setup
   const [items, setItems] = useState<BudgetLineItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -166,7 +166,7 @@ export default function BudgetModal({
       setClientNif(budget.clientNif || "");
       setClientAddress(budget.clientAddress || "");
       setDocumentLanguage(budget.language || "pt");
-      setTaxRate(budget.taxRate !== undefined ? budget.taxRate : 10);
+      setTaxRate(budget.taxRate !== undefined ? budget.taxRate : 0);
       setItems(budget.items || []);
       setNifFoundInfo(budget.clientNif ? { name: budget.clientName || "", email: budget.clientEmail || "", address: budget.clientAddress || "" } : null);
     } else {
@@ -175,15 +175,9 @@ export default function BudgetModal({
       setClientNif(prefillClient?.nif || "");
       setClientAddress(prefillClient?.address || "");
       setDocumentLanguage(currentLanguage);
-      setTaxRate(10);
-      setItems([
-        {
-          id: Math.random().toString(36).substring(2),
-          description: "Esquadrias de Alumínio Customizadas (m²)",
-          quantity: 1,
-          unitPrice: 1200,
-        },
-      ]);
+      setTaxRate(0);
+      // Novo orçamento inicia sem linhas ou preços inventados.
+      setItems([]);
       setNifFoundInfo(prefillClient?.nif ? { name: prefillClient.name || "", email: prefillClient.email || "", address: prefillClient.address || "" } : null);
     }
   }, [budget, isOpen, currentLanguage, prefillClient]);
@@ -195,7 +189,7 @@ export default function BudgetModal({
       id: Math.random().toString(36).substring(2),
       description: "",
       quantity: 1,
-      unitPrice: 100,
+      unitPrice: 0,
     };
     setItems([...items, newItem]);
   };
