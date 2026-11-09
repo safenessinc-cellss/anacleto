@@ -113,48 +113,33 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     return () => unsub();
   }, []);
 
-  // Create new blank quote
+  // Criar orçamento vazio; nenhum cliente, produto, imposto ou valor fictício.
   const handleCreateNewQuote = () => {
-    const defaultClient = companies[0] || {
-      id: "cli_gen",
-      name: "Cliente Particular",
-      taxId: "44556677B",
-      email: "cliente@ejemplo.com",
-      address: "Rua Principal 123",
-    };
-
+    const now = new Date().toISOString();
+    const quoteId = "quote_" + crypto.randomUUID();
     const newQ: Quote = {
-      id: "quote_" + Math.random().toString(36).substring(2, 9),
-      number: "PRE-" + new Date().getFullYear() + "-" + String(quotes.length + 1).padStart(3, "0"),
-      companyId: defaultClient.id,
-      clientName: defaultClient.name,
-      clientTaxId: defaultClient.taxId,
-      clientEmail: defaultClient.email,
-      clientAddress: defaultClient.address,
-      date: new Date().toISOString().split("T")[0],
-      validUntil: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split("T")[0],
-      items: [
-        {
-          id: "item_1",
-          description: "Janela de Alumínio Linha Suprema 120×100 cm c/ Vidro Incolor 6mm",
-          quantity: 2,
-          unitPrice: 380,
-          subtotal: 760,
-        },
-      ],
-      subtotal: 760,
+      id: quoteId,
+      number: "ORC-" + new Date().getFullYear() + "-" + quoteId.slice(-6).toUpperCase(),
+      companyId: "",
+      clientName: "",
+      clientTaxId: "",
+      clientEmail: "",
+      clientAddress: "",
+      date: now.slice(0, 10),
+      validUntil: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+      items: [],
+      subtotal: 0,
       taxRate: 0,
-      taxAmount: 159.6,
+      taxAmount: 0,
       discountRate: 0,
       discountAmount: 0,
-      total: 919.6,
+      total: 0,
       currency: senderConfig.currency || "BRL",
-      status: "pendente",
-      notes: "Prazo de entrega estimado: 15 dias úteis. Garantia de 5 anos em carpintaria.",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      status: "draft",
+      notes: "",
+      createdAt: now,
+      updatedAt: now,
     };
-
     setSelectedQuote(newQ);
     setIsEditing(true);
   };
@@ -308,7 +293,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       const quoteRef = doc(db, "quotes", quote.id);
       const invoiceRef = doc(collection(db, "invoices"));
       const invoiceId = invoiceRef.id;
-      const invoiceNumber = "FAC-" + new Date().getFullYear() + "-" + Math.floor(Math.random() * 900 + 100);
+      const invoiceNumber = "FAT-" + new Date().getFullYear() + "-" + invoiceId.slice(-8).toUpperCase();
       const baseInvoice: Invoice = {
         id: invoiceId, number: invoiceNumber, quoteId: quote.id, companyId: quote.companyId,
         clientName: quote.clientName, clientEmail: quote.clientEmail, clientTaxId: quote.clientTaxId,
@@ -335,7 +320,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: quote.id,
           notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
-        tx.update(quoteRef, { status: "approved", invoiceId, invoicedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        tx.update(quoteRef, { status: "invoiced", invoiceId, invoicedAt: serverTimestamp(), updatedAt: serverTimestamp() });
       });
       showToast(`Fatura ${invoiceNumber} gerada e vinculada ao Financeiro.`, "success");
     } catch (err) {
