@@ -33,16 +33,11 @@ export default function InvoiceModal({ isOpen, onClose, invoice, t }: InvoiceMod
     document.title = originalTitle;
   };
 
+  // Avoid fictitious legal identity, CNPJ, address or banking data in invoice output.
+  // Company details are captured in senderSnapshot during quote conversion.
   const sender = invoice.senderSnapshot || {
-    name: "Anacleto Consulting Group S.A.",
-    nif: "PT 502 234 450",
-    address: "Avenida Infante Santo Nº 24, r/c",
-    postalCode: "1350-178",
-    city: "Lisboa",
-    country: "Portugal",
-    logoUrl: "",
-    bankAccount: "PT50 0033 0000 12345678901 23 - BANCO BILBAO VIZCAYA",
-    currency: "BRL"
+    name: "", nif: "", address: "", postalCode: "", city: "", country: "Brasil",
+    logoUrl: "", bankAccount: "", currency: invoice.currency || "BRL"
   };
 
   const formattedSubtotal = formatCurrency(invoice.subtotal, sender.currency, currentLang === "pt" ? "pt-BR" : "en-US");
