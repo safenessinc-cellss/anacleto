@@ -79,14 +79,31 @@ export default function ReceivablesModule() {
   };
 
   const handleSave = async () => {
-    if (!form.description.trim()) return alert("Descrição é obrigatória");
+    if (!form.description.trim()) return alert("Descrição do serviço ou cobrança é obrigatória");
     if (!form.clientName.trim()) return alert("Informe o cliente");
     if (form.amount <= 0) return alert("Valor deve ser maior que zero");
-    const payload = { ...form };
+    const initialReceived = Math.max(0, Number(form.receivedAmount || 0));
+    if (initialReceived > Number(form.amount)) return alert("O adiantamento não pode ser maior que o valor total.");
+    const payload = { ...form, receivedAmount: initialReceived,
+      status: initialReceived >= Number(form.amount) ? "received" : initialReceived > 0 ? "partial" : "pending" } as Omit<Receivable, "id">;
     if (editing?.id) {
       await updateDoc(doc(db, "receivables", editing.id), payload);
     } else {
-      await addDoc(collection(db, "receivables"), payload);
+      const receivableRef = doc(collection(db, "receivables"));
+      await runTransaction(db, async tx => {
+        tx.set(receivableRef, { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        if (initialReceived > 0) {
+          const receiptRef = doc(db, "ledger_entries", `receivable-${receivableRef.id}-initial`);
+          tx.set(receiptRef, {
+            direction: "inflow", category: "customer_advance", sourceType: "receivable",
+            sourceId: receivableRef.id, receivableId: receivableRef.id,
+            description: `Adiantamento do cliente · ${form.description}`,
+            amount: initialReceived, date: new Date().toISOString().slice(0, 10),
+            status: "posted", paymentMethod: form.paymentMethod, createdAt: serverTimestamp(),
+            createdBy: auth.currentUser?.email || ""
+          });
+        }
+      });
     }
     setEditing(null);
     setForm(emptyForm);
@@ -215,8 +232,9 @@ export default function ReceivablesModule() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input placeholder="Cliente *" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" list="clients-list" />
             <datalist id="clients-list">{clients.map((c) => <option key={c.id} value={c.name} />)}</datalist>
-            <input placeholder="Descrição *" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800 md:col-span-2" />
+            <input placeholder="Serviço / orçamento / descrição *" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800 md:col-span-2" />
             <input type="number" step="0.01" placeholder="Valor *" value={form.amount} onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
+            <input type="number" min="0" step="0.01" placeholder="Adiantamento / valor já recebido (R$)" value={form.receivedAmount || 0} onChange={(e) => setForm({ ...form, receivedAmount: parseFloat(e.target.value) || 0 })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
             <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
             <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value as any })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800">
               {METHODS.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
