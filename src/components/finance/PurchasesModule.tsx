@@ -12,7 +12,7 @@ type ExtractedDocument = {
   description?: string; items?: PurchaseItem[]; confidence?: string; warnings?: string[];
 };
 type Purchase = {
-  id: string; number: string; supplierId: string; supplierName: string; supplierCnpj: string;
+  id: string; number: string; supplierId: string; supplierName: string; supplierCnpj: string; expenseCategory?: string;
   documentNumber: string; description: string; items: PurchaseItem[]; subtotal: number;
   tax: number; total: number; issueDate: string; dueDate: string; status: "draft" | "pending" | "approved" | "received" | "cancelled";
   documentType: string; documentName: string; documentUrl: string; documentPath: string;
@@ -125,7 +125,6 @@ export default function PurchasesModule() {
 
   const savePurchase = async () => {
     setError(""); setMessage("");
-    if (!supplierName.trim() && !selectedSupplier) return setError("Informe ou selecione o fornecedor.");
     if (!items.some(i => i.description.trim() && i.quantity > 0)) return setError("Adicione pelo menos um item válido.");
     if (total <= 0) return setError("O total da compra deve ser maior que zero.");
     setSaving(true);
@@ -150,7 +149,7 @@ export default function PurchasesModule() {
       const now = new Date().toISOString();
       const purchaseNumber = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
       const payload = {
-        number: purchaseNumber, supplierId, supplierName: resolvedSupplier?.name || supplierName.trim(),
+        number: purchaseNumber, supplierId, supplierName: resolvedSupplier?.name || supplierName.trim() || "Despesa sem fornecedor",
         supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, description: description.trim(), expenseCategory,
         items: items.filter(i => i.description.trim()).map(i => ({ ...i, total: i.quantity * i.unitPrice })),
         subtotal, tax, total, issueDate, dueDate, status: "pending",
@@ -288,7 +287,7 @@ export default function PurchasesModule() {
     </section>
 
     <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-black text-lg">Histórico de compras e despesas</h3><select value={filter} onChange={e=>setFilter(e.target.value)} className="rounded-lg border bg-white px-3 py-2 text-sm dark:bg-slate-900"><option value="all">Todas</option><option value="pending">Aguardando aprovação</option><option value="approved">Aprovadas</option><option value="received">Recebidas</option><option value="cancelled">Canceladas</option></select></div>
-      {visible.length===0?<div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma compra registrada.</div>:visible.map(p=><article key={p.id} className="rounded-xl border bg-white p-4 dark:bg-slate-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-blue-600">{p.number} · {p.documentNumber||"Sem nº fiscal"}</p><h4 className="font-bold">{p.supplierName}</h4><p className="text-xs text-slate-500">{p.description} · {p.items?.length||0} item(ns) · Vencimento {p.dueDate}</p><p className="mt-1 text-lg font-black">{money(p.total)}</p></div><span className={"rounded-full px-3 py-1 text-xs font-bold "+(statusClass[p.status]||statusClass.pending)}>{statusText[p.status]||p.status}</span></div>
+      {visible.length===0?<div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma compra registrada.</div>:visible.map(p=><article key={p.id} className="rounded-xl border bg-white p-4 dark:bg-slate-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-blue-600">{p.number} · {p.documentNumber||"Sem nº fiscal"}</p><h4 className="font-bold">{p.supplierName || "Despesa sem fornecedor"}</h4><p className="text-xs text-blue-600">{({materiais:"Compra de materiais",servicos:"Serviços contratados",administrativas:"Despesas administrativas",manutencao:"Manutenção",frete:"Frete e transporte",impostos:"Impostos e taxas",outros:"Outras despesas"} as Record<string,string>)[p.expenseCategory || ""] || "Compra geral"}</p><p className="text-xs text-slate-500">{p.description} · {p.items?.length||0} item(ns) · Vencimento {p.dueDate}</p><p className="mt-1 text-lg font-black">{money(p.total)}</p></div><span className={"rounded-full px-3 py-1 text-xs font-bold "+(statusClass[p.status]||statusClass.pending)}>{statusText[p.status]||p.status}</span></div>
         {p.documentUrl&&<a href={p.documentUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-600"><FileText className="h-3.5 w-3.5"/> Abrir documento original · {p.documentName}</a>}
         {p.payableId&&<p className="mt-2 text-xs font-semibold text-emerald-700">Vinculada ao Financeiro · Conta a pagar criada</p>}
         <div className="mt-3 flex flex-wrap gap-2">{p.status==="pending"&&<button onClick={()=>void approvePurchase(p)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Aprovar e lançar no Financeiro</button>}{p.status==="approved"&&<button onClick={()=>void markReceived(p)} className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700">Confirmar recebimento</button>}</div>
