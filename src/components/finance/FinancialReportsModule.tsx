@@ -15,7 +15,8 @@ const dateOf = (v:any) => {
 };
 function normalize(id:string,d:any,source:string):Row|null {
   if (source === "payables" && d.status !== "pending") return null;
-  const rawAmount = source === "receivables" ? Number(d.receivedAmount || 0) : Number(d.amount ?? d.total ?? d.value ?? 0);\n  const amount = rawAmount;
+  const rawAmount = source === "receivables" ? Number(d.receivedAmount || 0) : Number(d.amount ?? d.total ?? d.value ?? 0);
+  const amount = rawAmount;
   if(!Number.isFinite(amount)||amount===0) return null;
   const date=dateOf(d.date || d.paidAt || d.paymentDate || d.dueDate || d.createdAt || d.updatedAt);
   const isIn = source==="receivables" || d.direction==="inflow" || d.direction==="in" || source==="employee_payments" && false;
