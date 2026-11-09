@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { addDoc, collection, doc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage } from "../../firebase";
-import { AlertCircle, CheckCircle2, FileText, Loader2, Plus, ScanSearch, ShoppingCart, Upload } from "lucide-react";
+import { AlertCircle, Camera, CheckCircle2, FileText, Loader2, Plus, ScanSearch, ShoppingCart, Upload } from "lucide-react";
 
 type Supplier = { id: string; name: string; nif?: string; email?: string; phone?: string };
 type PurchaseItem = { description: string; sku: string; quantity: number; unit: string; unitPrice: number; total: number };
@@ -46,7 +46,7 @@ export default function PurchasesModule() {
   const [filter, setFilter] = useState("all");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);\n  const cameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const a = onSnapshot(collection(db, "suppliers"), snap => setSuppliers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier))));
@@ -213,7 +213,7 @@ export default function PurchasesModule() {
   };
 
   const markReceived = async (purchase: Purchase) => {
-    if (purchase.status !== "approved") return;
+    if (purchase.status !== "approved") return;\n    if (purchase.expenseCategory !== "materiais") { setError("Somente compras classificadas como materiais podem ser incluídas no estoque. Altere a categoria ou registre como compra de materiais."); return; }
     try {
       const purchaseRef = doc(db, "purchase_orders", purchase.id);
       const aggregates = new Map<string, PurchaseItem>();
@@ -250,7 +250,7 @@ export default function PurchasesModule() {
             createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || ""
           });
         }
-        tx.update(purchaseRef, { status: "received", receivedAt: serverTimestamp(), inventoryPostedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        tx.update(purchaseRef, { status: "received", stockIncluded: true, stockIncludedAt: serverTimestamp(), receivedAt: serverTimestamp(), inventoryPostedAt: serverTimestamp(), updatedAt: serverTimestamp() });
       });
       setMessage("Recebimento registrado: materiais lançados no Estoque e compra vinculada ao Financeiro.");
     } catch (e) { setError((e as Error).message || "Não foi possível registrar o recebimento."); }
@@ -270,8 +270,8 @@ export default function PurchasesModule() {
     <section className="rounded-2xl border bg-white p-5 dark:bg-slate-900 space-y-4">
       <div><h3 className="flex items-center gap-2 text-lg font-black"><ShoppingCart className="h-5 w-5 text-blue-600"/> Nova compra / despesa geral</h3><p className="text-xs text-slate-500">Registre compras de materiais, serviços contratados e despesas gerais da empresa. Anexe comprovantes ou notas para conferência.</p></div>
       <div className="rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/40 p-4 dark:bg-blue-950/20">
-        <input ref={fileRef} type="file" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={e => void handleFile(e.target.files?.[0] || null)}/>
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-bold text-sm">Documento da compra</p><p className="text-xs text-slate-500">{documentFile?.name || "PDF, JPG, PNG ou WEBP · até 10 MB"}</p></div><button type="button" onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white"><Upload className="h-4 w-4"/> Anexar arquivo</button></div>
+        <input ref={fileRef} type="file" accept=".pdf,application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={e => void handleFile(e.target.files?.[0] || null)}/>\n        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => void handleFile(e.target.files?.[0] || null)}/>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-bold text-sm">Documento da compra</p><p className="text-xs text-slate-500">{documentFile?.name || "PDF, JPG, PNG ou WEBP · até 10 MB"}</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => cameraRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white"><Camera className="h-4 w-4"/> Escanear nota pelo celular</button><button type="button" onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white"><Upload className="h-4 w-4"/> Anexar PDF ou imagem</button></div></div>
         {extracting && <p className="mt-3 flex items-center gap-2 text-sm text-blue-700"><Loader2 className="h-4 w-4 animate-spin"/> A IA está lendo o documento...</p>}
         {extracted && <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4"/> Tipo identificado: {extracted.documentType || "documento"} · Confiança: {extracted.confidence || "não informada"}. Confira os dados antes de salvar.</p>}
       </div>
@@ -309,7 +309,7 @@ export default function PurchasesModule() {
       {visible.length===0?<div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma compra registrada.</div>:visible.map(p=><article key={p.id} className="rounded-xl border bg-white p-4 dark:bg-slate-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-blue-600">{p.number} · {p.documentNumber||"Sem nº fiscal"}</p><h4 className="font-bold">{p.supplierName || "Despesa sem fornecedor"}</h4><p className="text-xs text-blue-600">{({materiais:"Compra de materiais",servicos:"Serviços contratados",administrativas:"Despesas administrativas",manutencao:"Manutenção",frete:"Frete e transporte",impostos:"Impostos e taxas",outros:"Outras despesas"} as Record<string,string>)[p.expenseCategory || ""] || "Compra geral"}</p><p className="text-xs text-slate-500">{p.description} · {p.items?.length||0} item(ns) · Vencimento {p.dueDate}</p><p className="mt-1 text-lg font-black">{money(p.total)}</p></div><span className={"rounded-full px-3 py-1 text-xs font-bold "+(statusClass[p.status]||statusClass.pending)}>{statusText[p.status]||p.status}</span></div>
         {p.documentUrl&&<a href={p.documentUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-600"><FileText className="h-3.5 w-3.5"/> Abrir documento original · {p.documentName}</a>}
         {p.payableId&&<p className="mt-2 text-xs font-semibold text-emerald-700">Vinculada ao Financeiro · Conta a pagar criada</p>}
-        <div className="mt-3 flex flex-wrap gap-2">{p.status==="pending"&&<button onClick={()=>void approvePurchase(p)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Aprovar e lançar no Financeiro</button>}{p.status==="approved"&&<button onClick={()=>void markReceived(p)} className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700">Confirmar recebimento</button>}</div>
+        <div className="mt-3 flex flex-wrap gap-2">{p.status==="pending"&&<button onClick={()=>void approvePurchase(p)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Aprovar e lançar no Financeiro</button>}{p.status==="approved"&&p.expenseCategory==="materiais"&&<button onClick={()=>void markReceived(p)} className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700">Incluir no estoque</button>}{p.status==="received"&&<span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Estoque atualizado</span>}</div>
       </article>)}
     </section>
   </div>;
