@@ -104,12 +104,31 @@ export default function PurchasesModule() {
       setIssueDate(result.issueDate || today());
       setDueDate(result.dueDate || today());
       setTax(Number(result.tax) || 0);
-      if (Array.isArray(result.items) && result.items.length) setItems(result.items.map((item: PurchaseItem) => ({
-        description: item.description || "", sku: item.sku || "", quantity: Number(item.quantity) || 1,
-        unit: item.unit || "un", unitPrice: Number(item.unitPrice) || 0,
-        total: Number(item.total) || (Number(item.quantity) || 1) * (Number(item.unitPrice) || 0)
-      })));
-      else if (Number(result.total) > 0) setItems([{ description: result.description || "Itens do documento", sku: "", quantity: 1, unit: "un", unitPrice: Number(result.total), total: Number(result.total) }]);
+      // Ignore empty/invalid rows returned by OCR. Gemini may return an array containing
+      // placeholder items even when it could not read the invoice line items.
+      const validItems = Array.isArray(result.items) ? result.items
+        .filter((item: any) => String(item?.description || "").trim() && Number(item?.quantity ?? 1) > 0)
+        .map((item: any) => {
+          const quantity = Math.max(0.01, Number(item.quantity) || 1);
+          const unitPrice = Math.max(0, Number(item.unitPrice) || 0);
+          const lineTotal = Math.max(0, Number(item.total) || quantity * unitPrice);
+          return {
+            description: String(item.description || "").trim(), sku: String(item.sku || ""),
+            quantity, unit: String(item.unit || "un"), unitPrice: unitPrice || lineTotal / quantity,
+            total: lineTotal
+          } as PurchaseItem;
+        }) : [];
+      if (validItems.length) {
+        setItems(validItems);
+      } else if (Number(result.total) > 0) {
+        // When OCR reads the invoice total but not its individual rows, create a
+        // single editable summary line so the document can still be registered.
+        const documentTotal = Math.max(0, Number(result.total) || 0);
+        setItems([{ description: String(result.description || result.documentType || "Total do documento"), sku: "", quantity: 1, unit: "un", unitPrice: documentTotal, total: documentTotal }]);
+        setTax(0);
+      } else {
+        setItems([emptyItem()]);
+      }
       const match = suppliers.find(s => (result.supplierCnpj && (s.nif || "").replace(/\D/g, "") === String(result.supplierCnpj).replace(/\D/g, "")) || (result.supplierName && s.name.toLowerCase() === String(result.supplierName).toLowerCase()));
       if (match) setSelectedSupplier(match.id);
       setMessage("Documento interpretado. Confira todos os campos antes de salvar; a IA pode cometer erros.");
