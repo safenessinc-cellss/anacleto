@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Users, Clock3, Wallet, Plus, Calculator, FileSpreadsheet, UserRound, ShieldCheck } from "lucide-react";
@@ -44,7 +44,7 @@ export default function PayrollModule() {
   const [normalHours, setNormalHours] = useState("8"); const [absences, setAbsences] = useState("0"); const [delays, setDelays] = useState("0");
   const [overtime50, setOvertime50] = useState("0"); const [overtime100, setOvertime100] = useState("0"); const [note, setNote] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
-  const [error, setError] = useState("");
+  const [error, setError] = useState("");\n  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);\n  const [editSalary, setEditSalary] = useState("");\n  const [editHours, setEditHours] = useState("");\n  const [savingSalary, setSavingSalary] = useState(false);
   useEffect(() => {
     const e = onSnapshot(query(collection(db, "employees"), orderBy("name")), s => setEmployees(s.docs.map(d => ({ id:d.id, ...d.data() } as Employee))), err => setError("Não foi possível carregar os funcionários: " + err.message));
     const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc")), s => setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))), err => setError("Não foi possível carregar os apontamentos: " + err.message));
@@ -69,6 +69,20 @@ export default function PayrollModule() {
     return { ...emp, hourly, normal, h50, h100, absenceHours, delayHours, extra50, extra100, additions, deductionsAttendance, gross, estimated, paidAmount };
   }), [employees, entries, payments, month]);
   const total = summary.reduce((s,e) => s + e.estimated, 0);
+  const saveSalary = async (ev: React.FormEvent) => {
+    ev.preventDefault(); setError("");
+    const value = Number(editSalary), hours = Number(editHours);
+    if (!editingEmployee || !Number.isFinite(value) || value <= 0 || !Number.isFinite(hours) || hours <= 0) return setError("Informe salário base e jornada mensal válidos.");
+    setSavingSalary(true);
+    try {
+      await updateDoc(doc(db, "employees", editingEmployee.id), {
+        salary: round2(value), monthlyHours: hours, salaryUpdatedAt: serverTimestamp(),
+        salaryUpdatedBy: auth.currentUser?.email || ""
+      });
+      setEditingEmployee(null); setEditSalary(""); setEditHours("");
+    } catch (e) { setError("Não foi possível atualizar o salário: " + (e as Error).message); }
+    finally { setSavingSalary(false); }
+  };
   const addEmployee = async (ev: React.FormEvent) => {
     ev.preventDefault(); setError("");
     if (!name.trim() || Number(salary) <= 0 || Number(monthlyHours) <= 0) return setError("Informe nome, salário e jornada mensal válidos.");
@@ -110,9 +124,10 @@ export default function PayrollModule() {
       </form>
     </div>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"><div className="hidden print:flex items-center gap-4 border-b border-slate-300 p-5"><img src={logoImg} alt="Anacleto Esquadrias" className="h-14 w-28 object-contain"/><div><p className="text-[10px] font-bold tracking-widest text-slate-500">ANACLETO ESQUADRIAS</p><h1 className="text-lg font-bold text-slate-900">Folha de Pagamento — {month}</h1></div></div><div className="flex flex-wrap items-center justify-between gap-2 border-b p-5 dark:border-slate-700"><h2 className="flex items-center gap-2 font-bold"><Calculator className="h-4 w-4 text-blue-600"/> Resumo da folha — {month}</h2><button onClick={()=>window.print()} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold"><FileSpreadsheet className="h-4 w-4"/> Imprimir / PDF</button></div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr>{["Funcionário","Horas normais","HE 50%","HE 100%","Salário base","Adicionais","Descontos de faltas/atrasos","Líquido estimado","Pago na competência"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead><tbody>{summary.map(e=><tr key={e.id} className="border-t dark:border-slate-700"><td className="p-3"><b>{e.name}</b><div className="text-xs text-slate-500">{e.role} · CPF {e.cpf || "não informado"}</div></td><td className="p-3">{e.normal.toFixed(2)} h</td><td className="p-3">{money(e.extra50)}</td><td className="p-3">{money(e.extra100)}</td><td className="p-3">{money(e.salary)}</td><td className="p-3">{money(e.additions)}</td><td className="p-3">{money(e.deductionsAttendance)}</td><td className="p-3 font-bold">{money(e.estimated)}</td><td className="p-3"><span className={e.paidAmount >= e.estimated ? "font-bold text-emerald-700" : "font-semibold text-amber-700"}>{money(e.paidAmount)}</span><div className="text-xs text-slate-500">{e.paidAmount >= e.estimated ? "Quitado" : `Saldo: ${money(Math.max(0, e.estimated - e.paidAmount))}`}</div></td></tr>)}{!summary.length&&<tr><td colSpan={9} className="p-8 text-center text-slate-500">Cadastre funcionários para iniciar a folha.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr>{["Funcionário","Horas normais","HE 50%","HE 100%","Salário base","Adicionais","Descontos de faltas/atrasos","Líquido estimado","Pago na competência"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead><tbody>{summary.map(e=><tr key={e.id} className="border-t dark:border-slate-700"><td className="p-3"><b>{e.name}</b><div className="text-xs text-slate-500">{e.role} · CPF {e.cpf || "não informado"}</div></td><td className="p-3">{e.normal.toFixed(2)} h</td><td className="p-3">{money(e.extra50)}</td><td className="p-3">{money(e.extra100)}</td><td className="p-3">{money(e.salary)}</td><td className="p-3">{money(e.additions)}</td><td className="p-3">{money(e.deductionsAttendance)}</td><td className="p-3 font-bold">{money(e.estimated)}</td><td className="p-3"><span className={e.paidAmount >= e.estimated ? "font-bold text-emerald-700" : "font-semibold text-amber-700"}>{money(e.paidAmount)}</span><div className="text-xs text-slate-500">{e.paidAmount >= e.estimated ? "Quitado" : `Saldo: ${money(Math.max(0, e.estimated - e.paidAmount))}`}</div></td><td className="p-3"><button type="button" onClick={()=>{setEditingEmployee(e);setEditSalary(String(e.salary || ""));setEditHours(String(e.monthlyHours || 220));}} className="rounded-lg border px-2.5 py-1.5 text-xs font-bold text-blue-700">Editar salário</button></td></tr>)}{!summary.length&&<tr><td colSpan={10} className="p-8 text-center text-slate-500">Cadastre funcionários para iniciar a folha.</td></tr>}</tbody></table></div>
     </section>
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900"><ShieldCheck className="mr-1 inline h-4 w-4"/> <b>Critério de cálculo:</b> valor-hora = salário base ÷ jornada mensal; HE 50% = horas × valor-hora × 1,5; HE 100% = horas × valor-hora × 2. Faltas e atrasos são estimados pelo valor-hora. O resultado ainda não é folha legal: INSS, IRRF, FGTS, DSR, férias, 13º, adicionais legais e convenções coletivas dependem de tabelas vigentes e regras aplicáveis, que precisam ser validadas pela contabilidade. Valores arredondados em centavos.</div>
+    {editingEmployee && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={saveSalary} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><div><h3 className="text-lg font-black">Editar salário base</h3><p className="text-sm text-slate-500">{editingEmployee.name}</p></div><label className="block text-xs font-semibold text-slate-500">Novo salário base (R$)<input autoFocus type="number" min="0.01" step="0.01" required value={editSalary} onChange={e=>setEditSalary(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">Jornada mensal (horas)<input type="number" min="1" max="300" required value={editHours} onChange={e=>setEditHours(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><p className="text-xs text-amber-700">A alteração atualiza o cadastro do funcionário e os cálculos da competência selecionada. Pagamentos já registrados permanecem no histórico.</p><div className="flex justify-end gap-2"><button type="button" onClick={()=>setEditingEmployee(null)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={savingSalary} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingSalary ? "Salvando..." : "Salvar salário"}</button></div></form></div>}
     <style>{`@media print { button, form, header label { display:none !important; } body { background:white !important; } }`}</style>
   </div>;
 }
