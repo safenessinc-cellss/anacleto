@@ -234,7 +234,7 @@ export default function ReceivablesModule() {
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por cliente ou descrição..." className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800" />
           </div>
-          <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800">
+          <select value={filter} onChange={(e) => { const next = e.target.value as typeof filter; setFilter(next); if (next === "partial") setReceiptTab("advance"); else if (next === "received") setReceiptTab("received"); else if (next === "pending" || next === "overdue") setReceiptTab("receivable"); }} className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800">
             <option value="all">Todos</option>
             <option value="pending">Pendentes</option>
             <option value="partial">Parciais</option>
