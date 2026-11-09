@@ -7,20 +7,22 @@ import PendingBoletosModule from "./PendingBoletosModule";
 import PaymentsModule from "./PaymentsModule";
 import PurchasesModule from "./PurchasesModule";
 import InventoryModule from "../inventory/InventoryModule";
+import EmployeePaymentsModule from "./EmployeePaymentsModule";
 
-type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments";
+type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments" | "employee_payments";
 
 export default function FinanceModule({ language = "pt" }: { language?: string }) {
   const [tab, setTab] = useState<FinanceTab>("payables");
 
   const tabs = [
     { id: "inventory" as FinanceTab, label: "Estoque", icon: Building2 },
-    { id: "purchases" as FinanceTab, label: "Compras", icon: ShoppingCart },
+    { id: "purchases" as FinanceTab, label: "Compras gerais", icon: ShoppingCart },
     { id: "payables" as FinanceTab, label: "Despesas e Contas a Pagar", icon: TrendingDown },
     { id: "receivables" as FinanceTab, label: "Contas a Receber", icon: TrendingUp },
     { id: "suppliers" as FinanceTab, label: "Fornecedores", icon: Building2 },
     { id: "pending_boletos" as FinanceTab, label: "Boletos a Revisar", icon: FileText },
-    { id: "payments" as FinanceTab, label: "Pagos", icon: CreditCard },
+    { id: "payments" as FinanceTab, label: "Pagamentos", icon: CreditCard },
+    { id: "employee_payments" as FinanceTab, label: "Pagamento funcionário", icon: CreditCard },
     ];
 
   return (
@@ -55,6 +57,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
       {tab === "suppliers" && <SuppliersModule />}
       {tab === "pending_boletos" && <PendingBoletosModule />}
       {tab === "payments" && <PaymentsModule />}
+      {tab === "employee_payments" && <EmployeePaymentsModule />}
     </div>
   );
 }
