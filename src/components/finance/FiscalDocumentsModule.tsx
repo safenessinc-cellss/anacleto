@@ -7,7 +7,6 @@ import {CheckCircle,Clock,FileText,Loader2,ShieldCheck,UploadCloud,XCircle} from
 
 type FiscalDoc={id:string;fileName:string;fileUrl:string;filePath:string;fileType:string;documentKind:string;accessKey:string;number:string;supplierName:string;supplierCnpj:string;issueDate:string;total:number;status:"pending_admin"|"approved"|"rejected";createdAt?:any;uploadedBy?:string;uploadedByEmail?:string;approvedBy?:string;approvalNote?:string};
 const brl=(v:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v||0);
-const clean=(v:string)=>String(v||"").replace(/\D/g,"");
 function xmlText(xml:Document,tag:string){return xml.getElementsByTagName(tag)[0]?.textContent?.trim()||"";}
 function readNfeXml(file:File):Promise<Partial<FiscalDoc>>{
  return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(new Error("Não foi possível ler XML."));
