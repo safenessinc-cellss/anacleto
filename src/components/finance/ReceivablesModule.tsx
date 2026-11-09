@@ -84,6 +84,7 @@ export default function ReceivablesModule() {
     if (!form.clientName.trim()) return alert("Informe o cliente");
     if (form.amount <= 0) return alert("Valor deve ser maior que zero");
     const initialReceived = Math.max(0, Number(form.receivedAmount || 0));
+    if (editing?.id && initialReceived !== Number(editing.receivedAmount || 0)) return alert("Para alterar valores recebidos, use a ação de registrar recebimento parcial. Assim o lançamento financeiro permanece rastreável.");
     if (initialReceived > Number(form.amount)) return alert("O adiantamento não pode ser maior que o valor total.");
     const payload = { ...form, receivedAmount: initialReceived,
       status: initialReceived >= Number(form.amount) ? "received" : initialReceived > 0 ? "partial" : "pending" } as Omit<Receivable, "id">;
