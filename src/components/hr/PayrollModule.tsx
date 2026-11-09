@@ -10,6 +10,7 @@ type Employee = {
   department?: string; email?: string; phone?: string; active: boolean;
   additions?: { name: string; kind: "fixed" | "percent"; value: number }[];
 };
+type EmployeePayment = { id: string; employeeId: string; competence: string; amount: number; paymentDate: string; };
 type TimeEntry = {
   id: string; employeeId: string; date: string; normalHours?: number;
   hours?: number; absences?: number; delays?: number;
@@ -33,7 +34,8 @@ function additionsTotal(emp: Employee) {
 }
 export default function PayrollModule() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [entries, setEntries] = useState<TimeEntry[]>([]);\n  const [payments, setPayments] = useState<EmployeePayment[]>([]);
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [payments, setPayments] = useState<EmployeePayment[]>([]);\n  const [payments, setPayments] = useState<EmployeePayment[]>([]);
   const [name, setName] = useState(""); const [cpf, setCpf] = useState("");
   const [role, setRole] = useState(""); const [salary, setSalary] = useState("2500");
   const [monthlyHours, setMonthlyHours] = useState("220"); const [admissionDate, setAdmissionDate] = useState(new Date().toISOString().slice(0,10));
@@ -46,7 +48,8 @@ export default function PayrollModule() {
   useEffect(() => {
     const e = onSnapshot(query(collection(db, "employees"), orderBy("name")), s => setEmployees(s.docs.map(d => ({ id:d.id, ...d.data() } as Employee))), err => setError("Não foi possível carregar os funcionários: " + err.message));
     const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc")), s => setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))), err => setError("Não foi possível carregar os apontamentos: " + err.message));
-    return () => { e(); t(); };
+    const p = onSnapshot(collection(db, "employee_payments"), s => setPayments(s.docs.map(d => ({ id:d.id, ...d.data() } as EmployeePayment))), err => setError("Não foi possível carregar os pagamentos: " + err.message));
+    return () => { e(); t(); p(); };
   }, []);
   const summary = useMemo(() => employees.filter(e => e.active !== false).map(emp => {
     const rows = entries.filter(x => x.employeeId === emp.id && monthKey(x.date) === month);
@@ -62,8 +65,9 @@ export default function PayrollModule() {
     const deductionsAttendance = round2((absenceHours + delayHours) * hourly);
     const gross = round2(Number(emp.salary || 0) + additions + extra50 + extra100);
     const estimated = round2(Math.max(0, gross - deductionsAttendance));
-    return { ...emp, hourly, normal, h50, h100, absenceHours, delayHours, extra50, extra100, additions, deductionsAttendance, gross, estimated };
-  }), [employees, entries, month]);
+    const paidAmount = payments.filter(p => p.employeeId === emp.id && p.competence === month).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    return { ...emp, hourly, normal, h50, h100, absenceHours, delayHours, extra50, extra100, additions, deductionsAttendance, gross, estimated, paidAmount };
+  }), [employees, entries, payments, month]);
   const total = summary.reduce((s,e) => s + e.estimated, 0);
   const addEmployee = async (ev: React.FormEvent) => {
     ev.preventDefault(); setError("");
