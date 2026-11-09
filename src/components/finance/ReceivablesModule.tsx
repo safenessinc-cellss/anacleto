@@ -46,6 +46,8 @@ export default function ReceivablesModule() {
   const [items, setItems] = useState<Receivable[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "partial" | "received" | "overdue">("all");
+  // Dedicated finance views: open balances, advances/partial receipts, and fully received.
+  const [receiptTab, setReceiptTab] = useState<"receivable" | "advance" | "received">("receivable");
   const [editing, setEditing] = useState<Receivable | null>(null);
   const [form, setForm] = useState<Omit<Receivable, "id">>(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -176,10 +178,14 @@ export default function ReceivablesModule() {
 
   const filtered = items.filter((i) => {
     if (search && !i.description.toLowerCase().includes(search.toLowerCase()) && !i.clientName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filter === "pending") return i.status === "pending";
-    if (filter === "partial") return i.status === "partial";
-    if (filter === "received") return i.status === "received";
-    if (filter === "overdue") return isOverdue(i);
+    // The tabs work as operational queues. The status dropdown further filters within a tab.
+    if (receiptTab === "receivable" && !(i.status === "pending" || (i.status === "partial" && Number(i.receivedAmount || 0) < i.amount))) return false;
+    if (receiptTab === "advance" && !(i.status === "partial" && Number(i.receivedAmount || 0) > 0)) return false;
+    if (receiptTab === "received" && i.status !== "received") return false;
+    if (filter === "pending" && i.status !== "pending") return false;
+    if (filter === "partial" && i.status !== "partial") return false;
+    if (filter === "received" && i.status !== "received") return false;
+    if (filter === "overdue" && !isOverdue(i)) return false;
     return true;
   });
 
@@ -207,6 +213,19 @@ export default function ReceivablesModule() {
           <div className="flex items-center gap-2 text-xs font-bold uppercase text-emerald-600"><TrendingUp className="w-3.5 h-3.5" /> Recebido</div>
           <div className="text-2xl font-black text-emerald-600 mt-1">R$ {totals.received.toFixed(2)}</div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 rounded-xl border bg-slate-50 p-2 dark:bg-slate-900">
+        {([
+          { id: "receivable", label: "A Receber", count: items.filter(i => i.status === "pending" || i.status === "partial").length },
+          { id: "advance", label: "Adiantamentos", count: items.filter(i => i.status === "partial" && Number(i.receivedAmount || 0) > 0).length },
+          { id: "received", label: "Recebidos", count: items.filter(i => i.status === "received").length },
+        ] as const).map(tab => (
+          <button key={tab.id} onClick={() => { setReceiptTab(tab.id); setFilter("all"); }}
+            className={"rounded-lg px-4 py-2 text-sm font-bold transition " + (receiptTab === tab.id ? "bg-indigo-600 text-white shadow" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800")}>
+            {tab.label} <span className={"ml-1 rounded-full px-1.5 py-0.5 text-xs " + (receiptTab === tab.id ? "bg-white/20" : "bg-slate-200 dark:bg-slate-700")}>{tab.count}</span>
+          </button>
+        ))}
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
