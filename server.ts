@@ -572,7 +572,8 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
         `Serviço: ${service || "-"}`,
         `Endereço: ${address || "-"}`,
         notes ? `Notas: ${notes}` : null,
-      ].filter(Boolean).join("\n"),
+      ].filter(Boolean).join("
+"),
       location: address || "",
       start: { dateTime: startDateTime, timeZone: "America/Sao_Paulo" },
       end: { dateTime: endDateTime, timeZone: "America/Sao_Paulo" },
@@ -644,7 +645,12 @@ app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, ra
     const match = raw.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(match ? match[0] : raw);
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) throw new Error("A IA não retornou uma estrutura de documento válida.");
-    parsed.total = Math.max(0, Number(parsed.total) || 0);\n    parsed.accessKey = String(parsed.accessKey || "").replace(/\\D/g, "").slice(0, 44);\n    parsed.digitableLine = String(parsed.digitableLine || "").replace(/[^0-9. ]/g, "").slice(0, 80);\n    parsed.barcode = String(parsed.barcode || "").replace(/\\D/g, "").slice(0, 48);\n    parsed.payerName = String(parsed.payerName || "").slice(0, 180);\n    parsed.payerCnpj = String(parsed.payerCnpj || "").replace(/\\D/g, "").slice(0, 14);
+    parsed.total = Math.max(0, Number(parsed.total) || 0);
+    parsed.accessKey = String(parsed.accessKey || "").replace(/\\D/g, "").slice(0, 44);
+    parsed.digitableLine = String(parsed.digitableLine || "").replace(/[^0-9. ]/g, "").slice(0, 80);
+    parsed.barcode = String(parsed.barcode || "").replace(/\\D/g, "").slice(0, 48);
+    parsed.payerName = String(parsed.payerName || "").slice(0, 180);
+    parsed.payerCnpj = String(parsed.payerCnpj || "").replace(/\\D/g, "").slice(0, 14);
     parsed.items = parsed.items.slice(0, 200).map((item: any) => ({ description: String(item.description || "").slice(0, 300), sku: String(item.sku || "").slice(0, 80), quantity: Math.max(0, Number(item.quantity) || 0), unit: String(item.unit || "un").slice(0, 20), unitPrice: Math.max(0, Number(item.unitPrice) || 0), total: Math.max(0, Number(item.total) || 0) }));
     return res.json(parsed);
   } catch (error: any) {
