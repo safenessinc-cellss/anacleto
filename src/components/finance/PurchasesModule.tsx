@@ -312,8 +312,8 @@ export default function PurchasesModule() {
         const match = inventorySnapshot.docs.find(d => {
           const data = d.data();
           const sameCatalog = item.supplierCatalogId && data.supplierCatalogId === item.supplierCatalogId;
-          const sameSku = item.sku && String(data.sku || "").trim().toLowerCase() === item.sku.trim().toLowerCase();
-          const sameName = String(data.name || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase() === String(item.description || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+          const sameSku = item.sku && normalizeText(String(data.supplierSku || data.sku || "")) === normalizeText(item.sku);
+          const sameName = normalizeText(String(data.name || "")) === normalizeText(item.description || "");
           return Boolean(sameCatalog || sameSku || sameName);
         });
         return doc(db, "inventory_items", match?.id || key);
@@ -329,7 +329,10 @@ export default function PurchasesModule() {
           const snap = stockSnapshots[i];
           const currentQty = snap.exists() ? Number(snap.data().quantity || 0) : 0;
           tx.set(stockRefs[i], {
-            name: item.description, sku: item.sku || key, unit: item.unit || "un",
+            name: item.description,
+            sku: snap.exists() ? snap.data().sku || item.sku || key : item.sku || key,
+            supplierSku: item.sku || (snap.exists() ? snap.data().supplierSku || "" : ""),
+            unit: item.unit || "un",
             category: item.supplierCatalogCategory || (snap.exists() ? snap.data().category || "" : ""),
             supplierCatalogId: item.supplierCatalogId || (snap.exists() ? snap.data().supplierCatalogId || "" : ""),
             supplierName: purchase.supplierName, lastUnitCost: Number(item.unitPrice || 0),
