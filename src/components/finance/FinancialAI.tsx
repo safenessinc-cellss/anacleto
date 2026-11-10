@@ -72,6 +72,7 @@ export default function FinancialAI() {
       if (!user) throw new Error("Sessão expirada. Entre novamente.");
       const normalizedBoletos = boletos.filter(b => Number(b.amount) > 0 && b.dueDate).map(b => ({ ...b, number: b.number.trim(), digitableLine: b.digitableLine.trim(), amount: Math.round(Number(b.amount) * 100) / 100 }));
       const keys = normalizedBoletos.map(b => b.digitableLine.replace(/\D/g, "") || b.number.replace(/\D/g, "")).filter(Boolean);
+      if (normalizedBoletos.length && Math.abs(normalizedBoletos.reduce((sum, row) => sum + row.amount, 0) - amount) > 0.02) throw new Error("A soma dos boletos precisa corresponder ao valor total da nota fiscal.");
       if (new Set(keys).size !== keys.length) throw new Error("Há boletos repetidos nesta nota fiscal. Corrija os números ou linhas digitáveis.");
       const existing = await getDocs(collection(db, "purchase_orders"));
       const invoiceKey = String(result.accessKey || "").replace(/\D/g, "");
