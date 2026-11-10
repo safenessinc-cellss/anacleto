@@ -112,7 +112,7 @@ export default function PurchasesModule() {
     const match = supplierCatalog.find(row => row.id === catalogId);
     setItems(current => current.map((item, i) => i !== index ? item : {
       ...item, supplierCatalogId: match?.id || "", supplierCatalogName: match?.name || "", supplierCatalogCategory: match?.category || "",
-      sku: match?.code || item.sku, unit: match?.unit || item.unit
+      sku: match?.code || match?.sku || item.sku, unit: match?.unit || item.unit
     }));
   };
   useEffect(() => {
@@ -120,7 +120,7 @@ export default function PurchasesModule() {
     setItems(current => current.map(item => {
       if (item.supplierCatalogId) return item;
       const match = findCatalogMatch(item, supplierName);
-      return match ? { ...item, supplierCatalogId: match.id, supplierCatalogName: match.name, supplierCatalogCategory: match.category || "", sku: match.code || item.sku, unit: match.unit || item.unit } : item;
+      return match ? { ...item, supplierCatalogId: match.id, supplierCatalogName: match.name, supplierCatalogCategory: match.category || "", sku: match.code || match.sku || item.sku, unit: match.unit || item.unit } : item;
     }));
   }, [supplierName, supplierCatalog, productCatalog]);
   const startEdit = (purchase: Purchase) => {
@@ -197,7 +197,7 @@ export default function PurchasesModule() {
       if (validItems.length) {
         setItems(validItems.map((item: PurchaseItem) => {
           const match = findCatalogMatch(item, String(result.supplierName || supplierName));
-          return match ? { ...item, supplierCatalogId: match.id, supplierCatalogName: match.name, sku: match.code || item.sku, unit: match.unit || item.unit } : item;
+          return match ? { ...item, supplierCatalogId: match.id, supplierCatalogName: match.name, sku: match.code || match.sku || item.sku, unit: match.unit || item.unit } : item;
         }));
       } else if (Number(result.total) > 0) {
         // When OCR reads the invoice total but not its individual rows, create a
