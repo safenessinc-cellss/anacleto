@@ -116,9 +116,10 @@ service cloud.firestore {
 
     // Pessoas e folha salarial: confidencialidade reforçada.
     match /employees/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','financeiro']); }
-    match /time_entries/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','supervisor']); }
-    match /payroll_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh']); }
+    match /time_entries/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','financeiro','supervisor']); }
+    match /payroll_settings/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','financeiro']); }
     match /payroll_runs/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','financeiro']); }
+    match /payroll_adjustments/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','financeiro']); }
     match /employee_payments/{id} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin','rh','financeiro']); }
 
     // Qualidade e pós-venda: registos operacionais e rastreabilidade.
