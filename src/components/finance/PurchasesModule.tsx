@@ -116,7 +116,7 @@ export default function PurchasesModule() {
     }));
   };
   useEffect(() => {
-    if (!supplierName || !supplierCatalog.length) return;
+    if (!supplierName || (!supplierCatalog.length && !productCatalog.length)) return;
     setItems(current => current.map(item => {
       if (item.supplierCatalogId) return item;
       const match = findCatalogMatch(item, supplierName);
@@ -401,7 +401,7 @@ export default function PurchasesModule() {
       const stockRefs = entries.map(([key, item]) => {
         const match = inventorySnapshot.docs.find(d => {
           const data = d.data();
-          const sameCatalog = item.supplierCatalogId && data.supplierCatalogId === item.supplierCatalogId;
+          const sameCatalog = item.supplierCatalogId && [data.supplierCatalogId, data.productCatalogId, data.catalogId].includes(item.supplierCatalogId);
           const sameSku = item.sku && normalizeText(String(data.supplierSku || data.sku || "")) === normalizeText(item.sku);
           const sameName = normalizeText(String(data.name || "")) === normalizeText(item.description || "");
           return Boolean(sameCatalog || sameSku || sameName);
@@ -425,6 +425,7 @@ export default function PurchasesModule() {
             unit: item.unit || "un",
             category: item.supplierCatalogCategory || (snap.exists() ? snap.data().category || "" : ""),
             supplierCatalogId: item.supplierCatalogId || (snap.exists() ? snap.data().supplierCatalogId || "" : ""),
+            productCatalogId: item.supplierCatalogId || (snap.exists() ? snap.data().productCatalogId || snap.data().catalogId || "" : ""),
             supplierName: purchase.supplierName, lastUnitCost: Number(item.unitPrice || 0),
             quantity: currentQty + Number(item.quantity || 0),
             reservedQuantity: Number(snap.exists() ? snap.data().reservedQuantity || 0 : 0),
