@@ -453,8 +453,11 @@ export default function PurchasesModule() {
   return <div className="space-y-5">
     <div className="grid gap-3 sm:grid-cols-3">
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Compras e despesas registradas</p><p className="mt-1 text-2xl font-black">{purchases.length}</p></div>
-      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Em aprovação</p><p className="mt-1 text-2xl font-black">{money(pendingTotal)}</p></div>
-      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Aprovadas</p><p className="mt-1 text-2xl font-black">{money(approvedTotal)}</p></div>
+      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Em aprovação · compromisso</p><p className="mt-1 text-2xl font-black">{money(pendingTotal)}</p></div>
+      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Aprovadas · a pagar</p><p className="mt-1 text-2xl font-black">{money(approvedTotal)}</p></div>
+    </div>
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+      <strong>Importante:</strong> compras parceladas e boletos ainda não pagos são compromissos em aberto, não saídas de caixa. O valor só entra como saída financeira quando cada boleto for efetivamente marcado como pago em Contas a Pagar. A compra permanece vinculada aos boletos para evitar lançamentos duplicados.
     </div>
 
     <section className="rounded-2xl border bg-white p-5 dark:bg-slate-900 space-y-4">
