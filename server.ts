@@ -533,9 +533,13 @@ const startServer = async () => {
   });
 };
 
-startServer().catch((err) => {
-  console.error("Express startup failed:", err);
-});
+// Vercel executa o Express como função serverless; não abra uma porta TCP durante a inicialização.
+// O listener local só é iniciado fora do ambiente Vercel.
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error("Express startup failed:", err);
+  });
+}
 
 
 // ============ Google Calendar Endpoint ============
