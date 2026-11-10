@@ -188,8 +188,8 @@ export default function PendingBoletosModule() {
       // Se a nota fiscal já foi cadastrada em Compras, vincula o boleto à compra
       // somente quando houver uma única nota pendente compatível com o fornecedor.
       const purchasesSnap = await getDocs(collection(db, "purchase_orders"));
-      const clean = (value: string) => String(value || "").replace(/\\D/g, "");
-      const norm = (value: string) => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const clean = (value: string) => String(value || "").replace(/\D/g, "");
+      const norm = (value: string) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       const supplierCnpj = clean(boleto.cnpj || "");
       const candidates = purchasesSnap.docs.filter(d => {
         const p = d.data();
