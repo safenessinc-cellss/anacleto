@@ -193,6 +193,7 @@ export default function PurchasesModule() {
       }
       const now = new Date().toISOString();
       const normalizedInstallments = installments.filter(row => Number(row.amount) > 0 && row.dueDate).map(row => ({ ...row, number: row.number.trim(), digitableLine: row.digitableLine.trim(), amount: Math.round(Number(row.amount) * 100) / 100 }));
+      if (normalizedInstallments.length && Math.abs(normalizedInstallments.reduce((sum, row) => sum + row.amount, 0) - total) > 0.02) throw new Error("A soma dos boletos precisa corresponder ao total da nota fiscal.");
       const invoiceKey = String(extracted?.accessKey || editingPurchase?.accessKey || "").replace(/\D/g, "");
       const duplicateInvoice = purchases.find(p => p.id !== editingPurchase?.id && (
         (invoiceKey && String(p.accessKey || "").replace(/\D/g, "") === invoiceKey) ||
