@@ -240,6 +240,22 @@ export default function PurchasesModule() {
         const duplicate = purchases.find(p => p.id !== editingPurchase?.id && (p.installments || []).some(old => key === (normalizeKey(old.digitableLine) || normalizeKey(old.number))));
         if (duplicate) throw new Error("Este boleto já está vinculado à compra " + duplicate.number + ". Não será criado novamente.");
       }
+      if (normalizedInstallments.length) {
+        const [pendingBoletoSnap, payableSnap] = await Promise.all([
+          getDocs(collection(db, "pending_boletos")),
+          getDocs(collection(db, "payables"))
+        ]);
+        for (const row of normalizedInstallments) {
+          const key = normalizeKey(row.digitableLine) || normalizeKey(row.number);
+          if (!key) continue;
+          const inPending = pendingBoletoSnap.docs.some(d => normalizeKey(String(d.data().digitableLine || "")) === key);
+          const inPayables = payableSnap.docs.some(d => {
+            const data = d.data();
+            return normalizeKey(String(data.digitableLine || "")) === key || normalizeKey(String(data.boletoNumber || "")) === key;
+          });
+          if (inPending || inPayables) throw new Error("Este boleto já consta em Boletos a Revisar ou Contas a Pagar. Não será duplicado.");
+        }
+      }
       const payload: any = {
         supplierId, supplierName: resolvedSupplier?.name || supplierName.trim() || "Despesa sem fornecedor",
         supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, accessKey: invoiceKey, description: description.trim(), expenseCategory,
