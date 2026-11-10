@@ -12,7 +12,7 @@ interface Payable {
   amount: number;
   dueDate: string;
   paymentMethod: "boleto" | "pix" | "transferencia" | "cartao" | "dinheiro" | "cheque";
-  status: "pending" | "paid" | "cancelled";
+  status: "pending_approval" | "pending" | "paid" | "cancelled";
   paidAt?: string;
   notes?: string;
   purchaseId?: string;
@@ -75,6 +75,7 @@ export default function PayablesModule() {
 
   const totals = {
     pending: items.filter((i) => i.status === "pending").reduce((s, i) => s + i.amount, 0),
+    pendingApproval: items.filter((i) => i.status === "pending_approval").reduce((s, i) => s + i.amount, 0),
     overdue: items.filter((i) => isOverdue(i)).reduce((s, i) => s + i.amount, 0),
     paid: items.filter((i) => i.status === "paid").reduce((s, i) => s + i.amount, 0),
   };
@@ -143,6 +144,7 @@ export default function PayablesModule() {
   const statusBadge = (p: Payable) => {
     if (p.status === "paid") return <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded"><CheckCircle className="w-3 h-3" /> Pago</span>;
     if (p.status === "cancelled") return <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded"><XCircle className="w-3 h-3" /> Cancelado</span>;
+    if (p.status === "pending_approval") return <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded"><Clock className="w-3 h-3" /> Aguardando aprovação da compra</span>;
     if (isOverdue(p)) return <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded"><AlertCircle className="w-3 h-3" /> Vencido</span>;
     if (isDueSoon(p)) return <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded"><Clock className="w-3 h-3" /> Vence em breve</span>;
     return <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">Pendente</span>;
@@ -150,10 +152,14 @@ export default function PayablesModule() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
           <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500"><Clock className="w-3.5 h-3.5" /> Pendente</div>
           <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">R$ {totals.pending.toFixed(2)}</div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase text-amber-600"><Clock className="w-3.5 h-3.5" /> Aguardando aprovação</div>
+          <div className="text-2xl font-black text-amber-600 mt-1">R$ {totals.pendingApproval.toFixed(2)}</div>
         </div>
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
           <div className="flex items-center gap-2 text-xs font-bold uppercase text-rose-600"><AlertCircle className="w-3.5 h-3.5" /> Vencido</div>
