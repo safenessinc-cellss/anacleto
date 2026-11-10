@@ -29,6 +29,12 @@ function normalizeLedger(id:string,d:any):Row|null {
   const direction: "in"|"out" = ["in","inflow","income","entrada"].includes(dir) ? "in" : "out";
   return {id,date,description:String(d.description||d.category||"Lançamento financeiro"),category:String(d.category||"Não categorizado"),party:String(d.clientName||d.supplierName||d.employeeName||d.party||"—"),direction,amount,status:String(d.status||"registrado"),source:"ledger_entries",kind:"cash"};
 }
+function normalizeEmployeePayment(id:string,d:any):Row|null {
+  const amount=amountOf(d);
+  const date=dateOf(d.paymentDate||d.createdAt);
+  if(!amount||!date) return null;
+  return {id,date,description:String(d.notes||"Pagamento de funcionário"),category:"Folha de pagamento",party:String(d.employeeName||"Funcionário"),direction:"out",amount,status:String(d.status||"paid"),source:"employee_payments",kind:"cash"};
+}
 function normalizeOpen(id:string,d:any,source:"receivables"|"payables"):Row|null {
   const status=String(d.status||"pending").toLowerCase();
   const active=source==="receivables" ? !["received","paid","pago","cancelled","cancelado"].includes(status) : ["pending","pendente","overdue","vencido"].includes(status);
@@ -48,9 +54,9 @@ export default function FinancialReportsModule(){
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   useEffect(()=>{
-    const sources=["ledger_entries","receivables","payables"] as const;
+    const sources=["ledger_entries","receivables","payables","employee_payments"] as const;
     const stops=sources.map(source=>onSnapshot(collection(db,source),snap=>{
-      const rows=snap.docs.map(doc=>source==="ledger_entries"?normalizeLedger(doc.id,doc.data()):normalizeOpen(doc.id,doc.data(),source)).filter((x):x is Row=>!!x);
+      const rows=snap.docs.map(doc=>source==="ledger_entries"?normalizeLedger(doc.id,doc.data()):source==="employee_payments"?normalizeEmployeePayment(doc.id,doc.data()):normalizeOpen(doc.id,doc.data(),source)).filter((x):x is Row=>!!x);
       setRecords(current=>[...current.filter(x=>x.source!==source),...rows]);
       setLoading(false);
     },err=>{setError("Falha ao carregar "+source+": "+err.message);setLoading(false);}));
@@ -69,7 +75,7 @@ export default function FinancialReportsModule(){
     const a=document.createElement("a");a.href=url;a.download="relatorio-financeiro-"+from+"-a-"+to+".csv";a.click();URL.revokeObjectURL(url);
   };
   return <div className="space-y-5">
-    <header><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Análise financeira · Brasil (R$)</p><h2 className="text-2xl font-black">Relatório de vendas, custos e caixa</h2><p className="text-sm text-slate-500">Caixa considera somente lançamentos conciliados em ledger_entries. Contas a receber/pagar são compromissos em aberto e não são somadas ao caixa.</p></header>
+    <header><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Análise financeira · Brasil (R$)</p><h2 className="text-2xl font-black">Relatório de vendas, custos e caixa</h2><p className="text-sm text-slate-500">Caixa considera lançamentos conciliados em ledger_entries e pagamentos efetivos da folha. Contas a receber/pagar são compromissos em aberto e não são somadas ao caixa.</p></header>
     {error&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{error}</div>}
     <div className="grid gap-3 rounded-2xl border bg-white p-4 dark:bg-slate-900 sm:grid-cols-4">
       <label className="text-xs font-semibold text-slate-500">Data inicial<input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
