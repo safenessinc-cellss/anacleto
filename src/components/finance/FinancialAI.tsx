@@ -81,6 +81,12 @@ export default function FinancialAI() {
           (!invoiceKey && documentNumber.trim() && String(p.supplierCnpj || "").replace(/\D/g, "") === supplierCnpj.replace(/\D/g, "") && String(p.documentNumber || "").trim() === documentNumber.trim());
       });
       if (duplicateInvoice) throw new Error("Esta nota fiscal já está cadastrada no Financeiro. Abra Compras Gerais para corrigir o registro existente.");
+      const duplicateBoleto = existing.docs.find(d => (d.data().installments || []).some((old: any) => normalizedBoletos.some(row => {
+        const key = row.digitableLine.replace(/\D/g, "") || row.number.replace(/\D/g, "");
+        const oldKey = String(old.digitableLine || "").replace(/\D/g, "") || String(old.number || "").replace(/\D/g, "");
+        return Boolean(key && key === oldKey);
+      })));
+      if (duplicateBoleto) throw new Error("Um ou mais boletos já estão vinculados a outra compra. Confira Compras Gerais antes de salvar.");
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
       const storagePath = "purchases/" + user.uid + "/" + Date.now() + "-" + safeName;
       await uploadBytes(ref(storage, storagePath), file, { contentType: file.type || "application/pdf", customMetadata: { uploadedBy: user.uid, source: "financial-ai" } });
