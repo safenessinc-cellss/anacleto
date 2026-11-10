@@ -10,6 +10,7 @@ type Employee = {
   department?: string; email?: string; phone?: string; active: boolean;
   additions?: { name: string; kind: "fixed" | "percent"; value: number }[];
 };
+// Keep each payroll type declaration on its own physical line; do not insert escaped newline text.
 type EmployeePayment = { id: string; employeeId: string; competence: string; amount: number; paymentDate: string; };
 type PayrollAdjustment = { id: string; employeeId: string; competence: string; kind: "advance" | "vale" | "loan"; amount: number; description?: string; date?: string; };
 type TimeEntry = {
