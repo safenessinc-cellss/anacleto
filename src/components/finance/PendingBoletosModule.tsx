@@ -185,13 +185,28 @@ export default function PendingBoletosModule() {
           } catch (e) { console.warn("Lookup de fornecedor indisponível; usando dados do boleto.", e); }
         }
       }
+      // Se a nota fiscal já foi cadastrada em Compras, vincula o boleto à compra
+      // somente quando houver uma única nota pendente compatível com o fornecedor.
+      const purchasesSnap = await getDocs(collection(db, "purchase_orders"));
+      const clean = (value: string) => String(value || "").replace(/\\D/g, "");
+      const norm = (value: string) => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const supplierCnpj = clean(boleto.cnpj || "");
+      const candidates = purchasesSnap.docs.filter(d => {
+        const p = d.data();
+        if (["cancelled", "cancelado", "rejected", "rejeitado", "received", "paid"].includes(String(p.status || "").toLowerCase())) return false;
+        const sameCnpj = supplierCnpj.length === 14 && clean(p.supplierCnpj || "") === supplierCnpj;
+        const sameName = norm(p.supplierName || "") === norm(supplierName);
+        return sameCnpj || sameName;
+      });
+      const linkedPurchase = candidates.length === 1 ? candidates[0] : null;
       await addDoc(collection(db, "payables"), {
         supplierId, supplierName, supplierCnpj: boleto.cnpj || "",
         description: boleto.description || `Boleto ${boleto.fileName || ""}`.trim(),
         amount: boleto.amount || 0, dueDate: boleto.dueDate || today(),
         paymentMethod: "boleto", status: "pending", digitableLine: boleto.digitableLine || "",
         documentUrl: boleto.fileUrl || "", documentName: boleto.fileName || "",
-        notes: `Importado via revisão de boletos${boleto.fileName ? ` — ${boleto.fileName}` : ""}`,
+        ...(linkedPurchase ? { purchaseId: linkedPurchase.id, purchaseNumber: String(linkedPurchase.data().number || ""), invoiceDocumentNumber: String(linkedPurchase.data().documentNumber || "") } : {}),
+        notes: linkedPurchase ? `Boleto vinculado à nota fiscal ${linkedPurchase.data().documentNumber || linkedPurchase.data().number || ""}.` : `Importado via revisão de boletos${boleto.fileName ? ` — ${boleto.fileName}` : ""}`,
         createdAt: new Date().toISOString()
       });
       await deleteDoc(doc(db, "pending_boletos", boleto.id));
