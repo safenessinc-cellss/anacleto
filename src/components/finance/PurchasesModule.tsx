@@ -5,7 +5,8 @@ import { auth, db, storage } from "../../firebase";
 import { AlertCircle, Camera, CheckCircle2, FileText, Loader2, Plus, ScanSearch, ShoppingCart, Upload, Pencil, X } from "lucide-react";
 
 type Supplier = { id: string; name: string; nif?: string; email?: string; phone?: string };
-type PurchaseItem = { description: string; sku: string; quantity: number; unit: string; unitPrice: number; total: number };
+type PurchaseItem = { description: string; sku: string; quantity: number; unit: string; unitPrice: number; total: number; supplierCatalogId?: string; supplierCatalogName?: string };
+type SupplierCatalogItem = { id: string; supplier: string; code?: string; name: string; category?: string; material?: string; unit?: string; price?: number; lengthMm?: number; color?: string };
 type PurchaseInstallment = { id: string; number: string; digitableLine: string; amount: number; dueDate: string; documentName?: string; documentUrl?: string; documentPath?: string };
 type ExtractedDocument = {
   documentType?: string; supplierName?: string; supplierCnpj?: string; documentNumber?: string; accessKey?: string;
@@ -27,6 +28,7 @@ const emptyItem = (): PurchaseItem => ({ description: "", sku: "", quantity: 1, 
 export default function PurchasesModule() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [supplierCatalog, setSupplierCatalog] = useState<SupplierCatalogItem[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [supplierName, setSupplierName] = useState("");
   const [supplierCnpj, setSupplierCnpj] = useState("");
@@ -54,12 +56,13 @@ export default function PurchasesModule() {
 
   useEffect(() => {
     const a = onSnapshot(collection(db, "suppliers"), snap => setSuppliers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier))));
+    const catalogUnsub = onSnapshot(collection(db, "supplier_catalog"), snap => setSupplierCatalog(snap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierCatalogItem))), err => setError("Falha ao carregar catálogo dos fornecedores: " + err.message));
     const b = onSnapshot(collection(db, "purchase_orders"), snap => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() } as Purchase));
       rows.sort((x, y) => (y.createdAt || "").localeCompare(x.createdAt || ""));
       setPurchases(rows);
     }, err => setError("Falha ao carregar compras: " + err.message));
-    return () => { a(); b(); };
+    return () => { a(); b(); catalogUnsub(); };
   }, []);
 
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + Math.max(0, Number(item.quantity) || 0) * Math.max(0, Number(item.unitPrice) || 0), 0), [items]);
@@ -75,6 +78,23 @@ export default function PurchasesModule() {
   }));
   const updateInstallment = (index: number, key: keyof PurchaseInstallment, value: string | number) => setInstallments(current => current.map((row, i) => i === index ? { ...row, [key]: value } : row));
   const normalizeKey = (value: string) => String(value || "").replace(/\D/g, "");
+  const normalizeText = (value: string) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const supplierCatalogFor = (supplier: string) => supplierCatalog.filter(row => normalizeText(row.supplier) === normalizeText(supplier));
+  const findCatalogMatch = (item: PurchaseItem, supplier: string) => {
+    const candidates = supplierCatalogFor(supplier);
+    const code = normalizeText(item.sku || "");
+    const name = normalizeText(item.description);
+    return candidates.find(row => code && normalizeText(row.code || "") === code)
+      || candidates.find(row => name && normalizeText(row.name) === name)
+      || null;
+  };
+  const mapItemToCatalog = (index: number, catalogId: string) => {
+    const match = supplierCatalog.find(row => row.id === catalogId);
+    setItems(current => current.map((item, i) => i !== index ? item : {
+      ...item, supplierCatalogId: match?.id || "", supplierCatalogName: match?.name || "",
+      sku: match?.code || item.sku, unit: match?.unit || item.unit
+    }));
+  };
   const startEdit = (purchase: Purchase) => {
     if (!["pending", "draft"].includes(purchase.status)) return;
     setEditingPurchase(purchase); setSelectedSupplier(purchase.supplierId || ""); setSupplierName(purchase.supplierName || "");
@@ -145,7 +165,10 @@ export default function PurchasesModule() {
           } as PurchaseItem;
         }) : [];
       if (validItems.length) {
-        setItems(validItems);
+        setItems(validItems.map((item: PurchaseItem) => {
+          const match = findCatalogMatch(item, String(result.supplierName || supplierName));
+          return match ? { ...item, supplierCatalogId: match.id, supplierCatalogName: match.name, sku: match.code || item.sku, unit: match.unit || item.unit } : item;
+        }));
       } else if (Number(result.total) > 0) {
         // When OCR reads the invoice total but not its individual rows, create a
         // single editable summary line so the document can still be registered.
@@ -342,6 +365,15 @@ export default function PurchasesModule() {
         {items.map((item,index)=><div key={index} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-12">
           <input placeholder="Descrição do material / serviço" value={item.description} onChange={e=>updateItem(index,"description",e.target.value)} className="rounded border p-2 text-sm sm:col-span-5"/>
           <input placeholder="SKU" value={item.sku} onChange={e=>updateItem(index,"sku",e.target.value)} className="rounded border p-2 text-sm sm:col-span-2"/>
+          <div className="sm:col-span-12 rounded-lg bg-slate-50 p-2 dark:bg-slate-800">
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Correspondência no catálogo do fornecedor
+              <select value={item.supplierCatalogId || ""} onChange={e=>mapItemToCatalog(index,e.target.value)} className="mt-1 w-full rounded border bg-white p-2 text-sm dark:bg-slate-900">
+                <option value="">Sem vínculo · manter item da nota</option>
+                {supplierCatalogFor(supplierName).map(row=><option key={row.id} value={row.id}>{row.code ? row.code+" · " : ""}{row.name} · {row.supplier}</option>)}
+              </select>
+            </label>
+            {item.supplierCatalogId && <p className="mt-1 text-xs font-semibold text-emerald-700">Vinculado: {item.supplierCatalogName || supplierCatalog.find(row=>row.id===item.supplierCatalogId)?.name || "Produto do fornecedor"}</p>}
+          </div>
           <input type="number" min="0" step="0.01" placeholder="Qtd." value={item.quantity} onChange={e=>updateItem(index,"quantity",Number(e.target.value))} className="rounded border p-2 text-sm sm:col-span-1"/>
           <input placeholder="Un." value={item.unit} onChange={e=>updateItem(index,"unit",e.target.value)} className="rounded border p-2 text-sm sm:col-span-1"/>
           <input type="number" min="0" step="0.01" placeholder="Preço unit." value={item.unitPrice} onChange={e=>updateItem(index,"unitPrice",Number(e.target.value))} className="rounded border p-2 text-sm sm:col-span-2"/>
