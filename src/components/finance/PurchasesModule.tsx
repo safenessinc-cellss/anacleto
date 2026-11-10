@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { addDoc, collection, doc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage } from "../../firebase";
-import { AlertCircle, Camera, CheckCircle2, FileText, Loader2, Plus, ScanSearch, ShoppingCart, Upload } from "lucide-react";
+import { AlertCircle, Camera, CheckCircle2, FileText, Loader2, Plus, ScanSearch, ShoppingCart, Upload, Pencil, X } from "lucide-react";
 
 type Supplier = { id: string; name: string; nif?: string; email?: string; phone?: string };
 type PurchaseItem = { description: string; sku: string; quantity: number; unit: string; unitPrice: number; total: number };
+type PurchaseInstallment = { id: string; number: string; digitableLine: string; amount: number; dueDate: string; documentName?: string; documentUrl?: string; documentPath?: string };
 type ExtractedDocument = {
   documentType?: string; supplierName?: string; supplierCnpj?: string; documentNumber?: string; accessKey?: string;
   issueDate?: string; dueDate?: string; currency?: string; total?: number; tax?: number;
@@ -16,7 +17,7 @@ type Purchase = {
   documentNumber: string; description: string; items: PurchaseItem[]; subtotal: number;
   tax: number; total: number; issueDate: string; dueDate: string; status: "draft" | "pending" | "approved" | "received" | "cancelled";
   documentType: string; documentName: string; documentUrl: string; documentPath: string;
-  payableId?: string; createdAt: string; updatedAt: string; createdBy: string; notes: string;
+  payableId?: string; payableIds?: string[]; installments?: PurchaseInstallment[]; accessKey?: string; createdAt: string; updatedAt: string; createdBy: string; notes: string;
 };
 
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
@@ -37,6 +38,8 @@ export default function PurchasesModule() {
   const [items, setItems] = useState<PurchaseItem[]>([emptyItem()]);
   const [tax, setTax] = useState(0);
   const [notes, setNotes] = useState("");
+  const [installments, setInstallments] = useState<PurchaseInstallment[]>([]);
+  const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentUrl, setDocumentUrl] = useState("");
   const [documentPath, setDocumentPath] = useState("");
@@ -70,6 +73,28 @@ export default function PurchasesModule() {
     next.total = Math.max(0, Number(next.quantity) || 0) * Math.max(0, Number(next.unitPrice) || 0);
     return next;
   }));
+  const updateInstallment = (index: number, key: keyof PurchaseInstallment, value: string | number) => setInstallments(current => current.map((row, i) => i === index ? { ...row, [key]: value } : row));
+  const normalizeKey = (value: string) => String(value || "").replace(/\\D/g, "");
+  const startEdit = (purchase: Purchase) => {
+    if (!["pending", "draft"].includes(purchase.status)) return;
+    setEditingPurchase(purchase); setSelectedSupplier(purchase.supplierId || ""); setSupplierName(purchase.supplierName || "");
+    setSupplierCnpj(purchase.supplierCnpj || ""); setExpenseCategory(purchase.expenseCategory || "materiais");
+    setDocumentNumber(purchase.documentNumber || ""); setDescription(purchase.description || "");
+    setIssueDate(purchase.issueDate || today()); setDueDate(purchase.dueDate || today());
+    setItems(purchase.items?.length ? purchase.items.map(item => ({ ...item })) : [emptyItem()]);
+    setTax(Number(purchase.tax || 0)); setNotes(purchase.notes || "");
+    setInstallments((purchase.installments || []).map((row, i) => ({ id: row.id || String(i), number: row.number || "", digitableLine: row.digitableLine || "", amount: Number(row.amount || 0), dueDate: row.dueDate || purchase.dueDate || today(), documentName: row.documentName || "", documentUrl: row.documentUrl || "", documentPath: row.documentPath || "" })));
+    setDocumentFile(null); setDocumentUrl(purchase.documentUrl || ""); setDocumentPath(purchase.documentPath || "");
+    setExtracted({ documentType: purchase.documentType, accessKey: purchase.accessKey || "" });
+    setMessage("Editando compra existente. O número e o status serão preservados."); setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const resetForm = () => {
+    setEditingPurchase(null); setSelectedSupplier(""); setSupplierName(""); setSupplierCnpj(""); setDocumentNumber("");
+    setDescription(""); setExpenseCategory("materiais"); setIssueDate(today()); setDueDate(today()); setItems([emptyItem()]);
+    setTax(0); setNotes(""); setInstallments([]); setDocumentFile(null); setDocumentUrl(""); setDocumentPath(""); setExtracted(null);
+    if (fileRef.current) fileRef.current.value = "";
+  };
 
   const readFileBase64 = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -167,23 +192,41 @@ export default function PurchasesModule() {
         url = await getDownloadURL(storageRef);
       }
       const now = new Date().toISOString();
-      const purchaseNumber = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
-      const payload = {
-        number: purchaseNumber, supplierId, supplierName: resolvedSupplier?.name || supplierName.trim() || "Despesa sem fornecedor",
-        supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, accessKey: extracted?.accessKey || "", description: description.trim(), expenseCategory,
+      const normalizedInstallments = installments.filter(row => Number(row.amount) > 0 && row.dueDate).map(row => ({ ...row, number: row.number.trim(), digitableLine: row.digitableLine.trim(), amount: Math.round(Number(row.amount) * 100) / 100 }));
+      const invoiceKey = String(extracted?.accessKey || editingPurchase?.accessKey || "").replace(/\\D/g, "");
+      const duplicateInvoice = purchases.find(p => p.id !== editingPurchase?.id && (
+        (invoiceKey && String(p.accessKey || "").replace(/\\D/g, "") === invoiceKey) ||
+        (!invoiceKey && documentNumber.trim() && normalizeKey(p.supplierCnpj || "") === normalizeKey(resolvedSupplier?.nif || supplierCnpj) && p.documentNumber?.trim() === documentNumber.trim())
+      ));
+      if (duplicateInvoice) throw new Error("Esta nota fiscal já está registrada na compra " + duplicateInvoice.number + ". Verifique antes de continuar.");
+      const knownBoletoKeys = new Set<string>();
+      for (const row of normalizedInstallments) {
+        const key = normalizeKey(row.digitableLine) || normalizeKey(row.number);
+        if (!key) continue;
+        if (knownBoletoKeys.has(key)) throw new Error("Há boletos repetidos nesta nota. Corrija o número ou a linha digitável.");
+        knownBoletoKeys.add(key);
+        const duplicate = purchases.find(p => p.id !== editingPurchase?.id && (p.installments || []).some(old => key === (normalizeKey(old.digitableLine) || normalizeKey(old.number))));
+        if (duplicate) throw new Error("Este boleto já está vinculado à compra " + duplicate.number + ". Não será criado novamente.");
+      }
+      const payload: any = {
+        supplierId, supplierName: resolvedSupplier?.name || supplierName.trim() || "Despesa sem fornecedor",
+        supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, accessKey: invoiceKey, description: description.trim(), expenseCategory,
         items: items.filter(i => i.description.trim()).map(i => ({ ...i, total: i.quantity * i.unitPrice })),
-        subtotal, tax, total, issueDate, dueDate, status: "pending",
-        documentType: extracted?.documentType || "manual", documentName: documentFile?.name || "",
-        documentUrl: url, documentPath: path, extractionConfidence: extracted?.confidence || "",
-        extractionWarnings: extracted?.warnings || [], notes: notes.trim(),
-        createdAt: now, updatedAt: now, createdBy: auth.currentUser?.email || ""
+        subtotal, tax, total, issueDate, dueDate, installments: normalizedInstallments,
+        documentType: extracted?.documentType || editingPurchase?.documentType || "manual", documentName: documentFile?.name || editingPurchase?.documentName || "",
+        documentUrl: url, documentPath: path, extractionConfidence: extracted?.confidence || editingPurchase?.extractionConfidence || "",
+        extractionWarnings: extracted?.warnings || editingPurchase?.extractionWarnings || [], notes: notes.trim(),
+        updatedAt: now
       };
-      await addDoc(collection(db, "purchase_orders"), payload);
-      setSelectedSupplier(""); setSupplierName(""); setSupplierCnpj(""); setDocumentNumber(""); setDescription(""); setExpenseCategory("materiais");
-      setIssueDate(today()); setDueDate(today()); setItems([emptyItem()]); setTax(0); setNotes("");
-      setDocumentFile(null); setDocumentUrl(""); setDocumentPath(""); setExtracted(null);
-      if (fileRef.current) fileRef.current.value = "";
-      setMessage("Compra registrada para aprovação. Nenhuma despesa será lançada até a aprovação.");
+      if (editingPurchase) {
+        await updateDoc(doc(db, "purchase_orders", editingPurchase.id), payload);
+        setMessage("Compra " + editingPurchase.number + " atualizada. Nenhuma nova compra ou conta a pagar foi criada.");
+      } else {
+        const purchaseNumber = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
+        await addDoc(collection(db, "purchase_orders"), { ...payload, number: purchaseNumber, status: "pending", createdAt: now, createdBy: auth.currentUser?.email || "" });
+        setMessage("Compra registrada para aprovação. Nenhuma despesa será lançada até a aprovação.");
+      }
+      resetForm();
     } catch (e) { setError((e as Error).message || "Falha ao salvar compra."); }
     finally { setSaving(false); }
   };
@@ -194,20 +237,24 @@ export default function PurchasesModule() {
     setError("");
     try {
       const purchaseRef = doc(db, "purchase_orders", purchase.id);
-      const payableRef = doc(collection(db, "payables"));
+      const rows = purchase.installments?.length ? purchase.installments : [{ id: "single", number: "", digitableLine: "", amount: purchase.total, dueDate: purchase.dueDate || today(), documentUrl: purchase.documentUrl || "", documentName: purchase.documentName || "" }];
+      const payableRefs = rows.map(() => doc(collection(db, "payables")));
       await runTransaction(db, async tx => {
         const current = await tx.get(purchaseRef);
-        if (!current.exists() || current.data().status !== "pending" || current.data().payableId) throw new Error("Esta compra já foi processada ou não está pendente.");
-        tx.set(payableRef, {
-          supplierId: purchase.supplierId, supplierName: purchase.supplierName, supplierCnpj: purchase.supplierCnpj || "",
-          description: purchase.description || "Compra " + purchase.number,
-          amount: purchase.total, dueDate: purchase.dueDate || today(), paymentMethod: "boleto",
-          status: "pending", purchaseId: purchase.id, purchaseNumber: purchase.number,
-          documentUrl: purchase.documentUrl || "", documentName: purchase.documentName || "",
-          notes: "Gerado automaticamente pela aprovação da compra " + purchase.number,
-          createdAt: new Date().toISOString(), createdBy: auth.currentUser?.uid || ""
+        if (!current.exists() || current.data().status !== "pending" || current.data().payableId || (current.data().payableIds || []).length) throw new Error("Esta compra já foi processada ou não está pendente.");
+        rows.forEach((row, index) => {
+          tx.set(payableRefs[index], {
+            supplierId: purchase.supplierId, supplierName: purchase.supplierName, supplierCnpj: purchase.supplierCnpj || "",
+            description: (purchase.description || "Compra " + purchase.number) + (rows.length > 1 ? " · Boleto " + (row.number || (index + 1) + "/" + rows.length) : ""),
+            amount: Number(row.amount || 0), dueDate: row.dueDate || purchase.dueDate || today(), paymentMethod: "boleto",
+            status: "pending", purchaseId: purchase.id, purchaseNumber: purchase.number,
+            boletoNumber: row.number || "", digitableLine: row.digitableLine || "",
+            documentUrl: row.documentUrl || purchase.documentUrl || "", documentName: row.documentName || purchase.documentName || "",
+            notes: "Gerado automaticamente pela aprovação da compra " + purchase.number,
+            createdAt: new Date().toISOString(), createdBy: auth.currentUser?.uid || ""
+          });
         });
-        tx.update(purchaseRef, { status: "approved", payableId: payableRef.id, approvedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        tx.update(purchaseRef, { status: "approved", payableId: payableRefs[0].id, payableIds: payableRefs.map(r => r.id), approvedAt: serverTimestamp(), updatedAt: serverTimestamp() });
       });
       setMessage("Compra aprovada e vinculada às Contas a Pagar do Financeiro.");
     } catch (e) { setError("Não foi possível aprovar: " + (e as Error).message); }
@@ -301,18 +348,31 @@ export default function PurchasesModule() {
           <p className="text-right text-xs font-bold text-slate-500 sm:col-span-12">Subtotal: {money(item.quantity*item.unitPrice)}</p>
         </div>)}
       </div>
+      <section className="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 dark:border-indigo-900 dark:bg-indigo-950/20">
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><h4 className="font-bold text-sm">Boletos vinculados a esta nota fiscal</h4><p className="text-xs text-slate-500">Cadastre cada parcela uma única vez. Na aprovação, cada boleto gera sua própria conta a pagar.</p></div><button type="button" onClick={() => setInstallments(rows => [...rows, { id: String(Date.now()) + Math.random(), number: "", digitableLine: "", amount: 0, dueDate }])} className="inline-flex items-center gap-1 rounded-lg border bg-white px-3 py-2 text-xs font-bold dark:bg-slate-900"><Plus className="h-3.5 w-3.5"/> Adicionar boleto</button></div>
+        {installments.length === 0 && <p className="text-xs text-slate-500">Nenhum boleto cadastrado. Se não houver parcelas, a aprovação criará uma conta a pagar pelo total da nota.</p>}
+        {installments.map((row,index)=><div key={row.id} className="grid gap-2 rounded-lg border bg-white p-3 dark:bg-slate-900 sm:grid-cols-2">
+          <label className="text-xs font-semibold">Número do boleto<input value={row.number} onChange={e=>updateInstallment(index,"number",e.target.value)} className="mt-1 w-full rounded border p-2 text-sm"/></label>
+          <label className="text-xs font-semibold">Valor (R$)<input type="number" min="0" step="0.01" value={row.amount} onChange={e=>updateInstallment(index,"amount",Number(e.target.value))} className="mt-1 w-full rounded border p-2 text-sm"/></label>
+          <label className="text-xs font-semibold sm:col-span-2">Linha digitável<input value={row.digitableLine} onChange={e=>updateInstallment(index,"digitableLine",e.target.value)} className="mt-1 w-full rounded border p-2 text-sm"/></label>
+          <label className="text-xs font-semibold">Vencimento<input type="date" value={row.dueDate} onChange={e=>updateInstallment(index,"dueDate",e.target.value)} className="mt-1 w-full rounded border p-2 text-sm"/></label>
+          <button type="button" onClick={()=>setInstallments(rows=>rows.filter((_,i)=>i!==index))} className="self-end rounded-lg px-3 py-2 text-xs font-bold text-rose-600">Remover boleto</button>
+        </div>)}
+        {installments.length > 0 && <p className="text-xs font-bold text-indigo-700">Total dos boletos: {money(installments.reduce((sum,row)=>sum+Math.max(0,Number(row.amount)||0),0))} · Total da nota: {money(total)}</p>}
+      </section>
       <div className="grid gap-3 sm:grid-cols-3"><label className="text-xs font-bold">Impostos / taxas (R$)<input type="number" min="0" step="0.01" value={tax} onChange={e=>setTax(Number(e.target.value))} className="mt-1 w-full rounded-lg border p-2.5 text-sm"/></label><div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800"><p className="text-xs text-slate-500">Subtotal</p><strong>{money(subtotal)}</strong></div><div className="rounded-lg bg-blue-50 p-3 text-sm dark:bg-blue-950/30"><p className="text-xs text-blue-700">Total da compra</p><strong className="text-lg">{money(total)}</strong></div></div>
       <label className="block text-xs font-bold">Observações<textarea rows={2} value={notes} onChange={e=>setNotes(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-950"/></label>
       {message && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
       {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-      <button type="button" disabled={saving||extracting} onClick={()=>void savePurchase()} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving?<Loader2 className="h-4 w-4 animate-spin"/>:<CheckCircle2 className="h-4 w-4"/>} Registrar compra para aprovação</button>
+      <div className="flex flex-wrap gap-2"><button type="button" disabled={saving||extracting} onClick={()=>void savePurchase()} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving?<Loader2 className="h-4 w-4 animate-spin"/>:<CheckCircle2 className="h-4 w-4"/>} {editingPurchase ? "Salvar correções da compra" : "Registrar compra para aprovação"}</button>{editingPurchase && <button type="button" onClick={resetForm} className="inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold"><X className="h-4 w-4"/> Cancelar edição</button>}</div>
     </section>
 
     <section className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-black text-lg">Histórico de compras e despesas</h3><select value={filter} onChange={e=>setFilter(e.target.value)} className="rounded-lg border bg-white px-3 py-2 text-sm dark:bg-slate-900"><option value="all">Todas</option><option value="pending">Aguardando aprovação</option><option value="approved">Aprovadas</option><option value="received">Recebidas</option><option value="cancelled">Canceladas</option></select></div>
       {visible.length===0?<div className="rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">Nenhuma compra registrada.</div>:visible.map(p=><article key={p.id} className="rounded-xl border bg-white p-4 dark:bg-slate-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-blue-600">{p.number} · {p.documentNumber||"Sem nº fiscal"}</p><h4 className="font-bold">{p.supplierName || "Despesa sem fornecedor"}</h4><p className="text-xs text-blue-600">{({materiais:"Compra de materiais",servicos:"Serviços contratados",administrativas:"Despesas administrativas",manutencao:"Manutenção",frete:"Frete e transporte",impostos:"Impostos e taxas",outros:"Outras despesas"} as Record<string,string>)[p.expenseCategory || ""] || "Compra geral"}</p><p className="text-xs text-slate-500">{p.description} · {p.items?.length||0} item(ns) · Vencimento {p.dueDate}</p><p className="mt-1 text-lg font-black">{money(p.total)}</p></div><span className={"rounded-full px-3 py-1 text-xs font-bold "+(statusClass[p.status]||statusClass.pending)}>{statusText[p.status]||p.status}</span></div>
         {p.documentUrl&&<a href={p.documentUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-600"><FileText className="h-3.5 w-3.5"/> Abrir documento original · {p.documentName}</a>}
         {p.payableId&&<p className="mt-2 text-xs font-semibold text-emerald-700">Vinculada ao Financeiro · Conta a pagar criada</p>}
-        <div className="mt-3 flex flex-wrap gap-2">{p.status==="pending"&&<button onClick={()=>void approvePurchase(p)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Aprovar e lançar no Financeiro</button>}{p.status==="approved"&&p.expenseCategory==="materiais"&&<button onClick={()=>void markReceived(p)} className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700">Incluir no estoque</button>}{p.status==="received"&&<span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Estoque atualizado</span>}</div>
+        {p.installments?.length ? <p className="mt-2 text-xs text-indigo-700">{p.installments.length} boleto(s) vinculado(s) · {money(p.installments.reduce((sum,row)=>sum+Number(row.amount||0),0))}</p> : null}
+        <div className="mt-3 flex flex-wrap gap-2">{["pending","draft"].includes(p.status)&&<button onClick={()=>startEdit(p)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700"><Pencil className="h-3.5 w-3.5"/> Editar compra</button>}{p.status==="pending"&&<button onClick={()=>void approvePurchase(p)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white">Aprovar e lançar no Financeiro</button>}{p.status==="approved"&&p.expenseCategory==="materiais"&&<button onClick={()=>void markReceived(p)} className="rounded-lg border border-emerald-300 px-3 py-2 text-xs font-bold text-emerald-700">Incluir no estoque</button>}{p.status==="received"&&<span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Estoque atualizado</span>}</div>
       </article>)}
     </section>
   </div>;
