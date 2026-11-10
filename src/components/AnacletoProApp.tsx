@@ -17,7 +17,6 @@ import FinancialAI from "./finance/FinancialAI";
 import ThemeModule from "./settings/ThemeModule";
 import AdminModule from "./admin/AdminModule";
 import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
-import PayrollModule from "./hr/PayrollModule";
 import CatalogModule from "./catalog/CatalogModule";
 import RegistryModule from "./registry/RegistryModule";
 import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
@@ -29,7 +28,7 @@ import ProductionModule from "./production/ProductionModule";
 import InventoryModule from "./inventory/InventoryModule";
 import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "payroll" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -181,12 +180,11 @@ export default function AnacletoProApp({
     { id: "contracts" as NavigationTab, label: "Contratos", icon: FileCheck, badge: null },
     { id: "materials" as NavigationTab, label: "Materiais de Produção", icon: Package, badge: null },
     { id: "production" as NavigationTab, label: "Ordens de Produção", icon: Factory, badge: null },
-    { id: "payroll" as NavigationTab, label: "Folha de Pagamento", icon: Wallet, badge: "RH" },
     { id: "deliveries" as NavigationTab, label: "Entregas e Instalações", icon: Truck, badge: null },
     { id: "post_sale" as NavigationTab, label: "Qualidade e Pós-venda", icon: Headset, badge: null },
   ];
 
-  const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || item.id !== "payroll" && hasAccessToTab(effectiveRole, item.id as RoleNavTab));
+  const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || hasAccessToTab(effectiveRole, item.id as RoleNavTab));
   const utilityItems = [
     { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
     { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },
@@ -428,7 +426,6 @@ export default function AnacletoProApp({
         {activeTab === "post_sale" && <PostSaleModule />}
 
          {activeTab === "finance" && (<FinanceModule language={language} />)}
-        {activeTab === "payroll" && (isFullMenuRole || hasAccessToTab(effectiveRole, "payroll")) && (<PayrollModule />)}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={effectiveRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI />)}
