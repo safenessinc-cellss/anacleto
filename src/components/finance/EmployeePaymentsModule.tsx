@@ -11,6 +11,17 @@ type EmployeePayment = {
 };
 const money = (value: number) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const today = new Date().toISOString().slice(0, 10);
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+const formatCPF = (value: string) => onlyDigits(value).slice(0, 11).replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+const validCPF = (value: string) => {
+  const cpf = onlyDigits(value);
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  const digit = (base: string, factor: number) => {
+    let sum = 0; for (const char of base) sum += Number(char) * factor--;
+    const rest = (sum * 10) % 11; return rest === 10 ? 0 : rest;
+  };
+  return digit(cpf.slice(0, 9), 10) === Number(cpf[9]) && digit(cpf.slice(0, 10), 11) === Number(cpf[10]);
+};
 
 export default function EmployeePaymentsModule() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -54,7 +65,7 @@ export default function EmployeePaymentsModule() {
 
   const beginEdit = (employee: Employee) => {
     setEditing(employee); setEditName(employee.name || ""); setEditRole(employee.role || "");
-    setEditCpf(employee.cpf || ""); setEditSalary(String(employee.salary || ""));
+    setEditCpf(formatCPF(employee.cpf || "")); setEditSalary(String(employee.salary || ""));
     setEditEmail(employee.email || ""); setEditPhone(employee.phone || "");
     setEditDepartment(employee.department || ""); setEditAdmissionDate(employee.admissionDate || "");
     setEditMonthlyHours(String(employee.monthlyHours || 220));
@@ -63,8 +74,8 @@ export default function EmployeePaymentsModule() {
   const saveEmployee = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!editing || !editName.trim() || !(Number(editSalary) > 0) || !(Number(editMonthlyHours) > 0)) { setError("Informe nome, salário e jornada mensal válidos."); return; }
-    const cpfDigits = editCpf.replace(/\\D/g, "");
-    if (cpfDigits && cpfDigits.length !== 11) { setError("O CPF deve conter 11 dígitos."); return; }
+    const cpfDigits = onlyDigits(editCpf);
+    if (cpfDigits && !validCPF(cpfDigits)) { setError("O CPF informado é inválido."); return; }
     if (cpfDigits && employees.some(e => e.id !== editing.id && (e.cpf || "").replace(/\\D/g, "") === cpfDigits)) { setError("Já existe outro funcionário com este CPF."); return; }
     setSavingEmployee(true); setError("");
     try {
@@ -126,7 +137,7 @@ export default function EmployeePaymentsModule() {
       <div><h3 className="text-lg font-black">Editar cadastro do funcionário</h3><p className="text-xs text-slate-500">As alterações serão refletidas na Folha de Pagamento e nos próximos pagamentos.</p></div>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs font-semibold">Nome completo<input required value={editName} onChange={e=>setEditName(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
-        <label className="text-xs font-semibold">CPF<input value={editCpf} onChange={e=>setEditCpf(e.target.value)} inputMode="numeric" className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
+        <label className="text-xs font-semibold">CPF<input value={editCpf} onChange={e=>setEditCpf(formatCPF(e.target.value))} inputMode="numeric" maxLength={14} placeholder="000.000.000-00" className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold">Cargo / função<input value={editRole} onChange={e=>setEditRole(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold">Salário base (R$)<input required type="number" min="0.01" step="0.01" value={editSalary} onChange={e=>setEditSalary(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold">E-mail<input type="email" value={editEmail} onChange={e=>setEditEmail(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
