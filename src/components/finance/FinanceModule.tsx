@@ -40,7 +40,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
