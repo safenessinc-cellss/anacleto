@@ -62,7 +62,7 @@ export default function FinancialReportsModule(){
     },err=>{setError("Falha ao carregar "+source+": "+err.message);setLoading(false);}));
     return ()=>stops.forEach(stop=>stop());
   },[]);
-  const filtered=useMemo(()=>records.filter(r=>r.date>=from&&r.date<=to&&(kind==="all"||r.direction===kind)),[records,from,to,kind]);
+  // Compromissos em aberto (boletos/parcelas) não são saídas de caixa. Só entram em Saídas de caixa após a baixa do pagamento em ledger_entries.\n  const filtered=useMemo(()=>records.filter(r=>r.date>=from&&r.date<=to&&(kind==="all"||(kind==="cash_in"&&r.kind==="cash"&&r.direction==="in")||(kind==="cash_out"&&r.kind==="cash"&&r.direction==="out")||(kind==="receivable"&&r.kind==="receivable")||(kind==="payable"&&r.kind==="payable"))),[records,from,to,kind]);
   const cash=filtered.filter(r=>r.kind==="cash");
   const incoming=cash.filter(r=>r.direction==="in").reduce((s,r)=>s+r.amount,0);
   const outgoing=cash.filter(r=>r.direction==="out").reduce((s,r)=>s+r.amount,0);
@@ -80,7 +80,7 @@ export default function FinancialReportsModule(){
     <div className="grid gap-3 rounded-2xl border bg-white p-4 dark:bg-slate-900 sm:grid-cols-4">
       <label className="text-xs font-semibold text-slate-500">Data inicial<input type="date" value={from} onChange={e=>setFrom(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
       <label className="text-xs font-semibold text-slate-500">Data final<input type="date" value={to} onChange={e=>setTo(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
-      <label className="text-xs font-semibold text-slate-500">Movimentação<select value={kind} onChange={e=>setKind(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"><option value="all">Entradas e saídas</option><option value="in">Entradas</option><option value="out">Saídas</option></select></label>
+      <label className="text-xs font-semibold text-slate-500">Movimentação<select value={kind} onChange={e=>setKind(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"><option value="all">Todos os lançamentos</option><option value="cash_in">Entradas de caixa</option><option value="cash_out">Saídas de caixa (pagas)</option><option value="receivable">Contas a receber</option><option value="payable">Contas a pagar (em aberto)</option></select></label>
       <div className="flex items-end gap-2"><button onClick={()=>window.print()} className="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-bold"><Printer className="h-4 w-4"/> Imprimir / PDF</button><button onClick={download} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white"><Download className="h-4 w-4"/> CSV</button></div>
     </div>
     <div className="grid gap-3 sm:grid-cols-3">
