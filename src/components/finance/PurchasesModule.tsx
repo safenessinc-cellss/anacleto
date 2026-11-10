@@ -289,14 +289,49 @@ export default function PurchasesModule() {
         extractionWarnings: extracted?.warnings || editingPurchase?.extractionWarnings || [], notes: notes.trim(),
         updatedAt: now
       };
-      if (editingPurchase) {
-        await updateDoc(doc(db, "purchase_orders", editingPurchase.id), payload);
-        setMessage("Compra " + editingPurchase.number + " atualizada. Nenhuma nova compra ou conta a pagar foi criada.");
-      } else {
-        const purchaseNumber = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
-        await addDoc(collection(db, "purchase_orders"), { ...payload, number: purchaseNumber, status: "pending", createdAt: now, createdBy: auth.currentUser?.email || "" });
-        setMessage("Compra registrada para aprovação. Nenhuma despesa será lançada até a aprovação.");
-      }
+      const payableRows = normalizedInstallments.length ? normalizedInstallments : [{
+        id: "single", number: "", digitableLine: "", amount: total, dueDate,
+        documentUrl: url, documentName: documentFile?.name || editingPurchase?.documentName || ""
+      }];
+      const purchaseNumber = editingPurchase?.number || ("CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase());
+      const purchaseRef = editingPurchase ? doc(db, "purchase_orders", editingPurchase.id) : doc(collection(db, "purchase_orders"));
+      const payableRefs = payableRows.map(() => doc(collection(db, "payables")));
+      const oldPayableIds = [...new Set([...(editingPurchase?.payableIds || []), ...(editingPurchase?.payableId ? [editingPurchase.payableId] : [])])];
+      await runTransaction(db, async tx => {
+        if (editingPurchase) {
+          const currentPurchase = await tx.get(purchaseRef);
+          if (!currentPurchase.exists() || !["pending", "draft"].includes(String(currentPurchase.data().status))) {
+            throw new Error("Somente compras em elaboração ou aguardando aprovação podem ser editadas.");
+          }
+          const oldPayables = await Promise.all(oldPayableIds.map(id => tx.get(doc(db, "payables", id))));
+          if (oldPayables.some(snapshot => snapshot.exists() && snapshot.data().status !== "pending_approval")) {
+            throw new Error("Há lançamentos desta compra que já foram liberados ou pagos. Não é seguro substituir as parcelas.");
+          }
+          oldPayables.forEach((snapshot, index) => { if (snapshot.exists()) tx.delete(doc(db, "payables", oldPayableIds[index])); });
+        }
+        payableRows.forEach((row, index) => {
+          tx.set(payableRefs[index], {
+            supplierId, supplierName: resolvedSupplier?.name || supplierName.trim() || "Despesa sem fornecedor",
+            supplierCnpj: resolvedSupplier?.nif || supplierCnpj,
+            description: (description.trim() || "Compra " + purchaseNumber) + (payableRows.length > 1 ? " · Boleto " + (row.number || (index + 1) + "/" + payableRows.length) : ""),
+            amount: Number(row.amount || 0), dueDate: row.dueDate || dueDate,
+            paymentMethod: paymentMode === "installments" ? "boleto" : "dinheiro",
+            status: "pending_approval", purchaseId: purchaseRef.id, purchaseNumber,
+            boletoNumber: row.number || "", digitableLine: row.digitableLine || "",
+            documentUrl: row.documentUrl || url || "", documentName: row.documentName || documentFile?.name || "",
+            notes: "Aguardando aprovação da compra " + purchaseNumber,
+            createdAt: now, createdBy: auth.currentUser?.uid || ""
+          });
+        });
+        tx.set(purchaseRef, {
+          ...payload, number: purchaseNumber, status: "pending",
+          payableId: payableRefs[0].id, payableIds: payableRefs.map(ref => ref.id),
+          ...(editingPurchase ? {} : { createdAt: now, createdBy: auth.currentUser?.email || "" })
+        }, { merge: true });
+      });
+      setMessage(editingPurchase
+        ? "Compra atualizada. Os lançamentos vinculados em Contas a Pagar foram sincronizados e aguardam aprovação."
+        : "Compra registrada. Os lançamentos já aparecem em Contas a Pagar como aguardando aprovação.");
       resetForm();
     } catch (e) { setError((e as Error).message || "Falha ao salvar compra."); }
     finally { setSaving(false); }
@@ -304,30 +339,46 @@ export default function PurchasesModule() {
 
   const approvePurchase = async (purchase: Purchase) => {
     if (purchase.status !== "pending") return;
-    if (!confirm("Aprovar esta compra e gerar automaticamente uma conta a pagar no Financeiro?")) return;
+    if (!confirm("Aprovar esta compra e liberar os lançamentos já criados em Contas a Pagar?")) return;
     setError("");
     try {
       const purchaseRef = doc(db, "purchase_orders", purchase.id);
-      const rows = purchase.installments?.length ? purchase.installments : [{ id: "single", number: "", digitableLine: "", amount: purchase.total, dueDate: purchase.dueDate || today(), documentUrl: purchase.documentUrl || "", documentName: purchase.documentName || "" }];
-      const payableRefs = rows.map(() => doc(collection(db, "payables")));
-      await runTransaction(db, async tx => {
-        const current = await tx.get(purchaseRef);
-        if (!current.exists() || current.data().status !== "pending" || current.data().payableId || (current.data().payableIds || []).length) throw new Error("Esta compra já foi processada ou não está pendente.");
-        rows.forEach((row, index) => {
-          tx.set(payableRefs[index], {
-            supplierId: purchase.supplierId, supplierName: purchase.supplierName, supplierCnpj: purchase.supplierCnpj || "",
-            description: (purchase.description || "Compra " + purchase.number) + (rows.length > 1 ? " · Boleto " + (row.number || (index + 1) + "/" + rows.length) : ""),
-            amount: Number(row.amount || 0), dueDate: row.dueDate || purchase.dueDate || today(), paymentMethod: purchase.paymentMode === "installments" ? "boleto" : "cash",
-            status: "pending", purchaseId: purchase.id, purchaseNumber: purchase.number,
-            boletoNumber: row.number || "", digitableLine: row.digitableLine || "",
-            documentUrl: row.documentUrl || purchase.documentUrl || "", documentName: row.documentName || purchase.documentName || "",
-            notes: "Gerado automaticamente pela aprovação da compra " + purchase.number,
-            createdAt: new Date().toISOString(), createdBy: auth.currentUser?.uid || ""
-          });
+      const linkedPayableIds = [...new Set([...(purchase.payableIds || []), ...(purchase.payableId ? [purchase.payableId] : [])])];
+      if (linkedPayableIds.length) {
+        await runTransaction(db, async tx => {
+          const current = await tx.get(purchaseRef);
+          if (!current.exists() || current.data().status !== "pending") throw new Error("Esta compra já foi processada ou não está pendente.");
+          const payableRefs = linkedPayableIds.map(id => doc(db, "payables", id));
+          const payableSnapshots = await Promise.all(payableRefs.map(ref => tx.get(ref)));
+          if (payableSnapshots.some(snapshot => !snapshot.exists() || !["pending_approval", "pending"].includes(String(snapshot.data().status)))) {
+            throw new Error("Um ou mais lançamentos vinculados não estão disponíveis para aprovação.");
+          }
+          payableRefs.forEach(ref => tx.update(ref, { status: "pending", approvedAt: serverTimestamp() }));
+          tx.update(purchaseRef, { status: "approved", approvedAt: serverTimestamp(), updatedAt: serverTimestamp() });
         });
-        tx.update(purchaseRef, { status: "approved", payableId: payableRefs[0].id, payableIds: payableRefs.map(r => r.id), approvedAt: serverTimestamp(), updatedAt: serverTimestamp() });
-      });
-      setMessage("Compra aprovada e vinculada às Contas a Pagar do Financeiro.");
+      } else {
+        // Compatibilidade com compras antigas que ainda não possuem lançamentos prévios.
+        const rows = purchase.installments?.length ? purchase.installments : [{ id: "single", number: "", digitableLine: "", amount: purchase.total, dueDate: purchase.dueDate || today(), documentUrl: purchase.documentUrl || "", documentName: purchase.documentName || "" }];
+        const payableRefs = rows.map(() => doc(collection(db, "payables")));
+        await runTransaction(db, async tx => {
+          const current = await tx.get(purchaseRef);
+          if (!current.exists() || current.data().status !== "pending") throw new Error("Esta compra já foi processada ou não está pendente.");
+          rows.forEach((row, index) => {
+            tx.set(payableRefs[index], {
+              supplierId: purchase.supplierId, supplierName: purchase.supplierName, supplierCnpj: purchase.supplierCnpj || "",
+              description: (purchase.description || "Compra " + purchase.number) + (rows.length > 1 ? " · Boleto " + (row.number || (index + 1) + "/" + rows.length) : ""),
+              amount: Number(row.amount || 0), dueDate: row.dueDate || purchase.dueDate || today(), paymentMethod: purchase.paymentMode === "installments" ? "boleto" : "dinheiro",
+              status: "pending", purchaseId: purchase.id, purchaseNumber: purchase.number,
+              boletoNumber: row.number || "", digitableLine: row.digitableLine || "",
+              documentUrl: row.documentUrl || purchase.documentUrl || "", documentName: row.documentName || purchase.documentName || "",
+              notes: "Gerado automaticamente pela aprovação da compra " + purchase.number,
+              createdAt: new Date().toISOString(), createdBy: auth.currentUser?.uid || ""
+            });
+          });
+          tx.update(purchaseRef, { status: "approved", payableId: payableRefs[0].id, payableIds: payableRefs.map(ref => ref.id), approvedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        });
+      }
+      setMessage("Compra aprovada. Os lançamentos de Contas a Pagar foram liberados para pagamento.");
     } catch (e) { setError("Não foi possível aprovar: " + (e as Error).message); }
   };
 
