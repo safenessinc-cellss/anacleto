@@ -74,20 +74,36 @@ export default function FinancialAI() {
       const keys = normalizedBoletos.map(b => b.digitableLine.replace(/\D/g, "") || b.number.replace(/\D/g, "")).filter(Boolean);
       if (normalizedBoletos.length && Math.abs(normalizedBoletos.reduce((sum, row) => sum + row.amount, 0) - amount) > 0.02) throw new Error("A soma dos boletos precisa corresponder ao valor total da nota fiscal.");
       if (new Set(keys).size !== keys.length) throw new Error("Há boletos repetidos nesta nota fiscal. Corrija os números ou linhas digitáveis.");
-      const existing = await getDocs(collection(db, "purchase_orders"));
-      const invoiceKey = String(result.accessKey || "").replace(/\D/g, "");
+      const [existing, pendingBoletoDocs, payableDocs, catalogDocs] = await Promise.all([
+        getDocs(collection(db, "purchase_orders")),
+        getDocs(collection(db, "pending_boletos")),
+        getDocs(collection(db, "payables")),
+        getDocs(collection(db, "supplier_catalog"))
+      ]);
+      const invoiceKey = String(result.accessKey || "").replace(/\\D/g, "");
       const duplicateInvoice = existing.docs.find(d => {
         const p = d.data();
-        return (invoiceKey && String(p.accessKey || "").replace(/\D/g, "") === invoiceKey) ||
-          (!invoiceKey && documentNumber.trim() && String(p.supplierCnpj || "").replace(/\D/g, "") === supplierCnpj.replace(/\D/g, "") && String(p.documentNumber || "").trim() === documentNumber.trim());
+        return (invoiceKey && String(p.accessKey || "").replace(/\\D/g, "") === invoiceKey) ||
+          (!invoiceKey && documentNumber.trim() && String(p.supplierCnpj || "").replace(/\\D/g, "") === supplierCnpj.replace(/\\D/g, "") && String(p.documentNumber || "").trim() === documentNumber.trim());
       });
       if (duplicateInvoice) throw new Error("Esta nota fiscal já está cadastrada no Financeiro. Abra Compras Gerais para corrigir o registro existente.");
-      const duplicateBoleto = existing.docs.find(d => (d.data().installments || []).some((old: any) => normalizedBoletos.some(row => {
-        const key = row.digitableLine.replace(/\D/g, "") || row.number.replace(/\D/g, "");
-        const oldKey = String(old.digitableLine || "").replace(/\D/g, "") || String(old.number || "").replace(/\D/g, "");
-        return Boolean(key && key === oldKey);
-      })));
-      if (duplicateBoleto) throw new Error("Um ou mais boletos já estão vinculados a outra compra. Confira Compras Gerais antes de salvar.");
+      const boletoKeys = normalizedBoletos.map(row => row.digitableLine.replace(/\\D/g, "") || row.number.replace(/\\D/g, "")).filter(Boolean);
+      const existingBoletoKeys = new Set<string>();
+      existing.docs.forEach(d => (d.data().installments || []).forEach((row: any) => {
+        const key = String(row.digitableLine || "").replace(/\\D/g, "") || String(row.number || "").replace(/\\D/g, "");
+        if (key) existingBoletoKeys.add(key);
+      }));
+      pendingBoletoDocs.docs.forEach(d => { const key = String(d.data().digitableLine || "").replace(/\\D/g, ""); if (key) existingBoletoKeys.add(key); });
+      payableDocs.docs.forEach(d => { const row = d.data(); const key = String(row.digitableLine || "").replace(/\\D/g, "") || String(row.boletoNumber || "").replace(/\\D/g, ""); if (key) existingBoletoKeys.add(key); });
+      if (boletoKeys.some(key => existingBoletoKeys.has(key))) throw new Error("Um ou mais boletos já estão cadastrados em Compras, Boletos a Revisar ou Contas a Pagar. Não será criado um lançamento duplicado.");
+      const normalize = (value: string) => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const supplierCatalog = catalogDocs.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(row => normalize(row.supplier) === normalize(supplierName));
+      const extractedItems = Array.isArray(result.items) ? result.items.filter(item => String(item.description || "").trim() && Number(item.quantity) > 0).map(item => {
+        const code = normalize(String(item.sku || ""));
+        const name = normalize(String(item.description || ""));
+        const match = supplierCatalog.find(row => code && normalize(row.code || "") === code) || supplierCatalog.find(row => name && normalize(row.name || "") === name);
+        return { description: String(item.description).slice(0, 300), sku: String(item.sku || "").slice(0, 80), quantity: Math.max(0.01, Number(item.quantity) || 1), unit: String(match?.unit || item.unit || "un").slice(0, 20), unitPrice: Math.max(0, Number(item.unitPrice) || 0), total: Math.max(0, Number(item.total) || 0), supplierCatalogId: match?.id || "", supplierCatalogName: match?.name || "", supplierCatalogCategory: match?.category || "" };
+      }) : [];
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
       const storagePath = "purchases/" + user.uid + "/" + Date.now() + "-" + safeName;
       await uploadBytes(ref(storage, storagePath), file, { contentType: file.type || "application/pdf", customMetadata: { uploadedBy: user.uid, source: "financial-ai" } });
