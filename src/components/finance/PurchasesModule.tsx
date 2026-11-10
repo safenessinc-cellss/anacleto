@@ -17,7 +17,7 @@ type Purchase = {
   documentNumber: string; description: string; items: PurchaseItem[]; subtotal: number;
   tax: number; total: number; issueDate: string; dueDate: string; status: "draft" | "pending" | "approved" | "received" | "cancelled";
   documentType: string; documentName: string; documentUrl: string; documentPath: string;
-  payableId?: string; payableIds?: string[]; installments?: PurchaseInstallment[]; accessKey?: string; createdAt: string; updatedAt: string; createdBy: string; notes: string;
+  payableId?: string; payableIds?: string[]; installments?: PurchaseInstallment[]; accessKey?: string; extractionConfidence?: string; extractionWarnings?: string[]; createdAt: string; updatedAt: string; createdBy: string; notes: string;
 };
 
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
@@ -74,7 +74,7 @@ export default function PurchasesModule() {
     return next;
   }));
   const updateInstallment = (index: number, key: keyof PurchaseInstallment, value: string | number) => setInstallments(current => current.map((row, i) => i === index ? { ...row, [key]: value } : row));
-  const normalizeKey = (value: string) => String(value || "").replace(/\\D/g, "");
+  const normalizeKey = (value: string) => String(value || "").replace(/\D/g, "");
   const startEdit = (purchase: Purchase) => {
     if (!["pending", "draft"].includes(purchase.status)) return;
     setEditingPurchase(purchase); setSelectedSupplier(purchase.supplierId || ""); setSupplierName(purchase.supplierName || "");
@@ -193,9 +193,9 @@ export default function PurchasesModule() {
       }
       const now = new Date().toISOString();
       const normalizedInstallments = installments.filter(row => Number(row.amount) > 0 && row.dueDate).map(row => ({ ...row, number: row.number.trim(), digitableLine: row.digitableLine.trim(), amount: Math.round(Number(row.amount) * 100) / 100 }));
-      const invoiceKey = String(extracted?.accessKey || editingPurchase?.accessKey || "").replace(/\\D/g, "");
+      const invoiceKey = String(extracted?.accessKey || editingPurchase?.accessKey || "").replace(/\D/g, "");
       const duplicateInvoice = purchases.find(p => p.id !== editingPurchase?.id && (
-        (invoiceKey && String(p.accessKey || "").replace(/\\D/g, "") === invoiceKey) ||
+        (invoiceKey && String(p.accessKey || "").replace(/\D/g, "") === invoiceKey) ||
         (!invoiceKey && documentNumber.trim() && normalizeKey(p.supplierCnpj || "") === normalizeKey(resolvedSupplier?.nif || supplierCnpj) && p.documentNumber?.trim() === documentNumber.trim())
       ));
       if (duplicateInvoice) throw new Error("Esta nota fiscal já está registrada na compra " + duplicateInvoice.number + ". Verifique antes de continuar.");
