@@ -37,7 +37,7 @@ export default function BudgetModal({
   const [clientNif, setClientNif] = useState("");
   const [clientAddress, setClientAddress] = useState("");
   const [documentLanguage, setDocumentLanguage] = useState("pt");
-  const [taxRate, setTaxRate] = useState(10); // Standard Brazil tax rate (10%)
+  const [taxRate, setTaxRate] = useState(0); // Tax rate must be configured from the company tax/accounting setup
   const [items, setItems] = useState<BudgetLineItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -136,7 +136,7 @@ export default function BudgetModal({
           id: Math.random().toString(36).substring(2),
           description: item.description,
           quantity: item.qty || 1,
-          unitPrice: item.price || 100,
+          unitPrice: Number(item.price ?? 0),
         }));
         setItems(generatedItems);
         showToast("Itens do orçamento criados pela IA! Edite qualquer campo abaixo se necessário.", "success");
@@ -145,14 +145,8 @@ export default function BudgetModal({
       }
     } catch (err) {
       console.error(err);
-      setAiError("Falha na geração. Usando itens de simulação para manter o fluxo ótimo.");
-      // Fallback
-      setItems([
-        { id: Math.random().toString(36).substring(2), description: "Janela de Alumínio Suprema 1.20x1.20m (Vidro Laminado 8mm)", quantity: 2, unitPrice: 2800 },
-        { id: Math.random().toString(36).substring(2), description: "Porta de Giro Alumínio Gold 2.10x0.90m completa", quantity: 1, unitPrice: 4200 },
-        { id: Math.random().toString(36).substring(2), description: "Instalação especializada com vedação de alta performance", quantity: 1, unitPrice: 850 }
-      ]);
-      showToast("Não foi possível conectar à IA. Simulamos itens de orçamento customizados para você editar.", "info");
+      setAiError("A IA não conseguiu gerar os itens. Nenhum produto ou preço fictício foi inserido. Revise a descrição e tente novamente ou adicione as linhas manualmente.");
+      showToast("Falha ao gerar orçamento por IA. Nenhum item de simulação foi criado.", "error");
     } finally {
       setIsGeneratingAi(false);
     }
@@ -166,7 +160,7 @@ export default function BudgetModal({
       setClientNif(budget.clientNif || "");
       setClientAddress(budget.clientAddress || "");
       setDocumentLanguage(budget.language || "pt");
-      setTaxRate(budget.taxRate !== undefined ? budget.taxRate : 10);
+      setTaxRate(budget.taxRate !== undefined ? budget.taxRate : 0);
       setItems(budget.items || []);
       setNifFoundInfo(budget.clientNif ? { name: budget.clientName || "", email: budget.clientEmail || "", address: budget.clientAddress || "" } : null);
     } else {
@@ -175,15 +169,9 @@ export default function BudgetModal({
       setClientNif(prefillClient?.nif || "");
       setClientAddress(prefillClient?.address || "");
       setDocumentLanguage(currentLanguage);
-      setTaxRate(10);
-      setItems([
-        {
-          id: Math.random().toString(36).substring(2),
-          description: "Esquadrias de Alumínio Customizadas (m²)",
-          quantity: 1,
-          unitPrice: 1200,
-        },
-      ]);
+      setTaxRate(0);
+      // Novo orçamento inicia sem linhas ou preços inventados.
+      setItems([]);
       setNifFoundInfo(prefillClient?.nif ? { name: prefillClient.name || "", email: prefillClient.email || "", address: prefillClient.address || "" } : null);
     }
   }, [budget, isOpen, currentLanguage, prefillClient]);
@@ -195,7 +183,7 @@ export default function BudgetModal({
       id: Math.random().toString(36).substring(2),
       description: "",
       quantity: 1,
-      unitPrice: 100,
+      unitPrice: 0,
     };
     setItems([...items, newItem]);
   };

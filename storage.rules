@@ -28,6 +28,28 @@ service firebase.storage {
         && (request.resource.contentType == 'application/pdf' || request.resource.contentType.matches('image/(jpeg|png|webp)'));
       allow delete: if owner();
     }
+    match /pending_boletos/{uid}/{fileName} {
+      allow read: if canManageFinance();
+      allow create: if canManageFinance()
+        && request.auth.uid == uid
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType == 'application/pdf'
+          || request.resource.contentType.matches('image/(jpeg|png|webp)'));
+      allow update: if owner();
+      allow delete: if owner();
+    }
+    match /fiscal_documents/{uid}/{fileName} {
+      allow read: if canManageFinance();
+      allow create: if canManageFinance()
+        && request.auth.uid == uid
+        && request.resource.size < 15 * 1024 * 1024
+        && (request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'application/xml'
+          || request.resource.contentType == 'text/xml'
+          || request.resource.contentType.matches('image/(jpeg|png)'));
+      allow update: if owner();
+      allow delete: if owner();
+    }
     match /deliveries/{deliveryId}/{fileName} {
       allow read: if canManageQuality();
       allow create, update: if canManageQuality()

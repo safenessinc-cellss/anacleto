@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Building2, TrendingDown, TrendingUp, FileText, CreditCard, ShoppingCart } from "lucide-react";
+import { Building2, TrendingDown, TrendingUp, FileText, CreditCard, ShoppingCart, Wallet } from "lucide-react";
 import SuppliersModule from "./SuppliersModule";
 import PayablesModule from "./PayablesModule";
 import ReceivablesModule from "./ReceivablesModule";
@@ -7,20 +7,28 @@ import PendingBoletosModule from "./PendingBoletosModule";
 import PaymentsModule from "./PaymentsModule";
 import PurchasesModule from "./PurchasesModule";
 import InventoryModule from "../inventory/InventoryModule";
+import EmployeePaymentsModule from "./EmployeePaymentsModule";
+import FinancialReportsModule from "./FinancialReportsModule";
+import PayrollModule from "../hr/PayrollModule";
+import FiscalDocumentsModule from "./FiscalDocumentsModule";
 
-type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments";
+type FinanceTab = "inventory" | "purchases" | "payables" | "receivables" | "suppliers" | "pending_boletos" | "payments" | "employee_payments" | "payroll" | "reports" | "fiscal_documents";
 
 export default function FinanceModule({ language = "pt" }: { language?: string }) {
   const [tab, setTab] = useState<FinanceTab>("payables");
 
   const tabs = [
     { id: "inventory" as FinanceTab, label: "Estoque", icon: Building2 },
-    { id: "purchases" as FinanceTab, label: "Compras", icon: ShoppingCart },
+    { id: "purchases" as FinanceTab, label: "Compras gerais", icon: ShoppingCart },
     { id: "payables" as FinanceTab, label: "Despesas e Contas a Pagar", icon: TrendingDown },
     { id: "receivables" as FinanceTab, label: "Contas a Receber", icon: TrendingUp },
     { id: "suppliers" as FinanceTab, label: "Fornecedores", icon: Building2 },
     { id: "pending_boletos" as FinanceTab, label: "Boletos a Revisar", icon: FileText },
-    { id: "payments" as FinanceTab, label: "Pagos", icon: CreditCard },
+    { id: "payments" as FinanceTab, label: "Pagamentos", icon: CreditCard },
+    { id: "employee_payments" as FinanceTab, label: "Pagamentos de Funcionários", icon: CreditCard },
+    { id: "payroll" as FinanceTab, label: "Folha de Pagamentos", icon: Wallet },
+    { id: "reports" as FinanceTab, label: "Relatórios", icon: FileText },
+    { id: "fiscal_documents" as FinanceTab, label: "Notas fiscais", icon: FileText },
     ];
 
   return (
@@ -32,7 +40,7 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -55,6 +63,10 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
       {tab === "suppliers" && <SuppliersModule />}
       {tab === "pending_boletos" && <PendingBoletosModule />}
       {tab === "payments" && <PaymentsModule />}
+      {tab === "employee_payments" && <EmployeePaymentsModule />}
+      {tab === "payroll" && <PayrollModule />}
+      {tab === "reports" && <FinancialReportsModule />}
+      {tab === "fiscal_documents" && <FiscalDocumentsModule />}
     </div>
   );
 }

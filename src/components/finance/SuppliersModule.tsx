@@ -185,6 +185,8 @@ export default function SuppliersModule() {
                 <td className="p-3 font-mono text-xs">{s.nif || "-"}</td>
                 <td className="p-3 text-slate-600">{s.email || "-"}</td>
                 <td className="p-3 text-slate-600">{s.phone || "-"}</td>
+                <td className="p-3">{purchaseRecords.filter(p => p.supplierId === s.id).length}</td>
+                <td className="p-3">{payableRecords.filter(p => p.supplierId === s.id && p.status !== "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
                 <td className="p-3">
                   <button onClick={() => { setEditing(s); setForm(s); }} className="p-1 text-blue-600"><Edit className="w-4 h-4" /></button>
                   <button onClick={() => handleDelete(s.id!)} className="p-1 text-rose-600"><Trash2 className="w-4 h-4" /></button>

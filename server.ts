@@ -533,9 +533,13 @@ const startServer = async () => {
   });
 };
 
-startServer().catch((err) => {
-  console.error("Express startup failed:", err);
-});
+// Vercel executa o Express como função serverless; não abra uma porta TCP durante a inicialização.
+// O listener local só é iniciado fora do ambiente Vercel.
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error("Express startup failed:", err);
+  });
+}
 
 
 // ============ Google Calendar Endpoint ============
@@ -593,37 +597,43 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
 });
 
 
+async function extractFinancialDocument(data: string, mimeType: string, fileName: string, prompt: string, maxOutputTokens = 4000) {
+  const binary = Buffer.from(data, "base64");
+  const attachment = mimeType === "application/pdf"
+    ? { type: "file" as const, data: binary, mediaType: mimeType, filename: fileName.slice(0, 120) }
+    : { type: "image" as const, image: binary, mediaType: mimeType };
+  const response = await generateText({
+    model: gateway("google/gemini-2.5-flash"),
+    messages: [{ role: "user", content: [{ type: "text", text: prompt }, attachment] }],
+    temperature: 0.1,
+    maxOutputTokens,
+  });
+  const raw = response.text || "";
+  const match = raw.match(/\{[\s\S]*\}/);
+  return JSON.parse(match ? match[0] : raw);
+}
+
 // ============ FINANCIAL AI: Extraer datos de boleto ============
 app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("financial-ai", 8, 60_000), async (req, res) => {
   try {
-    const { data, mimeType } = req.body || {};
+    const { data, mimeType, fileName } = req.body || {};
     const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
     if (typeof data !== "string" || !data || data.length > 14_000_000) return res.status(400).json({ error: "Envie um documento de até 10 MB." });
     if (!allowedMimeTypes.includes(mimeType)) return res.status(415).json({ error: "Formato não suportado. Use PDF, JPG, PNG ou WEBP." });
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: "Leitura inteligente indisponível: configure GEMINI_API_KEY no servidor." });
-    const { GoogleGenAI } = await import("@google/genai");
-    const genAI = new GoogleGenAI({ apiKey });
-    const prompt = `Você é um assistente financeiro. Analise este documento (boleto ou conta a pagar) e extraia em JSON:
-{ "beneficiary": "nome do beneficiário", "cnpj": "CNPJ", "amount": 123.45, "dueDate": "YYYY-MM-DD", "digitableLine": "linha digitável", "description": "descrição" }
-Responda APENAS o JSON, sem texto.`;
-    const result = await genAI.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{
-        role: "user",
-        parts: [
-          { inlineData: { mimeType: mimeType || "application/pdf", data } },
-          { text: prompt },
-        ],
-      }],
+    const prompt = "Analise este boleto ou conta a pagar brasileira. Extraia somente dados visíveis, sem inventar. Responda APENAS JSON válido: { \"beneficiary\":\"\", \"cnpj\":\"\", \"amount\":0, \"dueDate\":\"YYYY-MM-DD\", \"digitableLine\":\"\", \"description\":\"\" }. Se algum dado não estiver legível, use string vazia ou zero.";
+    const parsed = await extractFinancialDocument(data, mimeType, String(fileName || "documento"), prompt, 1800);
+    return res.json({
+      beneficiary: String(parsed.beneficiary || "").slice(0, 180),
+      cnpj: String(parsed.cnpj || "").replace(/\D/g, "").slice(0, 14),
+      amount: Math.max(0, Number(parsed.amount) || 0),
+      dueDate: String(parsed.dueDate || "").slice(0, 10),
+      digitableLine: String(parsed.digitableLine || "").replace(/[^0-9. ]/g, "").slice(0, 80),
+      description: String(parsed.description || "Boleto bancário").slice(0, 300),
+      extractedBy: "Vercel AI Gateway",
     });
-    const text = result.text || "";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
-    res.json(parsed);
   } catch (err: any) {
-    console.error("Financial AI error:", err);
-    res.status(500).json({ error: err?.message || "Erro" });
+    console.error("Financial AI error:", err?.message || err);
+    return res.status(422).json({ error: "Não foi possível interpretar o documento com segurança. Revise a imagem ou preencha manualmente." });
   }
 });
 
@@ -631,25 +641,37 @@ Responda APENAS o JSON, sem texto.`;
 app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("purchase-ai", 8, 60_000), async (req, res) => {
   try {
     const { data, mimeType, fileName } = req.body || {};
-    if (typeof data !== "string" || !data || data.length > 14_000_000) return res.status(400).json({ error: "Envie um PDF válido de até 10 MB." });
+    if (typeof data !== "string" || !data || data.length > 14_000_000) return res.status(400).json({ error: "Envie um documento de até 10 MB." });
     const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
-    if (!allowed.includes(mimeType)) return res.status(415).json({ error: "Formato não suportado. Use PDF, JPG ou PNG." });
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return res.status(503).json({ error: "Leitura inteligente indisponível: configure GEMINI_API_KEY no servidor." });
-    const { GoogleGenAI } = await import("@google/genai");
-    const genAI = new GoogleGenAI({ apiKey });
-    const prompt = `Você é um analista de compras e documentos fiscais brasileiros. Identifique o tipo do documento e extraia somente dados visíveis, sem inventar. Responda APENAS JSON válido: {"documentType":"nfe|danfe|supplier_quote|purchase_order|boleto|receipt|other","supplierName":"","supplierCnpj":"","documentNumber":"","issueDate":"YYYY-MM-DD","dueDate":"YYYY-MM-DD","currency":"BRL","total":0,"tax":0,"description":"","items":[{"description":"","sku":"","quantity":1,"unit":"un","unitPrice":0,"total":0}],"confidence":"high|medium|low","warnings":[]}. Se ausente, use string vazia, zero ou lista vazia. Não confunda CNPJ do emitente com destinatário. Valores numéricos em reais. Arquivo: ${String(fileName || "").slice(0,160)}`;
-    const result = await genAI.models.generateContent({ model: "gemini-2.5-flash", contents: [{ role: "user", parts: [{ inlineData: { mimeType, data } }, { text: prompt }] }] });
-    const raw = result.text || "";
-    const match = raw.match(/\{[\s\S]*\}/);
-    const parsed = JSON.parse(match ? match[0] : raw);
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) throw new Error("A IA não retornou uma estrutura de documento válida.");
+    if (!allowed.includes(mimeType)) return res.status(415).json({ error: "Formato não suportado. Use PDF, JPG, PNG ou WEBP." });
+    const prompt = "Você é um analista financeiro e fiscal brasileiro. Leia a nota fiscal, boleto, recibo, orçamento ou documento de compra. Extraia apenas dados visíveis, sem inventar. Responda APENAS JSON válido: { \"documentType\":\"nfe|danfe|supplier_quote|purchase_order|boleto|receipt|other\", \"supplierName\":\"\", \"supplierCnpj\":\"\", \"documentNumber\":\"\", \"accessKey\":\"\", \"issueDate\":\"YYYY-MM-DD\", \"dueDate\":\"YYYY-MM-DD\", \"currency\":\"BRL\", \"total\":0, \"tax\":0, \"description\":\"\", \"digitableLine\":\"\", \"barcode\":\"\", \"payerName\":\"\", \"payerCnpj\":\"\", \"items\":[{\"description\":\"\",\"sku\":\"\",\"quantity\":1,\"unit\":\"un\",\"unitPrice\":0,\"total\":0}], \"confidence\":\"high|medium|low\", \"warnings\":[] }. Use string vazia, zero ou lista vazia quando ausente. Não confunda CNPJ do emitente com destinatário/pagador. Valores em reais. Limite itens a 100. Arquivo: " + String(fileName || "").slice(0, 120);
+    const parsed = await extractFinancialDocument(data, mimeType, String(fileName || "documento"), prompt, 5000);
+    if (!parsed || typeof parsed !== "object") throw new Error("A IA não retornou dados estruturados.");
+    parsed.documentType = String(parsed.documentType || "other");
+    parsed.supplierName = String(parsed.supplierName || "").slice(0, 180);
+    parsed.supplierCnpj = String(parsed.supplierCnpj || "").replace(/\D/g, "").slice(0, 14);
+    parsed.documentNumber = String(parsed.documentNumber || "").slice(0, 80);
+    parsed.accessKey = String(parsed.accessKey || "").replace(/\D/g, "").slice(0, 44);
+    parsed.issueDate = String(parsed.issueDate || "").slice(0, 10);
+    parsed.dueDate = String(parsed.dueDate || "").slice(0, 10);
     parsed.total = Math.max(0, Number(parsed.total) || 0);
-    parsed.items = parsed.items.slice(0, 200).map((item: any) => ({ description: String(item.description || "").slice(0, 300), sku: String(item.sku || "").slice(0, 80), quantity: Math.max(0, Number(item.quantity) || 0), unit: String(item.unit || "un").slice(0, 20), unitPrice: Math.max(0, Number(item.unitPrice) || 0), total: Math.max(0, Number(item.total) || 0) }));
+    parsed.tax = Math.max(0, Number(parsed.tax) || 0);
+    parsed.description = String(parsed.description || "").slice(0, 300);
+    parsed.digitableLine = String(parsed.digitableLine || "").replace(/[^0-9. ]/g, "").slice(0, 80);
+    parsed.barcode = String(parsed.barcode || "").replace(/\D/g, "").slice(0, 48);
+    parsed.payerName = String(parsed.payerName || "").slice(0, 180);
+    parsed.payerCnpj = String(parsed.payerCnpj || "").replace(/\D/g, "").slice(0, 14);
+    parsed.items = Array.isArray(parsed.items) ? parsed.items.slice(0, 100).map((item: any) => ({
+      description: String(item.description || "").slice(0, 300), sku: String(item.sku || "").slice(0, 80),
+      quantity: Math.max(0, Number(item.quantity) || 0), unit: String(item.unit || "un").slice(0, 20),
+      unitPrice: Math.max(0, Number(item.unitPrice) || 0), total: Math.max(0, Number(item.total) || 0),
+    })) : [];
+    parsed.warnings = Array.isArray(parsed.warnings) ? parsed.warnings.map((warning: any) => String(warning).slice(0, 240)).slice(0, 20) : [];
+    parsed.confidence = ["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low";
     return res.json(parsed);
   } catch (error: any) {
-    console.error("Purchase document extraction error:", error);
-    return res.status(422).json({ error: "Não foi possível interpretar o documento com segurança. Revise o PDF ou preencha manualmente.", details: error?.message });
+    console.error("Purchase document extraction error:", error?.message || error);
+    return res.status(422).json({ error: "Não foi possível interpretar o documento com segurança. Revise o PDF ou preencha manualmente." });
   }
 });
 

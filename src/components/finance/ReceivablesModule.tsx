@@ -16,6 +16,7 @@ interface Receivable {
   status: "pending" | "partial" | "received" | "cancelled";
   receivedAt?: string;
   invoiceId?: string;
+  budgetId?: string;
   notes?: string;
 }
 
@@ -45,6 +46,8 @@ export default function ReceivablesModule() {
   const [items, setItems] = useState<Receivable[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "partial" | "received" | "overdue">("all");
+  // Dedicated finance views: open balances, advances/partial receipts, and fully received.
+  const [receiptTab, setReceiptTab] = useState<"receivable" | "advance" | "received">("receivable");
   const [editing, setEditing] = useState<Receivable | null>(null);
   const [form, setForm] = useState<Omit<Receivable, "id">>(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -79,14 +82,32 @@ export default function ReceivablesModule() {
   };
 
   const handleSave = async () => {
-    if (!form.description.trim()) return alert("Descrição é obrigatória");
+    if (!form.description.trim()) return alert("Descrição do serviço ou cobrança é obrigatória");
     if (!form.clientName.trim()) return alert("Informe o cliente");
     if (form.amount <= 0) return alert("Valor deve ser maior que zero");
-    const payload = { ...form };
+    const initialReceived = Math.max(0, Number(form.receivedAmount || 0));
+    if (editing?.id && initialReceived !== Number(editing.receivedAmount || 0)) return alert("Para alterar valores recebidos, use a ação de registrar recebimento parcial. Assim o lançamento financeiro permanece rastreável.");
+    if (initialReceived > Number(form.amount)) return alert("O adiantamento não pode ser maior que o valor total.");
+    const payload = { ...form, receivedAmount: initialReceived,
+      status: initialReceived >= Number(form.amount) ? "received" : initialReceived > 0 ? "partial" : "pending" } as Omit<Receivable, "id">;
     if (editing?.id) {
       await updateDoc(doc(db, "receivables", editing.id), payload);
     } else {
-      await addDoc(collection(db, "receivables"), payload);
+      const receivableRef = doc(collection(db, "receivables"));
+      await runTransaction(db, async tx => {
+        tx.set(receivableRef, { ...payload, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        if (initialReceived > 0) {
+          const receiptRef = doc(db, "ledger_entries", `receivable-${receivableRef.id}-initial`);
+          tx.set(receiptRef, {
+            direction: "inflow", category: "customer_advance", sourceType: "receivable",
+            sourceId: receivableRef.id, receivableId: receivableRef.id,
+            description: `Adiantamento do cliente · ${form.description}`,
+            amount: initialReceived, date: new Date().toISOString().slice(0, 10),
+            status: "posted", paymentMethod: form.paymentMethod, createdAt: serverTimestamp(),
+            createdBy: auth.currentUser?.email || ""
+          });
+        }
+      });
     }
     setEditing(null);
     setForm(emptyForm);
@@ -157,10 +178,14 @@ export default function ReceivablesModule() {
 
   const filtered = items.filter((i) => {
     if (search && !i.description.toLowerCase().includes(search.toLowerCase()) && !i.clientName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filter === "pending") return i.status === "pending";
-    if (filter === "partial") return i.status === "partial";
-    if (filter === "received") return i.status === "received";
-    if (filter === "overdue") return isOverdue(i);
+    // The tabs work as operational queues. The status dropdown further filters within a tab.
+    if (receiptTab === "receivable" && !(i.status === "pending" || (i.status === "partial" && Number(i.receivedAmount || 0) < i.amount))) return false;
+    if (receiptTab === "advance" && !(i.status === "partial" && Number(i.receivedAmount || 0) > 0)) return false;
+    if (receiptTab === "received" && i.status !== "received") return false;
+    if (filter === "pending" && i.status !== "pending") return false;
+    if (filter === "partial" && i.status !== "partial") return false;
+    if (filter === "received" && i.status !== "received") return false;
+    if (filter === "overdue" && !isOverdue(i)) return false;
     return true;
   });
 
@@ -190,13 +215,26 @@ export default function ReceivablesModule() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 rounded-xl border bg-slate-50 p-2 dark:bg-slate-900">
+        {([
+          { id: "receivable", label: "A Receber", count: items.filter(i => i.status === "pending" || i.status === "partial").length },
+          { id: "advance", label: "Adiantamentos", count: items.filter(i => i.status === "partial" && Number(i.receivedAmount || 0) > 0).length },
+          { id: "received", label: "Recebidos", count: items.filter(i => i.status === "received").length },
+        ] as const).map(tab => (
+          <button key={tab.id} onClick={() => { setReceiptTab(tab.id); setFilter("all"); }}
+            className={"rounded-lg px-4 py-2 text-sm font-bold transition " + (receiptTab === tab.id ? "bg-indigo-600 text-white shadow" : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800")}>
+            {tab.label} <span className={"ml-1 rounded-full px-1.5 py-0.5 text-xs " + (receiptTab === tab.id ? "bg-white/20" : "bg-slate-200 dark:bg-slate-700")}>{tab.count}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap flex-1">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por cliente ou descrição..." className="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800" />
           </div>
-          <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800">
+          <select value={filter} onChange={(e) => { const next = e.target.value as typeof filter; setFilter(next); if (next === "partial") setReceiptTab("advance"); else if (next === "received") setReceiptTab("received"); else if (next === "pending" || next === "overdue") setReceiptTab("receivable"); }} className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800">
             <option value="all">Todos</option>
             <option value="pending">Pendentes</option>
             <option value="partial">Parciais</option>
@@ -215,13 +253,15 @@ export default function ReceivablesModule() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input placeholder="Cliente *" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" list="clients-list" />
             <datalist id="clients-list">{clients.map((c) => <option key={c.id} value={c.name} />)}</datalist>
-            <input placeholder="Descrição *" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800 md:col-span-2" />
+            <input placeholder="Serviço / orçamento / descrição *" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800 md:col-span-2" />
             <input type="number" step="0.01" placeholder="Valor *" value={form.amount} onChange={(e) => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
+            <input type="number" min="0" step="0.01" placeholder="Adiantamento / valor já recebido (R$)" value={form.receivedAmount || 0} onChange={(e) => setForm({ ...form, receivedAmount: parseFloat(e.target.value) || 0 })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
             <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
             <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value as any })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800">
               {METHODS.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
             </select>
-            <input placeholder="Nº da fatura (opcional)" value={form.invoiceId || ""} onChange={(e) => setForm({ ...form, invoiceId: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800 md:col-span-2" />
+            <input placeholder="Nº da fatura (opcional)" value={form.invoiceId || ""} onChange={(e) => setForm({ ...form, invoiceId: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
+            <input placeholder="Orçamento / serviço vinculado (opcional)" value={form.budgetId || ""} onChange={(e) => setForm({ ...form, budgetId: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800" />
             <textarea placeholder="Notas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="p-2 border rounded text-sm bg-white dark:bg-slate-800 md:col-span-3" rows={2} />
           </div>
           <div className="flex gap-2 mt-3">
@@ -235,13 +275,14 @@ export default function ReceivablesModule() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 dark:bg-slate-800 text-left text-xs uppercase text-slate-500">
             <tr>
-              <th className="p-3">Cliente</th><th className="p-3">Descrição</th><th className="p-3">Valor</th><th className="p-3">Vencimento</th><th className="p-3">Método</th><th className="p-3">Status</th><th className="p-3">Ações</th>
+              <th className="p-3">Cliente</th><th className="p-3">Serviço / orçamento</th><th className="p-3">Descrição</th><th className="p-3">Valor</th><th className="p-3">Vencimento</th><th className="p-3">Método</th><th className="p-3">Status</th><th className="p-3">Ações</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td className="p-3 font-bold text-slate-900 dark:text-white">{r.clientName}</td>
+                <td className="p-3 text-xs text-slate-500">{r.budgetId || "—"}</td>
                 <td className="p-3 text-slate-600 dark:text-slate-300">{r.description}</td>
                 <td className="p-3 font-bold">R$ {r.amount.toFixed(2)}</td>
                 <td className="p-3 font-mono text-xs">{r.dueDate}</td>
@@ -263,7 +304,7 @@ export default function ReceivablesModule() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="p-8 text-center text-slate-400">Nenhuma cobrança encontrada</td></tr>
+              <tr><td colSpan={8} className="p-8 text-center text-slate-400">Nenhuma cobrança encontrada</td></tr>
             )}
           </tbody>
         </table>
