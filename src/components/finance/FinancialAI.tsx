@@ -1,11 +1,12 @@
 import React, { useRef, useState } from "react";
 import { Sparkles, Upload, CheckCircle, Loader2, FileText, Save, AlertTriangle } from "lucide-react";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, getDocs } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, auth, storage } from "../../firebase";
 
 type ExtractedItem = { description: string; sku?: string; quantity: number; unit?: string; unitPrice: number; total: number };
 type ExtractedDocument = { documentType?: string; supplierName?: string; supplierCnpj?: string; documentNumber?: string; accessKey?: string; issueDate?: string; dueDate?: string; total?: number; tax?: number; description?: string; items?: ExtractedItem[]; confidence?: string; warnings?: string[] };
+type InvoiceBoleto = { id: string; number: string; digitableLine: string; amount: number; dueDate: string };
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value) || 0);
 
@@ -23,6 +24,7 @@ export default function FinancialAI() {
   const [total, setTotal] = useState("");
   const [tax, setTax] = useState("0");
   const [notes, setNotes] = useState("");
+  const [boletos, setBoletos] = useState<InvoiceBoleto[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -68,6 +70,17 @@ export default function FinancialAI() {
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Sessão expirada. Entre novamente.");
+      const normalizedBoletos = boletos.filter(b => Number(b.amount) > 0 && b.dueDate).map(b => ({ ...b, number: b.number.trim(), digitableLine: b.digitableLine.trim(), amount: Math.round(Number(b.amount) * 100) / 100 }));
+      const keys = normalizedBoletos.map(b => b.digitableLine.replace(/\D/g, "") || b.number.replace(/\D/g, "")).filter(Boolean);
+      if (new Set(keys).size !== keys.length) throw new Error("Há boletos repetidos nesta nota fiscal. Corrija os números ou linhas digitáveis.");
+      const existing = await getDocs(collection(db, "purchase_orders"));
+      const invoiceKey = String(result.accessKey || "").replace(/\D/g, "");
+      const duplicateInvoice = existing.docs.find(d => {
+        const p = d.data();
+        return (invoiceKey && String(p.accessKey || "").replace(/\D/g, "") === invoiceKey) ||
+          (!invoiceKey && documentNumber.trim() && String(p.supplierCnpj || "").replace(/\D/g, "") === supplierCnpj.replace(/\D/g, "") && String(p.documentNumber || "").trim() === documentNumber.trim());
+      });
+      if (duplicateInvoice) throw new Error("Esta nota fiscal já está cadastrada no Financeiro. Abra Compras Gerais para corrigir o registro existente.");
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
       const storagePath = "purchases/" + user.uid + "/" + Date.now() + "-" + safeName;
       await uploadBytes(ref(storage, storagePath), file, { contentType: file.type || "application/pdf", customMetadata: { uploadedBy: user.uid, source: "financial-ai" } });
@@ -84,12 +97,12 @@ export default function FinancialAI() {
         documentNumber: documentNumber.trim(), accessKey: String(result.accessKey || "").replace(/\D/g, "").slice(0, 44),
         description: description.trim() || "Documento financeiro", expenseCategory: "materiais", items, subtotal, tax: taxes,
         total: Math.round((amount + Number.EPSILON) * 100) / 100, issueDate, dueDate, status: "pending",
-        documentType: result.documentType || "other", documentName: file.name, documentUrl, documentPath: storagePath,
+        documentType: result.documentType || "other", documentName: file.name, documentUrl, documentPath: storagePath, installments: normalizedBoletos,
         extractionConfidence: result.confidence || "", extractionWarnings: result.warnings || [], notes: notes.trim(),
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user.email || "", source: "financial-ai"
       });
-      setMessage("Documento enviado para Compras Gerais, aguardando aprovação. Após a aprovação, a conta será criada em Contas a Pagar.");
-      setFile(null); setResult(null); setNotes(""); if (fileRef.current) fileRef.current.value = "";
+      setMessage("Documento enviado para Compras Gerais, aguardando aprovação. Os boletos vinculados serão lançados separadamente em Contas a Pagar.");
+      setFile(null); setResult(null); setNotes(""); setBoletos([]); if (fileRef.current) fileRef.current.value = "";
     } catch (e) { setError((e as Error).message || "Não foi possível enviar o documento ao Financeiro."); }
     finally { setSaving(false); }
   };
@@ -117,6 +130,16 @@ export default function FinancialAI() {
         <label className="text-xs font-semibold text-slate-500">Tributos destacados (R$)<input type="number" min="0" step="0.01" value={tax} onChange={e => setTax(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
       </div>
       {Array.isArray(result.warnings) && result.warnings.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800"><AlertTriangle className="mr-1 inline h-4 w-4"/> Confira os alertas da IA: {result.warnings.join(" · ")}</div>}
+      <section className="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+        <div className="flex items-center justify-between gap-2"><div><h4 className="text-sm font-bold text-slate-800">Boletos desta nota fiscal</h4><p className="text-xs text-slate-500">Cadastre as parcelas agora para evitar lançamentos duplicados.</p></div><button type="button" onClick={() => setBoletos(rows => [...rows, { id: String(Date.now()) + Math.random(), number: "", digitableLine: "", amount: 0, dueDate }])} className="rounded-lg border bg-white px-3 py-2 text-xs font-bold">+ Adicionar boleto</button></div>
+        {boletos.map((b,i)=><div key={b.id} className="grid gap-2 rounded-lg border bg-white p-3 sm:grid-cols-2">
+          <label className="text-xs font-semibold">Número do boleto<input value={b.number} onChange={e=>setBoletos(rows=>rows.map((r,j)=>j===i?{...r,number:e.target.value}:r))} className="mt-1 w-full rounded border p-2 text-sm"/></label>
+          <label className="text-xs font-semibold">Valor (R$)<input type="number" min="0" step="0.01" value={b.amount} onChange={e=>setBoletos(rows=>rows.map((r,j)=>j===i?{...r,amount:Number(e.target.value)}:r))} className="mt-1 w-full rounded border p-2 text-sm"/></label>
+          <label className="text-xs font-semibold sm:col-span-2">Linha digitável<input value={b.digitableLine} onChange={e=>setBoletos(rows=>rows.map((r,j)=>j===i?{...r,digitableLine:e.target.value}:r))} className="mt-1 w-full rounded border p-2 text-sm"/></label>
+          <label className="text-xs font-semibold">Vencimento<input type="date" value={b.dueDate} onChange={e=>setBoletos(rows=>rows.map((r,j)=>j===i?{...r,dueDate:e.target.value}:r))} className="mt-1 w-full rounded border p-2 text-sm"/></label>
+          <button type="button" onClick={()=>setBoletos(rows=>rows.filter((_,j)=>j!==i))} className="self-end text-xs font-bold text-rose-600">Remover</button>
+        </div>)}
+      </section>
       <label className="block text-xs font-semibold text-slate-500">Observações<input value={notes} onChange={e => setNotes(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"><div><p className="text-xs text-slate-500">Total a registrar no Financeiro</p><p className="text-xl font-black">{money(Number(total))}</p><p className="text-xs text-slate-500">Status inicial: aguardando aprovação</p></div><button onClick={() => void saveToFinance()} disabled={saving || extracting} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4"/>}{saving ? "Enviando..." : "Enviar para o Financeiro"}</button></div>
     </section>}
