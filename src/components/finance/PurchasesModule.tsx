@@ -14,7 +14,7 @@ type ExtractedDocument = {
   description?: string; items?: PurchaseItem[]; confidence?: string; warnings?: string[];
 };
 type Purchase = {
-  id: string; number: string; supplierId: string; supplierName: string; supplierCnpj: string; expenseCategory?: string;
+  id: string; number: string; supplierId: string; supplierName: string; supplierCnpj: string; expenseCategory?: string; paymentMode?: "cash" | "installments";
   documentNumber: string; description: string; items: PurchaseItem[]; subtotal: number;
   tax: number; total: number; issueDate: string; dueDate: string; status: "draft" | "pending" | "approved" | "received" | "cancelled";
   documentType: string; documentName: string; documentUrl: string; documentPath: string;
@@ -40,6 +40,8 @@ export default function PurchasesModule() {
   const [items, setItems] = useState<PurchaseItem[]>([emptyItem()]);
   const [tax, setTax] = useState(0);
   const [notes, setNotes] = useState("");
+  const [paymentMode, setPaymentMode] = useState<"cash" | "installments">("cash");
+  const [installmentCount, setInstallmentCount] = useState("2");
   const [installments, setInstallments] = useState<PurchaseInstallment[]>([]);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -77,6 +79,18 @@ export default function PurchasesModule() {
     return next;
   }));
   const updateInstallment = (index: number, key: keyof PurchaseInstallment, value: string | number) => setInstallments(current => current.map((row, i) => i === index ? { ...row, [key]: value } : row));
+  const generateInstallments = () => {
+    const count = Math.max(1, Math.min(48, Number(installmentCount) || 1));
+    if (total <= 0) { setError("Informe os itens e o valor total da nota antes de gerar as parcelas."); return; }
+    const baseAmount = Math.floor((total / count) * 100) / 100;
+    const rows = Array.from({ length: count }, (_, index) => {
+      const due = new Date(dueDate + "T12:00:00");
+      due.setMonth(due.getMonth() + index);
+      const amount = index === count - 1 ? Math.round((total - baseAmount * (count - 1)) * 100) / 100 : baseAmount;
+      return { id: `parcela-${Date.now()}-${index}`, number: `${index + 1}/${count}`, digitableLine: "", amount, dueDate: due.toISOString().slice(0, 10) };
+    });
+    setInstallments(rows); setMessage(`${count} parcela(s) gerada(s). Confira valores e vencimentos antes de salvar.`); setError("");
+  };
   const normalizeKey = (value: string) => String(value || "").replace(/\D/g, "");
   const normalizeText = (value: string) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const supplierCatalogFor = (supplier: string) => supplierCatalog.filter(row => normalizeText(row.supplier) === normalizeText(supplier));
@@ -111,6 +125,8 @@ export default function PurchasesModule() {
     setIssueDate(purchase.issueDate || today()); setDueDate(purchase.dueDate || today());
     setItems(purchase.items?.length ? purchase.items.map(item => ({ ...item })) : [emptyItem()]);
     setTax(Number(purchase.tax || 0)); setNotes(purchase.notes || "");
+    setPaymentMode(purchase.paymentMode || (purchase.installments?.length ? "installments" : "cash"));
+    setInstallmentCount(String(Math.max(1, purchase.installments?.length || 2)));
     setInstallments((purchase.installments || []).map((row, i) => ({ id: row.id || String(i), number: row.number || "", digitableLine: row.digitableLine || "", amount: Number(row.amount || 0), dueDate: row.dueDate || purchase.dueDate || today(), documentName: row.documentName || "", documentUrl: row.documentUrl || "", documentPath: row.documentPath || "" })));
     setDocumentFile(null); setDocumentUrl(purchase.documentUrl || ""); setDocumentPath(purchase.documentPath || "");
     setExtracted({ documentType: purchase.documentType, accessKey: purchase.accessKey || "" });
@@ -120,7 +136,7 @@ export default function PurchasesModule() {
   const resetForm = () => {
     setEditingPurchase(null); setSelectedSupplier(""); setSupplierName(""); setSupplierCnpj(""); setDocumentNumber("");
     setDescription(""); setExpenseCategory("materiais"); setIssueDate(today()); setDueDate(today()); setItems([emptyItem()]);
-    setTax(0); setNotes(""); setInstallments([]); setDocumentFile(null); setDocumentUrl(""); setDocumentPath(""); setExtracted(null);
+    setTax(0); setNotes(""); setPaymentMode("cash"); setInstallmentCount("2"); setInstallments([]); setDocumentFile(null); setDocumentUrl(""); setDocumentPath(""); setExtracted(null);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -223,8 +239,9 @@ export default function PurchasesModule() {
         url = await getDownloadURL(storageRef);
       }
       const now = new Date().toISOString();
-      const normalizedInstallments = installments.filter(row => Number(row.amount) > 0 && row.dueDate).map(row => ({ ...row, number: row.number.trim(), digitableLine: row.digitableLine.trim(), amount: Math.round(Number(row.amount) * 100) / 100 }));
-      if (normalizedInstallments.length && Math.abs(normalizedInstallments.reduce((sum, row) => sum + row.amount, 0) - total) > 0.02) throw new Error("A soma dos boletos precisa corresponder ao total da nota fiscal.");
+      const normalizedInstallments = paymentMode === "installments" ? installments.filter(row => Number(row.amount) > 0 && row.dueDate).map(row => ({ ...row, number: row.number.trim(), digitableLine: row.digitableLine.trim(), amount: Math.round(Number(row.amount) * 100) / 100 })) : [];
+      if (paymentMode === "installments" && !normalizedInstallments.length) throw new Error("Gere ou cadastre ao menos uma parcela para o pagamento parcelado.");
+      if (paymentMode === "installments" && Math.abs(normalizedInstallments.reduce((sum, row) => sum + row.amount, 0) - total) > 0.02) throw new Error("A soma dos boletos precisa corresponder ao total da nota fiscal.");
       const invoiceKey = String(extracted?.accessKey || editingPurchase?.accessKey || "").replace(/\D/g, "");
       const duplicateInvoice = purchases.find(p => p.id !== editingPurchase?.id && (
         (invoiceKey && String(p.accessKey || "").replace(/\D/g, "") === invoiceKey) ||
@@ -260,7 +277,7 @@ export default function PurchasesModule() {
         supplierId, supplierName: resolvedSupplier?.name || supplierName.trim() || "Despesa sem fornecedor",
         supplierCnpj: resolvedSupplier?.nif || supplierCnpj, documentNumber, accessKey: invoiceKey, description: description.trim(), expenseCategory,
         items: items.filter(i => i.description.trim()).map(i => ({ ...i, total: i.quantity * i.unitPrice })),
-        subtotal, tax, total, issueDate, dueDate, installments: normalizedInstallments,
+        subtotal, tax, total, issueDate, dueDate, paymentMode, installments: normalizedInstallments,
         documentType: extracted?.documentType || editingPurchase?.documentType || "manual", documentName: documentFile?.name || editingPurchase?.documentName || "",
         documentUrl: url, documentPath: path, extractionConfidence: extracted?.confidence || editingPurchase?.extractionConfidence || "",
         extractionWarnings: extracted?.warnings || editingPurchase?.extractionWarnings || [], notes: notes.trim(),
@@ -294,7 +311,7 @@ export default function PurchasesModule() {
           tx.set(payableRefs[index], {
             supplierId: purchase.supplierId, supplierName: purchase.supplierName, supplierCnpj: purchase.supplierCnpj || "",
             description: (purchase.description || "Compra " + purchase.number) + (rows.length > 1 ? " · Boleto " + (row.number || (index + 1) + "/" + rows.length) : ""),
-            amount: Number(row.amount || 0), dueDate: row.dueDate || purchase.dueDate || today(), paymentMethod: "boleto",
+            amount: Number(row.amount || 0), dueDate: row.dueDate || purchase.dueDate || today(), paymentMethod: purchase.paymentMode === "installments" ? "boleto" : "cash",
             status: "pending", purchaseId: purchase.id, purchaseNumber: purchase.number,
             boletoNumber: row.number || "", digitableLine: row.digitableLine || "",
             documentUrl: row.documentUrl || purchase.documentUrl || "", documentName: row.documentName || purchase.documentName || "",
@@ -423,6 +440,15 @@ export default function PurchasesModule() {
           <p className="text-right text-xs font-bold text-slate-500 sm:col-span-12">Subtotal: {money(item.quantity*item.unitPrice)}</p>
         </div>)}
       </div>
+      <div className="grid gap-3 rounded-xl border bg-white p-4 dark:bg-slate-900 sm:grid-cols-2">
+        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Forma de pagamento
+          <select value={paymentMode} onChange={e => { const next = e.target.value as "cash" | "installments"; setPaymentMode(next); if (next === "cash") setInstallments([]); }} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800">
+            <option value="cash">À vista</option><option value="installments">Parcelado em boletos</option>
+          </select>
+        </label>
+        {paymentMode === "installments" ? <div className="flex items-end gap-2"><label className="flex-1 text-xs font-semibold text-slate-600 dark:text-slate-300">Quantidade de parcelas<input type="number" min="1" max="48" value={installmentCount} onChange={e=>setInstallmentCount(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label><button type="button" onClick={generateInstallments} className="rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-bold text-white">Gerar parcelas iguais</button></div> : <p className="self-end text-xs text-slate-500">O valor integral será lançado uma única vez em Contas a Pagar após a aprovação.</p>}
+      </div>
+      {paymentMode === "installments" ? (
       <section className="space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 dark:border-indigo-900 dark:bg-indigo-950/20">
         <div className="flex flex-wrap items-center justify-between gap-2"><div><h4 className="font-bold text-sm">Boletos vinculados a esta nota fiscal</h4><p className="text-xs text-slate-500">Cadastre cada parcela uma única vez. Na aprovação, cada boleto gera sua própria conta a pagar.</p></div><button type="button" onClick={() => setInstallments(rows => [...rows, { id: String(Date.now()) + Math.random(), number: "", digitableLine: "", amount: 0, dueDate }])} className="inline-flex items-center gap-1 rounded-lg border bg-white px-3 py-2 text-xs font-bold dark:bg-slate-900"><Plus className="h-3.5 w-3.5"/> Adicionar boleto</button></div>
         {installments.length === 0 && <p className="text-xs text-slate-500">Nenhum boleto cadastrado. Se não houver parcelas, a aprovação criará uma conta a pagar pelo total da nota.</p>}
@@ -435,6 +461,7 @@ export default function PurchasesModule() {
         </div>)}
         {installments.length > 0 && <p className="text-xs font-bold text-indigo-700">Total dos boletos: {money(installments.reduce((sum,row)=>sum+Math.max(0,Number(row.amount)||0),0))} · Total da nota: {money(total)}</p>}
       </section>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-3"><label className="text-xs font-bold">Impostos / taxas (R$)<input type="number" min="0" step="0.01" value={tax} onChange={e=>setTax(Number(e.target.value))} className="mt-1 w-full rounded-lg border p-2.5 text-sm"/></label><div className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800"><p className="text-xs text-slate-500">Subtotal</p><strong>{money(subtotal)}</strong></div><div className="rounded-lg bg-blue-50 p-3 text-sm dark:bg-blue-950/30"><p className="text-xs text-blue-700">Total da compra</p><strong className="text-lg">{money(total)}</strong></div></div>
       <label className="block text-xs font-bold">Observações<textarea rows={2} value={notes} onChange={e=>setNotes(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-950"/></label>
       {message && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
