@@ -6,7 +6,7 @@ import { AlertCircle, Camera, CheckCircle2, FileText, Loader2, Plus, ScanSearch,
 
 type Supplier = { id: string; name: string; nif?: string; email?: string; phone?: string };
 type PurchaseItem = { description: string; sku: string; quantity: number; unit: string; unitPrice: number; total: number; supplierCatalogId?: string; supplierCatalogName?: string; supplierCatalogCategory?: string };
-type SupplierCatalogItem = { id: string; supplier: string; code?: string; name: string; category?: string; material?: string; unit?: string; price?: number; lengthMm?: number; color?: string };
+type SupplierCatalogItem = { id: string; supplier: string; code?: string; sku?: string; name: string; category?: string; material?: string; unit?: string; price?: number; lengthMm?: number; color?: string };
 type PurchaseInstallment = { id: string; number: string; digitableLine: string; amount: number; dueDate: string; documentName?: string; documentUrl?: string; documentPath?: string };
 type ExtractedDocument = {
   documentType?: string; supplierName?: string; supplierCnpj?: string; documentNumber?: string; accessKey?: string;
@@ -29,6 +29,7 @@ export default function PurchasesModule() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [supplierCatalog, setSupplierCatalog] = useState<SupplierCatalogItem[]>([]);
+  const [productCatalog, setProductCatalog] = useState<SupplierCatalogItem[]>([]);
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [supplierName, setSupplierName] = useState("");
   const [supplierCnpj, setSupplierCnpj] = useState("");
@@ -59,12 +60,15 @@ export default function PurchasesModule() {
   useEffect(() => {
     const a = onSnapshot(collection(db, "suppliers"), snap => setSuppliers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier))));
     const catalogUnsub = onSnapshot(collection(db, "supplier_catalog"), snap => setSupplierCatalog(snap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierCatalogItem))), err => setError("Falha ao carregar catálogo dos fornecedores: " + err.message));
+    const productsCatalogUnsub = onSnapshot(collection(db, "catalog"), snap => setProductCatalog(current => [...current.filter(row => row.supplier === "__registry_products__" || row.supplier === "__registry_items__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), supplier: String(d.data().supplier || "Catálogo de produtos") } as SupplierCatalogItem))]), err => setError("Falha ao carregar o cadastro de produtos: " + err.message));
+    const registryProductsUnsub = onSnapshot(collection(db, "registry_products"), snap => setProductCatalog(current => [...current.filter(row => row.supplier !== "__registry_products__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), code: String(d.data().code || ""), supplier: "__registry_products__" } as SupplierCatalogItem))]), err => setError("Falha ao carregar produtos cadastrados: " + err.message));
+    const registryItemsUnsub = onSnapshot(collection(db, "registry_items"), snap => setProductCatalog(current => [...current.filter(row => row.supplier !== "__registry_items__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), code: String(d.data().code || ""), supplier: "__registry_items__" } as SupplierCatalogItem))]), err => setError("Falha ao carregar itens cadastrados: " + err.message));
     const b = onSnapshot(collection(db, "purchase_orders"), snap => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() } as Purchase));
       rows.sort((x, y) => (y.createdAt || "").localeCompare(x.createdAt || ""));
       setPurchases(rows);
     }, err => setError("Falha ao carregar compras: " + err.message));
-    return () => { a(); b(); catalogUnsub(); };
+    return () => { a(); b(); catalogUnsub(); productsCatalogUnsub(); registryProductsUnsub(); registryItemsUnsub(); };
   }, []);
 
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + Math.max(0, Number(item.quantity) || 0) * Math.max(0, Number(item.unitPrice) || 0), 0), [items]);
@@ -84,10 +88,12 @@ export default function PurchasesModule() {
     if (total <= 0) { setError("Informe os itens e o valor total da nota antes de gerar as parcelas."); return; }
     const baseAmount = Math.floor((total / count) * 100) / 100;
     const rows = Array.from({ length: count }, (_, index) => {
-      const due = new Date(dueDate + "T12:00:00");
-      due.setMonth(due.getMonth() + index);
+      const [year, month, day] = dueDate.split("-").map(Number);
+      const targetMonth = new Date(year, month - 1 + index, 1);
+      const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
+      targetMonth.setDate(Math.min(day || 1, lastDay));
       const amount = index === count - 1 ? Math.round((total - baseAmount * (count - 1)) * 100) / 100 : baseAmount;
-      return { id: `parcela-${Date.now()}-${index}`, number: `${index + 1}/${count}`, digitableLine: "", amount, dueDate: due.toISOString().slice(0, 10) };
+      return { id: `parcela-${Date.now()}-${index}`, number: `${index + 1}/${count}`, digitableLine: "", amount, dueDate: `${targetMonth.getFullYear()}-${String(targetMonth.getMonth() + 1).padStart(2, "0")}-${String(targetMonth.getDate()).padStart(2, "0")}` };
     });
     setInstallments(rows); setMessage(`${count} parcela(s) gerada(s). Confira valores e vencimentos antes de salvar.`); setError("");
   };
@@ -95,10 +101,10 @@ export default function PurchasesModule() {
   const normalizeText = (value: string) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const supplierCatalogFor = (supplier: string) => supplierCatalog.filter(row => normalizeText(row.supplier) === normalizeText(supplier));
   const findCatalogMatch = (item: PurchaseItem, supplier: string) => {
-    const candidates = supplierCatalogFor(supplier);
+    const candidates = [...supplierCatalogFor(supplier), ...productCatalog];
     const code = normalizeText(item.sku || "");
     const name = normalizeText(item.description);
-    return candidates.find(row => code && normalizeText(row.code || "") === code)
+    return candidates.find(row => code && normalizeText(row.code || row.sku || "") === code)
       || candidates.find(row => name && normalizeText(row.name) === name)
       || null;
   };
@@ -116,7 +122,7 @@ export default function PurchasesModule() {
       const match = findCatalogMatch(item, supplierName);
       return match ? { ...item, supplierCatalogId: match.id, supplierCatalogName: match.name, supplierCatalogCategory: match.category || "", sku: match.code || item.sku, unit: match.unit || item.unit } : item;
     }));
-  }, [supplierName, supplierCatalog]);
+  }, [supplierName, supplierCatalog, productCatalog]);
   const startEdit = (purchase: Purchase) => {
     if (!["pending", "draft"].includes(purchase.status)) return;
     setEditingPurchase(purchase); setSelectedSupplier(purchase.supplierId || ""); setSupplierName(purchase.supplierName || "");
