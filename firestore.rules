@@ -65,10 +65,10 @@ service cloud.firestore {
     match /projects/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /user_suggestions/{id} { allow read: if canOperate(); allow create: if canOperate(); allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /invoices/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial() || canManageFinance(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /catalog/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /supplier_catalog/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /registry_items/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /registry_products/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /catalog/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /supplier_catalog/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /registry_items/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /registry_products/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /registry_services/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /payment_methods/{id} { allow read: if canOperate(); allow create, update, delete: if canManageFinance(); }
     match /measurement_sheets/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
