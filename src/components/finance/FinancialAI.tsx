@@ -109,10 +109,6 @@ export default function FinancialAI() {
       await uploadBytes(ref(storage, storagePath), file, { contentType: file.type || "application/pdf", customMetadata: { uploadedBy: user.uid, source: "financial-ai" } });
       const documentUrl = await getDownloadURL(ref(storage, storagePath));
       const subtotal = Math.round((amount - taxes + Number.EPSILON) * 100) / 100;
-      const extractedItems = Array.isArray(result.items) ? result.items.filter(item => String(item.description || "").trim() && Number(item.quantity) > 0).map(item => ({
-        description: String(item.description).slice(0, 300), sku: String(item.sku || "").slice(0, 80), quantity: Math.max(0.01, Number(item.quantity) || 1),
-        unit: String(item.unit || "un").slice(0, 20), unitPrice: Math.max(0, Number(item.unitPrice) || 0), total: Math.max(0, Number(item.total) || 0)
-      })) : [];
       const items = extractedItems.length ? extractedItems : [{ description: description.trim() || "Total do documento", sku: "", quantity: 1, unit: "un", unitPrice: subtotal, total: subtotal }];
       const number = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
       await addDoc(collection(db, "purchase_orders"), {
