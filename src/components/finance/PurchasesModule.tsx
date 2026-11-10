@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, updateDoc, runTransaction, serverTimestamp, getDocs } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage } from "../../firebase";
 import { AlertCircle, Camera, CheckCircle2, FileText, Loader2, Plus, ScanSearch, ShoppingCart, Upload, Pencil, X } from "lucide-react";
 
 type Supplier = { id: string; name: string; nif?: string; email?: string; phone?: string };
-type PurchaseItem = { description: string; sku: string; quantity: number; unit: string; unitPrice: number; total: number; supplierCatalogId?: string; supplierCatalogName?: string };
+type PurchaseItem = { description: string; sku: string; quantity: number; unit: string; unitPrice: number; total: number; supplierCatalogId?: string; supplierCatalogName?: string; supplierCatalogCategory?: string };
 type SupplierCatalogItem = { id: string; supplier: string; code?: string; name: string; category?: string; material?: string; unit?: string; price?: number; lengthMm?: number; color?: string };
 type PurchaseInstallment = { id: string; number: string; digitableLine: string; amount: number; dueDate: string; documentName?: string; documentUrl?: string; documentPath?: string };
 type ExtractedDocument = {
@@ -91,10 +91,18 @@ export default function PurchasesModule() {
   const mapItemToCatalog = (index: number, catalogId: string) => {
     const match = supplierCatalog.find(row => row.id === catalogId);
     setItems(current => current.map((item, i) => i !== index ? item : {
-      ...item, supplierCatalogId: match?.id || "", supplierCatalogName: match?.name || "",
+      ...item, supplierCatalogId: match?.id || "", supplierCatalogName: match?.name || "", supplierCatalogCategory: match?.category || "",
       sku: match?.code || item.sku, unit: match?.unit || item.unit
     }));
   };
+  useEffect(() => {
+    if (!supplierName || !supplierCatalog.length) return;
+    setItems(current => current.map(item => {
+      if (item.supplierCatalogId) return item;
+      const match = findCatalogMatch(item, supplierName);
+      return match ? { ...item, supplierCatalogId: match.id, supplierCatalogName: match.name, supplierCatalogCategory: match.category || "", sku: match.code || item.sku, unit: match.unit || item.unit } : item;
+    }));
+  }, [supplierName, supplierCatalog]);
   const startEdit = (purchase: Purchase) => {
     if (!["pending", "draft"].includes(purchase.status)) return;
     setEditingPurchase(purchase); setSelectedSupplier(purchase.supplierId || ""); setSupplierName(purchase.supplierName || "");
@@ -292,13 +300,24 @@ export default function PurchasesModule() {
       const aggregates = new Map<string, PurchaseItem>();
       (purchase.items || []).forEach(item => {
         if (!item.description?.trim() || Number(item.quantity) <= 0) return;
-        const identity = (item.sku?.trim() || item.description).normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 90);
+        const stockName = item.supplierCatalogName || item.description;
+        const identity = (item.sku?.trim() || stockName).normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 90);
         if (!identity) return;
         const existing = aggregates.get(identity);
-        aggregates.set(identity, existing ? { ...existing, quantity: existing.quantity + Number(item.quantity), total: existing.total + Number(item.total || 0) } : { ...item, sku: identity, quantity: Number(item.quantity) });
+        aggregates.set(identity, existing ? { ...existing, quantity: existing.quantity + Number(item.quantity), total: existing.total + Number(item.total || 0) } : { ...item, description: stockName, sku: item.sku?.trim() || identity, quantity: Number(item.quantity) });
       });
       const entries = [...aggregates.entries()];
-      const stockRefs = entries.map(([key]) => doc(db, "inventory_items", key));
+      const inventorySnapshot = await getDocs(collection(db, "inventory_items"));
+      const stockRefs = entries.map(([key, item]) => {
+        const match = inventorySnapshot.docs.find(d => {
+          const data = d.data();
+          const sameCatalog = item.supplierCatalogId && data.supplierCatalogId === item.supplierCatalogId;
+          const sameSku = item.sku && String(data.sku || "").trim().toLowerCase() === item.sku.trim().toLowerCase();
+          const sameName = String(data.name || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase() === String(item.description || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+          return Boolean(sameCatalog || sameSku || sameName);
+        });
+        return doc(db, "inventory_items", match?.id || key);
+      });
       const movementRefs = entries.map(() => doc(collection(db, "inventory_movements")));
       await runTransaction(db, async tx => {
         const current = await tx.get(purchaseRef);
@@ -311,6 +330,9 @@ export default function PurchasesModule() {
           const currentQty = snap.exists() ? Number(snap.data().quantity || 0) : 0;
           tx.set(stockRefs[i], {
             name: item.description, sku: item.sku || key, unit: item.unit || "un",
+            category: item.supplierCatalogCategory || (snap.exists() ? snap.data().category || "" : ""),
+            supplierCatalogId: item.supplierCatalogId || (snap.exists() ? snap.data().supplierCatalogId || "" : ""),
+            supplierName: purchase.supplierName, lastUnitCost: Number(item.unitPrice || 0),
             quantity: currentQty + Number(item.quantity || 0),
             reservedQuantity: Number(snap.exists() ? snap.data().reservedQuantity || 0 : 0),
             minimumStock: Number(snap.exists() ? snap.data().minimumStock || 0 : 0),
@@ -318,6 +340,7 @@ export default function PurchasesModule() {
           }, { merge: true });
           tx.set(movementRefs[i], {
             itemId: stockRefs[i].id, itemName: item.description, type: "in", quantity: Number(item.quantity || 0),
+            unitCost: Number(item.unitPrice || 0), supplierCatalogId: item.supplierCatalogId || "",
             reason: "Recebimento da compra " + purchase.number, reference: purchase.id,
             supplierId: purchase.supplierId, supplierName: purchase.supplierName,
             createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || ""
