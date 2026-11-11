@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 
 interface ImageLightboxProps {
@@ -11,8 +11,10 @@ interface ImageLightboxProps {
 export default function ImageLightbox({ images, initialIndex = 0, onClose, alt = "Foto do item" }: ImageLightboxProps) {
   const [index, setIndex] = useState(Math.min(Math.max(initialIndex, 0), Math.max(images.length - 1, 0)));
   const [zoom, setZoom] = useState(1);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    closeButtonRef.current?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
       if (event.key === "ArrowLeft") setIndex((current) => (current - 1 + images.length) % images.length);
@@ -33,7 +35,7 @@ export default function ImageLightbox({ images, initialIndex = 0, onClose, alt =
         <span className="min-w-14 text-center text-xs font-semibold text-white">{Math.round(zoom * 100)}%</span>
         <button type="button" aria-label="Aumentar zoom" onClick={() => setZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))} className="rounded-full bg-white/10 p-3 text-white hover:bg-white/20"><ZoomIn className="h-5 w-5" /></button>
         <button type="button" aria-label="Redefinir zoom" onClick={() => setZoom(1)} className="rounded-full bg-white/10 p-3 text-white hover:bg-white/20"><RotateCcw className="h-5 w-5" /></button>
-        <button type="button" aria-label="Fechar" onClick={onClose} className="rounded-full bg-white/15 p-3 text-white hover:bg-rose-600"><X className="h-5 w-5" /></button>
+        <button ref={closeButtonRef} type="button" aria-label="Fechar" onClick={onClose} className="rounded-full bg-white/15 p-3 text-white hover:bg-rose-600"><X className="h-5 w-5" /></button>
       </div>
       {images.length > 1 && <button type="button" aria-label="Foto anterior" onClick={(event) => { event.stopPropagation(); setIndex((current) => (current - 1 + images.length) % images.length); }} className="absolute left-2 z-10 rounded-full bg-white/10 p-3 text-white hover:bg-white/20 sm:left-6"><ChevronLeft className="h-7 w-7" /></button>}
       <div className="flex h-full w-full items-center justify-center overflow-auto" onClick={(event) => event.stopPropagation()}>
