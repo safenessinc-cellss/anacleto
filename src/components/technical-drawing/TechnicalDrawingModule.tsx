@@ -344,7 +344,6 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     setIsLoading(true);
     let generated: TechnicalDrawing | null = null;
-    let usedLocalFallback = false;
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Entre na sua conta para gerar e salvar projetos técnicos.");
@@ -384,9 +383,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         budget: responseBody.budget,
       };
     } catch (error) {
-      console.error("Technical drawing AI unavailable; generating local draft:", error);
-      generated = buildLocalTechnicalDrawing(inputPrompt);
-      usedLocalFallback = true;
+      console.error("Technical drawing AI request failed:", error);
+      showToast(error instanceof Error ? error.message : "A IA não conseguiu gerar o desenho. Nenhum desenho fictício foi criado.", "error");
+      setIsLoading(false);
+      return;
     }
 
     try {
@@ -408,24 +408,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (!presetPrompt) setPrompt("");
 
       try {
-        const pdfRes = buildTechnicalDrawingPdf(generated, senderConfig);
-        const savedWithPdf: TechnicalDrawing = {
-          ...generated,
-          pdfDataUri: pdfRes.dataUri,
-          pdfFileName: pdfRes.fileName,
-          pdfGeneratedAt: new Date().toISOString(),
-          pdfFileSizeKb: pdfRes.sizeKb,
-          updatedAt: new Date().toISOString(),
-        };
-        setDrawing(savedWithPdf);
-        if (auth.currentUser) {
-          await setDoc(doc(db, "technical_drawings", savedWithPdf.id), savedWithPdf);
-          showToast(usedLocalFallback
-            ? "Desenho preliminar gerado localmente e salvo. Revise as medidas antes de fabricar."
-            : "Desenho técnico, despiece e PDF gerados e salvos.", "success");
-        } else {
-          showToast("Desenho gerado localmente. Entre novamente para salvar no projeto.", "warning");
-        }
+        setDrawing(generated);
+        showToast("Desenho gerado. Revise e use “Salvar PDF” para armazenar somente o documento final.", "success");
       } catch (saveError) {
         console.error("Drawing PDF / persistence error:", saveError);
         showToast(usedLocalFallback
