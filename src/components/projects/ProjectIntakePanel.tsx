@@ -54,7 +54,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
           const parsed = JSON.parse(content);
           if (parsed && typeof parsed === "object") imported = parsed.project && typeof parsed.project === "object" ? parsed.project : parsed;
         } else {
-          textImports.push("[Arquivo: " + file.name + "]\\n" + content.slice(0, 12000));
+          textImports.push("[Arquivo: " + file.name + "]\n" + content.slice(0, 12000));
         }
       }
 
@@ -64,14 +64,14 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         const response = await fetch("/api/ai/project-intake", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name: name.trim(), description: [description.trim(), ...textImports].filter(Boolean).join("\n\n"), sourceUrl: sourceUrl.trim() })
+          body: JSON.stringify({ name: name.trim(), description: [description.trim(), ...textImports, Object.keys(imported).length ? "[JSON importado] " + JSON.stringify(imported).slice(0, 12000) : ""].filter(Boolean).join("\n\n"), sourceUrl: sourceUrl.trim() })
         });
         const data = await response.json().catch(() => null);
         if (!response.ok) throw new Error(data?.error || `A IA não conseguiu interpretar o projeto (${response.status}).`);
         aiData = data?.project || {};
       }
 
-      const projectName = String(name.trim() || imported.name || aiData.name || files[0]?.name.replace(/\.[^.]+$/, "") || "Novo projeto").slice(0, 180);
+      const projectName = String(name.trim() || imported.name || aiData.name || files[0]?.name.replace(/\.[^.]+$/, "") || (sourceUrl.trim() ? new URL(sourceUrl.trim()).hostname : "") || "Novo projeto").slice(0, 180);
       const assets: IntakeAsset[] = [];
       for (const file of files) {
         if (file.size > MAX_FILE_SIZE) throw new Error(`O arquivo ${file.name} excede 20 MB.`);
@@ -105,7 +105,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         category: String(imported.category || aiData.category || "Projeto"),
         status: String(imported.status || "Em análise"),
         client: String(client.trim() || imported.client || aiData.client || "").slice(0, 180),
-        notes: [description.trim() || imported.notes || aiData.summary || "", ...textImports].filter(Boolean).join("\\n\\n").slice(0, 12000),
+        notes: [description.trim() || imported.notes || aiData.summary || "", ...textImports].filter(Boolean).join("\n\n").slice(0, 12000),
         width: Number(imported.width || aiData.width) || 0,
         height: Number(imported.height || aiData.height) || 0,
         quantity: Math.max(1, Number(imported.quantity || aiData.quantity) || 1),
