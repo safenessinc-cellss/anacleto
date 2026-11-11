@@ -68,6 +68,12 @@ const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
   }
 };
 
+const requireQuoteRole: express.RequestHandler = (_req, res, next) => {
+  const user = res.locals.firebaseUser as { role?: string } | undefined;
+  if (user && ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"].includes(user.role || "")) return next();
+  return res.status(403).json({ error: "Seu perfil não tem autorização para operações comerciais e orçamentos." });
+};
+
 const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
   const user = res.locals.firebaseUser as { role?: string } | undefined;
   if (user && ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role || "")) return next();
@@ -181,7 +187,7 @@ function hasVerifiedCatalogPrice(row: any): boolean {
 // ----------------------------------------------------
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
-app.post("/api/ai/quote-agent", requireFirebaseAuth, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
+app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
   try {
     const message = String(req.body?.message || "").trim();
     const requestedQuote = req.body?.currentQuote || {};
@@ -278,7 +284,7 @@ Regras obrigatórias:
   }
 });
 
-app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
+app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
   try {
     const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
