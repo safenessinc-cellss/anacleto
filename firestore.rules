@@ -90,6 +90,18 @@ service cloud.firestore {
       allow update: if (canManageCommercial() || canManageQuality() || canManageProduction()) && !('approvedSnapshotId' in resource.data);
       allow delete: if canManageCommercial() && !('approvedSnapshotId' in resource.data);
     }
+    match /drawing_jobs/{id} {
+      allow create: if (canManageCommercial() || canManageQuality() || canManageProduction())
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.status == 'PROCESSING';
+      allow read: if (signedIn() && resource.data.userUid == request.auth.uid)
+        || owner() || hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade','producao']);
+      allow update: if (signedIn() && resource.data.userUid == request.auth.uid
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','result','completedAt','error','updatedAt']))
+        || owner();
+      allow delete: if owner();
+    }
     match /approved_snapshots/{id} {
       allow read: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
       allow create: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
