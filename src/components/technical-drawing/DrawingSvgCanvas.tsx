@@ -165,6 +165,7 @@ export default function DrawingSvgCanvas({
   </g>;
 
   const renderFinal = () => {
+    const visualElements = Array.isArray((drawing as any).visualElements) ? (drawing as any).visualElements : [];
     const x = 285, y = 145, w = 430, h = 330;
     const side = Math.max(28, Math.min(95, D / Math.max(W, H, D) * 170));
     const frame = "#cbd5e1";
@@ -178,7 +179,30 @@ export default function DrawingSvgCanvas({
       <polygon points={`${x},${y} ${x+side},${y-side/2} ${x+w+side},${y-side/2} ${x+w},${y}`} fill="#64748b" fillOpacity=".35" stroke={frame} strokeWidth="1.5"/>
       <polygon points={`${x+w},${y} ${x+w+side},${y-side/2} ${x+w+side},${y+h-side/2} ${x+w},${y+h}`} fill="#334155" fillOpacity=".75" stroke={frame} strokeWidth="1.5"/>
       <rect x={x} y={y} width={w} height={h} fill="#0f172a" stroke={frame} strokeWidth="4" rx="2"/>
-      {isWindow ? <g>
+      {visualElements.length > 0 ? <g>
+        {visualElements.map((element: any, index: number) => {
+          const type = String(element.type || "rect").toLowerCase();
+          const stroke = element.stroke || "#cbd5e1";
+          const fill = element.fill || "none";
+          const sw = Math.max(0.5, Math.min(12, Number(element.strokeWidth) || 2));
+          const opacity = Math.max(0, Math.min(1, Number(element.opacity ?? 1)));
+          const label = String(element.label || "");
+          if (type === "line") return <g key={element.id || index} opacity={opacity}>
+            <line x1={x + Number(element.x1 || 0) * w / 1000} y1={y + Number(element.y1 || 0) * h / 1000} x2={x + Number(element.x2 || 0) * w / 1000} y2={y + Number(element.y2 || 0) * h / 1000} stroke={stroke} strokeWidth={sw} />
+            {label && <text x={x + Number(element.x1 || 0) * w / 1000} y={y + Number(element.y1 || 0) * h / 1000 - 5} fill="#f8fafc" fontSize="10">{label}</text>}
+          </g>;
+          if (type === "circle") return <circle key={element.id || index} cx={x + Number(element.cx || 0) * w / 1000} cy={y + Number(element.cy || 0) * h / 1000} r={Math.max(1, Number(element.r) || 8) * Math.min(w, h) / 1000} fill={fill} stroke={stroke} strokeWidth={sw} opacity={opacity} />;
+          if (type === "polygon") {
+            const points = Array.isArray(element.points) ? element.points.map((p: any) => (x + Number(p.x || 0) * w / 1000) + "," + (y + Number(p.y || 0) * h / 1000)).join(" ") : "";
+            return <polygon key={element.id || index} points={points} fill={fill} stroke={stroke} strokeWidth={sw} opacity={opacity} />;
+          }
+          if (type === "text") return <text key={element.id || index} x={x + Number(element.x || 0) * w / 1000} y={y + Number(element.y || 0) * h / 1000} fill={element.fill || "#f8fafc"} fontSize={Math.max(7, Math.min(22, Number(element.fontSize) || 12))} fontWeight={element.fontWeight || "normal"}>{String(element.text || "")}</text>;
+          return <g key={element.id || index} opacity={opacity}>
+            <rect x={x + Number(element.x || 0) * w / 1000} y={y + Number(element.y || 0) * h / 1000} width={Math.max(0, Number(element.width) || 0) * w / 1000} height={Math.max(0, Number(element.height) || 0) * h / 1000} rx={Math.max(0, Number(element.rx) || 0)} fill={fill} stroke={stroke} strokeWidth={sw} />
+            {label && <text x={x + Number(element.x || 0) * w / 1000 + 4} y={y + Number(element.y || 0) * h / 1000 + 14} fill="#f8fafc" fontSize="10">{label}</text>}
+          </g>;
+        })}
+      </g> : (isWindow ? <g>
         <rect x={x+14} y={y+14} width={w/2-19} height={h-28} fill="#38bdf8" fillOpacity=".2" stroke="#94a3b8" strokeWidth="5"/>
         <rect x={x+w/2+5} y={y+14} width={w/2-19} height={h-28} fill="#38bdf8" fillOpacity=".2" stroke="#94a3b8" strokeWidth="5"/>
         <line x1={x+w/2} y1={y+8} x2={x+w/2} y2={y+h-8} stroke="#e2e8f0" strokeWidth="5"/>
@@ -203,7 +227,7 @@ export default function DrawingSvgCanvas({
         <rect x={x+w-81} y={y+52} width="16" height={h-70} fill="#735728" opacity=".8"/>
       </g> : <g>
         {pieces.slice(0, 8).map((piece, index) => <rect key={piece.id || index} x={x+16+(index%4)*98} y={y+20+Math.floor(index/4)*145} width="82" height="120" rx="2" fill={piece.color || "#38bdf8"} fillOpacity=".28" stroke={piece.color || "#38bdf8"} strokeWidth="2"/>)}
-      </g>}
+      </g>)}
       {dimensionsVisible && <>
         {dimensionLabel(`LARGURA ${fmt(W)} ${unit}`, x, y+h+36, x+w, y+h+36, x+w/2, y+h+57)}
         {dimensionLabel(`ALTURA ${fmt(H)} ${unit}`, x-28, y, x-28, y+h, x-38, y+h/2, "end")}
