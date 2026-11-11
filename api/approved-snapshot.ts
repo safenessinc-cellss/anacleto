@@ -261,11 +261,11 @@ export default async function handler(req: any, res: any) {
           if (match.price === undefined || match.price === null || String(match.price).trim() === "" || !Number.isFinite(catalogPrice) || catalogPrice < 0 || catalogPrice !== price) {
             throw new Error("Preço não corresponde ao catálogo atual para " + (item.sku || match.id) + ".");
           }
-          return { ...item, quantity, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice, catalogItemId: match.id, sku: String(match.sku || match.code || item.sku || "") };
+          return { ...item, quantity, unitPrice: catalogPrice, subtotal: Number((quantity * catalogPrice).toFixed(2)), priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice, catalogItemId: match.id, sku: String(match.sku || match.code || item.sku || "") };
         }
         if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O item " + item.description + " tem preço pendente.");
         if (!canApproveManualPrice(user)) throw new Error("Somente direção/Financeiro pode aprovar manualmente preços sem SKU cadastrado.");
-        return { ...item, quantity, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
+        return { ...item, quantity, subtotal: Number((quantity * price).toFixed(2)), priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
       const subtotal = Number(reviewedItems.reduce((sum: number, item: any) => sum + item.quantity * item.unitPrice, 0).toFixed(2));
       const discountRate = Number(source.discountRate || 0);
