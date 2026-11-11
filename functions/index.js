@@ -98,7 +98,9 @@ exports.priceTableMonthlyReview = functions.pubsub
     for (const email of recipients) {
       const id = "price-monthly-review-" + period.replace("-", "") + "-" + Buffer.from(email).toString("hex");
       const ref = db.collection("notifications").doc(id);
-      batch.set(ref, {
+      const existing = await ref.get();
+      if (existing.exists) continue;
+      batch.create(ref, {
         type: "price_monthly_review",
         targetEmail: email,
         title: "Revisão mensal da tabela de preços",
@@ -106,7 +108,7 @@ exports.priceTableMonthlyReview = functions.pubsub
         createdAt: now.toISOString(),
         read: false,
         period,
-      }, { merge: true });
+      });
     }
     await batch.commit();
     return null;
