@@ -19,7 +19,7 @@ app.use(express.json({ limit: "16mb" }));
 const PORT = 3000;
 
 // Vercel AI Gateway supplies authentication in previews and deployments.
-const aiModel = gateway("openai/gpt-4o-mini");
+const aiModel = gateway(process.env.ANACLETO_AI_MODEL || "google/gemini-3.8-flash");
 
 const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
 const ownerEmail = "safeness.c.a@gmail.com";
@@ -150,7 +150,7 @@ app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
 // ----------------------------------------------------
 
 function normalizeCatalogName(value: unknown) {
-  return String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 function findExactCatalogItem(item: any, catalog: any[]) {
   const sku = String(item?.sku || item?.code || "").trim().toLowerCase();
