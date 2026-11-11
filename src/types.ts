@@ -28,6 +28,9 @@ export interface QuoteItem {
   itemCategory?: string;
   itemDimensions?: string;
   sku?: string;
+  catalogItemId?: string;
+  priceSource?: "catalog" | "pending" | "existing" | "manual";
+  priceValidation?: string;
 }
 
 export interface DeliveryEvidence {
@@ -79,6 +82,8 @@ export interface Quote {
   approvedSnapshotId?: string;
   approvedAt?: string;
   approvedBy?: { uid: string; email: string; role: string };
+  snapshotContentHash?: string;
+  senderSnapshot?: SenderConfig;
   // Legacy compatibility fields
   clientNif?: string;
   language?: string;
@@ -187,6 +192,8 @@ export interface TechnicalDrawing {
   approvedSnapshotId?: string;
   approvedAt?: string;
   approvedBy?: { uid: string; email: string; role: string };
+  snapshotContentHash?: string;
+  senderSnapshot?: SenderConfig;
   // Geometria vetorial específica gerada a partir do prompt, usada na tela e no PDF.
   visualElements?: Array<Record<string, any>>;
   modelDescription?: string;
