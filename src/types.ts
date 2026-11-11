@@ -24,6 +24,7 @@ export interface QuoteItem {
   itemId?: string;
   catalogSource?: string;
   itemPhotoUrl?: string;
+  itemPhotoUrls?: string[];
   itemCategory?: string;
   itemDimensions?: string;
   sku?: string;
