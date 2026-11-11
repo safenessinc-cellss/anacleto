@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 // import estático de vite eliminado - se usa import dinámico en desarrollo
 import { generateText, gateway } from "ai";
 import { google } from "googleapis";
-import firebaseConfig from "./firebase-applet-config.json";
+import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
 // Load .env.local first if available, then fallback to .env
 dotenv.config({ path: ".env.local" });
