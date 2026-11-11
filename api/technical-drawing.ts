@@ -4,6 +4,7 @@ import { parseAIJson } from "../src/server/ai-json";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data";
 import { recordAIAudit } from "../src/server/ai-audit";
 import { withDraftVectorWatermark } from "../src/server/drawing-vector";
+import { verifyServiceRequest, SERVICE_SIGNATURE_HEADER, SERVICE_TIMESTAMP_HEADER } from "../src/server/service-auth";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
@@ -193,6 +194,15 @@ export default async function handler(req: any, res: any) {
     }
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return json(res, 400, { error: "Corpo da solicitação inválido.", code: "INVALID_BODY" });
+    }
+    const serviceSignature = String(req.headers?.[SERVICE_SIGNATURE_HEADER] || "");
+    if (serviceSignature) {
+      const validServiceSignature = verifyServiceRequest({
+        method: req.method, path: "/generate",
+        timestamp: String(req.headers?.[SERVICE_TIMESTAMP_HEADER] || ""),
+        signature: serviceSignature, body: JSON.stringify(body),
+      });
+      if (!validServiceSignature) return json(res, 401, { error: "Assinatura inter-serviço inválida.", code: "INVALID_SERVICE_SIGNATURE" });
     }
 
     prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
