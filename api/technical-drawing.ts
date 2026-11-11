@@ -279,6 +279,10 @@ export default async function handler(req: any, res: any) {
     if (drawing.steps.length !== 5) throw new Error("A IA não retornou as cinco fases do desenho.");
     drawing.assemblyInstructions = Array.isArray(drawing.assemblyInstructions) ? drawing.assemblyInstructions : [];
     drawing.budget = buildTechnicalBudget(drawing.pieces, catalog);
+    drawing.isDraft = true;
+    drawing.status = "PRELIMINARY_CONTINGENCY";
+    drawing.draftStatus = "preliminary";
+    drawing.draftLabel = "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN";
     const requiredArrays = ["measurementPlan", "cuttingPlan", "manufacturingSteps", "qualityChecklist", "assumptions"];
     for (const field of requiredArrays) {
       if (!Array.isArray(drawing[field]) || drawing[field].length === 0) {
@@ -307,6 +311,10 @@ export default async function handler(req: any, res: any) {
         return json(res, 200, {
           ...fallback,
           budget: buildTechnicalBudget(fallback.pieces, catalog),
+          isDraft: true,
+          status: "PRELIMINARY_CONTINGENCY",
+          draftStatus: "preliminary",
+          draftLabel: "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN",
           warning: "A IA está temporariamente indisponível. Foi criado um desenho preliminar local; confira todas as medidas antes de fabricar.",
           fallbackReason: stage,
         });
