@@ -410,15 +410,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       setCurrentStep(1);
       if (!presetPrompt) setPrompt("");
 
-      try {
-        setDrawing(generated);
-        showToast("Desenho gerado. Revise e use “Salvar PDF” para armazenar somente o documento final.", "success");
-      } catch (saveError) {
-        console.error("Drawing PDF / persistence error:", saveError);
-        showToast(usedLocalFallback
-          ? "Desenho preliminar gerado localmente, mas não foi possível salvar o PDF."
-          : "Desenho gerado; houve uma falha ao salvar o PDF no projeto.", "warning");
-      }
+      setDrawing(generated);
+      showToast("Desenho gerado. Revise e use “Salvar somente PDF” para armazenar o documento final.", "success");
     } finally {
       setIsLoading(false);
     }
@@ -476,7 +469,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 text-xs font-bold rounded-xl transition border border-amber-500/40 shadow-sm"
           >
             <Eye className="w-4 h-4 text-amber-400" />
-            Ver Plano PDF Armazenado
+            Pré-visualizar PDF
           </button>
           <button
             onClick={handleSaveDrawing}
@@ -484,7 +477,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Save className="w-4 h-4 text-amber-400" />}
-            Salvar Projeto e PDF
+            Salvar somente PDF
           </button>
           <button
             onClick={handleExportPdf}
