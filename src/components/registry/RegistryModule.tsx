@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../../firebase";
-import { Check, FileUp, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { auth, db, storage } from "../../firebase";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { Check, FileUp, Pencil, Plus, Search, Trash2, X, ImagePlus, FileText, ExternalLink, Loader2 } from "lucide-react";
+import ImageLightbox from "../common/ImageLightbox";
 import Papa from "papaparse";
 
 export type RegistryKind = "items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials";
 
-type RecordRow = { id: string; name: string; code?: string; category?: string; unit?: string; price?: number; status?: string; notes?: string; createdAt?: string; updatedAt?: string };
+type CatalogAttachment = { id: string; fileName: string; fileType: string; mimeType: string; size: number; storagePath: string; downloadUrl: string; pageCount?: number; uploadedAt: string };
+type RecordRow = { id: string; name: string; code?: string; category?: string; unit?: string; price?: number; status?: string; notes?: string; width?: number; height?: number; depth?: number; catalogFiles?: CatalogAttachment[]; itemPhotoUrls?: string[]; itemPhotoStoragePaths?: string[]; itemThumbnailUrls?: string[]; createdAt?: string; updatedAt?: string };
 const config: Record<RegistryKind, { title: string; subtitle: string; collection: string; codeLabel: string; categories: string[]; unitLabel: string }> = {
   items: { title: "Cadastro de Itens", subtitle: "Cadastro geral de componentes e insumos.", collection: "registry_items", codeLabel: "Código / SKU", categories: ["Perfil", "Vidro", "Ferragem", "Acessório", "Outro"], unitLabel: "Unidade" },
   products: { title: "Produtos", subtitle: "Produtos e modelos comerciais disponíveis para orçamento.", collection: "registry_products", codeLabel: "Código do produto", categories: ["Janela", "Porta", "Box de banheiro", "Fachada", "Outro"], unitLabel: "Unidade" },
@@ -28,7 +31,11 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const empty = { name: "", code: "", category: meta.categories[0], unit: meta.unitLabel, price: "0", status: "Em elaboração", notes: "" };
+  const [catalogUploads, setCatalogUploads] = useState<File[]>([]);
+  const [photoUploads, setPhotoUploads] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
+  const empty = { name: "", code: "", category: meta.categories[0], unit: meta.unitLabel, price: "0", status: "Em elaboração", notes: "", width: "", height: "", depth: "" };
   const [form, setForm] = useState(empty);
 
   useEffect(() => {
@@ -46,19 +53,86 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
   }, [authReady, meta.collection]);
 
   const filtered = useMemo(() => rows.filter((row) => [row.name, row.code, row.category, row.status].some((value) => String(value || "").toLowerCase().includes(search.toLowerCase()))), [rows, search]);
-  const reset = () => { setEditing(null); setForm({ ...empty }); setError(""); };
+  const reset = () => { setEditing(null); setForm({ ...empty }); setCatalogUploads([]); setPhotoUploads([]); setUploadProgress(0); setError(""); };
+  const editingRow = rows.find((row) => row.id === editing);
+  const extensionOf = (name: string) => name.split(".").pop()?.toLowerCase() || "arquivo";
+  const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? Math.round(bytes / 1024) + " KB" : (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  const allowedCatalogExtensions = new Set(["pdf","doc","docx","xls","xlsx","jpg","jpeg","png","webp","csv","txt","zip","odt","ods","ppt","pptx"]);
+  const validateCatalogFiles = (files: File[]) => files.filter((file) => {
+    const ext = extensionOf(file.name);
+    const mime = file.type;
+    const validMime = !mime || mime === "application/octet-stream" || mime.startsWith("image/") || mime.startsWith("text/") || mime === "application/pdf" || mime.includes("word") || mime.includes("excel") || mime.includes("spreadsheet") || mime.includes("zip") || mime.includes("presentation") || mime.includes("opendocument");
+    if (!allowedCatalogExtensions.has(ext) || !validMime) { setError("Formato de catálogo não permitido: " + file.name); return false; }
+    if (file.size > 25 * 1024 * 1024) { setError("O arquivo " + file.name + " excede o limite de 25 MB."); return false; }
+    return true;
+  });
+  const validatePhotoFiles = (files: File[]) => files.filter((file) => {
+    const ext = extensionOf(file.name);
+    if (!["image/jpeg","image/png","image/webp"].includes(file.type) || !["jpg","jpeg","png","webp"].includes(ext)) { setError("A foto " + file.name + " deve estar em JPG, PNG ou WEBP."); return false; }
+    if (file.size > 5 * 1024 * 1024) { setError("A foto " + file.name + " excede o limite de 5 MB."); return false; }
+    return true;
+  });
+  const uploadFile = (file: File, path: string) => new Promise<{ url: string; path: string }>((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef(storage, path), file, { contentType: file.type || "application/octet-stream" });
+    task.on("state_changed", (snapshot) => setUploadProgress(Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100)), reject, async () => {
+      try { resolve({ url: await getDownloadURL(task.snapshot.ref), path }); } catch (e) { reject(e); }
+    });
+  });
+  const removeStorageFile = async (path: string) => {
+    try { await deleteObject(storageRef(storage, path)); }
+    catch (e: any) { if (e?.code !== "storage/object-not-found") throw e; }
+  };
+  const removeAttachment = async (row: RecordRow, file: CatalogAttachment) => {
+    try {
+      await removeStorageFile(file.storagePath);
+      await updateDoc(doc(db, meta.collection, row.id), { catalogFiles: (row.catalogFiles || []).filter((entry) => entry.id !== file.id), itemUpdatedAt: new Date().toISOString() });
+    } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível remover o anexo."); }
+  };
+  const removePhoto = async (row: RecordRow, index: number) => {
+    const paths = row.itemPhotoStoragePaths || [];
+    try {
+      if (paths[index]) await removeStorageFile(paths[index]);
+      await updateDoc(doc(db, meta.collection, row.id), {
+        itemPhotoUrls: (row.itemPhotoUrls || []).filter((_, i) => i !== index),
+        itemPhotoStoragePaths: paths.filter((_, i) => i !== index),
+        itemThumbnailUrls: (row.itemThumbnailUrls || row.itemPhotoUrls || []).filter((_, i) => i !== index),
+        itemUpdatedAt: new Date().toISOString()
+      });
+    } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível remover a foto."); }
+  };
 
   const save = async () => {
     if (!form.name.trim()) { setError("O nome/descrição é obrigatório."); return; }
-    setSaving(true); setError("");
-    const payload = { name: form.name.trim(), code: form.code.trim(), category: form.category, unit: form.unit.trim() || meta.unitLabel, price: Number(form.price) || 0, status: form.status, notes: form.notes.trim(), updatedAt: new Date().toISOString() };
+    setSaving(true); setError(""); setUploadProgress(0);
+    const now = new Date().toISOString();
+    const payload = { name: form.name.trim(), code: form.code.trim(), category: form.category, unit: form.unit.trim() || meta.unitLabel, price: Number(form.price) || 0, status: form.status, notes: form.notes.trim(), width: Number(form.width) || 0, height: Number(form.height) || 0, depth: Number(form.depth) || 0, updatedAt: now };
     try {
-      if (editing) await updateDoc(doc(db, meta.collection, editing), payload);
-      else await addDoc(collection(db, meta.collection), { ...payload, createdAt: new Date().toISOString() });
+      const recordRef = editing ? doc(db, meta.collection, editing) : doc(collection(db, meta.collection));
+      const current = editingRow || {} as RecordRow;
+      const catalogFiles = [...(current.catalogFiles || [])];
+      const itemPhotoUrls = [...(current.itemPhotoUrls || [])];
+      const itemPhotoStoragePaths = [...(current.itemPhotoStoragePaths || [])];
+      const total = catalogUploads.length + photoUploads.length;
+      let done = 0;
+      for (const file of catalogUploads) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = "catalogs/" + recordRef.id + "/" + Date.now() + "-" + safeName;
+        const uploaded = await uploadFile(file, storagePath);
+        catalogFiles.push({ id: crypto.randomUUID(), fileName: file.name, fileType: extensionOf(file.name), mimeType: file.type || "application/octet-stream", size: file.size, storagePath: uploaded.path, downloadUrl: uploaded.url, uploadedAt: new Date().toISOString() });
+        done++; setUploadProgress(Math.round(done / Math.max(total, 1) * 100));
+      }
+      for (const file of photoUploads) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = "items/" + recordRef.id + "/photos/" + Date.now() + "-" + safeName;
+        const uploaded = await uploadFile(file, storagePath);
+        itemPhotoUrls.push(uploaded.url); itemPhotoStoragePaths.push(uploaded.path);
+        done++; setUploadProgress(Math.round(done / Math.max(total, 1) * 100));
+      }
+      await setDoc(recordRef, { ...payload, catalogFiles, itemPhotoUrls, itemPhotoStoragePaths, itemThumbnailUrls: itemPhotoUrls, itemUpdatedAt: now, ...(editing ? {} : { createdAt: now }) }, { merge: true });
       reset();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível guardar. Verifique as regras de acesso do Firestore.");
-    } finally { setSaving(false); }
+      setError(e instanceof Error ? e.message : "Não foi possível salvar. Verifique as permissões do Firestore e do Storage.");
+    } finally { setSaving(false); setUploadProgress(0); }
   };
 
   const importRegistryCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,9 +190,16 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
   };
 
   const remove = async (id: string) => {
-    if (!window.confirm("Tem a certeza de que pretende eliminar este registo?")) return;
-    try { await deleteDoc(doc(db, meta.collection, id)); }
-    catch (e) { setError(e instanceof Error ? e.message : "Não foi possível eliminar o registo."); }
+    if (!window.confirm("Deseja excluir este item e todas as suas fotos e anexos? Esta ação não pode ser desfeita.")) return;
+    const row = rows.find((item) => item.id === id);
+    try {
+      const paths = [...(row?.itemPhotoStoragePaths || []), ...(row?.catalogFiles || []).map((file) => file.storagePath)].filter(Boolean);
+      const outcomes = await Promise.allSettled(paths.map(removeStorageFile));
+      const failure = outcomes.find((result) => result.status === "rejected");
+      if (failure) throw (failure as PromiseRejectedResult).reason;
+      await deleteDoc(doc(db, meta.collection, id));
+      if (editing === id) reset();
+    } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível excluir o item e seus arquivos."); }
   };
 
   return <section className="space-y-6 text-slate-900 dark:text-slate-100">
