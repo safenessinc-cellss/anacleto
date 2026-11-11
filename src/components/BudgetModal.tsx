@@ -150,8 +150,7 @@ export default function BudgetModal({
         throw new Error("A IA devolveu dados incompletos. Revise a descrição e tente novamente.");
       }
       setItems(generatedItems);
-      if (data.notes) setAiPrompt((previous) => previous);
-      showToast("Itens preparados. Preços validados no catálogo; medidas e valores pendentes devem ser conferidos antes de enviar.", "success");
+      showToast("Itens preparados. Preços validados no catálogo; " + (data.notes ? "pendências: " + data.notes : "revise medidas e valores pendentes") + ".", "success");
     } catch (err) {
       console.error("Budget AI generation failed:", err);
       setAiError(err instanceof Error ? err.message : "A IA não conseguiu gerar o orçamento. Nenhum preço foi inventado.");
