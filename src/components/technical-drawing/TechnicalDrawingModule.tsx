@@ -563,7 +563,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               Desenho Técnico e Lista de Componentes Inteligente
             </h1>            {(drawing as any).draftStatus === "preliminary" && (
               <div role="alert" className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] font-black tracking-wide text-amber-300">
-                <AlertTriangle className="h-4 w-4" />
+                <AlertCircle className="h-4 w-4" />
                 {(drawing as any).draftLabel || "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO"}
               </div>
             )}
