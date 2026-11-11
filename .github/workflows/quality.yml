@@ -29,8 +29,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Keep reporting low-severity advisories without blocking type/build validation.
+      # Moderate and higher severity advisories still fail the quality gate.
       - name: Audit dependencies
-        run: npm audit --audit-level=low
+        run: npm audit --audit-level=moderate
 
       - name: Type check
         run: npx tsc --noEmit --pretty false
