@@ -14,7 +14,7 @@ function serviceBase(): string {
   if (url.protocol !== "https:" && process.env.NODE_ENV === "production") throw new Error("Drawing service URL must use HTTPS in production.");
   return url.toString().replace(/\/$/, "");
 }
-export async function requestDrawingService(payload: unknown, timeoutMs = 5000): Promise<DrawingServiceJob> {
+export async function requestDrawingService(payload: unknown, timeoutMs = 5000, authorization = ""): Promise<DrawingServiceJob> {
   const base = serviceBase();
   const jobId = randomUUID();
   const path = "/generate";
@@ -22,6 +22,7 @@ export async function requestDrawingService(payload: unknown, timeoutMs = 5000):
   const headers = {
     "Content-Type": "application/json",
     "x-request-id": jobId,
+    ...(authorization ? { Authorization: authorization } : {}),
     ...createServiceAuthHeaders("POST", path, body),
   };
   try {
