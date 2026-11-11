@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "../../src/server/ai-config";
 import { parseAIJson } from "../../src/server/ai-json";
@@ -10,8 +11,10 @@ function send(res: any, status: number, payload: unknown) {
   return res.status(status).json(payload);
 }
 function clientIp(req: any): string {
-  const forwarded = String(req.headers?.["x-forwarded-for"] || "").split(",")[0].trim();
-  return forwarded || String(req.socket?.remoteAddress || req.ip || "unknown");
+  const trustedRealIp = String(req.headers?.["x-real-ip"] || "").trim();
+  const forwarded = String(req.headers?.["x-forwarded-for"] || "").split(",").map((value: string) => value.trim()).filter(Boolean);
+  const address = trustedRealIp || forwarded[forwarded.length - 1] || String(req.socket?.remoteAddress || req.ip || "unknown");
+  return createHash("sha256").update(address).digest("hex");
 }
 async function consumePublicQuota(ip: string): Promise<boolean> {
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -49,7 +52,10 @@ export default async function handler(req: any, res: any) {
     const ip = clientIp(req);
     if (!(await consumePublicQuota(ip))) return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial." });
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const prompt = typeof body?.description === "string" ? body.description.trim() : "";
+    if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some(key => key !== "description")) {
+      return send(res, 400, { error: "A solicitação contém campos não permitidos." });
+    }
+    const prompt = typeof body.description === "string" ? body.description.trim() : "";
     if (prompt.length < 12 || prompt.length > 3000) return send(res, 400, { error: "Descreva o projeto em 12 a 3000 caracteres." });
     const aiStartedAt = Date.now();
     const result = await generateText({
