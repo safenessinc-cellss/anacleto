@@ -1,7 +1,7 @@
 import { generateText, gateway } from "ai";
 import firebaseConfig from "../firebase-applet-config.json";
 
-type DrawingRequest = { prompt?: string; catalog?: unknown[] };
+type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[] };
 type WindowEntry = { startedAt: number; count: number };
 const windows = new Map<string, WindowEntry>();
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
@@ -116,6 +116,19 @@ export default async function handler(req: any, res: any) {
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (prompt.length < 3) return json(res, 400, { error: "Descreva a peça e suas dimensões." });
   const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 200) : [];
+  const imageUrls = Array.isArray(body.images) ? body.images.slice(0, 4) : [];
+  const allowedImageUrls: URL[] = [];
+  for (const value of imageUrls) {
+    try {
+      const url = new URL(String(value));
+      if (url.protocol !== "https:" || url.hostname !== "firebasestorage.googleapis.com" || !url.pathname.includes("/v0/b/" + firebaseConfig.storageBucket + "/o/")) {
+        return json(res, 400, { error: "Imagem de referência fora do armazenamento autorizado." });
+      }
+      allowedImageUrls.push(url);
+    } catch {
+      return json(res, 400, { error: "URL de imagem de referência inválida." });
+    }
+  }
 
   let user: { uid: string; email: string } | null = null;
   try {
@@ -135,7 +148,13 @@ export default async function handler(req: any, res: any) {
     const result = await generateText({
       model: gateway("openai/gpt-4o-mini"),
       system,
-      prompt: `Crie o desenho técnico, despiece e cotas para: ${prompt}`,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: `Analise também as fotografias e imagens anexadas como referência visual. Extraia apenas cotas legíveis; nunca estime medidas que não estejam indicadas. Se houver conflito entre a descrição e a imagem, liste a divergência em assumptions. Crie o desenho técnico, despiece e cotas para: ${prompt}` },
+          ...allowedImageUrls.map((image) => ({ type: "image" as const, image })),
+        ],
+      }],
       temperature: 0.2,
     });
     const raw = (result.text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
