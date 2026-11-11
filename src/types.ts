@@ -189,6 +189,12 @@ export interface TechnicalDrawing {
   status?: "PRELIMINARY_CONTINGENCY" | "APPROVED_FOR_MANUFACTURING";
   draftStatus?: "preliminary" | "approved";
   draftLabel?: string;
+  vectorPayload?: {
+    format: "svg";
+    svg: string;
+    watermarked: boolean;
+    status: "PRELIMINARY_CONTINGENCY" | "APPROVED_FOR_MANUFACTURING";
+  };
   approvedSnapshotId?: string;
   approvedAt?: string;
   approvedBy?: { uid: string; email: string; role: string };
