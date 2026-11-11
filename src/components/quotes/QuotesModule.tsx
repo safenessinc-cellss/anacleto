@@ -368,17 +368,19 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
       const data = await res.json();
 
-      // Check if action was generate_invoice
-      if (data.action === "generate_invoice" || userText.toLowerCase().includes("genera la factura")) {
+      // A IA nunca aprova um orçamento por conta própria nem emite fatura antes da aprovação humana.
+      if (data.action === "none") {
+        setAiChatHistory((prev) => [...prev, { role: "assistant", text: data.reply || "Nenhuma alteração foi aplicada ao orçamento." }]);
+        return;
+      }
+      if (data.action === "generate_invoice") {
+        const approved = ["accepted", "approved", "aprovado"].includes(String(selectedQuote.status || "").toLowerCase());
+        if (!approved) {
+          setAiChatHistory((prev) => [...prev, { role: "assistant", text: "O orçamento ainda não está aprovado. Registre a aprovação do cliente no orçamento antes de emitir a fatura." }]);
+          return;
+        }
         await handleConvertQuoteToInvoice(selectedQuote);
-        setAiChatHistory((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            text: `Aprovei o orçamento ${selectedQuote.number} e gerei a fatura correspondente.`,
-          },
-        ]);
-        setIsAiLoading(false);
+        setAiChatHistory((prev) => [...prev, { role: "assistant", text: `Solicitação de emissão da fatura processada para o orçamento ${selectedQuote.number}. Confira o resultado no módulo de Faturas.` }]);
         return;
       }
 
