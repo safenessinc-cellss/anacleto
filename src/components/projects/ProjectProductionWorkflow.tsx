@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
-import { auth, db } from "../../firebase";
+import { collection, doc, setDoc, updateDoc } from "firebase/firestore";
+import { auth, db, storage } from "../../firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { TechnicalDrawing } from "../../types";
 import DrawingSvgCanvas from "../technical-drawing/DrawingSvgCanvas";
 import { ClipboardCheck, Ruler, Scissors, Hammer, Box, Sparkles, Loader2, Save, ShieldCheck } from "lucide-react";
@@ -70,9 +72,16 @@ export default function ProjectProductionWorkflow({projectId,projectName,project
     const user=auth.currentUser;if(!user){setError("Sessão expirada.");return;}
     setSaving(true);setError("");setNotice("");
     try{
-      const ref=await addDoc(collection(db,"technical_drawings"),{...drawing,projectId,projectName,engineeringPlan:plan,workflowStatus:approved?"Aprovado tecnicamente":"Aguardando validação",approvedBy:approved?user.uid:"",approvedAt:approved?new Date().toISOString():""});
-      await updateDoc(doc(db,"projects",projectId),{engineering:{drawingId:ref.id,workflowStatus:approved?"Aprovado tecnicamente":"Aguardando validação",measurement:form,plan,approvalChecklist:checked,approved,updatedAt:new Date().toISOString()},updatedAt:new Date().toISOString()});
-      setNotice("Dossiê e desenho salvos no projeto. "+(approved?"Aprovação registrada.":"Permanece pendente de aprovação técnica."));
+      const pdf=buildTechnicalDrawingPdf(drawing);
+      const blob=await (await fetch(pdf.dataUri)).blob();
+      const drawingId="drawing_"+crypto.randomUUID();
+      const path="technical-drawings/"+user.uid+"/"+drawingId+".pdf";
+      const fileRef=storageRef(storage,path);
+      await uploadBytes(fileRef,blob,{contentType:"application/pdf",customMetadata:{ownerUid:user.uid,drawingId,projectId}});
+      const pdfUrl=await getDownloadURL(fileRef);
+      await setDoc(doc(db,"technical_drawings",drawingId),{id:drawingId,title:drawing.title,description:drawing.description,projectId,projectName,category:drawing.category,unit:drawing.unit,overallDimensions:drawing.overallDimensions,createdAt:drawing.createdAt,updatedAt:new Date().toISOString(),pdfUrl,pdfStoragePath:path,pdfFileName:pdf.fileName,pdfGeneratedAt:new Date().toISOString(),pdfFileSizeKb:pdf.sizeKb,storageFormat:"pdf-only",workflowStatus:approved?"Aprovado tecnicamente":"Aguardando validação",approvedBy:approved?user.uid:"",approvedAt:approved?new Date().toISOString():""});
+      await updateDoc(doc(db,"projects",projectId),{engineering:{drawingId,workflowStatus:approved?"Aprovado tecnicamente":"Aguardando validação",measurement:form,plan,approvalChecklist:checked,approved,updatedAt:new Date().toISOString()},updatedAt:new Date().toISOString()});
+      setNotice("Dossiê de fabricação e PDF final salvos no projeto. "+(approved?"Aprovação registrada.":"Permanece pendente de aprovação técnica."));
     }catch(e){setError(e instanceof Error?e.message:"Falha ao salvar o dossiê.");}
     finally{setSaving(false);}
   };
