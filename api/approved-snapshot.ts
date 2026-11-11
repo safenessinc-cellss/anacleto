@@ -211,11 +211,13 @@ export default async function handler(req: any, res: any) {
       if (!["draft","pending","pendente","borrador","accepted","approved","aprovado"].includes(String(source.status || "").toLowerCase())) {
         return send(res, 409, { error: "Somente orçamentos em rascunho ou pendentes podem ser aprovados." });
       }
-      if (!Array.isArray(source.items) || source.items.length === 0) return send(res, 422, { error: "O orçamento não possui itens." });
+      if (!Array.isArray(source.items) || source.items.length === 0 || source.items.length > 150) return send(res, 422, { error: "O orçamento deve possuir entre 1 e 150 itens." });
       const catalog = await loadCatalogFromFirestore(req);
       const reviewedItems = source.items.map((item: any) => {
+        const quantity = Number(item.quantity);
+        if (!Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento: use um inteiro positivo.");
         const price = Number(item.unitPrice);
-        if (!Number.isFinite(price) || price < 0) throw new Error("Preço inválido no orçamento.");
+        if (!Number.isFinite(price) || price < 0 || price > 1000000000) throw new Error("Preço inválido no orçamento.");
         const match = catalogMatch(item, catalog);
         if (item.catalogItemId || item.sku || item.itemId) {
           if (!match) throw new Error("SKU/ID sem correspondência no catálogo: " + (item.sku || item.catalogItemId || item.itemId));
@@ -223,10 +225,10 @@ export default async function handler(req: any, res: any) {
           if (match.price === undefined || match.price === null || String(match.price).trim() === "" || !Number.isFinite(catalogPrice) || catalogPrice < 0 || catalogPrice !== price) {
             throw new Error("Preço não corresponde ao catálogo atual para " + (item.sku || match.id) + ".");
           }
-          return { ...item, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice, catalogItemId: match.id, sku: String(match.sku || match.code || item.sku || "") };
+          return { ...item, quantity, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice, catalogItemId: match.id, sku: String(match.sku || match.code || item.sku || "") };
         }
         if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O item " + item.description + " tem preço pendente.");
-        return { ...item, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
+        return { ...item, quantity, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
       const subtotal = Number(reviewedItems.reduce((sum: number, item: any) => sum + item.quantity * item.unitPrice, 0).toFixed(2));
       const discountRate = Number(source.discountRate || 0);
@@ -254,7 +256,10 @@ export default async function handler(req: any, res: any) {
       if (source.isDraft === false || source.status === "APPROVED_FOR_MANUFACTURING") return send(res, 409, { error: "O desenho já foi aprovado e não pode ser reaprovado." });
       const catalog = await loadCatalogFromFirestore(req);
       const budgetItems = Array.isArray(source.budget?.items) ? source.budget.items : [];
+      if (budgetItems.length > 150) return send(res, 422, { error: "O orçamento técnico excede 150 linhas." });
       const reviewedBudgetItems = budgetItems.map((item: any) => {
+        const quantity = Number(item.quantity);
+        if (!Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento técnico.");
         if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O desenho contém preços pendentes; revise antes de aprovar.");
         const match = catalogMatch(item, catalog);
         if (item.catalogItemId || item.sku) {
@@ -263,9 +268,11 @@ export default async function handler(req: any, res: any) {
           if (match.price === undefined || match.price === null || !Number.isFinite(catalogPrice) || catalogPrice < 0 || catalogPrice !== Number(item.unitPrice)) {
             throw new Error("Preço do orçamento técnico não corresponde ao catálogo.");
           }
-          return { ...item, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice };
+          return { ...item, quantity, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice };
         }
-        return { ...item, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
+        const manualPrice = Number(item.unitPrice);
+        if (!Number.isFinite(manualPrice) || manualPrice < 0 || manualPrice > 1000000000) throw new Error("Preço manual inválido no orçamento técnico.");
+        return { ...item, quantity, unitPrice: manualPrice, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
       const approvedAt = new Date().toISOString();
       const { pdfDataUri: _pdfDataUri, pdfUrl: _pdfUrl, pdfStoragePath: _pdfStoragePath, pdfGeneratedAt: _pdfGeneratedAt, pdfFileName: _pdfFileName, pdfFileSizeKb: _pdfFileSizeKb, ...sourceWithoutPdf } = source;
