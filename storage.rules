@@ -34,6 +34,38 @@ service firebase.storage {
           || request.resource.contentType.matches('image/(jpeg|png|webp)'));
       allow delete: if canManageProjects() && request.auth.uid == uid;
     }
+    // Anexos de catálogo vinculados aos itens cadastrados.
+    match /catalogs/{itemId}/{fileName} {
+      allow read: if canManageProjects();
+      allow create, update: if canManageProjects()
+        && request.resource.size <= 25 * 1024 * 1024
+        && (request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'application/msword'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          || request.resource.contentType == 'application/vnd.ms-excel'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          || request.resource.contentType == 'application/vnd.ms-powerpoint'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+          || request.resource.contentType == 'application/vnd.oasis.opendocument.text'
+          || request.resource.contentType == 'application/vnd.oasis.opendocument.spreadsheet'
+          || request.resource.contentType == 'text/csv'
+          || request.resource.contentType == 'text/plain'
+          || request.resource.contentType == 'application/zip'
+          || request.resource.contentType == 'application/x-zip-compressed'
+          || request.resource.contentType == 'application/octet-stream'
+          || request.resource.contentType.matches('image/(jpeg|png|webp)'));
+      allow delete: if canManageProjects();
+    }
+
+    // Fotos dos itens: separadas dos documentos de catálogo.
+    match /items/{itemId}/photos/{fileName} {
+      allow read: if canManageProjects();
+      allow create, update: if canManageProjects()
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if canManageProjects();
+    }
+
     match /technical-drawings/{uid}/{fileName} {
       allow read: if canManageProjects();
       allow create, update: if canManageProjects()
