@@ -55,6 +55,7 @@ export async function generateValidatedJson<T>(options: {
   validate: (value: any) => T;
   temperature?: number;
   maxOutputTokens?: number;
+  onGeneration?: (event: { text: string; usage?: { inputTokens?: number; outputTokens?: number; promptTokens?: number; completionTokens?: number }; attempt: number }) => void;
 }): Promise<T> {
   const config = AI_CONFIG[options.capability];
   let raw = "";
@@ -72,6 +73,7 @@ export async function generateValidatedJson<T>(options: {
       abortSignal: AbortSignal.timeout(config.timeoutMs),
     });
     raw = result.text || "";
+    options.onGeneration?.({ text: raw, usage: result.usage as any, attempt });
     try {
       return parseAIJson(raw, options.validate);
     } catch (error) {
