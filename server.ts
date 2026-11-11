@@ -201,8 +201,8 @@ Catálogo real: ${JSON.stringify(catalog)}
 Regras obrigatórias:
 - Preserve TODAS as linhas atuais, seus IDs, quantidades e preços quando o usuário não pedir alteração.
 - Ao adicionar itens, devolva também todas as linhas que já existiam sem alterações.
-- Use somente itens do catálogo com correspondência exata por SKU/código, ID ou nome completo. Informe sku e catalogItemId quando existirem.
-- O servidor validará os preços contra o catálogo. Se não houver correspondência exata, unitPrice=0 e priceSource="pending".
+- Priorize SKU/código e ID; quando não houver, sugira por descrição técnica, categoria, marca e características. Informe sku e catalogItemId da sugestão.
+- O servidor validará os preços contra o catálogo. Se não houver correspondência forte ou o preço for zero, unitPrice=0 e priceSource="pending".
 - Nunca estime/invente preços, impostos, medidas ou custos. Medidas ausentes devem aparecer em notes como pendências.
 - Só altere imposto ou desconto quando o usuário solicitar explicitamente.
 - "generate_invoice" só pode ser retornado quando o usuário pedir explicitamente a emissão da fatura. Isso NÃO aprova o orçamento.
@@ -223,7 +223,7 @@ Regras obrigatórias:
       if (!String(item.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0) throw new Error("A IA retornou uma linha de orçamento inválida.");
       const match = findExactCatalogItem(item, catalog);
       const catalogPrice = match ? Number(match.price) : 0;
-      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice > 0;
       return {
         id: String(item.id || `ai-${index + 1}`),
         description: String(item.description).slice(0, 500),
@@ -263,7 +263,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
     const response = await generateText({
       model: aiModel,
       temperature: 0.1,
-      system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Priorize SKU/código e ID; quando não houver, sugira correspondência forte por descrição técnica e palavras-chave. Informe sku/catalogItemId da sugestão e não trate correspondência incerta como confirmada. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
+      system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Priorize SKU/código e ID; quando não houver, sugira correspondência forte por descrição técnica e palavras-chave. Informe sku/catalogItemId da sugestão e não trate correspondência incerta como confirmada. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência forte ou o preço for zero, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
       prompt,
     });
     const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
@@ -274,7 +274,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
       if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
       const match = findExactCatalogItem(item, catalog);
       const catalogPrice = match ? Number(match.price) : 0;
-      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice > 0;
       return {
         description: String(item.description).slice(0, 500),
         qty,
