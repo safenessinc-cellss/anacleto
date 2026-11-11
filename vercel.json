@@ -7,9 +7,16 @@
     "api/index.ts": {
       "includeFiles": "node_modules/@google/genai/**",
       "maxDuration": 60
+    },
+    "api/technical-drawing.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
+    {
+      "source": "/api/ai/technical-drawing",
+      "destination": "/api/technical-drawing"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api"
