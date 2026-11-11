@@ -4,7 +4,7 @@ import { Budget, BudgetLineItem } from "../types";
 import { Translation } from "../translations";
 import { generateBudgetTranslations, languageMeta } from "../utils";
 import { useToast } from "./ToastContext";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 
 interface BudgetModalProps {
@@ -122,31 +122,39 @@ export default function BudgetModal({
     setIsGeneratingAi(true);
     setAiError("");
     try {
-      const response = await fetch("/api/ai-preset", {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre na sua conta para gerar o orçamento com IA.");
+      const idToken = await user.getIdToken();
+      const sourceNames = ["catalog", "supplier_catalog", "registry_items", "price_table"];
+      const snapshots = await Promise.all(sourceNames.map((name) => getDocs(collection(db, name))));
+      const catalog = snapshots.flatMap((snapshot, index) => snapshot.docs.map((item) => {
+        const data = item.data();
+        return { id: item.id, name: data.name || data.description || "", sku: data.sku || data.code || "", category: data.category || "", unit: data.unit || "un", price: Number(data.price ?? 0), source: sourceNames[index] };
+      })).filter((item) => item.name);
+      const response = await fetch("/api/ai/budget-items", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: aiPrompt, language: documentLanguage }),
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken },
+        body: JSON.stringify({ prompt: aiPrompt, language: documentLanguage, catalog }),
       });
-      if (!response.ok) {
-        throw new Error("Erro na geração de orçamento por IA.");
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "Falha ao gerar orçamento (" + response.status + ").");
+      if (!Array.isArray(data?.items) || !data.items.length) throw new Error("A IA não retornou linhas válidas.");
+      const generatedItems: BudgetLineItem[] = data.items.map((item: any) => ({
+        id: crypto.randomUUID(),
+        description: String(item.description || ""),
+        quantity: Number(item.qty),
+        unitPrice: Number(item.price),
+        notes: item.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : "Preço consultado no catálogo.",
+      }));
+      if (generatedItems.some(item => !item.description || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0)) {
+        throw new Error("A IA devolveu dados incompletos. Revise a descrição e tente novamente.");
       }
-      const data = await response.json();
-      if (data && data.items && Array.isArray(data.items)) {
-        const generatedItems: BudgetLineItem[] = data.items.map((item: any) => ({
-          id: Math.random().toString(36).substring(2),
-          description: item.description,
-          quantity: item.qty || 1,
-          unitPrice: Number(item.price ?? 0),
-        }));
-        setItems(generatedItems);
-        showToast("Itens do orçamento criados pela IA! Edite qualquer campo abaixo se necessário.", "success");
-      } else {
-        throw new Error("Formato inválido.");
-      }
+      setItems(generatedItems);
+      showToast("Itens preparados. Confira os preços pendentes antes de enviar o orçamento.", "success");
     } catch (err) {
-      console.error(err);
-      setAiError("A IA não conseguiu gerar os itens. Nenhum produto ou preço fictício foi inserido. Revise a descrição e tente novamente ou adicione as linhas manualmente.");
-      showToast("Falha ao gerar orçamento por IA. Nenhum item de simulação foi criado.", "error");
+      console.error("Budget AI generation failed:", err);
+      setAiError(err instanceof Error ? err.message : "A IA não conseguiu gerar o orçamento. Nenhum preço foi inventado.");
+      showToast("Falha ao gerar orçamento por IA.", "error");
     } finally {
       setIsGeneratingAi(false);
     }
