@@ -565,146 +565,149 @@ export const exportInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDo
 };
 
 export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: SenderConfig): PdfDocumentResult => {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.width;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const unit = drawing.unit || "cm";
+  const dims = drawing.overallDimensions || { width: 0, height: 0, depth: 0 };
+  const width = Number(dims.width) || 0;
+  const height = Number(dims.height) || 0;
+  const depth = Number(dims.depth) || 0;
+  const pieces = Array.isArray(drawing.pieces) ? drawing.pieces : [];
+  const drawHeader = (title: string, subtitle: string) => {
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageWidth, 27, "F");
+    doc.setFillColor(197, 168, 80);
+    doc.rect(0, 27, pageWidth, 2, "F");
+    drawDocumentLogo(doc, sender, 10, 3, 21, 21);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(255, 255, 255);
+    doc.text(title, 36, 12);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(226, 232, 240);
+    doc.text(subtitle, 36, 19);
+    doc.setFontSize(7);
+    doc.text(new Date().toLocaleDateString("pt-BR"), pageWidth - 10, 12, { align: "right" });
+    doc.text("Ref. " + String(drawing.id || "").slice(0, 12).toUpperCase(), pageWidth - 10, 19, { align: "right" });
+  };
+  const fit = (w: number, h: number, maxW: number, maxH: number) => {
+    const safeW = Math.max(1, w), safeH = Math.max(1, h);
+    const scale = Math.min(maxW / safeW, maxH / safeH);
+    return { w: safeW * scale, h: safeH * scale };
+  };
+  const drawOrtho = (label: string, x: number, y: number, boxW: number, boxH: number, realW: number, realH: number, caption: string) => {
+    const fitted = fit(realW, realH, boxW - 18, boxH - 30);
+    const px = x + (boxW - fitted.w) / 2;
+    const py = y + 16 + (boxH - 30 - fitted.h) / 2;
+    doc.setDrawColor(100, 116, 139);
+    doc.setFillColor(239, 246, 255);
+    doc.roundedRect(x, y, boxW, boxH, 2, 2, "S");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+    doc.text(label, x + 5, y + 9);
+    doc.setLineWidth(0.8);
+    doc.rect(px, py, fitted.w, fitted.h, "FD");
+    doc.setDrawColor(148, 163, 184);
+    if (/janela|esquadria|porta|box|arm[aá]rio|closet/i.test(drawing.title + " " + drawing.description)) {
+      const count = /2\s*folhas|duas folhas|corredi[cç]a|correr/i.test(drawing.description + " " + drawing.title) ? 2 : 1;
+      if (count === 2) doc.line(px + fitted.w / 2, py, px + fitted.w / 2, py + fitted.h);
+      else if (/janela|esquadria/i.test(drawing.title + " " + drawing.description)) {
+        doc.line(px + fitted.w / 2, py, px + fitted.w / 2, py + fitted.h);
+        doc.line(px, py + fitted.h / 2, px + fitted.w, py + fitted.h / 2);
+      }
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    doc.text(caption, x + boxW / 2, y + boxH - 5, { align: "center" });
+  };
 
-  // Header
-  doc.setFillColor(15, 23, 42); // Slate 900
-  doc.rect(0, 0, pageWidth, 38, "F");
-
-  doc.setFillColor(197, 168, 80); // Gold
-  doc.rect(0, 38, pageWidth, 3, "F");
-
-  drawDocumentLogo(doc, sender, 14, 5, 25, 25);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(255, 255, 255);
-  doc.text("MEMORIA TÉCNICA Y PLANO ARQUITECTÓNICO", 44, 18);
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(197, 168, 80);
-  doc.text("ANACLETO ESQUADRIAS • DEPARTAMENTO TÉCNICO E DESENHO 2D", 44, 26);
-
-  doc.setFontSize(10);
-  doc.setTextColor(203, 213, 225);
-  doc.text(`Fecha: ${new Date().toISOString().split("T")[0]}`, pageWidth - 14, 20, { align: "right" });
-  doc.text(`Ref: ${drawing.id.substring(0, 8).toUpperCase()}`, pageWidth - 14, 27, { align: "right" });
-
-  let y = 48;
-
-  // General Specifications
+  // Página 1: identificação, dimensões e as três vistas do MESMO modelo do editor.
+  drawHeader("DESENHO TÉCNICO 2D — " + (drawing.title || "Projeto"), "ANACLETO ESQUADRIAS • Documento gerado a partir dos dados editáveis do projeto");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(15, 23, 42);
-  doc.text(drawing.title.toUpperCase(), 14, y);
-
+  doc.text(String(drawing.title || "Projeto técnico").slice(0, 90), 12, 40);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
-  doc.text(drawing.description, 14, y + 6);
-
-  // Overall Dimensions Badge
-  const dimBoxX = 14;
-  const dimBoxY = y + 12;
+  const descriptionLines = doc.splitTextToSize(String(drawing.description || ""), pageWidth - 24).slice(0, 2);
+  doc.text(descriptionLines, 12, 46);
   doc.setFillColor(241, 245, 249);
-  doc.roundedRect(dimBoxX, dimBoxY, pageWidth - 28, 14, 2, 2, "F");
+  doc.roundedRect(12, 55, pageWidth - 24, 16, 2, 2, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text(
-    `DIMENSIONES GENERALES: ${drawing.overallDimensions.width} cm (Ancho) × ${drawing.overallDimensions.height} cm (Alto)${
-      drawing.overallDimensions.depth ? ` × ${drawing.overallDimensions.depth} cm (Fondo)` : ""
-    }  |  UNIDADES: ${drawing.unit.toUpperCase()}  |  TOTAL PIEZAS: ${drawing.pieces.length}`,
-    dimBoxX + 6,
-    dimBoxY + 9
-  );
+  doc.text("DIMENSÕES GERAIS", 17, 61);
+  doc.setFont("helvetica", "normal");
+  doc.text("Largura: " + width + " " + unit + "   •   Altura: " + height + " " + unit + "   •   Profundidade: " + (depth || "não informada") + (depth ? " " + unit : "") + "   •   Componentes: " + pieces.length, 17, 66);
+  const gap = 6;
+  const viewW = (pageWidth - 24 - gap * 2) / 3;
+  const viewY = 79;
+  const viewH = 105;
+  drawOrtho("VISTA FRONTAL", 12, viewY, viewW, viewH, width, height, "Largura " + width + " " + unit + " × Altura " + height + " " + unit);
+  drawOrtho("VISTA LATERAL", 12 + viewW + gap, viewY, viewW, viewH, depth || 1, height, "Profundidade " + (depth || "—") + " " + unit);
+  drawOrtho("VISTA SUPERIOR", 12 + (viewW + gap) * 2, viewY, viewW, viewH, width, depth || 1, "Largura " + width + " " + unit + " × Prof. " + (depth || "—") + " " + unit);
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Representação técnica baseada nas dimensões e componentes registrados. Conferir medidas, folgas, ferragens e sistema do fabricante antes do corte.", 12, 194);
 
-  // Table of Pieces (Despiece / BOM)
-  const pieceRows = drawing.pieces.map((p) => [
-    p.pieceNumber,
-    p.name,
-    p.quantity,
-    `${p.dimensions.width} × ${p.dimensions.height}${p.dimensions.depth ? ` × ${p.dimensions.depth}` : ""} ${p.dimensions.unit}`,
-    p.material,
-    p.cutAngle || "90°",
+  // Página 2: lista de peças com as mesmas cotas armazenadas no desenho.
+  doc.addPage();
+  drawHeader("LISTA DE PEÇAS E PLANO DE CORTE", drawing.title || "Projeto técnico");
+  const pieceRows = pieces.map((piece) => [
+    piece.pieceNumber ?? "",
+    piece.name || "Componente",
+    piece.quantity ?? 1,
+    [piece.dimensions?.width, piece.dimensions?.height, piece.dimensions?.depth ?? piece.dimensions?.thickness].filter((v) => v !== undefined && v !== null).join(" × ") + " " + (piece.dimensions?.unit || unit),
+    piece.material || "A definir",
+    piece.cutAngle || "A validar",
   ]);
-
   autoTable(doc, {
-    startY: dimBoxY + 20,
-    head: [["Nº", "Nombre de la Pieza (Tipo Puzzle)", "Cant.", "Medidas (A × H × F)", "Material", "Corte / Mecanizado"]],
+    startY: 36,
+    head: [["Nº", "Peça / componente", "Qtd.", "Dimensões (L × A × P)", "Material", "Corte"]],
     body: pieceRows,
     theme: "striped",
-    headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: [255, 255, 255],
-      fontStyle: "bold",
-    },
-    columnStyles: {
-      0: { cellWidth: 10, halign: "center" },
-      1: { cellWidth: 60 },
-      2: { cellWidth: 14, halign: "center" },
-      3: { cellWidth: 42, halign: "center" },
-      4: { cellWidth: "auto" },
-      5: { cellWidth: 30, halign: "center" },
-    },
-    styles: {
-      fontSize: 8.5,
-      cellPadding: 3,
-    },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: "bold" },
+    styles: { fontSize: 8, cellPadding: 3, overflow: "linebreak" },
+    columnStyles: { 0: { cellWidth: 12, halign: "center" }, 1: { cellWidth: 52 }, 2: { cellWidth: 14, halign: "center" }, 3: { cellWidth: 48 }, 4: { cellWidth: "auto" }, 5: { cellWidth: 27 } },
+    didDrawPage: () => { if (doc.internal.getNumberOfPages() > 2) drawHeader("LISTA DE PEÇAS E PLANO DE CORTE", drawing.title || "Projeto técnico"); },
   });
-
-  let nextY = (doc as any).lastAutoTable.finalY + 12;
-
-  // 5 Phases of Construction Process
+  let nextY = ((doc as any).lastAutoTable?.finalY || 40) + 10;
+  if (nextY > pageHeight - 35) { doc.addPage(); drawHeader("MONTAGEM E OBSERVAÇÕES", drawing.title || "Projeto técnico"); nextY = 38; }
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
-  doc.text("PROCESO DE CONSTRUCCIÓN Y MONTAJE PASO A PASO (5 FASES):", 14, nextY);
-
+  doc.text("INSTRUÇÕES DE MONTAGEM", 12, nextY);
   nextY += 6;
-
-  drawing.steps.forEach((step) => {
-    if (nextY > 260) {
-      doc.addPage();
-      nextY = 20;
-    }
-
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(14, nextY, pageWidth - 28, 16, 2, 2, "F");
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, nextY, pageWidth - 28, 16, 2, 2, "D");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(197, 168, 80);
-    doc.text(`[Fase ${step.stepNumber}] ${step.phaseName}: ${step.title}`, 18, nextY + 6);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(71, 85, 105);
-    doc.text(step.description, 18, nextY + 12);
-
-    nextY += 20;
-  });
-
-  // Footer
-  const footerY = doc.internal.pageSize.height - 12;
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(
-    `Anacleto Esquadrias © ${new Date().getFullYear()} • Documentación Técnica de Fabricación y Despiece Certificado`,
-    pageWidth / 2,
-    footerY,
-    { align: "center" }
-  );
+  doc.setTextColor(71, 85, 105);
+  (drawing.assemblyInstructions || []).forEach((instruction, index) => {
+    const lines = doc.splitTextToSize((index + 1) + ". " + instruction, pageWidth - 24);
+    if (nextY + lines.length * 4 > pageHeight - 18) { doc.addPage(); drawHeader("MONTAGEM E OBSERVAÇÕES", drawing.title || "Projeto técnico"); nextY = 38; }
+    doc.text(lines, 12, nextY);
+    nextY += lines.length * 4 + 2;
+  });
+  (drawing.steps || []).forEach((step) => {
+    if (nextY + 14 > pageHeight - 18) { doc.addPage(); drawHeader("ETAPAS DO PROJETO", drawing.title || "Projeto técnico"); nextY = 38; }
+    doc.setFont("helvetica", "bold");
+    doc.text("Fase " + step.stepNumber + " — " + (step.phaseName || step.title || ""), 12, nextY);
+    nextY += 5;
+    doc.setFont("helvetica", "normal");
+    const lines = doc.splitTextToSize(String(step.description || ""), pageWidth - 24);
+    doc.text(lines, 12, nextY);
+    nextY += lines.length * 4 + 4;
+  });
 
   applyDocumentWatermark(doc, sender);
-  const cleanTitle = (drawing.title || "Proyecto").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const fileName = `Plano_Tecnico_${cleanTitle}.pdf`;
+  const cleanTitle = (drawing.title || "Projeto").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const fileName = "Desenho_Tecnico_" + cleanTitle + ".pdf";
   const dataUri = doc.output("datauristring");
   const sizeKb = Math.max(1, Math.round((dataUri.length * 0.75) / 1024));
-
   return { doc, dataUri, fileName, sizeKb };
 };
 
