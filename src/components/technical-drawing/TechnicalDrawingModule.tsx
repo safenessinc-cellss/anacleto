@@ -301,7 +301,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   const handleOpenDrawingPdf = async (targetDrawing?: TechnicalDrawing) => {
     const target = targetDrawing || drawing;
-    if (!target.pdfDataUri && !(target as any).pdfUrl) { showToast("Este desenho ainda não possui PDF salvo.", "warning"); return; }
+    if (!target.pdfDataUri && !(target as any).pdfUrl) {
+      try { const pdf = buildTechnicalDrawingPdf(target, senderConfig); target = { ...target, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb }; }
+      catch (error) { console.error("Could not build drawing preview PDF:", error); showToast("Não foi possível preparar a pré-visualização PDF.", "error"); return; }
+    }
     setDrawing(target); setIsPdfModalOpen(true);
   };
 
@@ -745,8 +748,11 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                 {savedDrawings.slice(0, 6).map((item) => (
-                  <button
+                  <div
                     key={item.id}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleOpenDrawingPdf(item); } }}
                     onClick={() => {
                       setDrawing(item);
                       setSelectedProjectId(item.projectId || "");
@@ -774,7 +780,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                         </span>
                       )}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
