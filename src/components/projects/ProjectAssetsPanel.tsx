@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { arrayRemove, arrayUnion, collection, onSnapshot, query, where, orderBy, updateDoc, doc } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, onSnapshot, query, where, updateDoc, doc } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { ExternalLink, FileText, ImagePlus, Link2, Loader2, Trash2, UploadCloud, X } from "lucide-react";
+import { ExternalLink, FileText, ImagePlus, Link2, Trash2, UploadCloud } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
 import { TechnicalDrawing } from "../../types";
 
@@ -36,8 +36,8 @@ export default function ProjectAssetsPanel({ projectId, projectName, assets = []
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
-    const q = query(collection(db, "technical_drawings"), where("projectId", "==", projectId), orderBy("createdAt", "desc"));
-    return onSnapshot(q, snap => setDrawings(snap.docs.map(d => ({ id: d.id, ...d.data() } as TechnicalDrawing))), err => {
+    const q = query(collection(db, "technical_drawings"), where("projectId", "==", projectId));
+    return onSnapshot(q, snap => setDrawings(snap.docs.map(d => ({ id: d.id, ...d.data() } as TechnicalDrawing)).sort((a,b) => b.createdAt.localeCompare(a.createdAt))), err => {
       console.warn("Project drawings load:", err);
     });
   }, [projectId]);
@@ -129,7 +129,7 @@ export default function ProjectAssetsPanel({ projectId, projectName, assets = []
       <h5 className="text-sm font-bold text-slate-800">Arquivos do projeto ({items.length})</h5>
       {items.map(item=><article key={item.id} className="flex items-center gap-3 rounded-lg border bg-white p-3">
         {item.kind==="pdf"?<FileText className="h-7 w-7 shrink-0 text-rose-600"/>:<ImagePlus className="h-7 w-7 shrink-0 text-blue-600"/>}
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-800">{item.name}</p><p className="text-xs text-slate-500">{item.source==="ai"?"Imagem IA":item.source==="internet"?"Internet":"Dispositivo"} • {new Date(item.createdAt).toLocaleString()}</p></div>
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-800">{item.name}</p><p className="text-xs text-slate-500">{item.source==="ai"?"Imagem IA":item.source==="internet"?"Internet":"Dispositivo"} • {new Date(item.createdAt).toLocaleString()}</p></div>{item.kind!=="pdf"&&<img src={item.url} alt={item.name} loading="lazy" className="h-12 w-16 rounded-md border object-cover"/>}
         <a href={item.url} target="_blank" rel="noreferrer" className="rounded-lg p-2 text-blue-600" aria-label="Abrir arquivo"><ExternalLink className="h-4 w-4"/></a>
         <button disabled={busy} onClick={()=>removeAsset(item)} className="rounded-lg p-2 text-rose-500" aria-label="Remover arquivo"><Trash2 className="h-4 w-4"/></button>
       </article>)}
