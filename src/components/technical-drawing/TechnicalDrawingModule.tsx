@@ -318,12 +318,17 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   }, [authReady]);
 
   const handleOpenDrawingPdf = async (targetDrawing?: TechnicalDrawing) => {
-    let target = targetDrawing || drawing;
-    if (!target.pdfDataUri && !(target as any).pdfUrl) {
-      try { const pdf = buildTechnicalDrawingPdf(target, senderConfig); target = { ...target, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb }; }
-      catch (error) { console.error("Could not build drawing preview PDF:", error); showToast("Não foi possível preparar a pré-visualização PDF.", "error"); return; }
+    // Sempre regenerar a partir dos dados editáveis atuais; nunca reutilizar PDF antigo/desatualizado.
+    const source = targetDrawing || drawing;
+    try {
+      const pdf = buildTechnicalDrawingPdf(source, senderConfig);
+      const target = { ...source, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb };
+      setDrawing(target);
+      setIsPdfModalOpen(true);
+    } catch (error) {
+      console.error("Could not build drawing preview PDF:", error);
+      showToast("Não foi possível preparar a pré-visualização PDF.", "error");
     }
-    setDrawing(target); setIsPdfModalOpen(true);
   };
 
   const handleSaveDrawing = async (targetDrawing: TechnicalDrawing = drawing, silent = false): Promise<boolean> => {
@@ -352,6 +357,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         updatedAt: now,
         pdfUrl,
         pdfStoragePath: storagePath,
+        ownerUid: user.uid,
+        schemaVersion: 2,
         pdfFileName: pdfRes.fileName,
         pdfGeneratedAt: now,
         pdfFileSizeKb: pdfRes.sizeKb,
@@ -420,7 +427,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         return;
       }
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/ai/technical-drawing", {
+      const res = await fetch("/api/technical-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
@@ -549,7 +556,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Save className="w-4 h-4 text-amber-400" />}
-            Salvar projeto
+            Salvar desenho
           </button>
           <button
             onClick={handleExportPdf}
