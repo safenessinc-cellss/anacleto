@@ -165,13 +165,13 @@ function findExactCatalogItem(item: any, catalog: any[]) {
   });
   if (exact) return exact;
   const ignored = new Set(["de","do","da","com","para","un","unidade","unidades","metro","metros","linear","componente","item","material"]);
-  const tokens = (value: unknown) => normalizeCatalogName(value).replace(/\\b\\d+(?:x\\d+)?\\b/g, " ").split(/\\s+/).filter((token) => token.length > 2 && !ignored.has(token));
+  const tokens = (value: unknown) => normalizeCatalogName(value).replace(/\b\d+(?:x\d+)?\b/g, " ").split(/\s+/).filter((token) => token.length > 2 && !ignored.has(token));
   const requested = tokens(item?.description);
   if (!requested.length) return undefined;
   let best: any = undefined;
   let bestScore = 0;
   for (const row of catalog) {
-    const candidate = tokens(row?.name || row?.description);
+    const candidate = [...new Set(tokens([row?.name, row?.description, row?.category, row?.brand, row?.dimensions].filter(Boolean).join(" ")))];
     if (!candidate.length) continue;
     const overlap = requested.filter((token) => candidate.some((part) => part === token || (token.length > 5 && part.length > 5 && (token.startsWith(part) || part.startsWith(token)))));
     const score = overlap.length / Math.max(requested.length, candidate.length);
