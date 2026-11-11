@@ -348,9 +348,14 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           message: userText,
-          currentQuote: selectedQuote,
-          history: newHistory,
-          catalog: catalogItems,
+          currentQuote: {
+            id: selectedQuote.id, number: selectedQuote.number, clientName: selectedQuote.clientName,
+            items: selectedQuote.items.map(item => ({ id: item.id, description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
+            subtotal: selectedQuote.subtotal, taxRate: selectedQuote.taxRate, discountRate: selectedQuote.discountRate || 0,
+            total: selectedQuote.total, currency: selectedQuote.currency, notes: selectedQuote.notes || "",
+          },
+          history: newHistory.slice(-12),
+          catalog: catalogItems.slice(0, 250),
         }),
       });
 
