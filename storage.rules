@@ -34,6 +34,14 @@ service firebase.storage {
           || request.resource.contentType.matches('image/(jpeg|png|webp)'));
       allow delete: if canManageProjects() && request.auth.uid == uid;
     }
+    match /technical-drawings/{uid}/{fileName} {
+      allow read: if canManageProjects();
+      allow create, update: if canManageProjects()
+        && request.auth.uid == uid
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow delete: if canManageProjects() && request.auth.uid == uid;
+    }
     match /purchases/{purchasePath=**} {
       allow read: if canManageFinance();
       allow create, update: if canManageFinance()
