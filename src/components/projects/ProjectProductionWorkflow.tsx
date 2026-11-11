@@ -50,7 +50,7 @@ export default function ProjectProductionWorkflow({projectId,projectName,project
         "REGRAS: preserve exatamente as dimensões fornecidas e a unidade. Não invente folgas, descontos, fórmulas de perfis, espessuras, códigos de sistema ou tolerâncias. Onde faltar informação, escreva PENDENTE DE CONFIRMAÇÃO e explique como obter a medida. Não libere corte real sem sistema de perfil e fórmula validados.",
         "Retorne desenho técnico com vistas/cotas, peças preliminares, plano de medição passo a passo (pontos, método, ferramenta, conferências), plano de corte preliminar por peça, sequência de fabricação/montagem, descrição do modelo 3D/visual final, checklist de qualidade e lista de premissas/pendências."
       ].join("\n");
-      const response=await fetch("/api/ai/technical-drawing",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({prompt,catalog:[]})});
+      const response=await fetch("/api/ai/technical-drawing",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({prompt,catalog:[],images:assets.filter(a=>a.kind==="image" && /^https:\/\//.test(a.url)).map(a=>a.url).slice(0,4)})});
       const data=await response.json().catch(()=>null);
       if(!response.ok)throw new Error(data?.error||"Falha ao gerar o dossiê técnico ("+response.status+").");
       if(data?._fallback)throw new Error("A IA está indisponível. Não foi criado um plano de fabricação fictício.");
