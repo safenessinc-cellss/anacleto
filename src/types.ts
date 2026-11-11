@@ -189,6 +189,8 @@ export interface TechnicalDrawing {
   pdfFileName?: string;
   pdfGeneratedAt?: string;
   pdfFileSizeKb?: number;
+  projectId?: string;
+  projectName?: string;
 }
 
 export interface LedgerEntry {
