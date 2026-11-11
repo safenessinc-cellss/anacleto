@@ -19,7 +19,7 @@ app.use(express.json({ limit: "16mb" }));
 const PORT = 3000;
 
 // Vercel AI Gateway supplies authentication in previews and deployments.
-const aiModel = gateway(process.env.ANACLETO_AI_MODEL || "google/gemini-3.8-flash");
+const aiModel = gateway(process.env.ANACLETO_AI_MODEL || "google/gemini-2.5-flash");
 
 const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
 const ownerEmail = "safeness.c.a@gmail.com";
@@ -234,8 +234,17 @@ Regras obrigatórias:
       notes: String(parsed.notes || ""),
     });
   } catch (err: any) {
-    console.error("Quote agent error:", err?.message || err);
-    return res.status(502).json({ error: "A IA não conseguiu gerar o orçamento. Nenhum preço não confirmado foi aplicado. Verifique o serviço de IA e tente novamente.", code: "QUOTE_AI_UNAVAILABLE" });
+    console.error("Quote agent error:", {
+      message: err?.message || String(err),
+      name: err?.name || "Error",
+      cause: err?.cause?.message || err?.cause || null,
+      statusCode: err?.statusCode || err?.status || null,
+      model: process.env.ANACLETO_AI_MODEL || "google/gemini-2.5-flash",
+    });
+    return res.status(502).json({
+      error: "O agente de orçamento está temporariamente indisponível. Verifique a configuração do Vercel AI Gateway e tente novamente.",
+      code: "QUOTE_AI_UNAVAILABLE",
+    });
   }
 });
 
