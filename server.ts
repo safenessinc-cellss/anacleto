@@ -3,7 +3,9 @@ import http from "http";
 import path from "path";
 import dotenv from "dotenv";
 // import estático de vite eliminado - se usa import dinámico en desarrollo
-import { generateText, gateway } from "ai";
+import { generateText } from "ai";
+import { AI_CONFIG, getAIModel } from "./src/server/ai-config";
+import { generateValidatedJson, parseAIJson } from "./src/server/ai-json";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -19,7 +21,7 @@ app.use(express.json({ limit: "16mb" }));
 const PORT = 3000;
 
 // Vercel AI Gateway supplies authentication in previews and deployments.
-const aiModel = gateway(process.env.ANACLETO_AI_MODEL || "google/gemini-2.5-flash");
+const aiModel = getAIModel("default");
 
 const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
 const ownerEmail = "safeness.c.a@gmail.com";
@@ -194,15 +196,20 @@ Regras obrigatórias:
 - Se não houver alteração solicitada, use action="none".
 `;
     const transcript = history.map((entry: any) => `${entry.role}: ${entry.text}`).join("\\n");
-    const response = await generateText({
-      model: aiModel,
+    const parsed = await generateValidatedJson({
+      capability: "quote",
       system: systemPrompt,
       prompt: `Histórico recente:\\n${transcript}\\n\\nSolicitação atual: ${message}`,
-      temperature: 0.1,
+      validate: (value: any) => {
+        if (!value || typeof value !== "object" || !Array.isArray(value.items)) throw new Error("Resposta de orçamento incompleta.");
+        if (value.items.length > 150) throw new Error("O orçamento excede o limite de 150 linhas.");
+        for (const item of value.items) {
+          const quantity = Number(item?.quantity);
+          if (!String(item?.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0) throw new Error("A IA retornou uma linha de orçamento inválida.");
+        }
+        return value;
+      },
     });
-    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) throw new Error("Resposta de orçamento incompleta.");
     const items = parsed.items.map((item: any, index: number) => {
       const quantity = Number(item.quantity);
       if (!String(item.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0) throw new Error("A IA retornou uma linha de orçamento inválida.");
@@ -246,7 +253,7 @@ Regras obrigatórias:
       name: err?.name || "Error",
       cause: err?.cause?.message || err?.cause || null,
       statusCode: err?.statusCode || err?.status || null,
-      model: process.env.ANACLETO_AI_MODEL || "google/gemini-2.5-flash",
+      model: AI_CONFIG.quote.model,
     });
     return res.status(502).json({
       error: "O agente de orçamento está temporariamente indisponível. Verifique a configuração do Vercel AI Gateway e tente novamente.",
@@ -261,15 +268,19 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
     const language = String(req.body?.language || "pt").slice(0, 8);
     const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
-    const response = await generateText({
-      model: aiModel,
-      temperature: 0.1,
+    const parsed = await generateValidatedJson({
+      capability: "budget",
       system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Só associe item do catálogo por SKU/código, ID ou nome completo EXATO. Informe sku/catalogItemId para validação. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
       prompt,
+      validate: (value: any) => {
+        if (!Array.isArray(value?.items) || !value.items.length || value.items.length > 150) throw new Error("A IA não retornou uma lista válida de itens.");
+        for (const item of value.items) {
+          const qty = Number(item?.qty);
+          if (!String(item?.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
+        }
+        return value;
+      },
     });
-    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.items) || !parsed.items.length) throw new Error("A IA não retornou itens.");
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
       if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
@@ -337,14 +348,17 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, rateLimitByUser("project
       try { parsed = new URL(sourceUrl); } catch { return res.status(400).json({ error: "Endereço de referência inválido." }); }
       if (!["http:", "https:"].includes(parsed.protocol)) return res.status(400).json({ error: "O endereço deve usar HTTP ou HTTPS." });
     }
-    const response = await generateText({
-      model: aiModel,
+    const project = await generateValidatedJson({
+      capability: "projectIntake",
       system: "Você é um analista de projetos. Organize os dados informados em JSON estrito. Não invente dimensões, cliente, preço ou código. Use strings vazias e zero quando desconhecidos. Responda somente com {name,code,category,client,summary,width,height,quantity,price}. width e height são milímetros quando explicitamente informados; price é BRL apenas se o usuário informar.",
       prompt: JSON.stringify({ name, description, sourceUrl }),
-      temperature: 0.2,
+      validate: (value: any) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Resposta da IA inválida.");
+        for (const field of ["name", "code", "category", "client", "summary"]) if (value[field] !== undefined && typeof value[field] !== "string") throw new Error("Campo textual inválido: " + field);
+        for (const field of ["width", "height", "quantity", "price"]) if (value[field] !== undefined && !Number.isFinite(Number(value[field]))) throw new Error("Campo numérico inválido: " + field);
+        return value;
+      },
     });
-    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const project = JSON.parse(raw);
     if (!project || typeof project !== "object" || Array.isArray(project)) throw new Error("Resposta da IA inválida.");
     return res.json({ project: {
       name: String(project.name || name || "Novo projeto").slice(0, 180),
@@ -484,7 +498,7 @@ app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("tech
     `;
 
     const response = await generateText({
-      model: aiModel,
+      model: getAIModel("technicalDrawing"),
       system: systemPrompt,
       prompt: `Diseña y despieza la siguiente pieza arquitectónica o mueble: "${prompt}"`,
       temperature: 0.2,
@@ -717,7 +731,7 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
     ? { type: "file" as const, data: binary, mediaType: mimeType, filename: fileName.slice(0, 120) }
     : { type: "image" as const, image: binary, mediaType: mimeType };
   const response = await generateText({
-    model: gateway("google/gemini-2.5-flash"),
+    model: getAIModel("documentExtraction"),
     messages: [{ role: "user", content: [{ type: "text", text: prompt }, attachment] }],
     temperature: 0.1,
     maxOutputTokens,
