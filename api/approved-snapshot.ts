@@ -115,8 +115,16 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
   const sourceName = base() + "/" + collection + "/" + encodeURIComponent(documentId);
   const now = new Date().toISOString();
   const sourceUpdate = collection === "quotes"
-    ? { status: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now }
-    : { isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now };
+    ? {
+        status: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now,
+        items: snapshot.document.items, subtotal: snapshot.document.subtotal, discountAmount: snapshot.document.discountAmount,
+        taxAmount: snapshot.document.taxAmount, total: snapshot.document.total, senderSnapshot: snapshot.senderSnapshot,
+      }
+    : {
+        isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedSnapshotId: snapshotId,
+        approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now,
+        budget: snapshot.document.budget, senderSnapshot: snapshot.senderSnapshot,
+      };
   const writes = [
     { update: { name: snapshotName, fields: encodeFields(snapshot) }, currentDocument: { exists: false } },
     { update: { name: sourceName, fields: encodeFields(sourceUpdate) }, updateMask: { fieldPaths: Object.keys(sourceUpdate) }, currentDocument: { updateTime } },
@@ -200,7 +208,7 @@ export default async function handler(req: any, res: any) {
       const discountAmount = Number((subtotal * discountRate / 100).toFixed(2));
       const taxAmount = Number((Math.max(0, subtotal - discountAmount) * taxRate / 100).toFixed(2));
       const total = Number((subtotal - discountAmount + taxAmount).toFixed(2));
-      const { pdfDataUri: _pdfDataUri, ...sourceWithoutPdf } = source;
+      const { pdfDataUri: _pdfDataUri, pdfFileName: _pdfFileName, pdfGeneratedAt: _pdfGeneratedAt, pdfFileSizeKb: _pdfFileSizeKb, ...sourceWithoutPdf } = source;
       const approvedAt = new Date().toISOString();
       snapshot = {
         schemaVersion: 1, type: "quote", documentId, documentNumber: source.number || "", status: "approved",
