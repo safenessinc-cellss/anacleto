@@ -81,9 +81,7 @@ export default function ProjectAssetsPanel({ projectId, projectName, assets = []
     let parsed: URL;
     try { parsed = new URL(imageUrl.trim()); } catch { setError("Informe uma URL válida de imagem."); return; }
     if (parsed.protocol !== "https:") { setError("A URL deve usar HTTPS."); return; }
-    if (!/\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i.test(parsed.pathname + parsed.search) && !parsed.hostname.match(/(images\.unsplash\.com|firebasestorage\.googleapis\.com|storage\.googleapis\.com)/i)) {
-      setError("Use um link direto de imagem (JPG, PNG, WEBP, GIF ou AVIF)."); return;
-    }
+    if (!parsed.hostname) { setError("Informe um endereço de imagem válido."); return; }
     setBusy(true); setError("");
     try {
       await persistAsset({
