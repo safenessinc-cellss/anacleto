@@ -25,8 +25,8 @@ export default function FinanceModule({ language = "pt" }: { language?: string }
     { id: "suppliers" as FinanceTab, label: "Fornecedores", icon: Building2 },
     { id: "pending_boletos" as FinanceTab, label: "Boletos a Revisar", icon: FileText },
     { id: "payments" as FinanceTab, label: "Pagamentos", icon: CreditCard },
-    { id: "employee_payments" as FinanceTab, label: "Pagamentos de Funcionários", icon: CreditCard },
-    { id: "payroll" as FinanceTab, label: "Folha de Pagamentos", icon: Wallet },
+    { id: "employee_payments" as FinanceTab, label: "Pagamentos Efetuados", icon: CreditCard },
+    { id: "payroll" as FinanceTab, label: "Folha de Pagamento", icon: Wallet },
     { id: "reports" as FinanceTab, label: "Relatórios", icon: FileText },
     { id: "fiscal_documents" as FinanceTab, label: "Notas fiscais", icon: FileText },
     ];
