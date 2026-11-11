@@ -669,14 +669,7 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
 
   // Página 1: identificação, dimensões e as três vistas do MESMO modelo do editor.
   drawHeader("DESENHO TÉCNICO 2D — " + (drawing.title || "Projeto"), "ANACLETO ESQUADRIAS • Documento gerado a partir dos dados editáveis do projeto");
-  if ((drawing as any).draftStatus === "preliminary") {
-    doc.setTextColor(180, 83, 9);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO", pageWidth / 2, 30, { align: "center" });
-    doc.setFontSize(8);
-    doc.setTextColor(90, 90, 90);
-  }
+  // O selo definitivo de rascunho é aplicado a todas as páginas após a composição do documento.
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(15, 23, 42);
@@ -757,6 +750,17 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
   });
 
   applyDocumentWatermark(doc, sender);
+  if ((drawing as any).isDraft !== false || (drawing as any).status !== "APPROVED_FOR_MANUFACTURING") {
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(185, 28, 28);
+      doc.text("BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN", pageWidth / 2, 27, { align: "center" });
+      doc.setFontSize(8);
+    }
+  }
   const cleanTitle = (drawing.title || "Projeto").replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = "Desenho_Tecnico_" + cleanTitle + ".pdf";
   const dataUri = doc.output("datauristring");
