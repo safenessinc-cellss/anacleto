@@ -150,73 +150,68 @@ app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
 // ----------------------------------------------------
 app.post("/api/ai/quote-agent", requireFirebaseAuth, async (req, res) => {
   try {
-    const { message, currentQuote, history = [] } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ error: "Mensaje requerido" });
-    }
-
-
+    const message = String(req.body?.message || "").trim();
+    const currentQuote = req.body?.currentQuote || {};
+    if (!message) return res.status(400).json({ error: "Mensagem obrigatória." });
+    const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
     const systemPrompt = `
-      Eres el Agente Experto de Presupuestos y Facturación de Anacleto Pro.
-      Tu misión es asistir al usuario creando y modificando presupuestos en tiempo real mediante lenguaje natural.
-      
-      Capacidades:
-      1. Generar o añadir ítems cuando el usuario describe un trabajo, servicio, producto de aluminio, vidrio, mueble o instalación (con descripción profesional, cantidad, precio unitario coherente de mercado y cálculo de subtotal).
-      2. Modificar el IVA cuando el usuario lo solicite (ej: "cambia el IVA al 21%", "aplica IVA del 10%").
-      3. Aplicar descuentos cuando se pida (ej: "añade un descuento del 10%", "descuento del 15%").
-      4. Preparar la conversión a factura cuando el usuario diga "genera la factura de este presupuesto", "factura este presupuesto", etc., fijando action = "generate_invoice".
-      5. Responder amablemente explicando los cambios realizados en el campo "reply".
-
-      Estado actual del presupuesto:
-      ${JSON.stringify(currentQuote || {})}
-
-      DEBES responder SIEMPRE en formato JSON estricto con el siguiente schema:
-      {
-        "reply": "Texto explicativo para el usuario en español",
-        "action": "update_quote" | "generate_invoice" | "none",
-        "items": [
-          { "id": "id_string", "description": "Nombre técnico del ítem", "quantity": 1, "unitPrice": 100, "subtotal": 100 }
-        ],
-        "taxRate": 21,
-        "discountRate": 0,
-        "notes": "Observaciones opcionales"
+Você é o agente técnico de orçamentos da Anacleto.
+Responda exclusivamente JSON válido: {"reply":"...","action":"update_quote|generate_invoice|none","items":[{"id":"...","description":"...","quantity":1,"unitPrice":0,"subtotal":0,"priceSource":"catalog|pending"}],"taxRate":0,"discountRate":0,"notes":""}.
+Estado atual: ${JSON.stringify(currentQuote)}
+Catálogo real disponível: ${JSON.stringify(catalog)}
+Regras obrigatórias:
+- Use preços unitários somente de itens encontrados no catálogo, sem alterar o valor cadastrado.
+- Se não houver correspondência confiável, unitPrice=0 e priceSource="pending"; explique que falta preço confirmado. Nunca estime ou invente preço.
+- Preserve itens atuais, quantidades e preços quando a instrução não pedir alteração.
+- Só modifique impostos/descontos quando explicitamente solicitado.
+- Para gerar itens, descreva materiais, medidas, quantidades e serviços claramente.
+- Não gere fatura nem altere estado do orçamento; apenas retorne action=generate_invoice quando solicitado.
+- Não inclua itens fictícios nem preencha valores ausentes com preços de mercado.
+`;
+    const response = await generateText({ model: aiModel, system: systemPrompt, prompt: message, temperature: 0.1 });
+    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) throw new Error("Resposta de orçamento incompleta.");
+    const items = parsed.items.map((item: any, index: number) => {
+      const quantity = Number(item.quantity);
+      const unitPrice = Number(item.unitPrice);
+      if (!String(item.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0) {
+        throw new Error("A IA retornou uma linha de orçamento inválida.");
       }
-    `;
+      return { id: String(item.id || `ai-${index + 1}`), description: String(item.description).slice(0, 500), quantity, unitPrice, subtotal: Number((quantity * unitPrice).toFixed(2)), priceSource: item.priceSource === "catalog" ? "catalog" : "pending" };
+    });
+    return res.json({ reply: String(parsed.reply || "Itens preparados. Confirme os preços pendentes antes de aprovar."), action: parsed.action === "generate_invoice" ? "generate_invoice" : "update_quote", items, taxRate: Number.isFinite(Number(parsed.taxRate)) ? Number(parsed.taxRate) : Number(currentQuote.taxRate || 0), discountRate: Number.isFinite(Number(parsed.discountRate)) ? Number(parsed.discountRate) : Number(currentQuote.discountRate || 0), notes: String(parsed.notes || "") });
+  } catch (err: any) {
+    console.error("Quote agent error:", err?.message || err);
+    return res.status(502).json({ error: "A IA não conseguiu gerar o orçamento. Nenhum preço fictício foi aplicado. Verifique o serviço de IA e tente novamente.", code: "QUOTE_AI_UNAVAILABLE" });
+  }
+});
 
+app.post("/api/ai/budget-items", requireFirebaseAuth, async (req, res) => {
+  try {
+    const prompt = String(req.body?.prompt || "").trim();
+    const language = String(req.body?.language || "pt").slice(0, 8);
+    const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
+    if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
     const response = await generateText({
       model: aiModel,
-      system: systemPrompt,
-      prompt: message,
-      temperature: 0.3,
+      temperature: 0.1,
+      system: `Você é especialista em orçamentos de esquadrias, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas e quantidades com base no pedido. Só use preço existente quando houver correspondência exata no catálogo. Sem preço correspondente, use price=0 e priceSource="pending". Nunca invente preços, custos de mercado, impostos ou valores. Não invente medidas ausentes; liste-as como pendências.`,
+      prompt,
     });
-
-    const parsed = JSON.parse(response.text || "{}");
-    return res.json(parsed);
+    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.items) || !parsed.items.length) throw new Error("A IA não retornou itens.");
+    const items = parsed.items.map((item: any) => {
+      const qty = Number(item.qty);
+      const price = Number(item.price);
+      if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0) throw new Error("Linha inválida retornada pela IA.");
+      return { description: String(item.description).slice(0, 500), qty, price, priceSource: item.priceSource === "catalog" ? "catalog" : "pending" };
+    });
+    return res.json({ items, notes: String(parsed.notes || "") });
   } catch (err: any) {
-    console.error("Quote agent error:", err);
-    // Intelligent fallback in case of rate limits or parsing failure
-    const msg = (req.body?.message || "").toLowerCase();
-    let taxRate = req.body?.currentQuote?.taxRate ?? 21;
-    let discountRate = req.body?.currentQuote?.discountRate ?? 0;
-    let action = "update_quote";
-
-    if (msg.includes("iva") && msg.includes("21")) taxRate = 21;
-    if (msg.includes("iva") && msg.includes("10")) taxRate = 10;
-    if (msg.includes("descuento") && msg.includes("10")) discountRate = 10;
-    if (msg.includes("descuento") && msg.includes("15")) discountRate = 15;
-    if (msg.includes("factura")) action = "generate_invoice";
-
-    return res.json({
-      reply: `He procesado tu solicitud: ${action === "generate_invoice" ? "Preparando factura correlativa..." : "Presupuesto actualizado correctamente."}`,
-      action: action,
-      items: req.body?.currentQuote?.items || [
-        { id: "item-1", description: "Esquadria de Alumínio Linha Suprema / Gold sob medida", quantity: 1, unitPrice: 850, subtotal: 850 }
-      ],
-      taxRate: taxRate,
-      discountRate: discountRate,
-      notes: "Procesado con respaldo local seguro."
-    });
+    console.error("Budget items AI error:", err?.message || err);
+    return res.status(502).json({ error: "Falha ao gerar os itens do orçamento. Nenhum valor fictício foi aplicado.", code: "BUDGET_AI_UNAVAILABLE" });
   }
 });
 
