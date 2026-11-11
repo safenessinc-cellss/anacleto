@@ -767,7 +767,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                       setDrawing(item);
                       setSelectedProjectId(item.projectId || "");
                       setCurrentStep(1);
-                      showToast(`Cargado proyecto: ${item.title}`, "info");
+                      handleOpenDrawingPdf(item);
                     }}
                     className={`p-3 rounded-2xl border text-left transition relative group ${
                       drawing.id === item.id
@@ -777,22 +777,14 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                   >
                     <div className="flex items-start justify-between gap-1">
                       <div className="min-w-0 flex-1"><h5 className="text-xs font-bold truncate">{item.title}</h5><p className="mt-1 truncate text-[10px] text-slate-500">{item.projectName || "Sem projeto associado"}</p></div>
-                      {item.pdfDataUri && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenDrawingPdf(item);
-                          }}
-                          title="Ver plano PDF almacenado"
-                          className="p-1 hover:bg-slate-800 text-slate-400 hover:text-amber-400 rounded-md transition"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      <span className="flex items-center gap-1">
+                        {(item.pdfDataUri || (item as any).pdfUrl) && <Eye className="h-3.5 w-3.5 text-emerald-400" />}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteDrawing(item); }} title="Eliminar PDF" className="rounded-md p-1 text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-1">
                       <span>{item.overallDimensions?.width}×{item.overallDimensions?.height} {item.unit}</span>
-                      {item.pdfDataUri && (
+                      {(item.pdfDataUri || (item as any).pdfUrl) && (
                         <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20">
                           PDF ({item.pdfFileSizeKb || 40} KB)
                         </span>
@@ -812,7 +804,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         onClose={() => setIsPdfModalOpen(false)}
         title={drawing.title}
         subtitle={`Dimensões: ${drawing.overallDimensions?.width || 0}×${drawing.overallDimensions?.height || 0} cm • ${drawing.pieces?.length || 0} peças tipo encaixe • Memorial técnico`}
-        pdfDataUri={drawing.pdfDataUri}
+        pdfDataUri={drawing.pdfDataUri || (drawing as any).pdfUrl}
         fileName={drawing.pdfFileName || `Plano_Tecnico_${(drawing.title || "Proyecto").replace(/\s+/g, "_")}.pdf`}
         fileSizeKb={drawing.pdfFileSizeKb}
         storedAt={drawing.pdfGeneratedAt || drawing.updatedAt}
