@@ -253,7 +253,7 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
 // ----------------------------------------------------
 // 3. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
-app.post("/api/ai/technical-drawing", requireFirebaseAuth, async (req, res) => {
+app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("technical-drawing", 12, 60_000), async (req, res) => {
   try {
     const { prompt, currentDrawing, catalog = [] } = req.body;
 
@@ -450,6 +450,7 @@ app.post("/api/ai/technical-drawing", requireFirebaseAuth, async (req, res) => {
     // The AI service is optional: always return a valid drawing so a provider
     // timeout, quota error, or malformed model response never becomes a 500.
     return res.status(200).json({
+      _fallback: true,
       title: title,
       description: "Generado con motor técnico de arquitectura e ingeniería Anacleto Pro.",
       category: isWindow ? "aluminum_window" : isTable ? "furniture" : "architectural",

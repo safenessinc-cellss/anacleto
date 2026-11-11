@@ -158,6 +158,93 @@ const initialSampleDrawing: TechnicalDrawing = {
   updatedAt: new Date().toISOString(),
 };
 
+
+function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
+  const normalized = input.toLowerCase();
+  const numbers = [...normalized.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?))?/g)];
+  const parsed = numbers[0];
+  const unit = /\bmm\b|milímetro|milimetro/.test(normalized) ? "mm" : "cm";
+  const factor = unit === "mm" ? 10 : 1;
+  const toNumber = (value?: string) => value ? Number(value.replace(",", ".")) : 0;
+  const width = Math.max(1, parsed ? toNumber(parsed[1]) : 100);
+  const height = Math.max(1, parsed ? toNumber(parsed[2]) : 100);
+  const depth = Math.max(1, parsed && parsed[3] ? toNumber(parsed[3]) : (normalized.includes("janela") || normalized.includes("ventana") ? 12 * factor : 50 * factor));
+  const isWindow = /janela|ventana|esquadria|corredi[cç]a/.test(normalized);
+  const isDoor = /porta|puerta/.test(normalized);
+  const isTable = /mesa|table/.test(normalized);
+  const isWardrobe = /arm[aá]rio|closet|guarda roupa/.test(normalized);
+  const category: TechnicalDrawing["category"] = isWindow ? "aluminum_window" : isDoor ? "glass_door" : isTable || isWardrobe ? "furniture" : "custom";
+  const title = isWindow ? "Esquadria / janela sob medida" : isDoor ? "Porta sob medida" : isTable ? "Mesa sob medida" : isWardrobe ? "Armário sob medida" : "Projeto técnico sob medida";
+  const material = isWindow || isDoor ? "Alumínio / vidro — especificação a validar" : "Material a definir pelo responsável técnico";
+  const piece = (id: string, name: string, qty: number, w: number, h: number, d: number, color: string): TechnicalDrawing["pieces"][number] => ({
+    id, pieceNumber: Number(id.replace("p", "")), name, quantity: qty,
+    dimensions: { width: w, height: h, depth: d, thickness: d, unit },
+    material, color, cutAngle: /45|inglete|mitre/.test(normalized) ? "Ângulo solicitado: validar corte a 45°" : "90° — validar antes de fabricar",
+    notes: "Dimensão preliminar gerada localmente; confirmar medidas, folgas e sistema de perfil antes da produção."
+  });
+  let pieces: TechnicalDrawing["pieces"];
+  if (isTable) {
+    const leg = Math.max(1, height - 4);
+    pieces = [
+      piece("p1", "Tampo superior", 1, width, 4, depth, "#C5A850"),
+      piece("p2", "Pés / montantes", 4, 8, leg, 8, "#8C6D37"),
+      piece("p3", "Travessas longitudinais", 2, Math.max(1, width - 16), 10, 3, "#A88440"),
+      piece("p4", "Travessas transversais", 2, Math.max(1, depth - 16), 10, 3, "#735728")
+    ];
+  } else if (isWindow || isDoor) {
+    pieces = [
+      piece("p1", "Perfil superior do marco", 1, width, 8, depth, "#94A3B8"),
+      piece("p2", "Perfil inferior do marco", 1, width, 8, depth, "#64748B"),
+      piece("p3", "Montantes laterais", 2, 8, height, depth, "#475569"),
+      piece("p4", "Folhas / painéis", isWindow ? 2 : 1, Math.max(1, width / (isWindow ? 2 : 1) - 2), Math.max(1, height - 12), 4, "#60A5FA")
+    ];
+  } else if (isWardrobe) {
+    pieces = [
+      piece("p1", "Lateral esquerda", 1, depth, height, 2, "#64748B"),
+      piece("p2", "Lateral direita", 1, depth, height, 2, "#64748B"),
+      piece("p3", "Tampo e base", 2, Math.max(1, width - 4), depth, 2, "#94A3B8"),
+      piece("p4", "Portas frontais", 2, Math.max(1, width / 2 - 2), Math.max(1, height - 6), 2, "#C5A850")
+    ];
+  } else {
+    pieces = [
+      piece("p1", "Componente principal", 1, width, height, depth, "#C5A850"),
+      piece("p2", "Elemento de suporte", 2, Math.max(1, width / 2), Math.max(1, height), Math.max(1, depth / 4), "#60A5FA"),
+      piece("p3", "Reforços / uniões", 2, Math.max(1, width / 5), Math.max(1, height / 5), Math.max(1, depth / 5), "#94A3B8")
+    ];
+  }
+  const steps = initialSampleDrawing.steps.map((step, index) => ({
+    ...step,
+    stepNumber: index + 1,
+    phaseName: ["Definição das dimensões gerais", "Despiece e lista de componentes", "Corte e cotagem individual", "Encaixe e montagem", "Vista final e conferência"][index],
+    title: ["Dimensões gerais", "Lista de peças", "Corte de cada peça", "Montagem / encaixe", "Resultado final"][index],
+    description: [
+      `Dimensões informadas: largura ${width} × altura ${height} × profundidade ${depth} ${unit}.`,
+      `Foram estruturados ${pieces.length} grupos de componentes para detalhamento.`,
+      "Cotas e ângulos são preliminares e precisam de validação técnica.",
+      "Verificar sequência, esquadro, folgas e fixações adequadas ao material.",
+      "Conferir medidas reais e tolerâncias antes de liberar para fabricação."
+    ][index],
+    instructions: [
+      ["Confirmar largura, altura e profundidade no local."],
+      ["Conferir materiais, quantidades e identificadores."],
+      ["Validar espessuras, folgas, ângulos e ferramentas."],
+      ["Montar a seco e verificar alinhamento e esquadro."],
+      ["Aprovar o desenho revisado antes da fabricação."]
+    ][index]
+  }));
+  return {
+    id: `draw_local_${Date.now()}`, title, description: `Projeto preliminar criado a partir de: ${input}`,
+    category, unit, overallDimensions: { width, height, depth }, pieces,
+    dimensionLines: [
+      { id: "d1", label: `${width} ${unit}`, value: width, unit, orientation: "horizontal", start: { x: 80, y: 50 }, end: { x: 520, y: 50 } },
+      { id: "d2", label: `${height} ${unit}`, value: height, unit, orientation: "vertical", start: { x: 50, y: 80 }, end: { x: 50, y: 380 } },
+      { id: "d3", label: `${depth} ${unit}`, value: depth, unit, orientation: "diagonal", start: { x: 540, y: 80 }, end: { x: 570, y: 50 } }
+    ],
+    assemblyInstructions: ["Conferir todas as dimensões no local.", "Validar componentes e materiais.", "Executar corte apenas após aprovação técnica.", "Montar e verificar esquadro e folgas.", "Registrar revisão final do projeto."],
+    steps, currentStep: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  };
+}
+
 export default function TechnicalDrawingModule({ senderConfig, language = "pt"}: TechnicalDrawingModuleProps) {
   // Esperar autenticación antes de escuchar Firestore
   const [authReady, setAuthReady] = useState(false);
@@ -185,18 +272,18 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   // Load saved drawings from Firestore
   useEffect(() => {
+    if (!authReady || !auth.currentUser) {
+      setSavedDrawings([]);
+      return;
+    }
     const unsub = onSnapshot(
       query(collection(db, "technical_drawings"), orderBy("createdAt", "desc")),
       (snap) => {
         const list: TechnicalDrawing[] = [];
-        snap.forEach((d) => {
-          list.push({ id: d.id, ...d.data() } as TechnicalDrawing);
-        });
+        snap.forEach((d) => list.push({ id: d.id, ...d.data() } as TechnicalDrawing));
         setSavedDrawings(list);
       },
-      (err) => {
-        console.warn("Firestore drawings load notice:", err);
-      }
+      (err) => console.warn("Firestore drawings load notice:", err)
     );
     return () => unsub();
   }, [authReady]);
@@ -247,75 +334,96 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   };
 
   const handleGenerate = async (presetPrompt?: string) => {
-    const inputPrompt = presetPrompt || prompt;
-    if (!inputPrompt.trim()) {
+    const inputPrompt = (presetPrompt || prompt).trim();
+    if (!inputPrompt) {
       showToast("Descreva a peça ou o móvel que deseja projetar.", "warning");
       return;
     }
 
     setIsLoading(true);
+    let generated: TechnicalDrawing | null = null;
+    let usedLocalFallback = false;
     try {
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) throw new Error("Entre na sua conta para gerar projetos técnicos.");
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre na sua conta para gerar e salvar projetos técnicos.");
+      const idToken = await user.getIdToken();
       const res = await fetch("/api/ai/technical-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
       });
-
       const responseBody = await res.json().catch(() => null);
-      if (!res.ok) {
-        const serverMessage = responseBody?.error || responseBody?.details;
-        throw new Error(serverMessage || `Error en el servidor de IA (${res.status})`);
+      if (!res.ok) throw new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
+      if (responseBody?._fallback) throw new Error("A IA está indisponível; será usado o gerador local com as dimensões informadas.");
+      if (!responseBody || !Array.isArray(responseBody.pieces) || responseBody.pieces.length === 0) {
+        throw new Error("O serviço retornou um desenho sem componentes renderizáveis.");
       }
-
-      const data = responseBody;
-      const newDrawing: TechnicalDrawing = {
-        id: "draw_" + Math.random().toString(36).substring(2, 9),
-        title: data.title || "Peça Arquitectónica a Medida",
-        description: data.description || inputPrompt,
-        category: data.category || "custom",
-        unit: data.unit || "cm",
-        overallDimensions: data.overallDimensions || { width: 100, height: 100, depth: 50 },
-        pieces: data.pieces || [],
-        dimensionLines: data.dimensionLines || [],
-        assemblyInstructions: data.assemblyInstructions || [],
-        steps: data.steps || initialSampleDrawing.steps,
+      const dimensions = responseBody.overallDimensions || {};
+      const width = Number(dimensions.width);
+      const height = Number(dimensions.height);
+      const depth = Number(dimensions.depth || 0);
+      if (![width, height].every((n) => Number.isFinite(n) && n > 0)) {
+        throw new Error("O serviço retornou dimensões inválidas.");
+      }
+      generated = {
+        id: "draw_" + Date.now().toString(36),
+        title: responseBody.title || "Projeto técnico sob medida",
+        description: responseBody.description || inputPrompt,
+        category: responseBody.category || "custom",
+        unit: responseBody.unit === "mm" ? "mm" : "cm",
+        overallDimensions: { width, height, depth: depth > 0 ? depth : undefined },
+        pieces: responseBody.pieces,
+        dimensionLines: Array.isArray(responseBody.dimensionLines) ? responseBody.dimensionLines : [],
+        assemblyInstructions: Array.isArray(responseBody.assemblyInstructions) ? responseBody.assemblyInstructions : [],
+        steps: Array.isArray(responseBody.steps) && responseBody.steps.length >= 5 ? responseBody.steps.slice(0, 5) : initialSampleDrawing.steps,
         currentStep: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        budget: responseBody.budget,
       };
+    } catch (error) {
+      console.error("Technical drawing AI unavailable; generating local draft:", error);
+      generated = buildLocalTechnicalDrawing(inputPrompt);
+      usedLocalFallback = true;
+    }
 
-      setDrawing(newDrawing);
+    try {
+      if (!generated) throw new Error("Não foi possível montar o desenho técnico.");
+      setDrawing(generated);
       setCurrentStep(1);
-      showToast("Desenho técnico e lista de peças gerados com sucesso!", "success");
+      if (!presetPrompt) setPrompt("");
 
-      // Auto-save to Firestore with persistent PDF
       try {
-        const pdfRes = buildTechnicalDrawingPdf(newDrawing, senderConfig);
+        const pdfRes = buildTechnicalDrawingPdf(generated, senderConfig);
         const savedWithPdf: TechnicalDrawing = {
-          ...newDrawing,
+          ...generated,
           pdfDataUri: pdfRes.dataUri,
           pdfFileName: pdfRes.fileName,
           pdfGeneratedAt: new Date().toISOString(),
           pdfFileSizeKb: pdfRes.sizeKb,
+          updatedAt: new Date().toISOString(),
         };
         setDrawing(savedWithPdf);
-        await setDoc(doc(db, "technical_drawings", newDrawing.id), savedWithPdf);
-      } catch (err) {
-        console.warn("Auto-save notice:", err);
+        if (auth.currentUser) {
+          await setDoc(doc(db, "technical_drawings", savedWithPdf.id), savedWithPdf);
+          showToast(usedLocalFallback
+            ? "Desenho preliminar gerado localmente e salvo. Revise as medidas antes de fabricar."
+            : "Desenho técnico, despiece e PDF gerados e salvos.", "success");
+        } else {
+          showToast("Desenho gerado localmente. Entre novamente para salvar no projeto.", "warning");
+        }
+      } catch (saveError) {
+        console.error("Drawing PDF / persistence error:", saveError);
+        showToast(usedLocalFallback
+          ? "Desenho preliminar gerado localmente, mas não foi possível salvar o PDF."
+          : "Desenho gerado; houve uma falha ao salvar o PDF no projeto.", "warning");
       }
-
-      if (!presetPrompt) setPrompt("");
-    } catch (err: any) {
-      console.error(err);
-      showToast("Não foi possível acessar a IA técnica. Usando o gerador inteligente local.", "info");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleExportPdf = () => {
+    const handleExportPdf = () => {
     try {
       exportTechnicalDrawingPdf(drawing, senderConfig);
       showToast("Desenho técnico e memorial exportados para PDF.", "success");
