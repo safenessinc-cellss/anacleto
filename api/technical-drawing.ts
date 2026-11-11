@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "../src/server/ai-config";
 import { parseAIJson } from "../src/server/ai-json";
+import { loadCatalogFromFirestore } from "../src/server/firestore-data";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
@@ -146,7 +147,7 @@ export default async function handler(req: any, res: any) {
       return json(res, 400, { error: "Descreva a peça e suas dimensões.", code: "PROMPT_REQUIRED" });
     }
 
-    const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 200) : [];
+    let catalog: any[] = [];
     const currentDrawing = body.currentDrawing && typeof body.currentDrawing === "object" &&
       !Array.isArray(body.currentDrawing) && body.currentDrawing.id !== "draw-sample-01"
       ? JSON.stringify(body.currentDrawing).slice(0, 18000)
@@ -174,6 +175,7 @@ export default async function handler(req: any, res: any) {
       return json(res, 401, { error: "Sessão inválida ou acesso não autorizado. Entre novamente.", code: "UNAUTHORIZED" });
     }
     authenticated = true;
+    catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
 
     if (!allowRequest(user.uid)) {
       return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
