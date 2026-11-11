@@ -248,6 +248,8 @@ function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
   }));
   return {
     id: `draw_local_${Date.now()}`, title, description: `Projeto preliminar criado a partir de: ${input}`,
+    isDraft: true, status: "PRELIMINARY_CONTINGENCY", draftStatus: "preliminary",
+    draftLabel: "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN",
     category, unit, overallDimensions: { width, height, depth }, pieces,
     dimensionLines: [
       { id: "d1", label: `${width} ${unit}`, value: width, unit, orientation: "horizontal", start: { x: 80, y: 50 }, end: { x: 520, y: 50 } },
