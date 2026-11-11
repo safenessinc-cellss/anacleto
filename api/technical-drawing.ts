@@ -138,7 +138,7 @@ export default async function handler(req: any, res: any) {
       prompt: `Crie o desenho técnico, despiece e cotas para: ${prompt}`,
       temperature: 0.2,
     });
-    const raw = (result.text || "").replace(/^```(?:json)?\\s*/i, "").replace(/\\s*```$/i, "").trim();
+    const raw = (result.text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     const drawing = JSON.parse(raw);
     const dims = drawing.overallDimensions || {};
     if (!Array.isArray(drawing.pieces) || !drawing.pieces.length ||
