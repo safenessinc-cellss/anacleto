@@ -333,6 +333,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   const handleApproveDrawing = async () => {
     if (!drawing?.id || !drawing.pieces?.length) return;
+    if (drawing.id === "draw-sample-01") {
+      showToast("Gere ou abra um projeto real antes de aprová-lo para fabricação.", "warning");
+      return;
+    }
     if (drawing.approvedSnapshotId) {
       showToast("Este desenho já está aprovado e bloqueado para fabricação.", "warning");
       return;
@@ -364,11 +368,11 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     const source = targetDrawing || drawing;
     try {
       let pdfSource = source;
-      let pdfSender = senderConfig;
+      let pdfSender: SenderConfig | undefined;
       if (source.approvedSnapshotId) {
         const snapshot = await loadApprovedDrawingSnapshot(source.approvedSnapshotId);
         pdfSource = snapshot.document as TechnicalDrawing;
-        pdfSender = snapshot.senderSnapshot || {};
+        pdfSender = snapshot.senderSnapshot as SenderConfig | undefined;
       }
       const pdf = buildTechnicalDrawingPdf(pdfSource, pdfSender);
       const target = { ...pdfSource, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb };
@@ -580,11 +584,11 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     const handleExportPdf = () => {
     try {
       let source = drawing;
-      let sender = senderConfig;
+      let sender: SenderConfig | undefined = senderConfig;
       if (drawing.approvedSnapshotId) {
         const snapshot = await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId);
         source = snapshot.document as TechnicalDrawing;
-        sender = snapshot.senderSnapshot || {};
+        sender = snapshot.senderSnapshot as SenderConfig | undefined;
       }
       exportTechnicalDrawingPdf(source, sender);
       showToast("Desenho técnico e memorial exportados para PDF.", "success");
