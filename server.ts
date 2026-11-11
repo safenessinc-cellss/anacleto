@@ -330,7 +330,7 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
     const quantity = Math.max(1, Number(item.quantity) || 1);
     const match = findExactCatalogItem(item, catalogRows);
     const catalogPrice = match ? Number(match.price) : 0;
-    const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+    const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
     const unitPrice = confirmed ? catalogPrice : 0;
     return {
       ...item,
