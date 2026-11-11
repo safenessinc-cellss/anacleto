@@ -289,6 +289,7 @@ export default async function handler(req: any, res: any) {
         return value;
       });
     } catch (firstError) {
+      const repairStartedAt = Date.now();
       const repaired = await generateText({
         model: getAIModel("technicalDrawing"),
         system: system + "\nRetorne somente JSON válido. Corrija exclusivamente a estrutura; preserve os dados, não invente medidas, materiais, ferragens ou componentes.",
@@ -296,6 +297,15 @@ export default async function handler(req: any, res: any) {
         temperature: 0,
         maxOutputTokens: AI_CONFIG.technicalDrawing.maxOutputTokens,
         abortSignal: AbortSignal.timeout(AI_CONFIG.technicalDrawing.timeoutMs),
+      });
+      await recordAIAudit({
+        serviceName: "TECHNICAL_DRAWING",
+        modelUsed: AI_CONFIG.technicalDrawing.model,
+        input: { prompt, repair: true, previousOutputHash: String(result.text || "").length },
+        output: repaired.text,
+        usage: repaired.usage as any,
+        actorUid, requestId, startedAt: repairStartedAt,
+        authorizationToken: String(req.headers?.authorization || "").replace(/^Bearer\\s+/i, ""),
       });
       drawing = parseAIJson(repaired.text, (value: any) => {
         const dims = value?.overallDimensions || {};
