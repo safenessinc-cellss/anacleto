@@ -67,3 +67,94 @@ exports.createCalendarEvent = functions.firestore
       return null;
     }
   });
+
+
+/**
+ * Revisión mensual de la tabla de precios.
+ * Notifica a los administradores el primer día de cada mes;
+ * no modifica precios automáticamente ni inventa valores.
+ */
+exports.priceTableMonthlyReview = functions.pubsub
+  .schedule("0 8 1 * *")
+  .timeZone("America/Sao_Paulo")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = new Date();
+    const period = now.toISOString().slice(0, 7);
+    const adminDocs = await db.collection("admins").get();
+    const recipients = new Set(["safeness.c.a@gmail.com"]);
+    adminDocs.forEach((snapshot) => {
+      const data = snapshot.data() || {};
+      const email = String(data.email || snapshot.id || "").toLowerCase();
+      if (email.includes("@")) recipients.add(email);
+    });
+    const activePrices = await db.collection("price_table").get();
+    const expired = activePrices.docs.filter((d) => {
+      const value = String(d.data().priceValidUntil || "");
+      return value && value < now.toISOString().slice(0, 10);
+    }).length;
+    const missingValidity = activePrices.docs.filter((d) => !d.data().priceValidUntil).length;
+    const batch = db.batch();
+    for (const email of recipients) {
+      const id = "price-monthly-review-" + period.replace("-", "") + "-" + Buffer.from(email).toString("hex");
+      const ref = db.collection("notifications").doc(id);
+      batch.set(ref, {
+        type: "price_monthly_review",
+        targetEmail: email,
+        title: "Revisão mensal da tabela de preços",
+        message: "Revise os valores com as tabelas vigentes dos fornecedores. " + expired + " preço(s) vencido(s) e " + missingValidity + " sem data de validade. Nenhum valor foi alterado automaticamente.",
+        createdAt: now.toISOString(),
+        read: false,
+        period,
+      }, { merge: true });
+    }
+    await batch.commit();
+    return null;
+  });
+
+/**
+ * Aviso diario de precios que vencen en los próximos 15 días.
+ * La clave determinista evita enviar repetidamente el mismo aviso.
+ */
+exports.priceTableExpiryAlerts = functions.pubsub
+  .schedule("0 8 * * *")
+  .timeZone("America/Sao_Paulo")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const today = new Date();
+    const dateOnly = today.toISOString().slice(0, 10);
+    const until = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const prices = await db.collection("price_table")
+      .where("priceValidUntil", ">=", dateOnly)
+      .where("priceValidUntil", "<=", until)
+      .get();
+    if (prices.empty) return null;
+    const adminDocs = await db.collection("admins").get();
+    const recipients = new Set(["safeness.c.a@gmail.com"]);
+    adminDocs.forEach((snapshot) => {
+      const data = snapshot.data() || {};
+      const email = String(data.email || snapshot.id || "").toLowerCase();
+      if (email.includes("@")) recipients.add(email);
+    });
+    const batch = db.batch();
+    for (const item of prices.docs) {
+      const data = item.data() || {};
+      const expiry = String(data.priceValidUntil || "");
+      for (const email of recipients) {
+        const id = "price-expiry-" + item.id + "-" + expiry.replace(/[^0-9]/g, "") + "-" + Buffer.from(email).toString("hex");
+        const ref = db.collection("notifications").doc(id);
+        batch.set(ref, {
+          type: "price_expiry",
+          targetEmail: email,
+          title: "Preço próximo do vencimento",
+          message: String(data.name || "Item sem nome") + " vence em " + expiry + ". Atualize o preço com a tabela vigente do fornecedor.",
+          itemId: item.id,
+          validUntil: expiry,
+          createdAt: today.toISOString(),
+          read: false,
+        }, { merge: true });
+      }
+    }
+    await batch.commit();
+    return null;
+  });
