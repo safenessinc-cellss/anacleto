@@ -173,7 +173,7 @@ export default async function handler(req: any, res: any) {
 
     let snapshot: any;
     if (type === "quote") {
-      if (!["draft","pending","pendente","borrador","accepted"].includes(String(source.status || "").toLowerCase())) {
+      if (!["draft","pending","pendente","borrador","accepted","approved","aprovado"].includes(String(source.status || "").toLowerCase())) {
         return send(res, 409, { error: "Somente orçamentos em rascunho ou pendentes podem ser aprovados." });
       }
       if (!Array.isArray(source.items) || source.items.length === 0) return send(res, 422, { error: "O orçamento não possui itens." });
