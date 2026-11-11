@@ -161,11 +161,19 @@ function findExactCatalogItem(item: any, catalog: any[]) {
   const description = normalizeCatalogName(item?.description);
   return catalog.find((row: any) => {
     const rowSku = String(row?.sku || row?.code || "").trim().toLowerCase();
-    if (catalogId && String(row?.id || "") === catalogId) return true;
-    if (sku && rowSku && sku === rowSku) return true;
+    const idMatches = !!catalogId && String(row?.id || "") === catalogId;
+    const skuMatches = !!sku && !!rowSku && sku === rowSku;
+    if (catalogId && sku) return idMatches && skuMatches;
+    if (catalogId) return idMatches;
+    if (sku) return skuMatches;
     const rowName = normalizeCatalogName(row?.name || row?.description);
     return !!description && !!rowName && description === rowName;
   });
+}
+function hasVerifiedCatalogPrice(row: any): boolean {
+  if (!row || row.price === undefined || row.price === null || String(row.price).trim() === "") return false;
+  const price = Number(row.price);
+  return Number.isFinite(price) && price >= 0;
 }
 
 // ----------------------------------------------------
@@ -222,7 +230,7 @@ Regras obrigatórias:
         ? currentQuote.items.find((row: any) => String(row?.id || "") === String(item.id || ""))
         : undefined;
       const catalogPrice = match ? Number(match.price) : 0;
-      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
       const storedExistingItem = storedQuoteItems.find((row: any) => String(row?.id || "") === String(existingItem?.id || ""));
       const existingPrice = Number(storedExistingItem?.unitPrice);
       const hasStoredPrice = storedExistingItem?.unitPrice !== undefined && storedExistingItem?.unitPrice !== null && String(storedExistingItem.unitPrice).trim() !== "";
@@ -272,7 +280,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
   try {
     const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
-    const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
+    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 250);
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
     const parsed = await generateValidatedJson({
       capability: "budget",
