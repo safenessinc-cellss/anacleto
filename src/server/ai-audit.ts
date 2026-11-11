@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import firebaseConfig from "../../firebase-applet-config.json" with { type: "json" };
 
 export type AIAuditServiceName = "BUDGET" | "TECHNICAL_DRAWING";
 export type BudgetLineState = "SUGGESTED_BY_AI" | "REVIEWED_BY_ENGINEER" | "APPROVED_FOR_MANUFACTURING";
@@ -62,9 +63,9 @@ async function appendFirestore(collection: string, record: Record<string, unknow
     console.warn("[AI_AUDIT_NOT_PERSISTED] Missing authenticated Firestore token", { collection, id: record.id });
     return;
   }
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
   if (!projectId) throw new Error("FIREBASE_PROJECT_ID is not configured for audit persistence.");
-  const databaseId = process.env.FIRESTORE_DATABASE_ID || "(default)";
+  const databaseId = process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || "(default)";
   const fields = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, firestoreValue(value)]));
   const response = await fetch(`https://firestore.googleapis.com/v1/projects/${projectId}/databases/${encodeURIComponent(databaseId)}/documents/${collection}?documentId=${encodeURIComponent(String(record.id))}`, {
     method: "POST",
