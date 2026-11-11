@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import firebaseConfig from "../../firebase-applet-config.json" with { type: "json" };
 
 export type AIAuditServiceName = "BUDGET" | "TECHNICAL_DRAWING";
@@ -60,7 +62,18 @@ function firestoreValue(value: unknown): Record<string, unknown> {
 }
 async function appendFirestore(collection: string, record: Record<string, unknown>, token?: string): Promise<void> {
   if (!token) {
-    console.warn("[AI_AUDIT_NOT_PERSISTED] Missing authenticated Firestore token", { collection, id: record.id });
+    const rawAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+    const serviceAccount = rawAccount ? JSON.parse(rawAccount) : (clientEmail && privateKey ? {
+      project_id: process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+      client_email: clientEmail,
+      private_key: privateKey,
+    } : null);
+    if (!serviceAccount) throw new Error("AI audit persistence requires a Firebase service account when no user token is available.");
+    const app = getApps().find(candidate => candidate.name === "anacleto-audit") ||
+      initializeApp({ credential: cert(serviceAccount), projectId: serviceAccount.project_id || firebaseConfig.projectId }, "anacleto-audit");
+    await getFirestore(app).collection(collection).doc(String(record.id)).create(record);
     return;
   }
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
@@ -92,7 +105,10 @@ export async function recordAIAudit(context: AIAuditContext): Promise<AIAuditRec
     errorCode: context.error instanceof Error ? context.error.name : undefined,
   };
   try { await appendFirestore("ai_audit_logs", record as unknown as Record<string, unknown>, context.authorizationToken); }
-  catch (error) { console.error("[AI_AUDIT_PERSISTENCE_ERROR]", error); }
+  catch (error) {
+    console.error("[AI_AUDIT_PERSISTENCE_ERROR]", error);
+    if (process.env.NODE_ENV === "production") throw error;
+  }
   return record;
 }
 export async function recordBudgetLineTransition(entry: Omit<BudgetLineAuditTransition, "id" | "timestamp">, authorizationToken?: string): Promise<BudgetLineAuditTransition> {
