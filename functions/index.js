@@ -124,11 +124,10 @@ exports.priceTableExpiryAlerts = functions.pubsub
     const today = new Date();
     const dateOnly = today.toISOString().slice(0, 10);
     const until = new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const prices = await db.collection("price_table")
-      .where("priceValidUntil", ">=", dateOnly)
-      .where("priceValidUntil", "<=", until)
-      .get();
-    if (prices.empty) return null;
+    const sourceNames = ["price_table", "registry_items", "supplier_catalog", "catalog"];
+    const snapshots = await Promise.all(sourceNames.map((name) =>
+      db.collection(name).where("priceValidUntil", ">=", dateOnly).where("priceValidUntil", "<=", until).get()
+    ));
     const adminDocs = await db.collection("admins").get();
     const recipients = new Set(["safeness.c.a@gmail.com"]);
     adminDocs.forEach((snapshot) => {
@@ -136,25 +135,34 @@ exports.priceTableExpiryAlerts = functions.pubsub
       const email = String(data.email || snapshot.id || "").toLowerCase();
       if (email.includes("@")) recipients.add(email);
     });
-    const batch = db.batch();
-    for (const item of prices.docs) {
-      const data = item.data() || {};
-      const expiry = String(data.priceValidUntil || "");
-      for (const email of recipients) {
-        const id = "price-expiry-" + item.id + "-" + expiry.replace(/[^0-9]/g, "") + "-" + Buffer.from(email).toString("hex");
-        const ref = db.collection("notifications").doc(id);
-        batch.set(ref, {
-          type: "price_expiry",
-          targetEmail: email,
-          title: "Preço próximo do vencimento",
-          message: String(data.name || "Item sem nome") + " vence em " + expiry + ". Atualize o preço com a tabela vigente do fornecedor.",
-          itemId: item.id,
-          validUntil: expiry,
-          createdAt: today.toISOString(),
-          read: false,
-        }, { merge: true });
+    const notifications = [];
+    for (let index = 0; index < snapshots.length; index++) {
+      for (const item of snapshots[index].docs) {
+        const data = item.data() || {};
+        const expiry = String(data.priceValidUntil || "");
+        for (const email of recipients) {
+          const id = "price-expiry-" + sourceNames[index] + "-" + item.id + "-" + expiry.replace(/[^0-9]/g, "") + "-" + Buffer.from(email).toString("hex");
+          const ref = db.collection("notifications").doc(id);
+          const existing = await ref.get();
+          if (existing.exists) continue;
+          notifications.push({ ref, data: {
+            type: "price_expiry",
+            targetEmail: email,
+            title: "Preço próximo do vencimento",
+            message: String(data.name || "Item sem nome") + " vence em " + expiry + ". Atualize o preço com a tabela vigente do fornecedor.",
+            itemId: item.id,
+            itemCollection: sourceNames[index],
+            validUntil: expiry,
+            createdAt: today.toISOString(),
+            read: false,
+          }});
+        }
       }
     }
-    await batch.commit();
+    for (let offset = 0; offset < notifications.length; offset += 450) {
+      const batch = db.batch();
+      notifications.slice(offset, offset + 450).forEach((entry) => batch.create(entry.ref, entry.data));
+      await batch.commit();
+    }
     return null;
   });
