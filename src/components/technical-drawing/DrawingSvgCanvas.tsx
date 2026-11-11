@@ -283,6 +283,13 @@ export default function DrawingSvgCanvas({
             {currentStep === 4 && renderAssembly()}
             {currentStep >= 5 && renderFinal()}
           </g>
+          {(drawing.isDraft !== false || drawing.status !== "APPROVED_FOR_MANUFACTURING") && (
+            <g id="anacleto-draft-watermark" pointerEvents="none" opacity="0.28">
+              <text x="500" y={Math.max(260, canvasHeight / 2)} textAnchor="middle" transform={`rotate(-24 500 ${Math.max(260, canvasHeight / 2)})`} fill="#ef4444" stroke="#ffffff" strokeWidth="1.2" paintOrder="stroke" fontSize="34" fontWeight="900" letterSpacing="2">
+                BORRADOR PRELIMINAR - NO VÁLIDO PARA FABRICACIÓN
+              </text>
+            </g>
+          )}
         </svg>
       </div>
       <div className="pointer-events-none absolute bottom-2 left-3 right-3 flex justify-between text-[9px] font-mono text-slate-500">
