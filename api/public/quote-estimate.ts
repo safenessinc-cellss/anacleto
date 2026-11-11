@@ -44,6 +44,8 @@ async function consumePublicQuota(ip: string): Promise<boolean> {
   return true;
 }
 export default async function handler(req: any, res: any) {
+  const requestStartedAt = Date.now();
+  let auditPrompt = "";
   if (req.method !== "POST") {
     res.setHeader?.("Allow", "POST");
     return send(res, 405, { error: "Método não permitido." });
@@ -56,6 +58,7 @@ export default async function handler(req: any, res: any) {
       return send(res, 400, { error: "A solicitação contém campos não permitidos." });
     }
     const prompt = typeof body.description === "string" ? body.description.trim() : "";
+    auditPrompt = prompt;
     if (prompt.length < 12 || prompt.length > 3000) return send(res, 400, { error: "Descreva o projeto em 12 a 3000 caracteres." });
     const aiStartedAt = Date.now();
     const result = await generateText({
@@ -74,7 +77,13 @@ export default async function handler(req: any, res: any) {
             typeof value.disclaimer !== "string") throw new Error("Invalid public estimate response schema.");
         return value as Record<string, unknown>;
       });
-    } catch {
+    } catch (parseError) {
+      await recordAIAudit({
+        serviceName: "BUDGET", modelUsed: AI_CONFIG.publicEstimate.model,
+        input: { description: prompt, channel: "public" }, output: result.text,
+        usage: result.usage as any, error: parseError, startedAt: aiStartedAt,
+        requestId: String(req.headers?.["x-request-id"] || ""),
+      });
       return send(res, 502, { error: "Não foi possível estruturar a pré-avaliação. Tente novamente." });
     }
     await recordAIAudit({
@@ -92,6 +101,16 @@ export default async function handler(req: any, res: any) {
       disclaimer: "Pré-avaliação automática sem preço comercial. Valores e especificações dependem de validação por comercial/engenharia.",
     });
   } catch (error) {
+    if (auditPrompt.length >= 12) {
+      try {
+        await recordAIAudit({
+          serviceName: "BUDGET", modelUsed: AI_CONFIG.publicEstimate.model,
+          input: { description: auditPrompt, channel: "public" }, error,
+          requestId: String(req.headers?.["x-request-id"] || ""),
+          startedAt: requestStartedAt,
+        });
+      } catch (auditError) { console.error("[PUBLIC_QUOTE_FAILURE_AUDIT]", auditError); }
+    }
     console.error("[PUBLIC_QUOTE_ESTIMATE]", error);
     return send(res, 503, { error: "Pré-avaliação temporariamente indisponível." });
   }
