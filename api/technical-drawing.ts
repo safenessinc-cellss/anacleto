@@ -17,6 +17,60 @@ function json(res: any, status: number, body: unknown) {
   res.setHeader?.("Cache-Control", "no-store");
   return res.status(status).json(body);
 }
+const firestoreDocuments = () => {
+  const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
+  return "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/" + databaseId + "/documents";
+};
+function encodeFirestoreValue(value: any): any {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(encodeFirestoreValue) } };
+  if (typeof value === "object") return { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, encodeFirestoreValue(item)])) } };
+  return { stringValue: String(value) };
+}
+function decodeFirestoreValue(value: any): any {
+  if (!value || typeof value !== "object") return value;
+  if ("stringValue" in value) return value.stringValue;
+  if ("integerValue" in value) return Number(value.integerValue);
+  if ("doubleValue" in value) return value.doubleValue;
+  if ("booleanValue" in value) return value.booleanValue;
+  if ("nullValue" in value) return null;
+  if ("arrayValue" in value) return (value.arrayValue?.values || []).map(decodeFirestoreValue);
+  if ("mapValue" in value) return Object.fromEntries(Object.entries(value.mapValue?.fields || {}).map(([key, item]) => [key, decodeFirestoreValue(item)]));
+  return value;
+}
+async function createDrawingJob(req: any, jobId: string, uid: string): Promise<void> {
+  const fields = { id: jobId, userUid: uid, status: "PROCESSING", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  const response = await fetch(firestoreDocuments() + "/drawing_jobs?documentId=" + encodeURIComponent(jobId), {
+    method: "POST", headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""), "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, encodeFirestoreValue(value)])) }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) throw new Error("Não foi possível registrar a tarefa técnica (HTTP " + response.status + ").");
+}
+async function updateDrawingJob(req: any, jobId: string, values: Record<string, unknown>): Promise<void> {
+  const params = new URLSearchParams();
+  for (const key of Object.keys(values)) params.append("updateMask.fieldPaths", key);
+  const fields = Object.fromEntries(Object.entries({ ...values, updatedAt: new Date().toISOString() }).map(([key, value]) => [key, encodeFirestoreValue(value)]));
+  params.append("updateMask.fieldPaths", "updatedAt");
+  const response = await fetch(firestoreDocuments() + "/drawing_jobs/" + encodeURIComponent(jobId) + "?" + params.toString(), {
+    method: "PATCH", headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""), "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }), signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) throw new Error("Não foi possível atualizar a tarefa técnica (HTTP " + response.status + ").");
+}
+async function readDrawingJob(req: any, jobId: string): Promise<Record<string, any> | null> {
+  const response = await fetch(firestoreDocuments() + "/drawing_jobs/" + encodeURIComponent(jobId), {
+    headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "") },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("Não foi possível consultar a tarefa técnica (HTTP " + response.status + ").");
+  const raw = await response.json() as any;
+  return Object.fromEntries(Object.entries(raw.fields || {}).map(([key, value]) => [key, decodeFirestoreValue(value)]));
+}
 
 async function authenticate(req: any): Promise<{ uid: string; email: string; role: string } | null> {
   const authorization = String(req.headers.authorization || "");
@@ -179,11 +233,29 @@ export default async function handler(req: any, res: any) {
   let catalog: any[] = [];
   let actorUid = "";
   let auditRecorded = false;
+  let drawingJobId: string | null = null;
+  let jobPersisted = false;
   let stage = "request";
 
   try {
+    if (req.method === "GET") {
+      const jobId = String(req.query?.jobId || "");
+      const timestamp = String(req.headers?.[SERVICE_TIMESTAMP_HEADER] || "");
+      const signature = String(req.headers?.[SERVICE_SIGNATURE_HEADER] || "");
+      const path = String(req.url || "/api/technical-drawing");
+      if (!/^[0-9a-f-]{36}$/i.test(jobId) || !verifyServiceRequest({ method: "GET", path, timestamp, signature, body: "" })) {
+        return json(res, 401, { error: "Consulta de tarefa não autorizada.", code: "INVALID_SERVICE_SIGNATURE" });
+      }
+      const user = await authenticate(req);
+      if (!user || !["owner","super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role)) {
+        return json(res, 403, { error: "Sem permissão para consultar tarefas técnicas.", code: "ROLE_FORBIDDEN" });
+      }
+      const job = await readDrawingJob(req, jobId);
+      if (!job || job.userUid !== user.uid) return json(res, 404, { error: "Tarefa técnica não encontrada.", code: "JOB_NOT_FOUND" });
+      return json(res, 200, job);
+    }
     if (req.method !== "POST") {
-      res.setHeader?.("Allow", "POST");
+      res.setHeader?.("Allow", "GET, POST");
       return json(res, 405, { error: "Método não permitido.", code: "METHOD_NOT_ALLOWED" });
     }
 
@@ -199,7 +271,7 @@ export default async function handler(req: any, res: any) {
     const serviceSignature = String(req.headers?.[SERVICE_SIGNATURE_HEADER] || "");
     if (serviceSignature) {
       const validServiceSignature = verifyServiceRequest({
-        method: req.method, path: "/generate",
+        method: req.method, path: "/api/technical-drawing",
         timestamp: String(req.headers?.[SERVICE_TIMESTAMP_HEADER] || ""),
         signature: serviceSignature, body: JSON.stringify(body),
       });
@@ -243,6 +315,13 @@ export default async function handler(req: any, res: any) {
       return json(res, 403, { error: "Seu perfil não possui permissão para operações de desenho técnico.", code: "ROLE_FORBIDDEN" });
     }
     catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
+    if (serviceSignature) {
+      const requestedJobId = String(body.requestId || req.headers?.["x-request-id"] || "");
+      if (!/^[0-9a-f-]{36}$/i.test(requestedJobId)) return json(res, 400, { error: "Identificador de tarefa inválido.", code: "INVALID_JOB_ID" });
+      drawingJobId = requestedJobId;
+      await createDrawingJob(req, drawingJobId, user.uid);
+      jobPersisted = true;
+    }
 
     if (!allowRequest(user.uid)) {
       return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
@@ -340,7 +419,9 @@ export default async function handler(req: any, res: any) {
         typeof drawing.finalAppearance !== "string" || !drawing.finalAppearance.trim()) {
       throw new Error("A IA não retornou a descrição do modelo e do resultado final.");
     }
-    return json(res, 200, withDraftVectorWatermark(drawing));
+    const responseDrawing = withDraftVectorWatermark(drawing);
+    if (jobPersisted && drawingJobId) await updateDrawingJob(req, drawingJobId, { status: "COMPLETED", result: responseDrawing, completedAt: new Date().toISOString() });
+    return json(res, 200, responseDrawing);
   } catch (error) {
     // Never leak provider credentials or internal stack traces to the browser.
     console.error("Technical drawing request failed", {
@@ -363,7 +444,7 @@ export default async function handler(req: any, res: any) {
           });
         }
         const fallback = localFallback(prompt);
-        return json(res, 200, withDraftVectorWatermark({
+        const fallbackDrawing = withDraftVectorWatermark({
           ...fallback,
           budget: buildTechnicalBudget(fallback.pieces, catalog),
           isDraft: true,
@@ -372,12 +453,17 @@ export default async function handler(req: any, res: any) {
           draftLabel: "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN",
           warning: "A IA está temporariamente indisponível. Foi criado um desenho preliminar local; confira todas as medidas antes de fabricar.",
           fallbackReason: stage,
-        }));
+        });
+        if (jobPersisted && drawingJobId) await updateDrawingJob(req, drawingJobId, { status: "COMPLETED_WITH_FALLBACK", result: fallbackDrawing, completedAt: new Date().toISOString() });
+        return json(res, 200, fallbackDrawing);
       } catch (fallbackError) {
         console.error("Technical drawing local fallback failed", {
           requestId,
           error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
         });
+        if (jobPersisted && drawingJobId) {
+          try { await updateDrawingJob(req, drawingJobId, { status: "FAILED", error: "DRAWING_GENERATION_FAILED", completedAt: new Date().toISOString() }); } catch (jobError) { console.error("Could not persist failed drawing job", jobError); }
+        }
         return json(res, 500, {
           error: "Não foi possível gerar o desenho técnico. Tente novamente ou revise a descrição.",
           code: "DRAWING_GENERATION_FAILED",
