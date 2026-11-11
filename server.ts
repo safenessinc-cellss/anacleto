@@ -148,55 +148,107 @@ app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
 // ----------------------------------------------------
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
-app.post("/api/ai/quote-agent", requireFirebaseAuth, async (req, res) => {
+
+function normalizeCatalogName(value: unknown) {
+  return String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+function findExactCatalogItem(item: any, catalog: any[]) {
+  const sku = String(item?.sku || item?.code || "").trim().toLowerCase();
+  const catalogId = String(item?.catalogItemId || "").trim();
+  const description = normalizeCatalogName(item?.description);
+  return catalog.find((row: any) => {
+    const rowSku = String(row?.sku || row?.code || "").trim().toLowerCase();
+    if (catalogId && String(row?.id || "") === catalogId) return true;
+    if (sku && rowSku && sku === rowSku) return true;
+    const rowName = normalizeCatalogName(row?.name || row?.description);
+    return !!description && !!rowName && description === rowName;
+  });
+}
+
+// ----------------------------------------------------
+// 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
+// ----------------------------------------------------
+app.post("/api/ai/quote-agent", requireFirebaseAuth, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
   try {
     const message = String(req.body?.message || "").trim();
     const currentQuote = req.body?.currentQuote || {};
     if (!message) return res.status(400).json({ error: "Mensagem obrigatória." });
     const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
+    const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((entry: any) => ({
+      role: entry?.role === "assistant" ? "assistant" : "user",
+      text: String(entry?.text || "").slice(0, 2000),
+    })) : [];
     const systemPrompt = `
-Você é o agente técnico de orçamentos da Anacleto.
-Responda exclusivamente JSON válido: {"reply":"...","action":"update_quote|generate_invoice|none","items":[{"id":"...","description":"...","quantity":1,"unitPrice":0,"subtotal":0,"priceSource":"catalog|pending"}],"taxRate":0,"discountRate":0,"notes":""}.
-Estado atual: ${JSON.stringify(currentQuote)}
-Catálogo real disponível: ${JSON.stringify(catalog)}
+Você é o agente técnico de orçamentos da Anacleto Esquadrias.
+Responda exclusivamente JSON válido: {"reply":"...","action":"update_quote|generate_invoice|none","items":[{"id":"...","description":"nome EXATO do catálogo quando houver correspondência","sku":"","catalogItemId":"","quantity":1,"unitPrice":0,"subtotal":0,"priceSource":"catalog|pending"}],"taxRate":0,"discountRate":0,"notes":""}.
+Orçamento atual: ${JSON.stringify(currentQuote)}
+Catálogo real: ${JSON.stringify(catalog)}
 Regras obrigatórias:
-- Use preços unitários somente de itens encontrados no catálogo, sem alterar o valor cadastrado.
-- Se não houver correspondência confiável, unitPrice=0 e priceSource="pending"; explique que falta preço confirmado. Nunca estime ou invente preço.
-- Preserve itens atuais, quantidades e preços quando a instrução não pedir alteração.
-- Só modifique impostos/descontos quando explicitamente solicitado.
-- Para gerar itens, descreva materiais, medidas, quantidades e serviços claramente.
-- Não gere fatura nem altere estado do orçamento; apenas retorne action=generate_invoice quando solicitado.
-- Não inclua itens fictícios nem preencha valores ausentes com preços de mercado.
+- Preserve TODAS as linhas atuais, seus IDs, quantidades e preços quando o usuário não pedir alteração.
+- Ao adicionar itens, devolva também todas as linhas que já existiam sem alterações.
+- Use somente itens do catálogo com correspondência exata por SKU/código, ID ou nome completo. Informe sku e catalogItemId quando existirem.
+- O servidor validará os preços contra o catálogo. Se não houver correspondência exata, unitPrice=0 e priceSource="pending".
+- Nunca estime/invente preços, impostos, medidas ou custos. Medidas ausentes devem aparecer em notes como pendências.
+- Só altere imposto ou desconto quando o usuário solicitar explicitamente.
+- "generate_invoice" só pode ser retornado quando o usuário pedir explicitamente a emissão da fatura. Isso NÃO aprova o orçamento.
+- Se não houver alteração solicitada, use action="none".
 `;
-    const response = await generateText({ model: aiModel, system: systemPrompt, prompt: message, temperature: 0.1 });
+    const transcript = history.map((entry: any) => `${entry.role}: ${entry.text}`).join("\\n");
+    const response = await generateText({
+      model: aiModel,
+      system: systemPrompt,
+      prompt: `Histórico recente:\\n${transcript}\\n\\nSolicitação atual: ${message}`,
+      temperature: 0.1,
+    });
     const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) throw new Error("Resposta de orçamento incompleta.");
     const items = parsed.items.map((item: any, index: number) => {
       const quantity = Number(item.quantity);
-      const unitPrice = Number(item.unitPrice);
-      if (!String(item.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0) {
-        throw new Error("A IA retornou uma linha de orçamento inválida.");
-      }
-      return { id: String(item.id || `ai-${index + 1}`), description: String(item.description).slice(0, 500), quantity, unitPrice, subtotal: Number((quantity * unitPrice).toFixed(2)), priceSource: item.priceSource === "catalog" ? "catalog" : "pending" };
+      if (!String(item.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0) throw new Error("A IA retornou uma linha de orçamento inválida.");
+      const match = findExactCatalogItem(item, catalog);
+      const catalogPrice = match ? Number(match.price) : 0;
+      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      return {
+        id: String(item.id || `ai-${index + 1}`),
+        description: String(item.description).slice(0, 500),
+        quantity,
+        unitPrice: confirmed ? catalogPrice : 0,
+        subtotal: Number((quantity * (confirmed ? catalogPrice : 0)).toFixed(2)),
+        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
+        catalogItemId: confirmed ? String(match.id || "") : "",
+        priceSource: confirmed ? "catalog" : "pending",
+      };
     });
-    return res.json({ reply: String(parsed.reply || "Itens preparados. Confirme os preços pendentes antes de aprovar."), action: parsed.action === "generate_invoice" ? "generate_invoice" : "update_quote", items, taxRate: Number.isFinite(Number(parsed.taxRate)) ? Number(parsed.taxRate) : Number(currentQuote.taxRate || 0), discountRate: Number.isFinite(Number(parsed.discountRate)) ? Number(parsed.discountRate) : Number(currentQuote.discountRate || 0), notes: String(parsed.notes || "") });
+    const taxRate = parsed.taxRate === undefined ? Number(currentQuote.taxRate || 0) : Number(parsed.taxRate);
+    const discountRate = parsed.discountRate === undefined ? Number(currentQuote.discountRate || 0) : Number(parsed.discountRate);
+    if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100 || !Number.isFinite(discountRate) || discountRate < 0 || discountRate > 100) {
+      throw new Error("Percentual de imposto ou desconto inválido.");
+    }
+    return res.json({
+      reply: String(parsed.reply || "Itens preparados. Confirme as medidas e os preços pendentes antes de aprovar."),
+      action: ["generate_invoice", "none"].includes(parsed.action) ? parsed.action : "update_quote",
+      items,
+      taxRate,
+      discountRate,
+      notes: String(parsed.notes || ""),
+    });
   } catch (err: any) {
     console.error("Quote agent error:", err?.message || err);
-    return res.status(502).json({ error: "A IA não conseguiu gerar o orçamento. Nenhum preço fictício foi aplicado. Verifique o serviço de IA e tente novamente.", code: "QUOTE_AI_UNAVAILABLE" });
+    return res.status(502).json({ error: "A IA não conseguiu gerar o orçamento. Nenhum preço não confirmado foi aplicado. Verifique o serviço de IA e tente novamente.", code: "QUOTE_AI_UNAVAILABLE" });
   }
 });
 
-app.post("/api/ai/budget-items", requireFirebaseAuth, async (req, res) => {
+app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
   try {
-    const prompt = String(req.body?.prompt || "").trim();
+    const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
     const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
     const response = await generateText({
       model: aiModel,
       temperature: 0.1,
-      system: `Você é especialista em orçamentos de esquadrias, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas e quantidades com base no pedido. Só use preço existente quando houver correspondência exata no catálogo. Sem preço correspondente, use price=0 e priceSource="pending". Nunca invente preços, custos de mercado, impostos ou valores. Não invente medidas ausentes; liste-as como pendências.`,
+      system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Só associe item do catálogo por SKU/código, ID ou nome completo EXATO. Informe sku/catalogItemId para validação. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
       prompt,
     });
     const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
@@ -204,14 +256,23 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, async (req, res) => {
     if (!Array.isArray(parsed.items) || !parsed.items.length) throw new Error("A IA não retornou itens.");
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
-      const price = Number(item.price);
-      if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0) throw new Error("Linha inválida retornada pela IA.");
-      return { description: String(item.description).slice(0, 500), qty, price, priceSource: item.priceSource === "catalog" ? "catalog" : "pending" };
+      if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
+      const match = findExactCatalogItem(item, catalog);
+      const catalogPrice = match ? Number(match.price) : 0;
+      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      return {
+        description: String(item.description).slice(0, 500),
+        qty,
+        price: confirmed ? catalogPrice : 0,
+        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
+        catalogItemId: confirmed ? String(match.id || "") : "",
+        priceSource: confirmed ? "catalog" : "pending",
+      };
     });
     return res.json({ items, notes: String(parsed.notes || "") });
   } catch (err: any) {
     console.error("Budget items AI error:", err?.message || err);
-    return res.status(502).json({ error: "Falha ao gerar os itens do orçamento. Nenhum valor fictício foi aplicado.", code: "BUDGET_AI_UNAVAILABLE" });
+    return res.status(502).json({ error: "Falha ao gerar os itens do orçamento. Nenhum preço sem confirmação no catálogo foi aplicado.", code: "BUDGET_AI_UNAVAILABLE" });
   }
 });
 
