@@ -153,6 +153,12 @@ export default async function handler(req: any, res: any) {
       return send(res, 400, { error: "Dados de aprovação inválidos." });
     }
     if (!canApprove(user, type)) return send(res, 403, { error: "Seu perfil não pode aprovar este documento." });
+    const senderInput = body?.senderSnapshot && typeof body.senderSnapshot === "object" ? body.senderSnapshot : {};
+    const senderSnapshot: any = {};
+    for (const key of ["name","nif","address","postalCode","city","country","currency","logoUrl","watermarkLogoUrl","website","phone","email"]) {
+      const value = String(senderInput[key] || "").slice(0, key.endsWith("Url") ? 220000 : 500);
+      if (value) senderSnapshot[key] = value;
+    }
     const collection = type === "quote" ? "quotes" : "technical_drawings";
     const found = await readDocument(req, collection, documentId);
     if (!found) return send(res, 404, { error: "Documento não encontrado." });
@@ -188,7 +194,8 @@ export default async function handler(req: any, res: any) {
       snapshot = {
         schemaVersion: 1, type: "quote", documentId, documentNumber: source.number || "", status: "approved",
         approvedAt: new Date().toISOString(), approvedBy: { uid: user.uid, email: user.email, role: user.role },
-        document: { ...source, items: reviewedItems, subtotal, discountAmount, taxAmount, total, status: "approved" },
+        document: { ...source, items: reviewedItems, subtotal, discountAmount, taxAmount, total, status: "approved", senderSnapshot },
+        senderSnapshot,
         modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.quote.model, capability: "quote", capturedAt: new Date().toISOString() },
       };
     } else {
@@ -199,7 +206,8 @@ export default async function handler(req: any, res: any) {
       snapshot = {
         schemaVersion: 1, type: "drawing", documentId, documentNumber: source.title || "", status: "APPROVED_FOR_MANUFACTURING",
         approvedAt: new Date().toISOString(), approvedBy: { uid: user.uid, email: user.email, role: user.role },
-        document: { ...source, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved" },
+        document: { ...source, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", senderSnapshot },
+        senderSnapshot,
         modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing", capturedAt: new Date().toISOString() },
         drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [] },
       };
