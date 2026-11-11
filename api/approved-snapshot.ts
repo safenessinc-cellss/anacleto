@@ -85,6 +85,7 @@ async function readDocument(req: any, collection: string, id: string) {
   return { data: decodeFields(raw.fields || {}), updateTime: raw.updateTime, name: raw.name };
 }
 function stable(value: any): string {
+  if (value === undefined || value === null) return "null";
   if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]";
   if (value && typeof value === "object") return "{" + Object.keys(value).sort().map(key => JSON.stringify(key) + ":" + stable(value[key])).join(",") + "}";
   return JSON.stringify(value);
@@ -159,6 +160,13 @@ export default async function handler(req: any, res: any) {
       if (!found) return send(res, 404, { error: "Instantânea aprovada não encontrada." });
       if (!["quote", "drawing"].includes(found.data.type) || !canReadSnapshot(user, found.data.type)) {
         return send(res, 403, { error: "Seu perfil não tem acesso a esta instantânea." });
+      }
+      const integrityPayload = { ...found.data, document: { ...found.data.document } };
+      const expectedHash = String(integrityPayload.contentHash || "");
+      delete integrityPayload.contentHash;
+      delete integrityPayload.document.snapshotContentHash;
+      if (!expectedHash || digest(integrityPayload) !== expectedHash) {
+        return send(res, 409, { error: "Falha de integridade: a instantânea não corresponde ao hash de aprovação.", code: "SNAPSHOT_INTEGRITY_FAILED" });
       }
       return send(res, 200, found.data);
     }
