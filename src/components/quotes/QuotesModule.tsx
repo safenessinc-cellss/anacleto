@@ -223,8 +223,14 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     if (!selectedQuote) return;
     const popup = window.open("about:blank", "_blank");
     try {
-      const pdfSender = await preparePdfSender();
-      const pdf = buildQuotePdf(recalculateQuote(selectedQuote), pdfSender);
+      let pdfSender = await preparePdfSender();
+      let pdfQuote = recalculateQuote(selectedQuote);
+      if (selectedQuote.approvedSnapshotId) {
+        const snapshot = await loadApprovedQuoteSnapshot(selectedQuote.approvedSnapshotId);
+        pdfQuote = snapshot.document as Quote;
+        pdfSender = snapshot.senderSnapshot || {};
+      }
+      const pdf = buildQuotePdf(pdfQuote, pdfSender);
       pdf.doc.save(pdf.fileName);
       const message = `Olá, ${selectedQuote.clientName}. Segue o orçamento ${selectedQuote.number} no valor de ${formatCurrency(selectedQuote.total, selectedQuote.currency)}. O PDF foi baixado; anexe o arquivo nesta conversa.`;
       if (channel === "whatsapp") {
@@ -258,6 +264,22 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     if (!response.ok) throw new Error(data?.error || "Não foi possível recuperar a instantânea aprovada.");
     if (data?.type !== "quote" || !data?.document) throw new Error("Instantânea de orçamento inválida.");
     return data;
+  };
+
+  const handleDownloadQuotePdf = async (quote: Quote) => {
+    try {
+      if (quote.approvedSnapshotId) {
+        const snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
+        const pdf = buildQuotePdf(snapshot.document as Quote, snapshot.senderSnapshot || {});
+        pdf.doc.save(pdf.fileName);
+      } else {
+        const sender = await preparePdfSender();
+        exportQuotePdf(quote, sender);
+      }
+    } catch (error) {
+      console.error("Quote PDF download failed:", error);
+      showToast((error as Error).message || "Não foi possível baixar o PDF.", "error");
+    }
   };
 
   const handleApproveQuote = async () => {
@@ -729,7 +751,7 @@ const handleAddItem = () => {
                       <Eye className="w-3.5 h-3.5 text-amber-400" /> Visualizar PDF armazenado
                     </button>
                     <button
-                      onClick={async () => { const pdfSender = await preparePdfSender(); exportQuotePdf(selectedQuote, pdfSender); }}
+                      onClick={() => handleDownloadQuotePdf(selectedQuote)}
                       className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
                     >
                       <Download className="w-3.5 h-3.5 text-slate-300" /> Baixar PDF
@@ -752,6 +774,19 @@ const handleAddItem = () => {
                     >
                       <FileCheck className="w-3.5 h-3.5" /> Converter em fatura
                     </button>
+                    {!selectedQuote.approvedSnapshotId && (
+                      <button
+                        onClick={handleApproveQuote}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-xl transition"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Aprovar e congelar versão
+                      </button>
+                    )}
+                    {selectedQuote.approvedSnapshotId && (
+                      <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300">
+                        Aprovado · Snapshot imutável
+                      </span>
+                    )}
                     <button
                       onClick={() => handleSaveQuote()}
                       className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase rounded-xl transition shadow-md shadow-amber-500/20"
