@@ -341,6 +341,11 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       showToast("Este desenho já está aprovado e bloqueado para fabricação.", "warning");
       return;
     }
+    if (drawing.id === "draw-sample-01") {
+      showToast("O desenho de demonstração não pode ser aprovado para fabricação. Gere ou abra um projeto real.", "warning");
+      return;
+    }
+    if ((drawing as any).isDraft === true && !window.confirm("CONFIRMAÇÃO DE RESPONSABILIDADE TÉCNICA\n\nRevisei as dimensões, materiais, componentes, folgas, ferragens e plano de corte. Confirmo que este desenho preliminar foi verificado por profissional autorizado e pode ser liberado para fabricação.\n\nDeseja congelar esta versão como aprovada?")) return;
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Entre novamente para aprovar o desenho.");
@@ -650,7 +655,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
           {!drawing.approvedSnapshotId && (
             <button
               onClick={handleApproveDrawing}
-              disabled={isSaving || !drawing.pieces?.length || drawing.isDraft === false}
+              disabled={isSaving || !drawing.pieces?.length || drawing.isDraft === false || drawing.id === "draw-sample-01"}
               className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-black rounded-xl transition"
             >
               <CheckCircle className="w-4 h-4" /> Aprovar para fabricação
