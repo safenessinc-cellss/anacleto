@@ -165,7 +165,7 @@ function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
   const parsed = numbers[0];
   const unit = /\bmm\b|milímetro|milimetro/.test(normalized) ? "mm" : "cm";
   const factor = unit === "mm" ? 10 : 1;
-  const toNumber = (value?: string) => value ? Number(value.replace(",", "")) : 0;
+  const toNumber = (value?: string) => value ? Number(value.replace(",", ".")) : 0;
   const width = Math.max(1, parsed ? toNumber(parsed[1]) : 100);
   const height = Math.max(1, parsed ? toNumber(parsed[2]) : 100);
   const depth = Math.max(1, parsed && parsed[3] ? toNumber(parsed[3]) : (normalized.includes("janela") || normalized.includes("ventana") ? 12 * factor : 50 * factor));
@@ -354,6 +354,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       });
       const responseBody = await res.json().catch(() => null);
       if (!res.ok) throw new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
+      if (responseBody?._fallback) throw new Error("A IA está indisponível; será usado o gerador local com as dimensões informadas.");
       if (!responseBody || !Array.isArray(responseBody.pieces) || responseBody.pieces.length === 0) {
         throw new Error("O serviço retornou um desenho sem componentes renderizáveis.");
       }
