@@ -663,7 +663,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
           )}
           {drawing.approvedSnapshotId && <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300">APROVADO · SNAPSHOT IMUTÁVEL</span>}
           <button
-            onClick={handleSaveDrawing}
+            onClick={() => handleSaveDrawing()}
             disabled={isSaving}
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
           >
