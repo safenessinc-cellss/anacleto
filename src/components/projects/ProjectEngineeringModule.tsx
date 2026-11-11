@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { BriefcaseBusiness, Ruler, Scissors, Layers3 } from "lucide-react";
+import { BriefcaseBusiness, Ruler, Scissors, Layers3, Tags } from "lucide-react";
 import BusinessWorkspace from "../workspace/BusinessWorkspace";
 import RegistryModule from "../registry/RegistryModule";
 import TechnicalDrawingModule from "../technical-drawing/TechnicalDrawingModule";
+import PriceTableModule from "../registry/PriceTableModule";
 import { SenderConfig } from "../../types";
 
-type WorkflowTab = "projects" | "measurement" | "cut_plan" | "profile_optimization" | "tipologias" | "technical_drawing";
+type WorkflowTab = "projects" | "measurement" | "cut_plan" | "profile_optimization" | "tipologias" | "technical_drawing" | "price_table";
 
 const tabs: { id: WorkflowTab; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "projects", label: "Projetos", description: "Cadastro e acompanhamento dos projetos de esquadrias.", icon: BriefcaseBusiness },
@@ -14,6 +15,7 @@ const tabs: { id: WorkflowTab; label: string; description: string; icon: React.C
   { id: "profile_optimization", label: "Otimização de Perfis", description: "Análise de barras, aproveitamento e sobras de perfis.", icon: Layers3 },
   { id: "tipologias", label: "Modelos de Esquadrias", description: "Biblioteca de tipologias, modelos e dimensões padrão.", icon: BriefcaseBusiness },
   { id: "technical_drawing", label: "Projetos Técnicos 2D", description: "Desenhos técnicos 2D vinculados ao desenvolvimento dos projetos.", icon: BriefcaseBusiness },
+  { id: "price_table", label: "Tabela de Preços", description: "Preços de vidros e componentes, validade, histórico e atualização mensal.", icon: Tags },
 ];
 
 export default function ProjectEngineeringModule({ language, senderConfig }: { language: string; senderConfig: SenderConfig }) {
@@ -30,7 +32,7 @@ export default function ProjectEngineeringModule({ language, senderConfig }: { l
         </p>
       </header>
 
-      <nav aria-label="Etapas de projetos e engenharia" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-3 xl:grid-cols-6">
+      <nav aria-label="Etapas de projetos e engenharia" className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-3 xl:grid-cols-4">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const selected = active === tab.id;
@@ -46,7 +48,7 @@ export default function ProjectEngineeringModule({ language, senderConfig }: { l
               <span className="min-w-0">
                 <span className="block text-sm font-bold">{tab.label}</span>
                 <span className={`mt-0.5 hidden text-[11px] sm:block ${selected ? "text-blue-100" : "text-slate-400"}`}>
-                  {tab.id === "projects" ? "Visão geral" : tab.id === "measurement" ? "Campo e dimensões" : tab.id === "cut_plan" ? "Preparação de corte" : tab.id === "profile_optimization" ? "Barras e sobras" : tab.id === "tipologias" ? "Biblioteca de modelos" : "Desenho técnico"}
+                  {tab.id === "projects" ? "Visão geral" : tab.id === "measurement" ? "Campo e dimensões" : tab.id === "cut_plan" ? "Preparação de corte" : tab.id === "profile_optimization" ? "Barras e sobras" : tab.id === "tipologias" ? "Biblioteca de modelos" : tab.id === "technical_drawing" ? "Desenho técnico" : "Preços e validade"}
                 </span>
               </span>
             </button>
@@ -65,6 +67,7 @@ export default function ProjectEngineeringModule({ language, senderConfig }: { l
         {active === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
         {active === "tipologias" && <BusinessWorkspace kind="tipologias" />}
         {active === "technical_drawing" && <TechnicalDrawingModule language={language} senderConfig={senderConfig} />}
+        {active === "price_table" && <PriceTableModule />}
       </div>
     </section>
   );
