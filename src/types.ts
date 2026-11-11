@@ -65,9 +65,6 @@ export interface Quote {
   updatedAt: string;
   // PDF Storage in Platform
   pdfDataUri?: string;
-  pdfUrl?: string;
-  pdfStoragePath?: string;
-  storageFormat?: "pdf-only";
   pdfFileName?: string;
   pdfGeneratedAt?: string;
   pdfFileSizeKb?: number;
