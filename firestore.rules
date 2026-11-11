@@ -52,7 +52,15 @@ service cloud.firestore {
     match /companies/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /companies_crm/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /budgets/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /quotes/{id} { allow read: if canOperate() || canManageProduction(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /quotes/{id} {
+      allow read: if canOperate() || canManageProduction();
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial() && (
+        !('approvedSnapshotId' in resource.data) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt'])
+      );
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']) && !('approvedSnapshotId' in resource.data);
+    }
     match /ledger_entries/{id} { allow read, write: if canManageFinance(); }
     match /user_profiles/{uid} { allow read, write: if signedIn() && (request.auth.uid == uid || owner()); }
     match /chat_sessions/{id} {
@@ -76,7 +84,17 @@ service cloud.firestore {
     match /cut_plans/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /profile_optimization/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /material_lists/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /technical_drawings/{id} { allow read: if canOperate(); allow create, update, delete: if canManageCommercial(); }
+    match /technical_drawings/{id} {
+      allow read: if canOperate();
+      allow create: if canManageCommercial();
+      allow update: if (canManageCommercial() || canManageQuality() || canManageProduction()) && !('approvedSnapshotId' in resource.data);
+      allow delete: if canManageCommercial() && !('approvedSnapshotId' in resource.data);
+    }
+    match /approved_snapshots/{id} {
+      allow read: if canOperate() || canManageFinance() || canManageQuality() || canManageProduction();
+      allow create: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
+      allow update, delete: if false;
+    }
 
     // Tabela central de preços e rastreabilidade das atualizações.
     match /price_table/{id} {
