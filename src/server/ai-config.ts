@@ -57,7 +57,7 @@ export const AI_CONFIG = {
     retries: 1,
   },
   publicEstimate: {
-    model: process.env.ANACLETO_PUBLIC_ESTIMATE_MODEL || "google/gemini-2.0-flash-lite",
+    model: process.env.ANACLETO_PUBLIC_ESTIMATE_MODEL || "google/gemini-2.5-flash-lite",
     temperature: 0.1,
     maxOutputTokens: 1200,
     timeoutMs: 8_000,
