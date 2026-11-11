@@ -11,7 +11,6 @@ import technicalDrawingHandler from "./api/technical-drawing";
 import approvedSnapshotHandler from "./api/approved-snapshot";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate";
 import { recordAIAudit, recordBudgetLineTransition } from "./src/server/ai-audit";
-import { verifyServiceRequest, SERVICE_SIGNATURE_HEADER, SERVICE_TIMESTAMP_HEADER } from "./src/server/service-auth";
 import { requestDrawingService, getDrawingServiceJob } from "./src/server/drawing-service-client";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -444,18 +443,6 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLi
 // 4. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
 app.post("/api/public/quote-estimate", (req, res) => publicQuoteEstimateHandler(req, res));
-
-app.post("/api/internal/technical-drawing", (req, res, next) => {
-  const rawBody = JSON.stringify(req.body || {});
-  const timestamp = String(req.headers[SERVICE_TIMESTAMP_HEADER] || "");
-  const signature = String(req.headers[SERVICE_SIGNATURE_HEADER] || "");
-  const valid = verifyServiceRequest({
-    method: req.method, path: "/api/internal/technical-drawing",
-    timestamp, signature, body: rawBody,
-  });
-  if (!valid) return res.status(401).json({ error: "Assinatura inter-serviço inválida ou expirada.", code: "INVALID_SERVICE_SIGNATURE" });
-  return technicalDrawingHandler(req, res);
-});
 
 app.post("/api/ai/technical-drawing", async (req, res) => {
   if (!process.env.ANACLETO_DRAWING_SERVICE_URL) return technicalDrawingHandler(req, res);
