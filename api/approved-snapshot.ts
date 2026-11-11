@@ -105,6 +105,9 @@ function catalogMatch(item: any, catalog: any[]) {
   }) || null;
 }
 
+function canApproveManualPrice(user: AuthUser) {
+  return user.role === "owner" || ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role);
+}
 function canApprove(user: AuthUser, type: "quote" | "drawing") {
   if (user.role === "owner") return true;
   const quoteRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"];
@@ -191,6 +194,14 @@ export default async function handler(req: any, res: any) {
       delete integrityPayload.document.snapshotContentHash;
       if (!expectedHash || digest(integrityPayload) !== expectedHash) {
         return send(res, 409, { error: "Falha de integridade: a instantânea não corresponde ao hash de aprovação.", code: "SNAPSHOT_INTEGRITY_FAILED" });
+      }
+      if (found.data.budgetSnapshot?.contentHash) {
+        const budgetPayload = { ...found.data.budgetSnapshot };
+        const budgetHash = String(budgetPayload.contentHash);
+        delete budgetPayload.contentHash;
+        if (digest(budgetPayload) !== budgetHash) {
+          return send(res, 409, { error: "Falha de integridade no ledger financeiro.", code: "BUDGET_SNAPSHOT_INTEGRITY_FAILED" });
+        }
       }
       return send(res, 200, found.data);
     }
@@ -303,6 +314,7 @@ export default async function handler(req: any, res: any) {
         }
         const manualPrice = Number(item.unitPrice);
         if (!Number.isFinite(manualPrice) || manualPrice < 0 || manualPrice > 1000000000) throw new Error("Preço manual inválido no orçamento técnico.");
+        if (!canApproveManualPrice(user)) throw new Error("Somente direção/Financeiro pode aprovar manualmente preços sem SKU cadastrado.");
         return { ...item, quantity, unitPrice: manualPrice, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
       const approvedAt = new Date().toISOString();
