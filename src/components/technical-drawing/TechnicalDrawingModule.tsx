@@ -376,7 +376,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       }
       const pdf = buildTechnicalDrawingPdf(pdfSource, pdfSender);
       const target = { ...pdfSource, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb };
-      if (drawing.id === target.id) setDrawing(target);
+      setDrawing(target);
       setIsPdfModalOpen(true);
     } catch (error) {
       console.error("Could not build drawing PDF from its approved snapshot:", error);
