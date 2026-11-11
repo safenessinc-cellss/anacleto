@@ -491,12 +491,32 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         return;
       }
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/technical-drawing", {
+      const res = await fetch("/api/ai/technical-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
       });
-      const responseBody = await res.json().catch(() => null);
+      let responseBody = await res.json().catch(() => null);
+      if (res.status === 202 && responseBody?.status === "JOB_PROCESSING" && responseBody?.jobId && responseBody?.pollUrl) {
+        let completed = false;
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const jobResponse = await fetch(responseBody.pollUrl, { headers: { Authorization: `Bearer ${idToken}` } });
+          const job = await jobResponse.json().catch(() => null);
+          if (!jobResponse.ok) throw new Error(job?.error || "Não foi possível consultar o processamento do desenho.");
+          if (job?.status === "COMPLETED" || job?.status === "COMPLETED_WITH_FALLBACK") {
+            responseBody = job.result;
+            completed = true;
+            break;
+          }
+          if (job?.status === "FAILED") throw new Error(job?.error || "O serviço não conseguiu concluir o desenho.");
+        }
+        if (!completed) {
+          showToast(`O desenho continua em processamento. ID da tarefa: ${responseBody.jobId}. Consulte novamente em instantes.`, "warning");
+          setIsLoading(false);
+          return;
+        }
+      }
       if (!res.ok) {
         const serviceError = new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
         if (res.status === 401 || res.status === 403) {
@@ -527,6 +547,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         overallDimensions: { width, height, depth: depth > 0 ? depth : undefined },
         pieces: responseBody.pieces,
         visualElements: Array.isArray(responseBody.visualElements) ? responseBody.visualElements : [],
+        ...(responseBody.vectorPayload ? { vectorPayload: responseBody.vectorPayload } as any : {}),
         modelDescription: responseBody.modelDescription || "",
         finalAppearance: responseBody.finalAppearance || "",
         measurementPlan: Array.isArray(responseBody.measurementPlan) ? responseBody.measurementPlan : [],
