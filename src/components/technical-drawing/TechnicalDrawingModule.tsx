@@ -532,7 +532,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               {drawing.pdfDataUri && (
                 <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
                   <CheckCircle className="w-3 h-3 text-emerald-400" />
-                  PDF Almacenado ({drawing.pdfFileSizeKb || 40} KB)
+                  PDF armazenado ({drawing.pdfFileSizeKb || 40} KB)
                 </span>
               )}
             </div>
