@@ -669,6 +669,14 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
 
   // Página 1: identificação, dimensões e as três vistas do MESMO modelo do editor.
   drawHeader("DESENHO TÉCNICO 2D — " + (drawing.title || "Projeto"), "ANACLETO ESQUADRIAS • Documento gerado a partir dos dados editáveis do projeto");
+  if ((drawing as any).draftStatus === "preliminary") {
+    doc.setTextColor(180, 83, 9);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO", pageWidth / 2, 30, { align: "center" });
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+  }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(15, 23, 42);
