@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "../../src/server/ai-config";
 import { parseAIJson } from "../../src/server/ai-json";
+import { recordAIAudit } from "../../src/server/ai-audit";
 
 type RateState = { count: number; resetAt: number };
 const localWindows = new Map<string, RateState>();
@@ -50,6 +51,7 @@ export default async function handler(req: any, res: any) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const prompt = typeof body?.description === "string" ? body.description.trim() : "";
     if (prompt.length < 12 || prompt.length > 3000) return send(res, 400, { error: "Descreva o projeto em 12 a 3000 caracteres." });
+    const aiStartedAt = Date.now();
     const result = await generateText({
       model: getAIModel("publicEstimate"),
       system: "Você é um assistente de pré-atendimento comercial. Resuma escopo, tipologia provável, medidas mencionadas e perguntas faltantes. NÃO invente preços, SKUs, prazos ou disponibilidade. NÃO produza orçamento vinculante nem preço comercial. Responda em português do Brasil, JSON válido com scopeSummary, detectedDimensions, questions, disclaimer.",
@@ -69,6 +71,15 @@ export default async function handler(req: any, res: any) {
     } catch {
       return send(res, 502, { error: "Não foi possível estruturar a pré-avaliação. Tente novamente." });
     }
+    await recordAIAudit({
+      serviceName: "BUDGET",
+      modelUsed: AI_CONFIG.publicEstimate.model,
+      input: { description: prompt, channel: "public" },
+      output: estimate,
+      usage: result.usage as any,
+      requestId: String(req.headers?.["x-request-id"] || ""),
+      startedAt: aiStartedAt,
+    });
     return send(res, 200, {
       type: "NON_BINDING_PRE_ESTIMATE",
       estimate,
