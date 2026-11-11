@@ -243,19 +243,25 @@ Regras obrigatórias:
       const catalogPrice = match ? Number(match.price) : 0;
       const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
       const storedExistingItem = storedQuoteItems.find((row: any) => String(row?.id || "") === String(existingItem?.id || ""));
+      const normalizeIdentity = (value: unknown) => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase();
+      const sameExistingIdentity = !!storedExistingItem &&
+        (item.sku === undefined || normalizeIdentity(item.sku) === normalizeIdentity(storedExistingItem.sku)) &&
+        (item.catalogItemId === undefined || String(item.catalogItemId || "") === String(storedExistingItem.catalogItemId || "")) &&
+        (item.itemId === undefined || String(item.itemId || "") === String(storedExistingItem.itemId || "")) &&
+        (item.description === undefined || normalizeIdentity(item.description) === normalizeIdentity(storedExistingItem.description));
       const existingPrice = Number(storedExistingItem?.unitPrice);
       const hasStoredPrice = storedExistingItem?.unitPrice !== undefined && storedExistingItem?.unitPrice !== null && String(storedExistingItem.unitPrice).trim() !== "";
-      const preservedExistingPrice = !confirmed && !!storedExistingItem && hasStoredPrice && Number.isFinite(existingPrice) && existingPrice >= 0;
+      const preservedExistingPrice = !confirmed && sameExistingIdentity && hasStoredPrice && Number.isFinite(existingPrice) && existingPrice >= 0;
       const unitPrice = confirmed ? catalogPrice : preservedExistingPrice ? existingPrice : 0;
       return {
         id: String(item.id || `ai-${index + 1}`),
-        itemId: String(match?.id || item.itemId || existingItem?.itemId || ""),
+        itemId: String(match?.id || item.itemId || (sameExistingIdentity ? existingItem?.itemId : "") || ""),
         description: String(item.description).slice(0, 500),
         quantity,
         unitPrice,
         subtotal: Number((quantity * unitPrice).toFixed(2)),
-        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || existingItem?.sku || ""),
-        catalogItemId: confirmed ? String(match.id || "") : String(item.catalogItemId || existingItem?.catalogItemId || ""),
+        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || (sameExistingIdentity ? existingItem?.sku : "") || ""),
+        catalogItemId: confirmed ? String(match.id || "") : String(item.catalogItemId || (sameExistingIdentity ? existingItem?.catalogItemId : "") || ""),
         priceSource: confirmed ? "catalog" : preservedExistingPrice ? "existing" : "pending",
       };
     });
