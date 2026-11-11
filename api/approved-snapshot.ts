@@ -251,7 +251,7 @@ export default async function handler(req: any, res: any) {
       const catalog = await loadCatalogFromFirestore(req);
       const reviewedItems = source.items.map((item: any) => {
         const quantity = Number(item.quantity);
-        if (!Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento: use um inteiro positivo.");
+        if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento: informe um valor positivo.");
         const price = Number(item.unitPrice);
         if (!Number.isFinite(price) || price < 0 || price > 1000000000) throw new Error("Preço inválido no orçamento.");
         const match = catalogMatch(item, catalog);
@@ -303,7 +303,7 @@ export default async function handler(req: any, res: any) {
       if (budgetItems.length > 150) return send(res, 422, { error: "O orçamento técnico excede 150 linhas." });
       const reviewedBudgetItems = budgetItems.map((item: any) => {
         const quantity = Number(item.quantity);
-        if (!Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento técnico.");
+        if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento técnico.");
         if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O desenho contém preços pendentes; revise antes de aprovar.");
         const match = catalogMatch(item, catalog);
         if (item.catalogItemId || item.sku) {
