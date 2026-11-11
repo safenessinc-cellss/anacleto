@@ -447,24 +447,48 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     try {
       if (!generated) throw new Error("Não foi possível montar o desenho técnico.");
+
+      // Renderizar o desenho imediatamente. A criação/vinculação do projeto no Firestore
+      // é complementar e não pode impedir que o resultado apareça na tela.
       let selectedProject = projects.find((project) => project.id === selectedProjectId);
-      if (!selectedProject && auth.currentUser) {
-        const now = new Date().toISOString();
-        const projectRef = await addDoc(collection(db, "projects"), {
-          name: generated.title, category: generated.category, status: "Em andamento",
-          notes: generated.description, client: "", ownerUid: auth.currentUser.uid,
-          createdAt: now, updatedAt: now
-        });
-        selectedProject = { id: projectRef.id, name: generated.title };
-        setSelectedProjectId(projectRef.id);
-      }
-      generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
+      generated = {
+        ...generated,
+        projectId: selectedProject?.id,
+        projectName: selectedProject?.name,
+      };
       setDrawing(generated);
       setCurrentStep(1);
       if (!presetPrompt) setPrompt("");
+      showToast("Desenho gerado. Revise as cotas antes de fabricar.", "success");
 
-      setDrawing(generated);
-      showToast("Desenho gerado. Revise e use “Salvar desenho” para armazenar o documento final.", "success");
+      // Criar projeto automaticamente apenas como melhor esforço. Se as regras do
+      // Firestore recusarem a gravação, manter o desenho disponível para exportar PDF.
+      if (!selectedProject && auth.currentUser) {
+        try {
+          const now = new Date().toISOString();
+          const projectRef = await addDoc(collection(db, "projects"), {
+            name: generated.title,
+            category: generated.category,
+            status: "Em andamento",
+            notes: generated.description,
+            client: "",
+            ownerUid: auth.currentUser.uid,
+            createdAt: now,
+            updatedAt: now,
+          });
+          selectedProject = { id: projectRef.id, name: generated.title };
+          setSelectedProjectId(projectRef.id);
+          generated = {
+            ...generated,
+            projectId: projectRef.id,
+            projectName: generated.title,
+          };
+          setDrawing(generated);
+        } catch (projectError) {
+          console.warn("Drawing generated but project auto-link failed:", projectError);
+          showToast("O desenho foi gerado, mas não foi vinculado a um projeto. Você ainda pode exportá-lo em PDF.", "warning");
+        }
+      }
     } finally {
       setIsLoading(false);
     }
