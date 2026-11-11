@@ -728,7 +728,7 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
     headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: "bold" },
     styles: { fontSize: 8, cellPadding: 3, overflow: "linebreak" },
     columnStyles: { 0: { cellWidth: 12, halign: "center" }, 1: { cellWidth: 52 }, 2: { cellWidth: 14, halign: "center" }, 3: { cellWidth: 48 }, 4: { cellWidth: "auto" }, 5: { cellWidth: 27 } },
-    didDrawPage: () => { if (doc.internal.getNumberOfPages() > 2) drawHeader("LISTA DE PEÇAS E PLANO DE CORTE", drawing.title || "Projeto técnico"); },
+    didDrawPage: () => { if (doc.getNumberOfPages() > 2) drawHeader("LISTA DE PEÇAS E PLANO DE CORTE", drawing.title || "Projeto técnico"); },
   });
   let nextY = ((doc as any).lastAutoTable?.finalY || 40) + 10;
   if (nextY > pageHeight - 35) { doc.addPage(); drawHeader("MONTAGEM E OBSERVAÇÕES", drawing.title || "Projeto técnico"); nextY = 38; }
