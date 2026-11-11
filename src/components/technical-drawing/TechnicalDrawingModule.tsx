@@ -163,18 +163,30 @@ const initialSampleDrawing: TechnicalDrawing = {
 
 function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
   const normalized = input.toLowerCase();
-  const numbers = [...normalized.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?))?/g)];
-  const parsed = numbers[0];
-  const unit = /\bmm\b|milímetro|milimetro/.test(normalized) ? "mm" : "cm";
-  const factor = unit === "mm" ? 10 : 1;
-  const toNumber = (value?: string) => value ? Number(value.replace(",", ".")) : 0;
-  const width = Math.max(1, parsed ? toNumber(parsed[1]) : 100);
-  const height = Math.max(1, parsed ? toNumber(parsed[2]) : 100);
-  const depth = Math.max(1, parsed && parsed[3] ? toNumber(parsed[3]) : (normalized.includes("janela") || normalized.includes("ventana") ? 12 * factor : 50 * factor));
   const isWindow = /janela|ventana|esquadria|corredi[cç]a/.test(normalized);
   const isDoor = /porta|puerta/.test(normalized);
   const isTable = /mesa|table/.test(normalized);
   const isWardrobe = /arm[aá]rio|closet|guarda roupa/.test(normalized);
+  // Aceita medidas no formato 120x80x75, inclusive com unidade após cada número.
+  const dimensionText = normalized.replace(/(\d)\s*(?:mm|cm)\b/g, "$1");
+  const numbers = [...dimensionText.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?))?/g)];
+  const parsed = numbers[0];
+  const unit = /\bmm\b|milímetro|milimetro/.test(normalized) ? "mm" : "cm";
+  const factor = unit === "mm" ? 10 : 1;
+  const toNumber = (value?: string) => value ? Number(value.replace(",", ".")) : 0;
+  const namedDimension = (labels: string) => {
+    const match = normalized.match(new RegExp("(?:\\b(?:" + labels + ")\\b)\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)"));
+    return match ? toNumber(match[1]) : 0;
+  };
+  const first = parsed ? toNumber(parsed[1]) : 0;
+  const second = parsed ? toNumber(parsed[2]) : 0;
+  const third = parsed?.[3] ? toNumber(parsed[3]) : 0;
+  const width = Math.max(1, namedDimension("largura|width") || first || 100);
+  const heightFromLabel = namedDimension("altura|alto|height");
+  const depthFromLabel = namedDimension("profundidade|fundo|depth");
+  // Para mesas, a ordem usual é largura × profundidade × altura.
+  const height = Math.max(1, heightFromLabel || (isTable && third ? third : second) || 100);
+  const depth = Math.max(1, depthFromLabel || (isTable && third ? second : third) || (isWindow || isDoor ? 12 * factor : 50 * factor));
   const category: TechnicalDrawing["category"] = isWindow ? "aluminum_window" : isDoor ? "glass_door" : isTable || isWardrobe ? "furniture" : "custom";
   const title = isWindow ? "Esquadria / janela sob medida" : isDoor ? "Porta sob medida" : isTable ? "Mesa sob medida" : isWardrobe ? "Armário sob medida" : "Projeto técnico sob medida";
   const material = isWindow || isDoor ? "Alumínio / vidro — especificação a validar" : "Material a definir pelo responsável técnico";
