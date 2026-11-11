@@ -185,7 +185,7 @@ export default async function handler(req: any, res: any) {
       if (!["quote", "drawing"].includes(found.data.type) || !canReadSnapshot(user, found.data.type)) {
         return send(res, 403, { error: "Seu perfil não tem acesso a esta instantânea." });
       }
-      const integrityPayload = { ...found.data, document: { ...found.data.document } };
+      const integrityPayload: any = { ...found.data, document: { ...found.data.document } };
       const expectedHash = String(integrityPayload.contentHash || "");
       delete integrityPayload.contentHash;
       delete integrityPayload.document.snapshotContentHash;
