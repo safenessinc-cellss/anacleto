@@ -1,5 +1,5 @@
 import { generateText, gateway } from "ai";
-import firebaseConfig from "../firebase-applet-config.json";
+import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[] };
 type WindowEntry = { startedAt: number; count: number };
