@@ -9,6 +9,9 @@ import { generateValidatedJson, parseAIJson } from "./src/server/ai-json";
 import { loadCatalogFromFirestore, loadQuoteFromFirestore } from "./src/server/firestore-data";
 import technicalDrawingHandler from "./api/technical-drawing";
 import approvedSnapshotHandler from "./api/approved-snapshot";
+import publicQuoteEstimateHandler from "./api/public/quote-estimate";
+import { recordAIAudit, recordBudgetLineTransition } from "./src/server/ai-audit";
+import { verifyServiceRequest, SERVICE_SIGNATURE_HEADER, SERVICE_TIMESTAMP_HEADER } from "./src/server/service-auth";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -188,6 +191,7 @@ function hasVerifiedCatalogPrice(row: any): boolean {
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
 app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
+  const aiStartedAt = Date.now();
   try {
     const message = String(req.body?.message || "").trim();
     const requestedQuote = req.body?.currentQuote && typeof req.body.currentQuote === "object" ? req.body.currentQuote : {};
@@ -232,6 +236,14 @@ Regras obrigatórias:
         }
         return value;
       },
+    });
+    await recordAIAudit({
+      serviceName: "BUDGET", modelUsed: AI_CONFIG.quote.model,
+      input: { message, history, currentQuote },
+      output: parsed, actorUid: res.locals.firebaseUser?.uid,
+      requestId: String(req.headers["x-request-id"] || ""),
+      startedAt: aiStartedAt,
+      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""),
     });
     const items = parsed.items.map((item: any, index: number) => {
       const quantity = Number(item.quantity);
@@ -294,6 +306,7 @@ Regras obrigatórias:
 });
 
 app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
+  const aiStartedAt = Date.now();
   try {
     const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
@@ -311,6 +324,14 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
         }
         return value;
       },
+    });
+    await recordAIAudit({
+      serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
+      input: { prompt, language, catalogCount: catalog.length },
+      output: parsed, actorUid: res.locals.firebaseUser?.uid,
+      requestId: String(req.headers["x-request-id"] || ""),
+      startedAt: aiStartedAt,
+      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""),
     });
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
@@ -411,6 +432,20 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLi
 // ----------------------------------------------------
 // 4. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
+app.post("/api/public/quote-estimate", (req, res) => publicQuoteEstimateHandler(req, res));
+
+app.post("/api/internal/technical-drawing", (req, res, next) => {
+  const rawBody = JSON.stringify(req.body || {});
+  const timestamp = String(req.headers[SERVICE_TIMESTAMP_HEADER] || "");
+  const signature = String(req.headers[SERVICE_SIGNATURE_HEADER] || "");
+  const valid = verifyServiceRequest({
+    method: req.method, path: "/api/internal/technical-drawing",
+    timestamp, signature, body: rawBody,
+  });
+  if (!valid) return res.status(401).json({ error: "Assinatura inter-serviço inválida ou expirada.", code: "INVALID_SERVICE_SIGNATURE" });
+  return technicalDrawingHandler(req, res);
+});
+
 app.post("/api/ai/technical-drawing", (req, res) => technicalDrawingHandler(req, res));
 app.all("/api/approved-snapshot", (req, res) => approvedSnapshotHandler(req, res));
 
