@@ -7,7 +7,7 @@ import Papa from "papaparse";
 
 type PriceRow = { id: string; code?: string; sku?: string; name: string; category?: string; unit?: string; price: number; supplier?: string; priceSupplier?: string; brand?: string; dimensions?: string; validUntil?: string; notes?: string };
 const blank = { code: "", name: "", category: "Perfil", unit: "m", price: "0", supplier: "", brand: "", dimensions: "", validUntil: "", notes: "" };
-const norm = (value: unknown) => String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
+const norm = (value: unknown) => String(value ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value) || 0);
 
 export default function PriceTableModule({ onNavigateQuotes }: { onNavigateQuotes?: () => void }) {
