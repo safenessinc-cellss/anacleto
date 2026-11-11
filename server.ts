@@ -156,13 +156,28 @@ function findExactCatalogItem(item: any, catalog: any[]) {
   const sku = String(item?.sku || item?.code || "").trim().toLowerCase();
   const catalogId = String(item?.catalogItemId || "").trim();
   const description = normalizeCatalogName(item?.description);
-  return catalog.find((row: any) => {
+  const exact = catalog.find((row: any) => {
     const rowSku = String(row?.sku || row?.code || "").trim().toLowerCase();
     if (catalogId && String(row?.id || "") === catalogId) return true;
     if (sku && rowSku && sku === rowSku) return true;
     const rowName = normalizeCatalogName(row?.name || row?.description);
     return !!description && !!rowName && description === rowName;
   });
+  if (exact) return exact;
+  const ignored = new Set(["de","do","da","com","para","un","unidade","unidades","metro","metros","linear","componente","item","material"]);
+  const tokens = (value: unknown) => normalizeCatalogName(value).replace(/\\b\\d+(?:x\\d+)?\\b/g, " ").split(/\\s+/).filter((token) => token.length > 2 && !ignored.has(token));
+  const requested = tokens(item?.description);
+  if (!requested.length) return undefined;
+  let best: any = undefined;
+  let bestScore = 0;
+  for (const row of catalog) {
+    const candidate = tokens(row?.name || row?.description);
+    if (!candidate.length) continue;
+    const overlap = requested.filter((token) => candidate.some((part) => part === token || (token.length > 5 && part.length > 5 && (token.startsWith(part) || part.startsWith(token)))));
+    const score = overlap.length / Math.max(requested.length, candidate.length);
+    if (score > bestScore) { bestScore = score; best = row; }
+  }
+  return bestScore >= 0.72 ? best : undefined;
 }
 
 // ----------------------------------------------------
@@ -248,7 +263,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
     const response = await generateText({
       model: aiModel,
       temperature: 0.1,
-      system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Só associe item do catálogo por SKU/código, ID ou nome completo EXATO. Informe sku/catalogItemId para validação. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
+      system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Priorize SKU/código e ID; quando não houver, sugira correspondência forte por descrição técnica e palavras-chave. Informe sku/catalogItemId da sugestão e não trate correspondência incerta como confirmada. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
       prompt,
     });
     const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
