@@ -479,6 +479,14 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         updatedAt: new Date().toISOString(),
         budget: responseBody.budget,
       };
+      if (generationWarning || responseBody.draftStatus === "preliminary") {
+        (generated as any).draftStatus = "preliminary";
+        (generated as any).draftLabel = responseBody.draftLabel || "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO";
+        (generated as any).assumptions = [
+          ...(Array.isArray((generated as any).assumptions) ? (generated as any).assumptions : []),
+          "Desenho de contingência ou resposta não validada pelo serviço de IA. Confirmar todas as medidas, materiais, ferragens e cortes antes de fabricar."
+        ];
+      }
     } catch (error) {
       console.error("Falha na geração do desenho técnico:", error);
       generated = buildLocalTechnicalDrawing(inputPrompt);
@@ -553,7 +561,12 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
               Desenho Técnico e Lista de Componentes Inteligente
-            </h1>
+            </h1>            {(drawing as any).draftStatus === "preliminary" && (
+              <div role="alert" className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] font-black tracking-wide text-amber-300">
+                <AlertTriangle className="h-4 w-4" />
+                {(drawing as any).draftLabel || "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO"}
+              </div>
+            )}
           </div>
         </div>
 
