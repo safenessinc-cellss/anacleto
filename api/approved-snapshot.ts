@@ -109,6 +109,13 @@ function canApprove(user: AuthUser, type: "quote" | "drawing") {
   const drawingRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "qualidade", "producao"];
   return (type === "quote" ? quoteRoles : drawingRoles).includes(user.role);
 }
+function canReadSnapshot(user: AuthUser, type: "quote" | "drawing") {
+  if (user.role === "owner") return true;
+  const quoteRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"];
+  const drawingRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "qualidade", "producao"];
+  return (type === "quote" ? quoteRoles : drawingRoles).includes(user.role);
+}
+
 async function commitSnapshot(req: any, collection: string, documentId: string, updateTime: string, snapshot: any) {
   const snapshotId = (collection === "quotes" ? "quote_" : "drawing_") + documentId + "_" + randomUUID();
   const snapshotName = base() + "/approved_snapshots/" + snapshotId;
@@ -150,6 +157,9 @@ export default async function handler(req: any, res: any) {
       if (!snapshotId || snapshotId.length > 300 || snapshotId.includes("/")) return send(res, 400, { error: "snapshotId inválido." });
       const found = await readDocument(req, "approved_snapshots", snapshotId);
       if (!found) return send(res, 404, { error: "Instantânea aprovada não encontrada." });
+      if (!["quote", "drawing"].includes(found.data.type) || !canReadSnapshot(user, found.data.type)) {
+        return send(res, 403, { error: "Seu perfil não tem acesso a esta instantânea." });
+      }
       return send(res, 200, found.data);
     }
     if (req.method !== "POST") {
