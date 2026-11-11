@@ -232,7 +232,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       }
       const pdf = buildQuotePdf(pdfQuote, pdfSender);
       pdf.doc.save(pdf.fileName);
-      const message = `Olá, ${selectedQuote.clientName}. Segue o orçamento ${selectedQuote.number} no valor de ${formatCurrency(selectedQuote.total, selectedQuote.currency)}. O PDF foi baixado; anexe o arquivo nesta conversa.`;
+      const message = `Olá, ${pdfQuote.clientName}. Segue o orçamento ${pdfQuote.number} no valor de ${formatCurrency(pdfQuote.total, pdfQuote.currency)}. O PDF foi baixado; anexe o arquivo nesta conversa.`;
       if (channel === "whatsapp") {
         const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
         if (popup) popup.location.href = url;
@@ -376,13 +376,25 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     try {
       let approvedQuote = quote;
       let invoiceSender: SenderConfig = senderConfig;
+      let snapshot: any;
       if (quote.approvedSnapshotId) {
-        const snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
-        approvedQuote = snapshot.document as Quote;
-        invoiceSender = snapshot.senderSnapshot || senderConfig;
+        snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
       } else {
-        throw new Error("A fatura só pode ser emitida a partir de um orçamento aprovado e congelado.");
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error("Faça login novamente para gerar a fatura.");
+        const senderSnapshot = await preparePdfSender();
+        const approvalResponse = await fetch("/api/approved-snapshot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ type: "quote", documentId: quote.id, senderSnapshot }),
+        });
+        const approvalResult = await approvalResponse.json();
+        if (!approvalResponse.ok) throw new Error(approvalResult?.error || "Não foi possível congelar o orçamento antes de faturar.");
+        snapshot = approvalResult.snapshot;
+        setSelectedQuote({ ...snapshot.document, approvedSnapshotId: approvalResult.snapshotId });
       }
+      approvedQuote = { ...snapshot.document, id: quote.id, approvedSnapshotId: quote.approvedSnapshotId || snapshot.document.approvedSnapshotId } as Quote;
+      invoiceSender = snapshot.senderSnapshot || senderConfig;
       const quoteRef = doc(db, "quotes", approvedQuote.id);
       const invoiceRef = doc(collection(db, "invoices"));
       const invoiceId = invoiceRef.id;
