@@ -41,7 +41,6 @@ export default function PdfPageThumbnails({ url, pageLimit = 3 }: PdfPageThumbna
         setPages(rendered);
         setLoading(false);
       }
-      await pdf.destroy();
     }).catch((reason: unknown) => {
       if (!cancelled) {
         setError(reason instanceof Error ? reason.message : "Não foi possível gerar as miniaturas do PDF.");
