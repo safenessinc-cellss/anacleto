@@ -7,14 +7,20 @@ export interface VectorDrawingPayload {
 }
 type VectorElement = Record<string, unknown>;
 const escapeXml = (value: unknown): string => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char] as string);
+function safePaint(value: unknown, fallback: string): string {
+  const paint = String(value || fallback).trim();
+  if (/^#[0-9a-f]{3,8}$/i.test(paint) || /^(none|transparent|black|white|red|green|blue|gray|grey|silver|gold|navy|orange)$/i.test(paint) ||
+      /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(\s*,\s*(0|1|0?\.\d+))?\s*\)$/i.test(paint)) return paint;
+  return fallback;
+}
 function safeNumber(value: unknown, fallback = 0): number {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(-10000, Math.min(10000, number)) : fallback;
 }
 function renderElement(element: VectorElement): string {
   const type = String(element.type || "").toLowerCase();
-  const stroke = escapeXml(element.stroke || "#cbd5e1");
-  const fill = escapeXml(element.fill || "none");
+  const stroke = safePaint(element.stroke, "#cbd5e1");
+  const fill = safePaint(element.fill, "none");
   const width = Math.max(0.5, Math.min(12, safeNumber(element.strokeWidth, 2)));
   if (type === "rect") return `<rect x="${safeNumber(element.x)}" y="${safeNumber(element.y)}" width="${Math.max(0,safeNumber(element.width))}" height="${Math.max(0,safeNumber(element.height))}" fill="${fill}" stroke="${stroke}" stroke-width="${width}"/>`;
   if (type === "line") return `<line x1="${safeNumber(element.x1)}" y1="${safeNumber(element.y1)}" x2="${safeNumber(element.x2)}" y2="${safeNumber(element.y2)}" stroke="${stroke}" stroke-width="${width}"/>`;
