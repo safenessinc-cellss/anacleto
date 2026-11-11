@@ -264,6 +264,7 @@ export default async function handler(req: any, res: any) {
           return { ...item, quantity, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice, catalogItemId: match.id, sku: String(match.sku || match.code || item.sku || "") };
         }
         if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O item " + item.description + " tem preço pendente.");
+        if (!canApproveManualPrice(user)) throw new Error("Somente direção/Financeiro pode aprovar manualmente preços sem SKU cadastrado.");
         return { ...item, quantity, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
       const subtotal = Number(reviewedItems.reduce((sum: number, item: any) => sum + item.quantity * item.unitPrice, 0).toFixed(2));
