@@ -17,7 +17,7 @@ function serviceBase(): string {
 export async function requestDrawingService(payload: unknown, timeoutMs = 5000, authorization = ""): Promise<DrawingServiceJob> {
   const base = serviceBase();
   const jobId = randomUUID();
-  const path = "/generate";
+  const path = "/api/technical-drawing";
   const body = JSON.stringify({ ...((payload && typeof payload === "object") ? payload as object : {}), requestId: jobId });
   const headers = {
     "Content-Type": "application/json",
@@ -44,11 +44,11 @@ export async function requestDrawingService(payload: unknown, timeoutMs = 5000, 
     throw error;
   }
 }
-export async function getDrawingServiceJob(jobId: string): Promise<unknown> {
+export async function getDrawingServiceJob(jobId: string, authorization = ""): Promise<unknown> {
   if (!/^[0-9a-f-]{36}$/i.test(jobId)) throw new Error("Invalid drawing job ID.");
   const base = serviceBase();
-  const path = "/jobs/" + encodeURIComponent(jobId);
-  const headers = createServiceAuthHeaders("GET", path, "");
+  const path = "/api/technical-drawing?jobId=" + encodeURIComponent(jobId);
+  const headers = { ...(authorization ? { Authorization: authorization } : {}), ...createServiceAuthHeaders("GET", path, "") };
   const response = await fetch(base + path, { method: "GET", headers, signal: AbortSignal.timeout(5000) });
   if (!response.ok) throw new Error("Drawing job lookup returned HTTP " + response.status);
   return response.json();
