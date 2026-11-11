@@ -129,7 +129,7 @@ export default function BudgetModal({
       const snapshots = await Promise.all(sourceNames.map((name) => getDocs(collection(db, name))));
       const catalog = snapshots.flatMap((snapshot, index) => snapshot.docs.map((item) => {
         const data = item.data();
-        return { id: item.id, name: data.name || data.description || "", sku: data.sku || data.code || "", category: data.category || "", unit: data.unit || "un", price: Number(data.price ?? 0), source: sourceNames[index] };
+        return { id: item.id, name: data.name || data.description || "", sku: data.sku || data.code || "", category: data.category || "", unit: data.unit || "un", price: Number(data.price ?? 0), supplier: data.priceSupplier || data.supplier || "", brand: data.brand || data.manufacturer || "", dimensions: data.dimensions || data.specification || "", validUntil: data.validUntil || "", source: sourceNames[index] };
       })).filter((item) => item.name);
       const response = await fetch("/api/ai/budget-items", {
         method: "POST",
