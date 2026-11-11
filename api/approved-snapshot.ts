@@ -161,8 +161,17 @@ export default async function handler(req: any, res: any) {
         Object.keys(body).some(key => !["type","documentId","senderSnapshot"].includes(key))) {
       return send(res, 400, { error: "A solicitação contém campos não permitidos." });
     }
-    const type = body?.type;
-    const documentId = String(body?.documentId || "").trim();
+    if (typeof body.type !== "string" || typeof body.documentId !== "string") {
+      return send(res, 400, { error: "type e documentId devem ser textos válidos." });
+    }
+    if (body.senderSnapshot !== undefined && (!body.senderSnapshot || typeof body.senderSnapshot !== "object" || Array.isArray(body.senderSnapshot))) {
+      return send(res, 400, { error: "senderSnapshot deve ser um objeto." });
+    }
+    if (body.senderSnapshot && JSON.stringify(body.senderSnapshot).length > 500000) {
+      return send(res, 413, { error: "Os metadados do emissor excedem o limite permitido." });
+    }
+    const type = body.type;
+    const documentId = body.documentId.trim();
     if (!["quote", "drawing"].includes(type) || !documentId || documentId.length > 180 || documentId.includes("/")) {
       return send(res, 400, { error: "Dados de aprovação inválidos." });
     }
@@ -198,7 +207,7 @@ export default async function handler(req: any, res: any) {
           }
           return { ...item, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice, catalogItemId: match.id, sku: String(match.sku || match.code || item.sku || "") };
         }
-        if (item.priceSource === "pending") throw new Error("O item " + item.description + " tem preço pendente.");
+        if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O item " + item.description + " tem preço pendente.");
         return { ...item, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
       const subtotal = Number(reviewedItems.reduce((sum: number, item: any) => sum + item.quantity * item.unitPrice, 0).toFixed(2));
@@ -228,7 +237,7 @@ export default async function handler(req: any, res: any) {
       const catalog = await loadCatalogFromFirestore(req);
       const budgetItems = Array.isArray(source.budget?.items) ? source.budget.items : [];
       const reviewedBudgetItems = budgetItems.map((item: any) => {
-        if (item.priceSource === "pending") throw new Error("O desenho contém preços pendentes; revise antes de aprovar.");
+        if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O desenho contém preços pendentes; revise antes de aprovar.");
         const match = catalogMatch(item, catalog);
         if (item.catalogItemId || item.sku) {
           if (!match) throw new Error("SKU/ID do orçamento técnico não existe no catálogo.");
