@@ -15,7 +15,7 @@ function json(res: any, status: number, body: unknown) {
   return res.status(status).json(body);
 }
 
-async function authenticate(req: any): Promise<{ uid: string; email: string } | null> {
+async function authenticate(req: any): Promise<{ uid: string; email: string; role: string } | null> {
   const authorization = String(req.headers.authorization || "");
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
@@ -33,6 +33,7 @@ async function authenticate(req: any): Promise<{ uid: string; email: string } | 
   if (!user?.localId || !user.email) return null;
 
   const email = user.email.toLowerCase();
+  let role = "owner";
   if (email !== OWNER_EMAIL) {
     const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
     const documentId = encodeURIComponent(email);
@@ -44,8 +45,9 @@ async function authenticate(req: any): Promise<{ uid: string; email: string } | 
     if (!roleResponse.ok) return null;
     const roleData = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
     if (!roleData.fields?.role?.stringValue) return null;
+    role = roleData.fields.role.stringValue;
   }
-  return { uid: user.localId, email };
+  return { uid: user.localId, email, role };
 }
 
 function allowRequest(uid: string): boolean {
@@ -222,6 +224,9 @@ export default async function handler(req: any, res: any) {
       return json(res, 401, { error: "Sessão inválida ou acesso não autorizado. Entre novamente.", code: "UNAUTHORIZED" });
     }
     authenticated = true;
+    if (!["owner","super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role)) {
+      return json(res, 403, { error: "Seu perfil não possui permissão para operações de desenho técnico.", code: "ROLE_FORBIDDEN" });
+    }
     catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
 
     if (!allowRequest(user.uid)) {
