@@ -55,8 +55,8 @@ const initialSampleDrawing: TechnicalDrawing = {
       dimensions: { width: 120, height: 4, depth: 80, unit: "cm" },
       material: "Madeira maciça de carvalho 40mm",
       color: "#C5A850",
-      cutAngle: "90° recto",
-      notes: "Qtdos biselados a 2mm",
+      cutAngle: "90° reto",
+      notes: "Cantos biselados em 2 mm",
     },
     {
       id: "p2",
@@ -66,7 +66,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
       color: "#8C6D37",
-      cutAngle: "90° recto",
+      cutAngle: "90° reto",
     },
     {
       id: "p3",
@@ -76,7 +76,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
       color: "#8C6D37",
-      cutAngle: "90° recto",
+      cutAngle: "90° reto",
     },
     {
       id: "p4",
@@ -86,7 +86,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
       color: "#735728",
-      cutAngle: "90° recto",
+      cutAngle: "90° reto",
     },
     {
       id: "p5",
@@ -96,7 +96,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
       color: "#735728",
-      cutAngle: "90° recto",
+      cutAngle: "90° reto",
     },
     {
       id: "p6",
@@ -106,7 +106,7 @@ const initialSampleDrawing: TechnicalDrawing = {
       dimensions: { width: 104, height: 10, depth: 3, unit: "cm" },
       material: "Madeira maciça de carvalho",
       color: "#A88440",
-      cutAngle: "90° recto",
+      cutAngle: "90° reto",
     },
   ],
   dimensionLines: [
@@ -115,7 +115,7 @@ const initialSampleDrawing: TechnicalDrawing = {
   ],
   assemblyInstructions: [
     "Montar as quatro pernas unindo as travessas longitudinais.",
-    "Comprobar las escuadras en diagonal (máx. 1 mm de diferencia).",
+    "Conferir o esquadro pelas diagonais (diferença máxima de 1 mm).",
     "Fixar o tampo superior com conectores ocultos em Z.",
   ],
   steps: [
@@ -137,22 +137,22 @@ const initialSampleDrawing: TechnicalDrawing = {
       stepNumber: 3,
       phaseName: "Passo 3: Corte de cada peça com suas medidas",
       title: "Dimensionamento individual e usinagem",
-      description: "Cortes con precisión milimétrica, ingletes y ranurados para fijación.",
-      instructions: ["Ejecutar cortes siguiendo las cotas individuales.", "Limpiar rebabas y perfilar cantos."],
+      description: "Cortes com precisão milimétrica, meia-esquadria e ranhuras para fixação.",
+      instructions: ["Executar os cortes conforme as medidas individuais.", "Remover rebarbas e fazer o acabamento das bordas."],
     },
     {
       stepNumber: 4,
       phaseName: "Passo 4: Montagem por encaixe",
-      title: "Secuencia de montaje y unión",
-      description: "Montaje secuencial con flechas de ensamble y ajuste de fijaciones.",
+      title: "Sequência de montagem e união",
+      description: "Montagem sequencial com indicações de encaixe e ajuste das fixações.",
       instructions: ["Posicionar as peças sem fixação definitiva.", "Ajustar as uniões com fixadores ocultos."],
     },
     {
       stepNumber: 5,
       phaseName: "Passo 5: Resultado final com vista completa e medidas totais",
-      title: "Producto terminado y revisión de calidad",
-      description: "Estructura final consolidada con todas las cotas y verificación de aplomo.",
-      instructions: ["Comprobación de solidez mecánica.", "Limpieza final y entrega."],
+      title: "Produto finalizado e inspeção de qualidade",
+      description: "Estrutura final montada, com todas as medidas e conferência de alinhamento.",
+      instructions: ["Verificação da resistência mecânica.", "Limpeza final e entrega."],
     },
   ],
   currentStep: 1,
@@ -217,7 +217,7 @@ function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
   const steps = initialSampleDrawing.steps.map((step, index) => ({
     ...step,
     stepNumber: index + 1,
-    phaseName: ["Definição das dimensões gerais", "Despiece e lista de componentes", "Corte e cotagem individual", "Encaixe e montagem", "Vista final e conferência"][index],
+    phaseName: ["Definição das dimensões gerais", "Lista de peças e componentes", "Corte e cotagem individual", "Encaixe e montagem", "Vista final e conferência"][index],
     title: ["Dimensões gerais", "Lista de peças", "Corte de cada peça", "Montagem / encaixe", "Resultado final"][index],
     description: [
       `Dimensões informadas: largura ${width} × altura ${height} × profundidade ${depth} ${unit}.`,
