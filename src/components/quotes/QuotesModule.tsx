@@ -350,10 +350,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           message: userText,
           currentQuote: selectedQuote,
           history: newHistory,
+          catalog: catalogItems,
         }),
       });
 
-      if (!res.ok) throw new Error("Erro no servidor de IA");
+      const errorBody = await res.clone().json().catch(() => null);
+      if (!res.ok) throw new Error(errorBody?.error || `Erro no servidor de IA (${res.status}).`);
 
       const data = await res.json();
 
@@ -403,44 +405,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         },
       ]);
     } catch (err: any) {
-      console.error(err);
-      // Smart local command execution fallback
-      const lower = userText.toLowerCase();
-      let updated = { ...selectedQuote };
-      let reply = "Processei sua instrução:";
-
-      if (lower.includes("iva") && lower.includes("21")) {
-        updated.taxRate = 21;
-        reply = "IVA alterado para 21%. Totais recalculados.";
-      } else if (lower.includes("iva") && lower.includes("10")) {
-        updated.taxRate = 10;
-        reply = "IVA reduzido para 10%. Totais recalculados.";
-      } else if ((lower.includes("desconto") || lower.includes("descuento")) && lower.includes("10")) {
-        updated.discountRate = 10;
-        reply = "Aplicado desconto comercial de 10% sobre a base tributável.";
-      } else if ((lower.includes("desconto") || lower.includes("descuento")) && lower.includes("15")) {
-        updated.discountRate = 15;
-        reply = "Aplicado desconto de 15% sobre o orçamento.";
-      } else if (lower.includes("factura")) {
-        handleConvertQuoteToInvoice(selectedQuote);
-        reply = "Fatura emitida com sucesso a partir deste orçamento.";
-      } else {
-        // Add sample requested item
-        updated.items.push({
-          id: "item_" + Math.random().toString(36).substring(2, 6),
-          description: userText,
-          quantity: 1,
-          unitPrice: 450,
-          subtotal: 450,
-        });
-        reply = `Conceito "${userText}" adicionado com preço estimado.`;
-      }
-
-      updated = recalculateQuote(updated);
-      setSelectedQuote(updated);
-      handleSaveQuote(updated);
-
-      setAiChatHistory((prev) => [...prev, { role: "assistant", text: reply }]);
+      console.error("Quote assistant request failed:", err);
+      setAiChatHistory((prev) => [...prev, {
+        role: "assistant",
+        text: err instanceof Error ? err.message : "Não foi possível gerar o orçamento. Nenhuma linha ou preço foi inventado. Tente novamente.",
+      }]);
+      showToast("Falha no assistente de orçamento. O orçamento não foi alterado.", "error");
     } finally {
       setIsAiLoading(false);
     }
@@ -478,10 +448,10 @@ const handleAddItem = () => {
     if (!selectedQuote) return;
     const newItem: QuoteItem = {
       id: "it_" + Math.random().toString(36).substring(2, 7),
-      description: "Serviço de Carpintaria de Alumínio / Instalação Técnica",
+      description: "",
       quantity: 1,
-      unitPrice: 150,
-      subtotal: 150,
+      unitPrice: 0,
+      subtotal: 0,
     };
     const updated = recalculateQuote({
       ...selectedQuote,
