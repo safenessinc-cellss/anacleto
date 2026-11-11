@@ -10,7 +10,7 @@ import { loadCatalogFromFirestore, loadQuoteFromFirestore } from "./src/server/f
 import technicalDrawingHandler from "./api/technical-drawing";
 import approvedSnapshotHandler from "./api/approved-snapshot";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate";
-import { recordAIAudit, recordBudgetLineTransition } from "./src/server/ai-audit";
+import { recordAIAudit } from "./src/server/ai-audit";
 import { requestDrawingService, getDrawingServiceJob } from "./src/server/drawing-service-client";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
