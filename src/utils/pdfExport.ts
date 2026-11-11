@@ -610,13 +610,55 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
     doc.text(label, x + 5, y + 9);
     doc.setLineWidth(0.8);
     doc.rect(px, py, fitted.w, fitted.h, "FD");
-    doc.setDrawColor(148, 163, 184);
-    if (/janela|esquadria|porta|box|arm[aá]rio|closet/i.test(drawing.title + " " + drawing.description)) {
-      const count = /2\s*folhas|duas folhas|corredi[cç]a|correr/i.test(drawing.description + " " + drawing.title) ? 2 : 1;
-      if (count === 2) doc.line(px + fitted.w / 2, py, px + fitted.w / 2, py + fitted.h);
-      else if (/janela|esquadria/i.test(drawing.title + " " + drawing.description)) {
-        doc.line(px + fitted.w / 2, py, px + fitted.w / 2, py + fitted.h);
-        doc.line(px, py + fitted.h / 2, px + fitted.w, py + fitted.h / 2);
+    const visualElements = Array.isArray((drawing as any).visualElements) ? (drawing as any).visualElements : [];
+    if (label === "VISTA FRONTAL" && visualElements.length > 0) {
+      const sx = fitted.w / 1000, sy = fitted.h / 1000;
+      const hex = (value: unknown, fallback: [number, number, number]): [number, number, number] => {
+        const raw = String(value || "").trim();
+        const match = raw.match(/^#?([0-9a-f]{6})$/i);
+        return match ? [parseInt(match[1].slice(0,2),16), parseInt(match[1].slice(2,4),16), parseInt(match[1].slice(4,6),16)] : fallback;
+      };
+      visualElements.forEach((element: any) => {
+        const type = String(element.type || "rect").toLowerCase();
+        const stroke = hex(element.stroke, [51,65,85]);
+        const fill = hex(element.fill, [255,255,255]);
+        doc.setDrawColor(...stroke);
+        doc.setFillColor(...fill);
+        doc.setLineWidth(Math.max(0.15, Math.min(1.5, Number(element.strokeWidth || 2) * 0.18)));
+        const ex = px + Number(element.x || 0) * sx;
+        const ey = py + Number(element.y || 0) * sy;
+        if (type === "line") {
+          doc.line(ex, py + Number(element.y1 || 0) * sy, px + Number(element.x2 || 0) * sx, py + Number(element.y2 || 0) * sy);
+        } else if (type === "circle") {
+          const radius = Math.max(0.3, Number(element.r || 8) * Math.min(sx, sy));
+          doc.circle(px + Number(element.cx || 0) * sx, py + Number(element.cy || 0) * sy, radius, element.fill && element.fill !== "none" ? "FD" : "S");
+        } else if (type === "polygon" && Array.isArray(element.points) && element.points.length >= 3) {
+          const pts = element.points.map((point: any) => [px + Number(point.x || 0) * sx, py + Number(point.y || 0) * sy]);
+          for (let i = 0; i < pts.length; i++) doc.line(pts[i][0], pts[i][1], pts[(i + 1) % pts.length][0], pts[(i + 1) % pts.length][1]);
+        } else if (type === "text") {
+          doc.setFontSize(Math.max(4, Math.min(8, Number(element.fontSize || 12) * 0.35)));
+          doc.setTextColor(...hex(element.fill, [15,23,42]));
+          doc.text(String(element.text || "").slice(0, 60), ex, ey);
+        } else {
+          const rw = Math.max(0, Number(element.width || 0) * sx);
+          const rh = Math.max(0, Number(element.height || 0) * sy);
+          doc.rect(ex, ey, rw, rh, element.fill && element.fill !== "none" ? "FD" : "S");
+          if (element.label) {
+            doc.setFontSize(5);
+            doc.setTextColor(15,23,42);
+            doc.text(String(element.label).slice(0,35), ex + 1, ey + 3);
+          }
+        }
+      });
+    } else {
+      doc.setDrawColor(148, 163, 184);
+      if (/janela|esquadria|porta|box|arm[aá]rio|closet/i.test(drawing.title + " " + drawing.description)) {
+        const count = /2\s*folhas|duas folhas|corredi[cç]a|correr/i.test(drawing.description + " " + drawing.title) ? 2 : 1;
+        if (count === 2) doc.line(px + fitted.w / 2, py, px + fitted.w / 2, py + fitted.h);
+        else if (/janela|esquadria/i.test(drawing.title + " " + drawing.description)) {
+          doc.line(px + fitted.w / 2, py, px + fitted.w / 2, py + fitted.h);
+          doc.line(px, py + fitted.h / 2, px + fitted.w, py + fitted.h / 2);
+        }
       }
     }
     doc.setFont("helvetica", "normal");
@@ -653,7 +695,10 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
   drawOrtho("VISTA SUPERIOR", 12 + (viewW + gap) * 2, viewY, viewW, viewH, width, depth || 1, "Largura " + width + " " + unit + " × Prof. " + (depth || "—") + " " + unit);
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text("Representação técnica baseada nas dimensões e componentes registrados. Conferir medidas, folgas, ferragens e sistema do fabricante antes do corte.", 12, 194);
+  const hasFaithfulGeometry = Array.isArray((drawing as any).visualElements) && (drawing as any).visualElements.length >= 2;
+  doc.text(hasFaithfulGeometry
+    ? "Vista frontal reproduz a geometria visual estruturada do projeto; vistas lateral e superior representam as cotas gerais."
+    : "ATENÇÃO: geometria visual específica indisponível. Esta folha contém apenas vistas dimensionais esquemáticas; não usar como imagem final do produto.", 12, 194);
 
   // Página 2: lista de peças com as mesmas cotas armazenadas no desenho.
   doc.addPage();
