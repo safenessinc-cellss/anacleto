@@ -149,6 +149,16 @@ export default async function handler(req: any, res: any) {
     drawing.steps = Array.isArray(drawing.steps) ? drawing.steps.slice(0, 5) : [];
     if (drawing.steps.length !== 5) throw new Error("A IA não retornou as cinco fases do desenho.");
     drawing.assemblyInstructions = Array.isArray(drawing.assemblyInstructions) ? drawing.assemblyInstructions : [];
+    const requiredArrays = ["measurementPlan", "cuttingPlan", "manufacturingSteps", "qualityChecklist", "assumptions"];
+    for (const field of requiredArrays) {
+      if (!Array.isArray(drawing[field]) || drawing[field].length === 0) {
+        throw new Error("A IA não retornou a etapa obrigatória: " + field);
+      }
+    }
+    if (typeof drawing.modelDescription !== "string" || !drawing.modelDescription.trim() ||
+        typeof drawing.finalAppearance !== "string" || !drawing.finalAppearance.trim()) {
+      throw new Error("A IA não retornou a descrição do modelo e do resultado final.");
+    }
     return json(res, 200, drawing);
   } catch (aiError) {
     console.error("Technical drawing provider fallback:", aiError);
