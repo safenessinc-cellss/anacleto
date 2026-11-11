@@ -190,10 +190,13 @@ function hasVerifiedCatalogPrice(row: any): boolean {
 app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
   try {
     const message = String(req.body?.message || "").trim();
-    const requestedQuote = req.body?.currentQuote || {};
-    const currentQuote = requestedQuote && typeof requestedQuote === "object" ? requestedQuote : {};
-    const storedQuote = await loadQuoteFromFirestore(req, currentQuote.id);
-    const storedQuoteItems = Array.isArray(storedQuote?.items) ? storedQuote.items : [];
+    const requestedQuote = req.body?.currentQuote && typeof req.body.currentQuote === "object" ? req.body.currentQuote : {};
+    const quoteId = String(requestedQuote.id || "").trim();
+    if (!quoteId) return res.status(400).json({ error: "Selecione um orçamento salvo antes de usar o agente." });
+    const storedQuote = await loadQuoteFromFirestore(req, quoteId);
+    if (!storedQuote) return res.status(404).json({ error: "Orçamento não encontrado no banco de dados." });
+    const currentQuote = { ...storedQuote, id: quoteId };
+    const storedQuoteItems = Array.isArray(storedQuote.items) ? storedQuote.items : [];
     if (!message) return res.status(400).json({ error: "Mensagem obrigatória." });
     const catalog = (await loadCatalogFromFirestore(req)).slice(0, 250);
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((entry: any) => ({
