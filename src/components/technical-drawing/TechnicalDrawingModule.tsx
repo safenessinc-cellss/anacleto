@@ -577,12 +577,13 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     const handleExportPdf = () => {
     try {
-      const source = drawing.approvedSnapshotId
-        ? (await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId)).document as TechnicalDrawing
-        : drawing;
-      const sender = drawing.approvedSnapshotId
-        ? (await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId)).senderSnapshot || {}
-        : senderConfig;
+      let source = drawing;
+      let sender = senderConfig;
+      if (drawing.approvedSnapshotId) {
+        const snapshot = await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId);
+        source = snapshot.document as TechnicalDrawing;
+        sender = snapshot.senderSnapshot || {};
+      }
       exportTechnicalDrawingPdf(source, sender);
       showToast("Desenho técnico e memorial exportados para PDF.", "success");
     } catch (err) {
