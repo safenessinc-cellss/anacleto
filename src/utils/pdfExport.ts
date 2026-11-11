@@ -388,6 +388,16 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   );
 
   applyDocumentWatermark(doc, sender);
+  if (!quote.snapshotContentHash || quote.status !== "approved") {
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(185, 28, 28);
+      doc.text("BORRADOR COMERCIAL - NO VÁLIDO COMO PRESUPUESTO APROBADO", pageWidth / 2, 34, { align: "center", angle: -18 });
+    }
+  }
   const fileName = `Presupuesto_${quote.number || "PRE"}.pdf`;
   const dataUri = doc.output("datauristring");
   const sizeKb = Math.max(1, Math.round((dataUri.length * 0.75) / 1024));
@@ -765,7 +775,7 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.setTextColor(185, 28, 28);
-      doc.text("BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN", pageWidth / 2, 27, { align: "center" });
+      doc.text("BORRADOR PRELIMINAR - NO VÁLIDO PARA FABRICACIÓN", pageWidth / 2, 27, { align: "center", angle: -18 });
       doc.setFontSize(8);
     }
   }
