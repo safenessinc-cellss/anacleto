@@ -577,7 +577,13 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     const handleExportPdf = () => {
     try {
-      exportTechnicalDrawingPdf(drawing, senderConfig);
+      const source = drawing.approvedSnapshotId
+        ? (await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId)).document as TechnicalDrawing
+        : drawing;
+      const sender = drawing.approvedSnapshotId
+        ? (await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId)).senderSnapshot || {}
+        : senderConfig;
+      exportTechnicalDrawingPdf(source, sender);
       showToast("Desenho técnico e memorial exportados para PDF.", "success");
     } catch (err) {
       console.error(err);
@@ -617,10 +623,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
               Desenho Técnico e Lista de Componentes Inteligente
-            </h1>            {(drawing as any).draftStatus === "preliminary" && (
+            </h1>            {(drawing as any).isDraft !== false && drawing.status !== "APPROVED_FOR_MANUFACTURING" && (
               <div role="alert" className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] font-black tracking-wide text-amber-300">
                 <AlertCircle className="h-4 w-4" />
-                {(drawing as any).draftLabel || "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO"}
+                {(drawing as any).draftLabel || "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN"}
               </div>
             )}
           </div>
@@ -634,6 +640,16 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             <Eye className="w-4 h-4 text-amber-400" />
             Pré-visualizar PDF
           </button>
+          {!drawing.approvedSnapshotId && (
+            <button
+              onClick={handleApproveDrawing}
+              disabled={isSaving || !drawing.pieces?.length || drawing.isDraft === false}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-black rounded-xl transition"
+            >
+              <CheckCircle className="w-4 h-4" /> Aprovar para fabricação
+            </button>
+          )}
+          {drawing.approvedSnapshotId && <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300">APROVADO · SNAPSHOT IMUTÁVEL</span>}
           <button
             onClick={handleSaveDrawing}
             disabled={isSaving}
