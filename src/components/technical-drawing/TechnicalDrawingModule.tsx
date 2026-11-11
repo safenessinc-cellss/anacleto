@@ -288,10 +288,16 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       return;
     }
     const unsub = onSnapshot(
-      query(collection(db, "technical_drawings"), orderBy("createdAt", "desc")),
+      collection(db, "technical_drawings"),
       (snap) => {
         const list: TechnicalDrawing[] = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() } as TechnicalDrawing));
+        // Ordena pelo salvamento/edição mais recente; registros legados usam createdAt.
+        list.sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return dateB - dateA;
+        });
         setSavedDrawings(list);
       },
       (err) => console.warn("Firestore drawings load notice:", err)
