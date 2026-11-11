@@ -419,6 +419,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     setIsLoading(true);
     let generated: TechnicalDrawing | null = null;
+    let generationWarning = false;
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -445,6 +446,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (!responseBody || !Array.isArray(responseBody.pieces) || responseBody.pieces.length === 0) {
         throw new Error("O serviço retornou um desenho sem componentes renderizáveis.");
       }
+      // A resposta de fallback é um rascunho heurístico, não um desenho validado pela IA.
+      generationWarning = Boolean(responseBody._fallback || responseBody.warning);
       const dimensions = responseBody.overallDimensions || {};
       const width = Number(dimensions.width);
       const height = Number(dimensions.height);
@@ -479,7 +482,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     } catch (error) {
       console.error("Falha na geração do desenho técnico:", error);
       generated = buildLocalTechnicalDrawing(inputPrompt);
-      showToast("A IA não respondeu corretamente. Foi criado um rascunho local; confira as dimensões e os componentes antes de fabricar.", "warning");
+      generationWarning = true;
     }
 
     try {
@@ -493,11 +496,15 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (!presetPrompt) setPrompt("");
 
       setDrawing(generated);
-      const saved = await handleSaveDrawing(generated, true);
-      if (saved) {
-        showToast("Desenho gerado e salvo automaticamente no projeto, com PDF e dados editáveis.", "success");
+      if (generationWarning) {
+        showToast("A IA não confirmou um desenho técnico válido. Um rascunho preliminar foi aberto, mas não será salvo automaticamente. Revise a geometria e as medidas antes de salvar ou fabricar.", "warning");
       } else {
-        showToast("Desenho gerado, mas não foi possível salvar automaticamente. Ele permanece aberto; use Salvar projeto para tentar novamente.", "warning");
+        const saved = await handleSaveDrawing(generated, true);
+        if (saved) {
+          showToast("Desenho gerado pela IA e salvo com PDF e dados editáveis.", "success");
+        } else {
+          showToast("Desenho gerado, mas não foi possível salvar automaticamente. Ele permanece aberto; use Salvar projeto para tentar novamente.", "warning");
+        }
       }
     } finally {
       setIsLoading(false);
