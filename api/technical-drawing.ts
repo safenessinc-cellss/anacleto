@@ -1,4 +1,6 @@
-import { generateText, gateway } from "ai";
+import { generateText } from "ai";
+import { AI_CONFIG, getAIModel } from "../src/server/ai-config";
+import { parseAIJson } from "../src/server/ai-json";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
@@ -94,6 +96,9 @@ function localFallback(prompt: string) {
   ];
   return {
     _fallback: true,
+    draftStatus: "preliminary",
+    draftLabel: "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO",
+    assumptions: ["Gerado pelo mecanismo local de contingência porque o provedor de IA falhou. Todas as medidas, materiais, ferragens, folgas e cortes exigem validação humana."],
     title: isWindow ? "Esquadria / janela sob medida" : isDoor ? "Porta sob medida" : isTable ? "Mesa sob medida" : isCabinet ? "Armário sob medida" : "Projeto técnico sob medida",
     description: `Projeto preliminar criado a partir de: ${prompt}`,
     category, unit, overallDimensions: { width, height, depth }, pieces,
@@ -178,7 +183,7 @@ export default async function handler(req: any, res: any) {
     const system = `Você é o engenheiro de produto, projetista e especialista em fabricação da Anacleto Pro. Interprete a solicitação inteira, não apenas palavras-chave. Identifique produto, material, tipo de abertura/encaixe, quantidade de folhas/portas, divisões, posição dos componentes e todas as dimensões explicitamente informadas. Diferencie largura, altura e profundidade conforme o produto; para móveis, não confunda profundidade com altura. Preserve a unidade original e converta somente quando o usuário pedir. Se o usuário solicitar alteração de um desenho existente, modifique somente os pontos pedidos e preserve os demais dados e componentes existentes; não reinicie o projeto. Se for um novo projeto, não reutilize o desenho anterior. Nunca invente dimensões, perfis, ferragens, folgas, descontos, espessuras, tolerâncias, fórmulas ou ângulos. Se faltar informação necessária, mantenha o campo vazio/zero e registre pergunta/pendência em assumptions; não apresente suposições como medidas confirmadas. A lista de corte é preliminar até validar sistema, ferragens e tabelas oficiais do fabricante. Gere somente JSON válido, sem markdown, com: title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array), steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions), measurementPlan (array de {point,method,tool,checks}), cuttingPlan (array de {pieceNumber,name,material,quantity,length,width,thickness,unit,cutAngle,notes}), manufacturingSteps (array de {step,title,instructions,qualityGate}), modelDescription (string), finalAppearance (string), visualElements (array de elementos SVG estruturados para desenhar exatamente o produto solicitado, coordenadas normalizadas de 0 a 1000: retângulos {type:"rect",x,y,width,height,fill,stroke,strokeWidth,label}, linhas {type:"line",x1,y1,x2,y2,stroke,strokeWidth,label}, círculos {type:"circle",cx,cy,r,fill,stroke}, polígonos {type:"polygon",points:[{x,y}],fill,stroke}, textos {type:"text",x,y,text,fill,fontSize}). A geometria deve representar fielmente a configuração pedida: número e posição exatos de folhas, portas, gavetas, divisórias, prateleiras, puxadores, trilhos, montantes, travessas, pés, recortes e demais detalhes descritos. Cada elemento visual deve corresponder a um componente real descrito na solicitação ou na lista de peças; use coordenadas normalizadas de 0 a 1000, mantenha proporções coerentes e distribua os elementos dentro do contorno do produto. A vista frontal deve mostrar exatamente a quantidade de folhas/portas/divisões solicitadas, suas posições, puxadores e ferragens explicitamente mencionados. Não use uma ilustração genérica da categoria; não acrescente elementos que o usuário não pediu. Se não for possível determinar a geometria com segurança, registre a lacuna em assumptions em vez de inventar uma imagem. Use o catálogo quando aplicável: ${JSON.stringify(catalog)}.`;
 
     const result = await generateText({
-      model: gateway(process.env.ANACLETO_DRAWING_MODEL || process.env.ANACLETO_AI_MODEL || "google/gemini-2.5-flash"),
+      model: getAIModel("technicalDrawing"),
       system,
       messages: [{
         role: "user",
@@ -187,13 +192,34 @@ export default async function handler(req: any, res: any) {
           ...allowedImageUrls.map((image) => ({ type: "image" as const, image })),
         ],
       }],
-      temperature: 0.2,
-      abortSignal: AbortSignal.timeout(45_000),
+      temperature: AI_CONFIG.technicalDrawing.temperature,
+      maxOutputTokens: AI_CONFIG.technicalDrawing.maxOutputTokens,
+      abortSignal: AbortSignal.timeout(AI_CONFIG.technicalDrawing.timeoutMs),
     });
 
     stage = "validate_ai_response";
-    const raw = (result.text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    const drawing = JSON.parse(raw);
+    let drawing: any;
+    try {
+      drawing = parseAIJson(result.text, (value: any) => {
+        const dims = value?.overallDimensions || {};
+        if (!value || !Array.isArray(value.pieces) || !value.pieces.length || !Number.isFinite(Number(dims.width)) || Number(dims.width) <= 0 || !Number.isFinite(Number(dims.height)) || Number(dims.height) <= 0) throw new Error("Resposta da IA sem dimensões ou componentes válidos.");
+        return value;
+      });
+    } catch (firstError) {
+      const repaired = await generateText({
+        model: getAIModel("technicalDrawing"),
+        system: system + "\nRetorne somente JSON válido. Corrija exclusivamente a estrutura; preserve os dados, não invente medidas, materiais, ferragens ou componentes.",
+        prompt: "A resposta anterior não passou na validação JSON. Erro: " + String((firstError as Error)?.message || firstError) + ". Corrija esta resposta sem acrescentar fatos: " + String(result.text || "").slice(0, 30000),
+        temperature: 0,
+        maxOutputTokens: AI_CONFIG.technicalDrawing.maxOutputTokens,
+        abortSignal: AbortSignal.timeout(AI_CONFIG.technicalDrawing.timeoutMs),
+      });
+      drawing = parseAIJson(repaired.text, (value: any) => {
+        const dims = value?.overallDimensions || {};
+        if (!value || !Array.isArray(value.pieces) || !value.pieces.length || !Number.isFinite(Number(dims.width)) || Number(dims.width) <= 0 || !Number.isFinite(Number(dims.height)) || Number(dims.height) <= 0) throw new Error("Resposta reparada sem dimensões ou componentes válidos.");
+        return value;
+      });
+    }
     const dims = drawing?.overallDimensions || {};
     if (!drawing || !Array.isArray(drawing.pieces) || !drawing.pieces.length ||
         !Number.isFinite(Number(dims.width)) || Number(dims.width) <= 0 ||
