@@ -53,7 +53,7 @@ service cloud.firestore {
     match /companies_crm/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /budgets/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /quotes/{id} {
-      allow read: if canOperate() || canManageProduction();
+      allow read: if canOperate() || canManageProduction() || canManageFinance();
       allow create: if canManageCommercial();
       allow update: if (canManageCommercial() || canManageFinance()) && (
         !('approvedSnapshotId' in resource.data) ||
@@ -73,7 +73,7 @@ service cloud.firestore {
     match /projects/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /user_suggestions/{id} { allow read: if canOperate(); allow create: if canOperate(); allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /invoices/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial() || canManageFinance(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /catalog/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /catalog/{id} { allow read: if canOperate() || canManageFinance() || canManageQuality() || canManageProduction(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /supplier_catalog/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /registry_items/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /registry_products/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
@@ -85,8 +85,8 @@ service cloud.firestore {
     match /profile_optimization/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /material_lists/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /technical_drawings/{id} {
-      allow read: if canOperate();
-      allow create: if canManageCommercial();
+      allow read: if canOperate() || canManageQuality() || canManageProduction();
+      allow create: if canManageCommercial() || canManageQuality() || canManageProduction();
       allow update: if (canManageCommercial() || canManageQuality() || canManageProduction()) && !('approvedSnapshotId' in resource.data);
       allow delete: if canManageCommercial() && !('approvedSnapshotId' in resource.data);
     }
