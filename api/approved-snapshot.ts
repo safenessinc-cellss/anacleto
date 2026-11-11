@@ -4,6 +4,15 @@ import { AI_CONFIG } from "../src/server/ai-config";
 
 type AuthUser = { uid: string; email: string; role: string };
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
+const requestWindows = new Map<string, { startedAt: number; count: number }>();
+function withinRateLimit(uid: string) {
+  const now = Date.now();
+  const current = requestWindows.get(uid);
+  if (!current || now - current.startedAt >= 60000) { requestWindows.set(uid, { startedAt: now, count: 1 }); return true; }
+  if (current.count >= 6) return false;
+  current.count += 1;
+  return true;
+}
 const base = () => {
   const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
   return "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/" + databaseId + "/documents";
@@ -135,6 +144,7 @@ export default async function handler(req: any, res: any) {
   try {
     const user = await authenticate(req);
     if (!user) return send(res, 401, { error: "Autenticação obrigatória ou sessão expirada." });
+    if (!withinRateLimit(user.uid)) return send(res, 429, { error: "Limite de aprovações e consultas atingido. Aguarde um minuto." });
     if (req.method === "GET") {
       const snapshotId = String(req.query?.snapshotId || "").trim();
       if (!snapshotId || snapshotId.length > 300 || snapshotId.includes("/")) return send(res, 400, { error: "snapshotId inválido." });
@@ -147,6 +157,10 @@ export default async function handler(req: any, res: any) {
       return send(res, 405, { error: "Método não permitido." });
     }
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) ||
+        Object.keys(body).some(key => !["type","documentId","senderSnapshot"].includes(key))) {
+      return send(res, 400, { error: "A solicitação contém campos não permitidos." });
+    }
     const type = body?.type;
     const documentId = String(body?.documentId || "").trim();
     if (!["quote", "drawing"].includes(type) || !documentId || documentId.length > 180 || documentId.includes("/")) {
@@ -191,10 +205,12 @@ export default async function handler(req: any, res: any) {
       const discountAmount = Number((subtotal * discountRate / 100).toFixed(2));
       const taxAmount = Number((Math.max(0, subtotal - discountAmount) * taxRate / 100).toFixed(2));
       const total = Number((subtotal - discountAmount + taxAmount).toFixed(2));
+      const { pdfDataUri: _pdfDataUri, ...sourceWithoutPdf } = source;
+      const approvedAt = new Date().toISOString();
       snapshot = {
         schemaVersion: 1, type: "quote", documentId, documentNumber: source.number || "", status: "approved",
-        approvedAt: new Date().toISOString(), approvedBy: { uid: user.uid, email: user.email, role: user.role },
-        document: { ...source, items: reviewedItems, subtotal, discountAmount, taxAmount, total, status: "approved", senderSnapshot },
+        approvedAt, approvedBy: { uid: user.uid, email: user.email, role: user.role },
+        document: { ...sourceWithoutPdf, items: reviewedItems, subtotal, discountAmount, taxAmount, total, status: "approved", approvedAt, senderSnapshot },
         senderSnapshot,
         modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.quote.model, capability: "quote", capturedAt: new Date().toISOString() },
       };
@@ -203,16 +219,18 @@ export default async function handler(req: any, res: any) {
       if (source.status === "APPROVED_FOR_MANUFACTURING") return send(res, 409, { error: "O desenho já foi aprovado." });
       const budgetItems = Array.isArray(source.budget?.items) ? source.budget.items : [];
       if (budgetItems.some((item: any) => item.priceSource === "pending")) return send(res, 422, { error: "O desenho contém preços pendentes; revise antes de aprovar." });
+      const approvedAt = new Date().toISOString();
       snapshot = {
         schemaVersion: 1, type: "drawing", documentId, documentNumber: source.title || "", status: "APPROVED_FOR_MANUFACTURING",
-        approvedAt: new Date().toISOString(), approvedBy: { uid: user.uid, email: user.email, role: user.role },
-        document: { ...source, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", senderSnapshot },
+        approvedAt, approvedBy: { uid: user.uid, email: user.email, role: user.role },
+        document: { ...source, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedAt, senderSnapshot },
         senderSnapshot,
         modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing", capturedAt: new Date().toISOString() },
         drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [] },
       };
     }
     snapshot.contentHash = digest(snapshot);
+    snapshot.document.snapshotContentHash = snapshot.contentHash;
     const snapshotId = await commitSnapshot(req, collection, documentId, found.updateTime, snapshot);
     return send(res, 201, { snapshotId, snapshot, immutable: true });
   } catch (error: any) {
