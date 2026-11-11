@@ -44,7 +44,7 @@ export default function PdfPageThumbnails({ url, pageLimit = 3 }: PdfPageThumbna
         if (!context) continue;
         canvas.width = Math.ceil(viewport.width);
         canvas.height = Math.ceil(viewport.height);
-        await page.render({ canvasContext: context, viewport }).promise;
+        await page.render({ canvas, canvasContext: context, viewport }).promise;
         rendered.push(canvas.toDataURL("image/png"));
       }
       if (!cancelled) {
