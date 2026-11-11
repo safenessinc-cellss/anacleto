@@ -30,6 +30,7 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTran
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
+import ImageLightbox from "../common/ImageLightbox";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
 
 interface QuotesModuleProps {
@@ -45,6 +46,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [showCatalog, setShowCatalog] = useState(false);
+  const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
 
   // Carregar desenhos técnicos para vincular o desenho 2D ao orçamento
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         setCatalogItems((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...list]);
       }, (err) => console.warn("Supplier catalog listener (quotes):", err)),
       onSnapshot(collection(db, "registry_items"), (snap) => {
-        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", source: "registry_items" }; });
+        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, itemId: d.id, name: data.name || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", width: data.width || 0, height: data.height || 0, depth: data.depth || 0, itemPhotoUrls: data.itemPhotoUrls || [], source: "registry_items" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "registry_items"), ...list]);
       }, (err) => console.warn("Items registry listener (quotes):", err)),
       onSnapshot(collection(db, "price_table"), (snap) => {
@@ -249,7 +251,8 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         const pdfRes = buildQuotePdf(target, pdfSender);
         target = {
           ...target,
-          pdfDataUri: pdfRes.dataUri,
+          itemIds: Array.from(new Set(target.items.map((item) => item.itemId).filter((id): id is string => Boolean(id)))),
+        pdfDataUri: pdfRes.dataUri,
           pdfFileName: pdfRes.fileName,
           pdfGeneratedAt: new Date().toISOString(),
           pdfFileSizeKb: pdfRes.sizeKb,
@@ -448,7 +451,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       id: Math.random().toString(36).substring(2),
       description: `${item.name}${item.sku ? ` (${item.sku})` : ""}${item.supplier ? ` — ${item.supplier}` : ""}`,
       quantity: 1,
-      unitPrice: item.price,
+      unitPrice: Number(item.price || 0),
+                          itemId: item.itemId || (item.source === "registry_items" ? item.id : undefined),
+                          catalogSource: item.source,
+                          itemPhotoUrl: item.itemPhotoUrls?.[0],
+                          itemCategory: item.category,
+                          itemDimensions: [item.width,item.height,item.depth].filter(Boolean).join(" × "),
       unit: item.unit || "UN",
     };
     setQuoteItems([...quoteItems, newItem]);
@@ -810,7 +818,7 @@ const handleAddItem = () => {
                 {catalogItems
                   .filter((i) => 
                     i.name?.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-                    i.sku?.toLowerCase().includes(catalogSearch.toLowerCase())
+                    i.sku?.toLowerCase().includes(catalogSearch.toLowerCase()) || i.category?.toLowerCase().includes(catalogSearch.toLowerCase()) || [i.width, i.height, i.depth].join(" ").includes(catalogSearch.toLowerCase())
                   )
                   .slice(0, 20)
                   .map((item) => (
@@ -821,7 +829,7 @@ const handleAddItem = () => {
                         // Adicionar o produto ao orçamento
                         const newItem = {
                           id: Math.random().toString(36).substring(2),
-                          description: `${item.name} (${item.sku})`,
+                          description: item.name + (item.sku ? " (" + item.sku + ")" : "") + (item.width || item.height || item.depth ? " · " + [item.width,item.height,item.depth].filter(Boolean).join(" × ") + " mm" : ""),
                           quantity: 1,
                           unitPrice: item.price,
                         };
@@ -926,6 +934,7 @@ const handleAddItem = () => {
                 </div>
               </div>
 
+              {itemPhotoViewer && <ImageLightbox images={itemPhotoViewer} onClose={() => setItemPhotoViewer(null)} />}
               {/* AI Real-Time Quote Copilot Chat */}
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
