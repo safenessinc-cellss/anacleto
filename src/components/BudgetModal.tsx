@@ -144,13 +144,14 @@ export default function BudgetModal({
         description: String(item.description || ""),
         quantity: Number(item.qty),
         unitPrice: Number(item.price),
-        notes: item.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : "Preço consultado no catálogo.",
+        notes: item.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : "Preço validado no catálogo cadastrado.",
       }));
       if (generatedItems.some(item => !item.description || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0)) {
         throw new Error("A IA devolveu dados incompletos. Revise a descrição e tente novamente.");
       }
       setItems(generatedItems);
-      showToast("Itens preparados. Confira os preços pendentes antes de enviar o orçamento.", "success");
+      if (data.notes) setAiPrompt((previous) => previous);
+      showToast("Itens preparados. Preços validados no catálogo; medidas e valores pendentes devem ser conferidos antes de enviar.", "success");
     } catch (err) {
       console.error("Budget AI generation failed:", err);
       setAiError(err instanceof Error ? err.message : "A IA não conseguiu gerar o orçamento. Nenhum preço foi inventado.");
