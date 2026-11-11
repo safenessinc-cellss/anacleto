@@ -294,28 +294,29 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
 
 function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[]) {
   const catalogRows = Array.isArray(catalog) ? catalog : [];
-  const rawItems = Array.isArray(rawBudget?.items) ? rawBudget.items : pieces.map((piece: any) => {
-    const material = String(piece.material || piece.name || "").toLowerCase();
-    const match = catalogRows.find((item: any) => {
-      const haystack = `${item.name || ""} ${item.sku || ""} ${item.category || ""}`.toLowerCase();
-      return material.split(/\s+/).some((word) => word.length > 3 && haystack.includes(word));
-    });
-    const quantity = Math.max(1, Number(piece.quantity) || 1);
-    const unitPrice = Number(match?.price) || 0;
+  const rawItems = Array.isArray(rawBudget?.items) ? rawBudget.items : pieces.map((piece: any) => ({
+    pieceId: piece.id,
+    description: piece.name || piece.material || "Componente técnico",
+    quantity: Math.max(1, Number(piece.quantity) || 1),
+  }));
+  // Preços do orçamento técnico só podem vir de uma correspondência exata no catálogo.
+  // Nunca aceitar preço estimado pela IA nem associação por palavras parcialmente coincidentes.
+  const items = rawItems.map((item: any, index: number) => {
+    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const match = findExactCatalogItem(item, catalogRows);
+    const catalogPrice = match ? Number(match.price) : 0;
+    const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+    const unitPrice = confirmed ? catalogPrice : 0;
     return {
-      pieceId: piece.id,
-      description: piece.name || piece.material || "Componente técnico",
-      sku: match?.sku || "",
+      ...item,
+      id: item.id || `budget-${index + 1}`,
+      sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
+      catalogItemId: confirmed ? String(match.id || "") : "",
       quantity,
       unitPrice,
       subtotal: quantity * unitPrice,
-      priceSource: match ? "catalogo" : "estimado",
+      priceSource: confirmed ? "catalogo" : "pendente",
     };
-  });
-  const items = rawItems.map((item: any, index: number) => {
-    const quantity = Math.max(1, Number(item.quantity) || 1);
-    const unitPrice = Math.max(0, Number(item.unitPrice) || 0);
-    return { ...item, id: item.id || `budget-${index + 1}`, quantity, unitPrice, subtotal: quantity * unitPrice };
   });
   const subtotal = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
   const labor = Math.max(0, Number(rawBudget?.labor) || 0);
@@ -382,7 +383,7 @@ app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("tech
       Debes generar un proyecto técnico completo con TODAS las siguientes especificaciones.
       Catálogo disponible del taller (usa sus nombres, SKU y precios cuando coincidan; no inventes precios si hay coincidencia):
       ${JSON.stringify(Array.isArray(catalog) ? catalog.slice(0, 200) : [])}
-      La salida también debe incluir presupuesto materializado con líneas, precio unitario, subtotal y total en BRL. Si no existe precio para una pieza, marca priceSource como "estimado" y usa un valor prudente.
+      La salida también debe incluir presupuesto materializado con líneas, precio unitario, subtotal y total en BRL. Se não existir correspondência exata no catálogo, use unitPrice=0 e priceSource="pendente". Nunca estime nem invente preços, custos ou mão de obra.
       1. Título y categoría de la pieza.
       2. Dimensiones generales (ancho, alto, profundidad, unidad en cm o mm).
       3. Despiece detallado (BOM): Lista de componentes donde cada pieza tiene:
