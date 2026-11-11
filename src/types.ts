@@ -209,7 +209,11 @@ export interface TechnicalDrawing {
   currentStep: number;
   budget?: {
     currency: string;
-    items: Array<{ id?: string; pieceId?: string; description: string; sku?: string; quantity: number; unitPrice: number; subtotal: number; priceSource?: string }>;
+    items: Array<{
+      id?: string; pieceId?: string; description: string; sku?: string; catalogItemId?: string;
+      quantity: number; unitPrice: number; subtotal: number; priceSource?: string;
+      priceValidation?: string; catalogPriceAtApproval?: number;
+    }>;
     subtotal: number;
     labor: number;
     total: number;
