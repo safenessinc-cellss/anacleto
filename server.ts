@@ -504,9 +504,14 @@ app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("tech
       temperature: 0.2,
     });
 
-    const rawText = response.text || "{}";
-    const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    const drawingData = JSON.parse(jsonText);
+    const drawingData = parseAIJson(response.text, (value: any) => {
+      if (!value || !Array.isArray(value.pieces) || !value.pieces.length ||
+          !Number.isFinite(Number(value?.overallDimensions?.width)) || Number(value.overallDimensions.width) <= 0 ||
+          !Number.isFinite(Number(value?.overallDimensions?.height)) || Number(value.overallDimensions.height) <= 0) {
+        throw new Error("Desenho técnico sem dimensões ou componentes válidos.");
+      }
+      return value;
+    });
     const pieces = Array.isArray(drawingData.pieces) ? drawingData.pieces : [];
     drawingData.assemblyInstructions = Array.isArray(drawingData.assemblyInstructions)
       ? drawingData.assemblyInstructions
