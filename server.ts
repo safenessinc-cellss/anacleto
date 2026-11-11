@@ -497,20 +497,18 @@ app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("tech
       }
     `;
 
-    const response = await generateText({
-      model: getAIModel("technicalDrawing"),
+    const drawingData = await generateValidatedJson({
+      capability: "technicalDrawing",
       system: systemPrompt,
       prompt: `Diseña y despieza la siguiente pieza arquitectónica o mueble: "${prompt}"`,
-      temperature: 0.2,
-    });
-
-    const drawingData = parseAIJson(response.text, (value: any) => {
-      if (!value || !Array.isArray(value.pieces) || !value.pieces.length ||
-          !Number.isFinite(Number(value?.overallDimensions?.width)) || Number(value.overallDimensions.width) <= 0 ||
-          !Number.isFinite(Number(value?.overallDimensions?.height)) || Number(value.overallDimensions.height) <= 0) {
-        throw new Error("Desenho técnico sem dimensões ou componentes válidos.");
-      }
-      return value;
+      validate: (value: any) => {
+        if (!value || !Array.isArray(value.pieces) || !value.pieces.length ||
+            !Number.isFinite(Number(value?.overallDimensions?.width)) || Number(value.overallDimensions.width) <= 0 ||
+            !Number.isFinite(Number(value?.overallDimensions?.height)) || Number(value.overallDimensions.height) <= 0) {
+          throw new Error("Desenho técnico sem dimensões ou componentes válidos.");
+        }
+        return value;
+      },
     });
     const pieces = Array.isArray(drawingData.pieces) ? drawingData.pieces : [];
     drawingData.assemblyInstructions = Array.isArray(drawingData.assemblyInstructions)
