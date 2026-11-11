@@ -455,6 +455,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
                           itemId: item.itemId || (item.source === "registry_items" ? item.id : undefined),
                           catalogSource: item.source,
                           itemPhotoUrl: item.itemPhotoUrls?.[0],
+                          itemPhotoUrls: item.itemPhotoUrls || [],
                           itemCategory: item.category,
                           itemDimensions: [item.width,item.height,item.depth].filter(Boolean).join(" × "),
       unit: item.unit || "UN",
@@ -835,6 +836,7 @@ const handleAddItem = () => {
                           itemId: item.itemId || (item.source === "registry_items" ? item.id : undefined),
                           catalogSource: item.source,
                           itemPhotoUrl: item.itemPhotoUrls?.[0],
+                          itemPhotoUrls: item.itemPhotoUrls || [],
                           itemCategory: item.category,
                           itemDimensions: [item.width,item.height,item.depth].filter(Boolean).join(" × "),
                         };
@@ -871,7 +873,7 @@ const handleAddItem = () => {
                         key={item.id}
                         className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center gap-3"
                       >
-                        {item.itemPhotoUrl && <button type="button" onClick={() => setItemPhotoViewer([item.itemPhotoUrl!])} className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-700"><img src={item.itemPhotoUrl} alt={"Foto de " + item.description} className="h-full w-full object-cover"/></button>}
+                        {item.itemPhotoUrl && <button type="button" onClick={() => setItemPhotoViewer(item.itemPhotoUrls?.length ? item.itemPhotoUrls : [item.itemPhotoUrl!])} className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-700"><img src={item.itemPhotoUrl} alt={"Foto de " + item.description} className="h-full w-full object-cover"/></button>}
                         <input
                           type="text"
                           value={item.description}
