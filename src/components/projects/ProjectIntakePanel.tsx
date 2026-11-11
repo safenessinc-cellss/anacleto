@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { collection, doc, setDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { FileUp, FolderPlus, Globe, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
+import { Camera, FileUp, FolderPlus, Globe, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
 
 type IntakeAsset = {
@@ -14,7 +14,7 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const safeName = (name: string) => name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(-100) || "arquivo";
 
 export default function ProjectIntakePanel({ onCreated }: Props) {
-  const picker = useRef<HTMLInputElement>(null);
+  const picker = useRef<HTMLInputElement>(null);\n  const cameraPicker = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
@@ -115,7 +115,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
       };
       await setDoc(projectRef, project);
       setFiles([]); setName(""); setClient(""); setDescription(""); setSourceUrl("");
-      if (picker.current) picker.current.value = "";
+      if (picker.current) picker.current.value = "";\n      if (cameraPicker.current) cameraPicker.current.value = "";
       setNotice(`Projeto "${projectName}" criado com ${assets.length} anexo(s)/referência(s).`);
       onCreated?.(projectRef.id);
     } catch (e) {
@@ -137,7 +137,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
     <div className="grid gap-3 md:grid-cols-2">
       <div className="rounded-xl border bg-white p-3 space-y-2">
         <p className="flex items-center gap-2 text-sm font-semibold text-slate-800"><UploadCloud className="h-4 w-4 text-blue-600"/> Arquivos do PC ou celular</p>
-        <input ref={picker} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.json,.txt,.csv,application/pdf,application/json,text/plain,text/csv,image/jpeg,image/png,image/webp" onChange={e=>selectFiles(e.target.files)} className="block w-full text-xs"/>
+        <input ref={picker} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.json,.txt,.csv,application/pdf,application/json,text/plain,text/csv,image/jpeg,image/png,image/webp" onChange={e=>selectFiles(e.target.files)} className="block w-full text-xs"/>\n        <input ref={cameraPicker} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={e=>selectFiles(e.target.files)} className="hidden"/>\n        <button type="button" onClick={()=>cameraPicker.current?.click()} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold text-slate-700"><Camera className="h-4 w-4"/> Tirar foto com a câmera</button>
         <p className="text-xs text-slate-500">PDF, imagens, JSON e texto • até 20 MB por arquivo. No celular, escolha câmera ou galeria pelo seletor do navegador.</p>
         {files.map((file,index)=><div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 text-xs"><span className="truncate">{file.name}</span><button type="button" onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))} aria-label="Remover arquivo"><X className="h-3.5 w-3.5"/></button></div>)}
       </div>
