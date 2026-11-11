@@ -211,7 +211,6 @@ export default async function handler(req: any, res: any) {
       return json(res, 400, { error: "Descreva a peça e suas dimensões.", code: "PROMPT_REQUIRED" });
     }
 
-    let catalog: any[] = [];
     const currentDrawing = body.currentDrawing && typeof body.currentDrawing === "object" &&
       !Array.isArray(body.currentDrawing) && body.currentDrawing.id !== "draw-sample-01"
       ? JSON.stringify(body.currentDrawing).slice(0, 18000)
