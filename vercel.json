@@ -18,6 +18,10 @@
       "destination": "/api/technical-drawing"
     },
     {
+      "source": "/api/approved-snapshot",
+      "destination": "/api/approved-snapshot"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api"
     },
