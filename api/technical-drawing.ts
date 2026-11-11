@@ -44,7 +44,7 @@ function decodeFirestoreValue(value: any): any {
 async function createDrawingJob(req: any, jobId: string, uid: string): Promise<void> {
   const fields = { id: jobId, userUid: uid, status: "PROCESSING", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   const response = await fetch(firestoreDocuments() + "/drawing_jobs?documentId=" + encodeURIComponent(jobId), {
-    method: "POST", headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""), "Content-Type": "application/json" },
+    method: "POST", headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""), "Content-Type": "application/json" },
     body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, encodeFirestoreValue(value)])) }),
     signal: AbortSignal.timeout(5000),
   });
@@ -56,14 +56,14 @@ async function updateDrawingJob(req: any, jobId: string, values: Record<string, 
   const fields = Object.fromEntries(Object.entries({ ...values, updatedAt: new Date().toISOString() }).map(([key, value]) => [key, encodeFirestoreValue(value)]));
   params.append("updateMask.fieldPaths", "updatedAt");
   const response = await fetch(firestoreDocuments() + "/drawing_jobs/" + encodeURIComponent(jobId) + "?" + params.toString(), {
-    method: "PATCH", headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""), "Content-Type": "application/json" },
+    method: "PATCH", headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""), "Content-Type": "application/json" },
     body: JSON.stringify({ fields }), signal: AbortSignal.timeout(5000),
   });
   if (!response.ok) throw new Error("Não foi possível atualizar a tarefa técnica (HTTP " + response.status + ").");
 }
 async function readDrawingJob(req: any, jobId: string): Promise<Record<string, any> | null> {
   const response = await fetch(firestoreDocuments() + "/drawing_jobs/" + encodeURIComponent(jobId), {
-    headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "") },
+    headers: { Authorization: "Bearer " + String(req.headers.authorization || "").replace(/^Bearer\s+/i, "") },
     signal: AbortSignal.timeout(5000),
   });
   if (response.status === 404) return null;
@@ -383,7 +383,7 @@ export default async function handler(req: any, res: any) {
         output: repaired.text,
         usage: repaired.usage as any,
         actorUid, requestId, startedAt: repairStartedAt,
-        authorizationToken: String(req.headers?.authorization || "").replace(/^Bearer\\s+/i, ""),
+        authorizationToken: String(req.headers?.authorization || "").replace(/^Bearer\s+/i, ""),
       });
       drawing = parseAIJson(repaired.text, (value: any) => {
         const dims = value?.overallDimensions || {};
