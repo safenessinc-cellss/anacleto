@@ -578,6 +578,9 @@ app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("tech
     // timeout, quota error, or malformed model response never becomes a 500.
     return res.status(200).json({
       _fallback: true,
+      draftStatus: "preliminary",
+      draftLabel: "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO",
+      assumptions: ["Gerado pelo mecanismo local de contingência porque o provedor de IA falhou. Todas as medidas, materiais, ferragens, folgas e cortes exigem validação humana."],
       title: title,
       description: "Generado con motor técnico de arquitectura e ingeniería Anacleto Pro.",
       category: isWindow ? "aluminum_window" : isTable ? "furniture" : "architectural",
