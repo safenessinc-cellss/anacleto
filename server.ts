@@ -154,7 +154,7 @@ function normalizeCatalogName(value: unknown) {
 }
 function findExactCatalogItem(item: any, catalog: any[]) {
   const sku = String(item?.sku || item?.code || "").trim().toLowerCase();
-  const catalogId = String(item?.catalogItemId || "").trim();
+  const catalogId = String(item?.catalogItemId || item?.itemId || "").trim();
   const description = normalizeCatalogName(item?.description);
   return catalog.find((row: any) => {
     const rowSku = String(row?.sku || row?.code || "").trim().toLowerCase();
@@ -207,17 +207,24 @@ Regras obrigatórias:
       const quantity = Number(item.quantity);
       if (!String(item.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0) throw new Error("A IA retornou uma linha de orçamento inválida.");
       const match = findExactCatalogItem(item, catalog);
+      const existingItem = Array.isArray(currentQuote.items)
+        ? currentQuote.items.find((row: any) => String(row?.id || "") === String(item.id || ""))
+        : undefined;
       const catalogPrice = match ? Number(match.price) : 0;
       const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const existingPrice = Number(existingItem?.unitPrice);
+      const preservedExistingPrice = !confirmed && !!existingItem && Number.isFinite(existingPrice) && existingPrice >= 0;
+      const unitPrice = confirmed ? catalogPrice : preservedExistingPrice ? existingPrice : 0;
       return {
         id: String(item.id || `ai-${index + 1}`),
+        itemId: String(match?.id || item.itemId || existingItem?.itemId || ""),
         description: String(item.description).slice(0, 500),
         quantity,
-        unitPrice: confirmed ? catalogPrice : 0,
-        subtotal: Number((quantity * (confirmed ? catalogPrice : 0)).toFixed(2)),
-        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
-        catalogItemId: confirmed ? String(match.id || "") : "",
-        priceSource: confirmed ? "catalog" : "pending",
+        unitPrice,
+        subtotal: Number((quantity * unitPrice).toFixed(2)),
+        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || existingItem?.sku || ""),
+        catalogItemId: confirmed ? String(match.id || "") : String(item.catalogItemId || existingItem?.catalogItemId || ""),
+        priceSource: confirmed ? "catalog" : preservedExistingPrice ? "existing" : "pending",
       };
     });
     const taxRate = parsed.taxRate === undefined ? Number(currentQuote.taxRate || 0) : Number(parsed.taxRate);
