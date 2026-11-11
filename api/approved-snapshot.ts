@@ -3,6 +3,7 @@ import firebaseConfig from "../firebase-applet-config.json" with { type: "json" 
 import { AI_CONFIG } from "../src/server/ai-config";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger";
+import { buildDrawingVectorPayload } from "../src/server/drawing-vector";
 
 type AuthUser = { uid: string; email: string; role: string };
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
@@ -318,11 +319,13 @@ export default async function handler(req: any, res: any) {
         return { ...item, quantity, unitPrice: manualPrice, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
       const approvedAt = new Date().toISOString();
+      const cleanVisualElements = (Array.isArray(source.visualElements) ? source.visualElements : []).filter((element: any) => element?.id !== "anacleto-draft-watermark");
+      const approvedVectorPayload = buildDrawingVectorPayload(cleanVisualElements, false);
       const { pdfDataUri: _pdfDataUri, pdfUrl: _pdfUrl, pdfStoragePath: _pdfStoragePath, pdfGeneratedAt: _pdfGeneratedAt, pdfFileName: _pdfFileName, pdfFileSizeKb: _pdfFileSizeKb, ...sourceWithoutPdf } = source;
       snapshot = {
         schemaVersion: 1, type: "drawing", documentId, documentNumber: source.title || "", status: "APPROVED_FOR_MANUFACTURING",
         approvedAt, approvedBy: { uid: user.uid, email: user.email, role: user.role },
-        document: { ...sourceWithoutPdf, budget: source.budget ? { ...source.budget, items: reviewedBudgetItems } : source.budget, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedAt, senderSnapshot },
+        document: { ...sourceWithoutPdf, visualElements: cleanVisualElements, vectorPayload: approvedVectorPayload, budget: source.budget ? { ...source.budget, items: reviewedBudgetItems } : source.budget, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedAt, senderSnapshot },
         senderSnapshot,
         modelSignatures: {
           provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing",
@@ -330,7 +333,7 @@ export default async function handler(req: any, res: any) {
           signature: digest({ provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing" }),
           capturedAt: new Date().toISOString(),
         },
-        drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [], budget: reviewedBudgetItems },
+        drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: cleanVisualElements, vectorPayload: approvedVectorPayload, cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [], budget: reviewedBudgetItems },
       };
       const drawingSubtotal = Number(reviewedBudgetItems.reduce((sum: number, item: any) => sum + Number(item.quantity) * Number(item.unitPrice), 0).toFixed(2));
       snapshot.budgetSnapshot = createBudgetSnapshot({
