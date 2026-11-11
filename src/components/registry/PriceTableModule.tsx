@@ -12,10 +12,11 @@ const keyOf=(r:any)=>r.code? "code:"+norm(r.code):"name:"+norm(r.name)+"|"+norm(
 const parsePrice=(v:unknown)=>{const s=String(v??"0").replace(/R\$\s?/gi,"").replace(/\./g,"").replace(",",".").replace(/[^0-9.-]/g,"");return Math.max(0,Number.parseFloat(s)||0);};
 const money=(n:number)=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 export default function PriceTableModule(){
- const [items,setItems]=useState<PriceItem[]>([]);const [uid,setUid]=useState("");const [email,setEmail]=useState("");const [search,setSearch]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");const [alerts,setAlerts]=useState<Notice[]>([]);
+ const [collectionRows,setCollectionRows]=useState<Record<string,PriceItem[]>>({});const [uid,setUid]=useState("");const [email,setEmail]=useState("");const [search,setSearch]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");const [alerts,setAlerts]=useState<Notice[]>([]);
  const [form,setForm]=useState({name:"",code:"",category:"Vidro",unit:"m²",price:"",supplier:"",validUntil:"",source:"Cadastro manual"});
  useEffect(()=>onAuthStateChanged(auth,u=>{setUid(u?.uid||"");setEmail(u?.email?.toLowerCase()||"");}),[]);
- useEffect(()=>{if(!uid)return;return onSnapshot(collection(db,"price_table"),s=>setItems(s.docs.map(d=>({id:d.id,...d.data()} as PriceItem))),e=>setError("Falha ao carregar tabela de preços: "+e.message));},[uid]);
+ useEffect(()=>{if(!uid)return;const names=["price_table","registry_items","supplier_catalog","catalog"];const unsubs=names.map(name=>onSnapshot(collection(db,name),s=>setCollectionRows(current=>({...current,[name]:s.docs.map(d=>({id:d.id,sourceCollection:name,sourceItemId:d.id,...d.data()} as PriceItem))})),e=>setError("Falha ao carregar "+name+": "+e.message)));return()=>unsubs.forEach(unsub=>unsub());},[uid]);
+ const items=useMemo(()=>{const map=new Map<string,PriceItem>();for(const name of ["price_table","registry_items","supplier_catalog","catalog"]){for(const item of collectionRows[name]||[]){const key=keyOf(item);if(!map.has(key))map.set(key,item);}}return Array.from(map.values());},[collectionRows]);
  useEffect(()=>{if(!email)return;return onSnapshot(query(collection(db,"notifications"),where("targetEmail","==",email)),s=>setAlerts(s.docs.map(d=>({id:d.id,...d.data()} as Notice)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))),()=>{});},[email]);
  const today=new Date().toISOString().slice(0,10);const expiring=useMemo(()=>items.filter(i=>i.priceValidUntil&&i.priceValidUntil>=today&&i.priceValidUntil<=new Date(Date.now()+15*86400000).toISOString().slice(0,10)),[items,today]);
  const filtered=useMemo(()=>items.filter(i=>[i.name,i.code,i.category,i.priceSupplier].some(v=>String(v||"").toLowerCase().includes(search.toLowerCase()))),[items,search]);
@@ -23,8 +24,9 @@ export default function PriceTableModule(){
   if(!form.name.trim()||Number(form.price)<0||!form.price){setError("Informe item e preço válido.");return;}
   setBusy(true);setError("");setNotice("");
   try{
-   const all=await getDocs(collection(db,"price_table"));const candidate={name:form.name,code:form.code,category:form.category,unit:form.unit};
-   const existing=all.docs.find(d=>keyOf({...d.data(),id:d.id})===keyOf(candidate));
+   const candidate={name:form.name,code:form.code,category:form.category,unit:form.unit};
+   const sources=["price_table","registry_items","supplier_catalog","catalog"];const snapshots=await Promise.all(sources.map(name=>getDocs(collection(db,name))));
+   let existing:{collection:string;id:string;data:any}|undefined;for(let i=0;i<snapshots.length&&!existing;i++){const found=snapshots[i].docs.find(d=>keyOf(d.data())===keyOf(candidate));if(found)existing={collection:sources[i],id:found.id,data:found.data()};}
    const now=new Date().toISOString();const price=Number(form.price);
    if(existing){const old=existing.data();await updateDoc(doc(db,"price_table",existing.id),{price,priceUpdatedAt:now,priceValidUntil:form.validUntil||"",priceSource:form.source,priceSupplier:form.supplier,updatedAt:now});await addDoc(collection(db,"price_history"),{itemId:existing.id,itemName:old.name,oldPrice:Number(old.price)||0,newPrice:price,source:form.source,supplier:form.supplier,validUntil:form.validUntil||"",changedAt:now,changedBy:uid});setNotice("Preço atualizado. O cadastro do item foi preservado.");}
    else{const created=await addDoc(collection(db,"price_table"),{...candidate,price,priceUpdatedAt:now,priceValidUntil:form.validUntil||"",priceSource:form.source,priceSupplier:form.supplier,status:"Ativo",createdAt:now,updatedAt:now});await addDoc(collection(db,"price_history"),{itemId:created.id,itemName:form.name,oldPrice:0,newPrice:price,source:form.source,supplier:form.supplier,validUntil:form.validUntil||"",changedAt:now,changedBy:uid});setNotice("Novo item incluído na tabela de preços.");}
