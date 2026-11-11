@@ -238,7 +238,7 @@ export default function DrawingSvgCanvas({
         onPointerCancel={onPointerUp}
         onPointerLeave={onPointerUp}
       >
-        <svg viewBox={`0 0 1000 ${canvasHeight}`} className="h-full min-h-[460px] w-full" style={{ transform: `translate(${pan.x}px,${pan.y}px) scale(${zoom})`, transformOrigin: "center center", transition: dragging ? "none" : "transform .12s ease-out" }} role="img" aria-label={`Desenho técnico de ${drawing.title}`}>
+        <svg viewBox={`0 0 1000 ${canvasHeight}`} className="h-full min-h-[460px] w-full" style={{ minHeight: `${canvasHeight}px` }} role="img" aria-label={`Desenho técnico de ${drawing.title}`}>
           <defs>
             <pattern id="drawing-grid-small" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#334155" strokeWidth=".6" opacity=".45"/></pattern>
             <pattern id="drawing-grid-large" width="100" height="100" patternUnits="userSpaceOnUse"><rect width="100" height="100" fill="url(#drawing-grid-small)"/><path d="M 100 0 L 0 0 0 100" fill="none" stroke="#475569" strokeWidth="1" opacity=".5"/></pattern>
