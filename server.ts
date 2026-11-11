@@ -362,7 +362,7 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
 // ----------------------------------------------------
 // 3. Project intake AI (/api/ai/project-intake)
 // ----------------------------------------------------
-app.post("/api/ai/project-intake", requireFirebaseAuth, rateLimitByUser("project-intake", 20, 60_000), async (req, res) => {
+app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("project-intake", 20, 60_000), async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim().slice(0, 180);
     const description = String(req.body?.description || "").trim().slice(0, 10000);
