@@ -154,6 +154,10 @@ const applyDocumentWatermark = (doc: jsPDF, sender?: SenderConfig) => {
 
 export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF();
+  if (quote.approvedAt) {
+    doc.setCreationDate(new Date(quote.approvedAt));
+    if (quote.snapshotContentHash) doc.setFileId(String(quote.snapshotContentHash).slice(0, 32).toUpperCase());
+  }
   const pageWidth = doc.internal.pageSize.width;
   const currency = quote.currency || "BRL";
 
@@ -566,6 +570,10 @@ export const exportInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDo
 
 export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  if (drawing.approvedAt) {
+    doc.setCreationDate(new Date(drawing.approvedAt));
+    if (drawing.snapshotContentHash) doc.setFileId(String(drawing.snapshotContentHash).slice(0, 32).toUpperCase());
+  }
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const unit = drawing.unit || "cm";
