@@ -163,7 +163,7 @@ export default async function handler(req: any, res: any) {
     const senderSnapshot: any = {};
     for (const key of ["name","nif","address","postalCode","city","country","currency","logoUrl","watermarkLogoUrl","website","phone","email"]) {
       const value = String(senderInput[key] || "").slice(0, key.endsWith("Url") ? 220000 : 500);
-      if (value) senderSnapshot[key] = value;
+      if (value && (!(key.endsWith("Url")) || value.length <= 220000)) senderSnapshot[key] = value;
     }
     const collection = type === "quote" ? "quotes" : "technical_drawings";
     const found = await readDocument(req, collection, documentId);
@@ -173,6 +173,9 @@ export default async function handler(req: any, res: any) {
 
     let snapshot: any;
     if (type === "quote") {
+      if (!["draft","pending","pendente","borrador","accepted"].includes(String(source.status || "").toLowerCase())) {
+        return send(res, 409, { error: "Somente orçamentos em rascunho ou pendentes podem ser aprovados." });
+      }
       if (!Array.isArray(source.items) || source.items.length === 0) return send(res, 422, { error: "O orçamento não possui itens." });
       const catalog = await loadCatalogFromFirestore(req);
       const reviewedItems = source.items.map((item: any) => {
@@ -208,18 +211,31 @@ export default async function handler(req: any, res: any) {
       };
     } else {
       if (!Array.isArray(source.pieces) || source.pieces.length === 0) return send(res, 422, { error: "O desenho não possui componentes." });
-      if (source.status === "APPROVED_FOR_MANUFACTURING") return send(res, 409, { error: "O desenho já foi aprovado." });
+      if (source.isDraft === false || source.status === "APPROVED_FOR_MANUFACTURING") return send(res, 409, { error: "O desenho já foi aprovado e não pode ser reaprovado." });
+      const catalog = await loadCatalogFromFirestore(req);
       const budgetItems = Array.isArray(source.budget?.items) ? source.budget.items : [];
-      if (budgetItems.some((item: any) => item.priceSource === "pending")) return send(res, 422, { error: "O desenho contém preços pendentes; revise antes de aprovar." });
+      const reviewedBudgetItems = budgetItems.map((item: any) => {
+        if (item.priceSource === "pending") throw new Error("O desenho contém preços pendentes; revise antes de aprovar.");
+        const match = catalogMatch(item, catalog);
+        if (item.catalogItemId || item.sku) {
+          if (!match) throw new Error("SKU/ID do orçamento técnico não existe no catálogo.");
+          const catalogPrice = Number(match.price);
+          if (match.price === undefined || match.price === null || !Number.isFinite(catalogPrice) || catalogPrice < 0 || catalogPrice !== Number(item.unitPrice)) {
+            throw new Error("Preço do orçamento técnico não corresponde ao catálogo.");
+          }
+          return { ...item, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice };
+        }
+        return { ...item, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
+      });
       const approvedAt = new Date().toISOString();
       const { pdfDataUri: _pdfDataUri, pdfUrl: _pdfUrl, pdfStoragePath: _pdfStoragePath, pdfGeneratedAt: _pdfGeneratedAt, pdfFileName: _pdfFileName, pdfFileSizeKb: _pdfFileSizeKb, ...sourceWithoutPdf } = source;
       snapshot = {
         schemaVersion: 1, type: "drawing", documentId, documentNumber: source.title || "", status: "APPROVED_FOR_MANUFACTURING",
         approvedAt, approvedBy: { uid: user.uid, email: user.email, role: user.role },
-        document: { ...sourceWithoutPdf, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedAt, senderSnapshot },
+        document: { ...sourceWithoutPdf, budget: source.budget ? { ...source.budget, items: reviewedBudgetItems } : source.budget, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedAt, senderSnapshot },
         senderSnapshot,
         modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing", capturedAt: new Date().toISOString() },
-        drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [] },
+        drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [], budget: reviewedBudgetItems },
       };
     }
     snapshot.contentHash = digest(snapshot);
