@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { addDoc, collection } from "firebase/firestore";
+import { collection, doc, setDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { FileUp, FolderPlus, Globe, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
@@ -44,7 +44,9 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
     setBusy(true); setError(""); setNotice("");
     const now = new Date().toISOString();
     try {
+      const projectRef = doc(collection(db, "projects"));
       let imported: any = {};
+      const textImports: string[] = [];
       const jsonFile = files.find(file => file.name.toLowerCase().endsWith(".json") || file.type === "application/json");
       if (jsonFile) {
         const parsed = JSON.parse(await jsonFile.text());
@@ -79,7 +81,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
           continue;
         }
         const id = crypto.randomUUID();
-        const storagePath = `project-assets/${user.uid}/pending-${id}/${id}-${safeName(file.name)}`;
+        const storagePath = `project-assets/${user.uid}/${projectRef.id}/${id}-${safeName(file.name)}`;
         const fileRef = ref(storage, storagePath);
         await uploadBytes(fileRef, file, { contentType: file.type, customMetadata: { originalName: file.name, importType: "project-intake" } });
         assets.push({
@@ -104,7 +106,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         category: String(imported.category || aiData.category || "Projeto"),
         status: String(imported.status || "Em análise"),
         client: String(client.trim() || imported.client || aiData.client || "").slice(0, 180),
-        notes: String(description.trim() || imported.notes || aiData.summary || "").slice(0, 12000),
+        notes: [description.trim() || imported.notes || aiData.summary || "", ...textImports].filter(Boolean).join("\\n\\n").slice(0, 12000),
         width: Number(imported.width || aiData.width) || 0,
         height: Number(imported.height || aiData.height) || 0,
         quantity: Math.max(1, Number(imported.quantity || aiData.quantity) || 1),
@@ -112,11 +114,11 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         assets, ownerUid: user.uid, importSource: sourceUrl.trim() ? "browser" : files.length ? "device" : "ai",
         importedAt: now, createdAt: now, updatedAt: now
       };
-      const created = await addDoc(collection(db, "projects"), project);
+      await setDoc(projectRef, project);
       setFiles([]); setName(""); setClient(""); setDescription(""); setSourceUrl("");
       if (picker.current) picker.current.value = "";
       setNotice(`Projeto "${projectName}" criado com ${assets.length} anexo(s)/referência(s).`);
-      onCreated?.(created.id);
+      onCreated?.(projectRef.id);
     } catch (e) {
       console.error("Project intake failed:", e);
       setError(e instanceof Error ? e.message : "Não foi possível importar o projeto.");
