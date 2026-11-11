@@ -526,7 +526,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               Describe en lenguaje natural cualquier pieza arquitectónica, ventana de aluminio o mueble con sus medidas:
             </p>
             <label className="mb-3 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Guardar este modelo en projeto</label>
-            <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="mb-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs text-white">
+            <select value={selectedProjectId} onChange={(e) => { const id = e.target.value; const project = projects.find((item) => item.id === id); setSelectedProjectId(id); setDrawing((current) => ({ ...current, projectId: project?.id, projectName: project?.name, updatedAt: new Date().toISOString() })); }} className="mb-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs text-white">
               <option value="">Sem projeto associado</option>
               {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
             </select>
