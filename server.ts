@@ -128,7 +128,7 @@ app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
     });
 
     const response = await generateText({
-      model: aiModel,
+      model: getAIModel("chat"),
       system: systemInstruction,
       messages: contents.map((content) => ({
         role: content.role === "model" ? "assistant" : content.role,
@@ -300,7 +300,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
       if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
       const match = findExactCatalogItem(item, catalog);
       const catalogPrice = match ? Number(match.price) : 0;
-      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
       return {
         description: String(item.description).slice(0, 500),
         qty,
@@ -757,9 +757,23 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
     temperature: 0.1,
     maxOutputTokens,
   });
-  const raw = response.text || "";
-  const match = raw.match(/\{[\s\S]*\}/);
-  return JSON.parse(match ? match[0] : raw);
+  const validate = (value: any) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Documento sem objeto de dados válido.");
+    return value;
+  };
+  try {
+    return parseAIJson(response.text, validate);
+  } catch (firstError) {
+    const repaired = await generateText({
+      model: getAIModel("documentExtraction"),
+      system: "Corrija somente a estrutura JSON da extração. Não invente, complete ou altere nenhum dado do documento. Retorne apenas JSON válido.",
+      prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "\nResposta original:\n" + String(response.text || "").slice(0, 30000),
+      temperature: 0,
+      maxOutputTokens,
+      abortSignal: AbortSignal.timeout(AI_CONFIG.documentExtraction.timeoutMs),
+    });
+    return parseAIJson(repaired.text, validate);
+  }
 }
 
 // ============ FINANCIAL AI: Extraer datos de boleto ============
