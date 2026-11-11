@@ -21,6 +21,12 @@ export interface QuoteItem {
   unitPrice: number;
   subtotal?: number;
   notes?: string;
+  itemId?: string;
+  catalogSource?: string;
+  itemPhotoUrl?: string;
+  itemCategory?: string;
+  itemDimensions?: string;
+  sku?: string;
 }
 
 export interface DeliveryEvidence {
@@ -51,6 +57,7 @@ export interface Quote {
   date: string;
   validUntil?: string;
   items: QuoteItem[];
+  itemIds?: string[];
   technicalDrawing?: TechnicalDrawing;
   subtotal: number;
   taxRate: number;
