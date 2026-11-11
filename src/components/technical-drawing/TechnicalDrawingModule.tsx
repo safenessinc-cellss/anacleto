@@ -326,24 +326,29 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     setDrawing(target); setIsPdfModalOpen(true);
   };
 
-  const handleSaveDrawing = async () => {
+  const handleSaveDrawing = async (targetDrawing: TechnicalDrawing = drawing, silent = false): Promise<boolean> => {
     const user = auth.currentUser;
-    if (!user) { showToast("Faça login novamente para salvar o projeto técnico.", "error"); return; }
-    if (!drawing.pieces?.length) { showToast("O desenho não possui peças para salvar.", "warning"); return; }
+    if (!user) {
+      if (!silent) showToast("Faça login novamente para salvar o projeto técnico.", "error");
+      return false;
+    }
+    if (!targetDrawing.pieces?.length) {
+      if (!silent) showToast("O desenho não possui peças para salvar.", "warning");
+      return false;
+    }
     setIsSaving(true);
     try {
       const now = new Date().toISOString();
-      const pdfRes = buildTechnicalDrawingPdf(drawing, senderConfig);
+      const pdfRes = buildTechnicalDrawingPdf(targetDrawing, senderConfig);
       const blob = await (await fetch(pdfRes.dataUri)).blob();
-      const storagePath = "technical-drawings/" + user.uid + "/" + drawing.id + ".pdf";
+      const storagePath = "technical-drawings/" + user.uid + "/" + targetDrawing.id + ".pdf";
       const fileRef = storageRef(storage, storagePath);
-      await uploadBytes(fileRef, blob, { contentType: "application/pdf", customMetadata: { ownerUid: user.uid, drawingId: drawing.id } });
+      await uploadBytes(fileRef, blob, { contentType: "application/pdf", customMetadata: { ownerUid: user.uid, drawingId: targetDrawing.id } });
       const pdfUrl = await getDownloadURL(fileRef);
-      // Persistência completa: geometria, peças, cotas e fases continuam editáveis após reabrir.
-      const { pdfDataUri: _temporaryPdfDataUri, ...editableDrawing } = drawing;
+      const { pdfDataUri: _temporaryPdfDataUri, ...editableDrawing } = targetDrawing;
       const savedDrawing: TechnicalDrawing = {
         ...editableDrawing,
-        createdAt: drawing.createdAt || now,
+        createdAt: targetDrawing.createdAt || now,
         updatedAt: now,
         pdfUrl,
         pdfStoragePath: storagePath,
@@ -351,11 +356,17 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         pdfGeneratedAt: now,
         pdfFileSizeKb: pdfRes.sizeKb,
       };
-      await setDoc(doc(db, "technical_drawings", drawing.id), savedDrawing);
+      await setDoc(doc(db, "technical_drawings", targetDrawing.id), savedDrawing);
       setDrawing(savedDrawing);
-      showToast("Projeto técnico salvo com desenho editável e PDF.", "success");
-    } catch (err) { console.error("Technical drawing save failed:", err); showToast("Não foi possível salvar o projeto técnico. Verifique as permissões.", "error"); }
-    finally { setIsSaving(false); }
+      if (!silent) showToast("Projeto técnico salvo com desenho editável e PDF.", "success");
+      return true;
+    } catch (err) {
+      console.error("Technical drawing save failed:", err);
+      if (!silent) showToast("Não foi possível salvar o projeto técnico. O desenho continua aberto para tentar novamente.", "error");
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteDrawing = async (item: TechnicalDrawing) => {
@@ -403,7 +414,11 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     let generated: TechnicalDrawing | null = null;
     try {
       const user = auth.currentUser;
-      if (!user) throw new Error("Entre na sua conta para gerar e salvar projetos técnicos.");
+      if (!user) {
+        showToast("Entre na sua conta para gerar e salvar projetos técnicos.", "error");
+        setIsLoading(false);
+        return;
+      }
       const idToken = await user.getIdToken();
       const res = await fetch("/api/ai/technical-drawing", {
         method: "POST",
@@ -412,7 +427,6 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       });
       const responseBody = await res.json().catch(() => null);
       if (!res.ok) throw new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
-      if (responseBody?._fallback) throw new Error("A IA está indisponível; será usado o gerador local com as dimensões informadas.");
       if (!responseBody || !Array.isArray(responseBody.pieces) || responseBody.pieces.length === 0) {
         throw new Error("O serviço retornou um desenho sem componentes renderizáveis.");
       }
@@ -440,9 +454,9 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         budget: responseBody.budget,
       };
     } catch (error) {
-      console.warn("Serviço de desenho por IA indisponível; usando o gerador paramétrico local:", error);
+      console.error("Falha na geração do desenho técnico:", error);
       generated = buildLocalTechnicalDrawing(inputPrompt);
-      showToast("O serviço de IA está indisponível. Foi criado um desenho técnico preliminar a partir das medidas e do tipo de produto informados; revise as cotas antes de fabricar.", "warning");
+      showToast("A IA não respondeu corretamente. Foi criado um rascunho local; confira as dimensões e os componentes antes de fabricar.", "warning");
     }
 
     try {
@@ -464,7 +478,12 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (!presetPrompt) setPrompt("");
 
       setDrawing(generated);
-      showToast("Desenho gerado. Revise e use “Salvar desenho” para armazenar o documento final.", "success");
+      const saved = await handleSaveDrawing(generated, true);
+      if (saved) {
+        showToast("Desenho gerado e salvo automaticamente no projeto, com PDF e dados editáveis.", "success");
+      } else {
+        showToast("Desenho gerado, mas não foi possível salvar automaticamente. Ele permanece aberto; use Salvar projeto para tentar novamente.", "warning");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -530,7 +549,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Save className="w-4 h-4 text-amber-400" />}
-            Salvar somente PDF
+            Salvar projeto
           </button>
           <button
             onClick={handleExportPdf}
@@ -802,7 +821,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center">
                 <FolderOpen className="w-8 h-8 mx-auto mb-2 text-slate-400" />
                 <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Nenhum desenho salvo ainda</p>
-                <p className="text-xs text-slate-500 mt-1">Depois de gerar um desenho, clique em “Salvar desenho”.</p>
+                <p className="text-xs text-slate-500 mt-1">Os desenhos gerados são salvos automaticamente neste histórico.</p>
               </div>
             ) : (
               <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
