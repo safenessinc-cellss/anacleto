@@ -300,7 +300,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   }, [authReady]);
 
   const handleOpenDrawingPdf = async (targetDrawing?: TechnicalDrawing) => {
-    const target = targetDrawing || drawing;
+    let target = targetDrawing || drawing;
     if (!target.pdfDataUri && !(target as any).pdfUrl) {
       try { const pdf = buildTechnicalDrawingPdf(target, senderConfig); target = { ...target, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb }; }
       catch (error) { console.error("Could not build drawing preview PDF:", error); showToast("Não foi possível preparar a pré-visualização PDF.", "error"); return; }
