@@ -7,8 +7,9 @@ const windows = new Map<string, WindowEntry>();
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
 
 function json(res: any, status: number, body: unknown) {
-  res.status(status).setHeader("Cache-Control", "no-store");
-  return res.json(body);
+  // Vercel Node responses and Express responses do not share identical chaining semantics.
+  res.setHeader?.("Cache-Control", "no-store");
+  return res.status(status).json(body);
 }
 
 async function authenticate(req: any): Promise<{ uid: string; email: string } | null> {
@@ -21,6 +22,7 @@ async function authenticate(req: any): Promise<{ uid: string; email: string } | 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ idToken: token }),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) return null;
   const data = await response.json() as { users?: Array<{ localId?: string; email?: string }> };
@@ -32,7 +34,10 @@ async function authenticate(req: any): Promise<{ uid: string; email: string } | 
     const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
     const documentId = encodeURIComponent(email);
     const roleUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${databaseId}/documents/admins/${documentId}`;
-    const roleResponse = await fetch(roleUrl, { headers: { Authorization: `Bearer ${token}` } });
+    const roleResponse = await fetch(roleUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!roleResponse.ok) return null;
     const roleData = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
     if (!roleData.fields?.role?.stringValue) return null;
@@ -110,41 +115,62 @@ function localFallback(prompt: string) {
 }
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== "POST") return json(res, 405, { error: "Método não permitido." });
+  const requestId = String(req.headers?.["x-vercel-id"] || req.headers?.["x-request-id"] || "unknown");
+  let prompt = "";
+  let authenticated = false;
+  let stage = "request";
 
-  const body = (req.body || {}) as DrawingRequest;
-  const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-  if (prompt.length < 3) return json(res, 400, { error: "Descreva a peça e suas dimensões." });
-  const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 200) : [];
-  const imageUrls = Array.isArray(body.images) ? body.images.slice(0, 4) : [];
-  const allowedImageUrls: URL[] = [];
-  for (const value of imageUrls) {
-    try {
-      const url = new URL(String(value));
-      if (url.protocol !== "https:" || url.hostname !== "firebasestorage.googleapis.com" || !url.pathname.includes("/v0/b/" + firebaseConfig.storageBucket + "/o/")) {
-        return json(res, 400, { error: "Imagem de referência fora do armazenamento autorizado." });
-      }
-      allowedImageUrls.push(url);
-    } catch {
-      return json(res, 400, { error: "URL de imagem de referência inválida." });
+  try {
+    if (req.method !== "POST") {
+      res.setHeader?.("Allow", "POST");
+      return json(res, 405, { error: "Método não permitido.", code: "METHOD_NOT_ALLOWED" });
     }
-  }
 
-  let user: { uid: string; email: string } | null = null;
-  try {
-    user = await authenticate(req);
-  } catch (authError) {
-    console.error("Technical drawing authentication service unavailable:", authError);
-    return json(res, 503, {
-      error: "Não foi possível validar sua sessão agora. Tente novamente em instantes.",
-      code: "AUTH_SERVICE_UNAVAILABLE"
-    });
-  }
-  if (!user) return json(res, 401, { error: "Sessão inválida ou acesso não autorizado. Entre novamente." });
-  if (!allowRequest(user.uid)) return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente." });
+    stage = "input";
+    let body = req.body || {};
+    if (typeof body === "string") {
+      try { body = JSON.parse(body); }
+      catch { return json(res, 400, { error: "Corpo da solicitação inválido.", code: "INVALID_JSON" }); }
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return json(res, 400, { error: "Corpo da solicitação inválido.", code: "INVALID_BODY" });
+    }
 
-  try {
+    prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+    if (prompt.length < 3) {
+      return json(res, 400, { error: "Descreva a peça e suas dimensões.", code: "PROMPT_REQUIRED" });
+    }
+
+    const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 200) : [];
+    const imageUrls = Array.isArray(body.images) ? body.images.slice(0, 4) : [];
+    const allowedImageUrls: URL[] = [];
+    for (const value of imageUrls) {
+      try {
+        const url = new URL(String(value));
+        if (url.protocol !== "https:" || url.hostname !== "firebasestorage.googleapis.com" ||
+            !url.pathname.includes("/v0/b/" + firebaseConfig.storageBucket + "/o/")) {
+          return json(res, 400, { error: "Imagem de referência fora do armazenamento autorizado.", code: "IMAGE_NOT_ALLOWED" });
+        }
+        allowedImageUrls.push(url);
+      } catch {
+        return json(res, 400, { error: "URL de imagem de referência inválida.", code: "INVALID_IMAGE_URL" });
+      }
+    }
+
+    stage = "authentication";
+    const user = await authenticate(req);
+    if (!user) {
+      return json(res, 401, { error: "Sessão inválida ou acesso não autorizado. Entre novamente.", code: "UNAUTHORIZED" });
+    }
+    authenticated = true;
+
+    if (!allowRequest(user.uid)) {
+      return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
+    }
+
+    stage = "ai_generation";
     const system = `Você é o engenheiro de produto e fabricação da Anacleto Pro. Gere somente JSON válido, sem markdown. Inclua: title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array), steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions), measurementPlan (array de {point,method,tool,checks}), cuttingPlan (array de {pieceNumber,name,material,quantity,length,width,thickness,unit,cutAngle,notes}), manufacturingSteps (array de {step,title,instructions,qualityGate}), modelDescription (string), finalAppearance (string), qualityChecklist (array de strings), assumptions (array de strings). Preserve rigorosamente as dimensões e unidade informadas pelo usuário; não substitua nem estime dimensões ausentes. NÃO invente fórmulas de perfis, descontos, folgas, espessuras, tolerâncias, códigos ou ângulos de corte. Quando faltarem dados, use valores vazios/zero e liste a pendência em assumptions; qualquer lista de corte será preliminar até validar sistema, ferragens e tabelas oficiais do fabricante. Use o catálogo quando aplicável: ${JSON.stringify(catalog)}.`;
+
     const result = await generateText({
       model: gateway("openai/gpt-4o-mini"),
       system,
@@ -156,11 +182,14 @@ export default async function handler(req: any, res: any) {
         ],
       }],
       temperature: 0.2,
+      abortSignal: AbortSignal.timeout(45_000),
     });
-    const raw = (result.text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+    stage = "validate_ai_response";
+    const raw = (result.text || "").replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/i, "").trim();
     const drawing = JSON.parse(raw);
-    const dims = drawing.overallDimensions || {};
-    if (!Array.isArray(drawing.pieces) || !drawing.pieces.length ||
+    const dims = drawing?.overallDimensions || {};
+    if (!drawing || !Array.isArray(drawing.pieces) || !drawing.pieces.length ||
         !Number.isFinite(Number(dims.width)) || Number(dims.width) <= 0 ||
         !Number.isFinite(Number(dims.height)) || Number(dims.height) <= 0) {
       throw new Error("Resposta da IA sem dimensões ou componentes válidos.");
@@ -179,16 +208,47 @@ export default async function handler(req: any, res: any) {
       throw new Error("A IA não retornou a descrição do modelo e do resultado final.");
     }
     return json(res, 200, drawing);
-  } catch (aiError) {
-    console.error("Technical drawing provider fallback:", aiError);
-    try {
-      return json(res, 200, localFallback(prompt));
-    } catch (fallbackError) {
-      console.error("Technical drawing local fallback failed:", fallbackError);
-      return json(res, 500, {
-        error: "Não foi possível montar o desenho. Revise a descrição e as dimensões.",
-        code: "DRAWING_GENERATION_FAILED"
+  } catch (error) {
+    // Never leak provider credentials or internal stack traces to the browser.
+    console.error("Technical drawing request failed", {
+      requestId,
+      stage,
+      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+    });
+
+    if (authenticated && prompt.length >= 3) {
+      try {
+        const fallback = localFallback(prompt);
+        return json(res, 200, {
+          ...fallback,
+          warning: "A IA está temporariamente indisponível. Foi criado um desenho preliminar local; confira todas as medidas antes de fabricar.",
+          fallbackReason: stage,
+        });
+      } catch (fallbackError) {
+        console.error("Technical drawing local fallback failed", {
+          requestId,
+          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+        });
+        return json(res, 500, {
+          error: "Não foi possível gerar o desenho técnico. Tente novamente ou revise a descrição.",
+          code: "DRAWING_GENERATION_FAILED",
+          requestId,
+        });
+      }
+    }
+
+    if (stage === "authentication") {
+      return json(res, 503, {
+        error: "Não foi possível validar sua sessão agora. Tente novamente em instantes.",
+        code: "AUTH_SERVICE_UNAVAILABLE",
+        requestId,
       });
     }
+
+    return json(res, 500, {
+      error: "O serviço de desenho técnico encontrou uma falha inesperada.",
+      code: "TECHNICAL_DRAWING_INTERNAL_ERROR",
+      requestId,
+    });
   }
 }
