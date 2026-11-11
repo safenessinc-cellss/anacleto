@@ -251,7 +251,47 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
 }
 
 // ----------------------------------------------------
-// 3. Technical Drawing AI Agent (/api/ai/technical-drawing)
+// 3. Project intake AI (/api/ai/project-intake)
+// ----------------------------------------------------
+app.post("/api/ai/project-intake", requireFirebaseAuth, rateLimitByUser("project-intake", 20, 60_000), async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim().slice(0, 180);
+    const description = String(req.body?.description || "").trim().slice(0, 10000);
+    const sourceUrl = String(req.body?.sourceUrl || "").trim().slice(0, 2000);
+    if (!description) return res.status(400).json({ error: "Descreva o projeto para a IA organizar." });
+    if (sourceUrl) {
+      let parsed: URL;
+      try { parsed = new URL(sourceUrl); } catch { return res.status(400).json({ error: "Endereço de referência inválido." }); }
+      if (!["http:", "https:"].includes(parsed.protocol)) return res.status(400).json({ error: "O endereço deve usar HTTP ou HTTPS." });
+    }
+    const response = await generateText({
+      model: aiModel,
+      system: "Você é um analista de projetos. Organize os dados informados em JSON estrito. Não invente dimensões, cliente, preço ou código. Use strings vazias e zero quando desconhecidos. Responda somente com {name,code,category,client,summary,width,height,quantity,price}. width e height são milímetros quando explicitamente informados; price é BRL apenas se o usuário informar.",
+      prompt: JSON.stringify({ name, description, sourceUrl }),
+      temperature: 0.2,
+    });
+    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+    const project = JSON.parse(raw);
+    if (!project || typeof project !== "object" || Array.isArray(project)) throw new Error("Resposta da IA inválida.");
+    return res.json({ project: {
+      name: String(project.name || name || "Novo projeto").slice(0, 180),
+      code: String(project.code || "").slice(0, 80),
+      category: String(project.category || "Projeto").slice(0, 80),
+      client: String(project.client || "").slice(0, 180),
+      summary: String(project.summary || description).slice(0, 12000),
+      width: Number(project.width) > 0 ? Number(project.width) : 0,
+      height: Number(project.height) > 0 ? Number(project.height) : 0,
+      quantity: Number(project.quantity) > 0 ? Number(project.quantity) : 1,
+      price: Number(project.price) >= 0 ? Number(project.price) : 0,
+    }});
+  } catch (error: any) {
+    console.error("Project intake AI error:", error?.message || error);
+    return res.status(502).json({ error: "A IA não conseguiu estruturar o projeto agora. Tente novamente ou importe os arquivos sem IA." });
+  }
+});
+
+// ----------------------------------------------------
+// 4. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
 app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("technical-drawing", 12, 60_000), async (req, res) => {
   try {
