@@ -427,3 +427,68 @@ html.dark {
 html.dark main .rounded-2xl.border, html.dark main .rounded-3xl.border, html.dark main .rounded-xl.border {
   border-color: var(--anacleto-border);
 }
+
+
+/* ANACLETO · acabamento visual unificado (light mode) */
+:root {
+  --anacleto-primary: #3978d5;
+  --anacleto-primary-soft: #eaf2ff;
+  --anacleto-ink: #24364d;
+  --anacleto-muted: #718096;
+  --anacleto-line: #e3eaf3;
+}
+html:not(.dark) body,
+html:not(.dark) #root { background: #f5f8fd !important; color: var(--anacleto-ink) !important; }
+html:not(.dark) [class~="bg-slate-900"],
+html:not(.dark) [class~="bg-slate-950"],
+html:not(.dark) [class~="bg-gray-900"],
+html:not(.dark) [class~="bg-gray-950"] {
+  background-color: #fff !important;
+  border-color: var(--anacleto-line) !important;
+  color: var(--anacleto-ink) !important;
+}
+html:not(.dark) [class~="bg-slate-900"] .text-white:not(button):not(a),
+html:not(.dark) [class~="bg-slate-950"] .text-white:not(button):not(a),
+html:not(.dark) [class~="bg-gray-900"] .text-white:not(button):not(a),
+html:not(.dark) [class~="bg-gray-950"] .text-white:not(button):not(a) {
+  color: var(--anacleto-ink) !important;
+}
+html:not(.dark) [class~="bg-slate-900"] .text-slate-300,
+html:not(.dark) [class~="bg-slate-900"] .text-slate-400,
+html:not(.dark) [class~="bg-slate-950"] .text-slate-300,
+html:not(.dark) [class~="bg-slate-950"] .text-slate-400 {
+  color: #64758b !important;
+}
+html:not(.dark) [class~="bg-slate-900"] button.text-white,
+html:not(.dark) [class~="bg-slate-950"] button.text-white { color: #fff !important; }
+html:not(.dark) .bg-amber-500,
+html:not(.dark) .bg-amber-600,
+html:not(.dark) .bg-orange-500,
+html:not(.dark) .bg-orange-600,
+html:not(.dark) .bg-yellow-500,
+html:not(.dark) .bg-yellow-600 { background-color: var(--anacleto-primary) !important; }
+html:not(.dark) .text-amber-400,
+html:not(.dark) .text-amber-500,
+html:not(.dark) .text-amber-600,
+html:not(.dark) .text-orange-400,
+html:not(.dark) .text-orange-500,
+html:not(.dark) .text-orange-600,
+html:not(.dark) .text-yellow-500,
+html:not(.dark) .text-yellow-600 { color: var(--anacleto-primary) !important; }
+html:not(.dark) .border-amber-200,
+html:not(.dark) .border-amber-300,
+html:not(.dark) .border-amber-500,
+html:not(.dark) .border-orange-200,
+html:not(.dark) .border-yellow-200 { border-color: #d7e5fa !important; }
+html:not(.dark) button.bg-amber-500,
+html:not(.dark) button.bg-amber-600,
+html:not(.dark) button.bg-orange-500,
+html:not(.dark) button.bg-yellow-500 { color: #fff !important; }
+html:not(.dark) .shadow-amber-500\/20,
+html:not(.dark) .shadow-amber-500\/10 { --tw-shadow-color: rgb(57 120 213 / 10%) !important; }
+html:not(.dark) input:focus,
+html:not(.dark) select:focus,
+html:not(.dark) textarea:focus {
+  border-color: #8bb4ef !important;
+  --tw-ring-color: #8bb4ef !important;
+}
