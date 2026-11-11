@@ -25,7 +25,7 @@ import {
 import { TechnicalDrawing, SenderConfig } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
-import { addDoc, collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
@@ -433,7 +433,15 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
       });
       const responseBody = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
+      if (!res.ok) {
+        const serviceError = new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
+        if (res.status === 401 || res.status === 403) {
+          showToast("Sua conta não tem autorização para gerar desenhos. Entre com o usuário autorizado.", "error");
+          setIsLoading(false);
+          return;
+        }
+        throw serviceError;
+      }
       if (!responseBody || !Array.isArray(responseBody.pieces) || responseBody.pieces.length === 0) {
         throw new Error("O serviço retornou um desenho sem componentes renderizáveis.");
       }
@@ -468,17 +476,9 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     try {
       if (!generated) throw new Error("Não foi possível montar o desenho técnico.");
-      let selectedProject = projects.find((project) => project.id === selectedProjectId);
-      if (!selectedProject && auth.currentUser) {
-        const now = new Date().toISOString();
-        const projectRef = await addDoc(collection(db, "projects"), {
-          name: generated.title, category: generated.category, status: "Em andamento",
-          notes: generated.description, client: "", ownerUid: auth.currentUser.uid,
-          createdAt: now, updatedAt: now
-        });
-        selectedProject = { id: projectRef.id, name: generated.title };
-        setSelectedProjectId(projectRef.id);
-      }
+      // O desenho técnico é salvo independentemente do cadastro de um projeto comercial.
+      // Se houver projeto selecionado, vincula; caso contrário, mantém como desenho avulso.
+      const selectedProject = projects.find((project) => project.id === selectedProjectId);
       generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
       setDrawing(generated);
       setCurrentStep(1);
