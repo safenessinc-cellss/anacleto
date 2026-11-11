@@ -313,7 +313,7 @@ export default function AnacletoProApp({
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-[10px] font-black uppercase text-blue-600 dark:text-amber-400 tracking-wider">
-                Assistente de IA
+                Motor Gemini 3.8 Flash
               </span>
             </div>
             <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-tight">
