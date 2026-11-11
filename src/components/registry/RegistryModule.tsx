@@ -105,6 +105,7 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
     if (!form.name.trim()) { setError("O nome/descrição é obrigatório."); return; }
     setSaving(true); setError(""); setUploadProgress(0);
     const now = new Date().toISOString();
+    const uploadedPaths: string[] = [];
     const payload = { name: form.name.trim(), code: form.code.trim(), category: form.category, unit: form.unit.trim() || meta.unitLabel, price: Number(form.price) || 0, status: form.status, notes: form.notes.trim(), width: Number(form.width) || 0, height: Number(form.height) || 0, depth: Number(form.depth) || 0, updatedAt: now };
     try {
       const recordRef = editing ? doc(db, meta.collection, editing) : doc(collection(db, meta.collection));
@@ -118,6 +119,7 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const storagePath = "catalogs/" + recordRef.id + "/" + Date.now() + "-" + safeName;
         const uploaded = await uploadFile(file, storagePath);
+        uploadedPaths.push(uploaded.path);
         catalogFiles.push({ id: crypto.randomUUID(), fileName: file.name, fileType: extensionOf(file.name), mimeType: file.type || "application/octet-stream", size: file.size, storagePath: uploaded.path, downloadUrl: uploaded.url, uploadedAt: new Date().toISOString() });
         done++; setUploadProgress(Math.round(done / Math.max(total, 1) * 100));
       }
@@ -125,12 +127,14 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
         const storagePath = "items/" + recordRef.id + "/photos/" + Date.now() + "-" + safeName;
         const uploaded = await uploadFile(file, storagePath);
+        uploadedPaths.push(uploaded.path);
         itemPhotoUrls.push(uploaded.url); itemPhotoStoragePaths.push(uploaded.path);
         done++; setUploadProgress(Math.round(done / Math.max(total, 1) * 100));
       }
       await setDoc(recordRef, { ...payload, catalogFiles, itemPhotoUrls, itemPhotoStoragePaths, itemThumbnailUrls: itemPhotoUrls, itemUpdatedAt: now, ...(editing ? {} : { createdAt: now }) }, { merge: true });
       reset();
     } catch (e) {
+      await Promise.allSettled(uploadedPaths.map(removeStorageFile));
       setError(e instanceof Error ? e.message : "Não foi possível salvar. Verifique as permissões do Firestore e do Storage.");
     } finally { setSaving(false); setUploadProgress(0); }
   };
