@@ -76,6 +76,9 @@ export interface Quote {
   pdfFileName?: string;
   pdfGeneratedAt?: string;
   pdfFileSizeKb?: number;
+  approvedSnapshotId?: string;
+  approvedAt?: string;
+  approvedBy?: { uid: string; email: string; role: string };
   // Legacy compatibility fields
   clientNif?: string;
   language?: string;
@@ -177,6 +180,13 @@ export interface TechnicalDrawing {
     depth?: number;
   };
   pieces: TechnicalPiece[];
+  isDraft?: boolean;
+  status?: "PRELIMINARY_CONTINGENCY" | "APPROVED_FOR_MANUFACTURING";
+  draftStatus?: "preliminary" | "approved";
+  draftLabel?: string;
+  approvedSnapshotId?: string;
+  approvedAt?: string;
+  approvedBy?: { uid: string; email: string; role: string };
   // Geometria vetorial específica gerada a partir do prompt, usada na tela e no PDF.
   visualElements?: Array<Record<string, any>>;
   modelDescription?: string;
