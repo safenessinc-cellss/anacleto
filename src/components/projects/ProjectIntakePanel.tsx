@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { collection, doc, setDoc } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Camera, FileUp, FolderPlus, Globe, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
 
@@ -44,7 +44,13 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
     }
     setBusy(true); setError(""); setNotice("");
     const now = new Date().toISOString();
+    const uploadedPaths: string[] = [];
     try {
+      let parsedSourceUrl: URL | null = null;
+      if (sourceUrl.trim()) {
+        try { parsedSourceUrl = new URL(sourceUrl.trim()); } catch { throw new Error("Endereço de referência inválido."); }
+        if (!["https:", "http:"].includes(parsedSourceUrl.protocol)) throw new Error("O endereço deve usar HTTP ou HTTPS.");
+      }
       const projectRef = doc(collection(db, "projects"));
       let imported: any = {};
       const textImports: string[] = [];
@@ -60,16 +66,22 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
       }
 
       let aiData: any = {};
+      let aiWarning = "";
       if (description.trim() || textImports.length > 0) {
-        const token = await user.getIdToken();
-        const response = await fetch("/api/ai/project-intake", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name: name.trim(), description: [description.trim(), ...textImports, Object.keys(imported).length ? "[JSON importado] " + JSON.stringify(imported).slice(0, 12000) : ""].filter(Boolean).join("\n\n"), sourceUrl: sourceUrl.trim() })
-        });
-        const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(data?.error || `A IA não conseguiu interpretar o projeto (${response.status}).`);
-        aiData = data?.project || {};
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch("/api/ai/project-intake", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ name: name.trim(), description: [description.trim(), ...textImports, Object.keys(imported).length ? "[JSON importado] " + JSON.stringify(imported).slice(0, 12000) : ""].filter(Boolean).join("\n\n"), sourceUrl: sourceUrl.trim() })
+          });
+          const data = await response.json().catch(() => null);
+          if (!response.ok) throw new Error(data?.error || `IA indisponível (${response.status})`);
+          aiData = data?.project || {};
+        } catch (error) {
+          aiWarning = error instanceof Error ? error.message : "IA indisponível";
+          console.warn("Project import continues without AI:", error);
+        }
       }
 
       const projectName = String(name.trim() || imported.name || aiData.name || files[0]?.name.replace(/\.[^.]+$/, "") || (sourceUrl.trim() ? new URL(sourceUrl.trim()).hostname : "") || "Novo projeto").slice(0, 180);
@@ -84,6 +96,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         const storagePath = `project-assets/${user.uid}/${projectRef.id}/${id}-${safeName(file.name)}`;
         const fileRef = ref(storage, storagePath);
         await uploadBytes(fileRef, file, { contentType: file.type, customMetadata: { originalName: file.name, importType: "project-intake" } });
+        uploadedPaths.push(storagePath);
         assets.push({
           id, name: file.name, kind: file.type === "application/pdf" ? "pdf" : "image",
           source: "device", url: await getDownloadURL(fileRef), storagePath,
@@ -91,12 +104,10 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         });
       }
 
-      if (sourceUrl.trim()) {
-        const parsed = new URL(sourceUrl.trim());
-        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("O endereço de referência deve ser HTTP ou HTTPS.");
+      if (parsedSourceUrl) {
         assets.push({
-          id: crypto.randomUUID(), name: parsed.hostname + parsed.pathname.slice(0, 80),
-          kind: "reference", source: "browser", url: parsed.toString(), createdAt: now, createdBy: user.uid
+          id: crypto.randomUUID(), name: parsedSourceUrl.hostname + parsedSourceUrl.pathname.slice(0, 80),
+          kind: "reference", source: "browser", url: parsedSourceUrl.toString(), createdAt: now, createdBy: user.uid
         });
       }
 
@@ -115,12 +126,14 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         importedAt: now, createdAt: now, updatedAt: now
       };
       await setDoc(projectRef, project);
+      uploadedPaths.length = 0;
       setFiles([]); setName(""); setClient(""); setDescription(""); setSourceUrl("");
       if (picker.current) picker.current.value = "";
       if (cameraPicker.current) cameraPicker.current.value = "";
-      setNotice(`Projeto "${projectName}" criado com ${assets.length} anexo(s)/referência(s).`);
+      setNotice(`Projeto "${projectName}" criado com ${assets.length} anexo(s)/referência(s).${aiWarning ? " IA não disponível nesta tentativa; os dados foram guardados sem análise automática." : ""}`);
       onCreated?.(projectRef.id);
     } catch (e) {
+      await Promise.all(uploadedPaths.map(path => deleteObject(ref(storage, path)).catch(() => undefined)));
       console.error("Project intake failed:", e);
       setError(e instanceof Error ? e.message : "Não foi possível importar o projeto.");
     } finally { setBusy(false); }
