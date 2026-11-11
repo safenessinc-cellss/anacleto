@@ -248,28 +248,72 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   const formatCurrency = (value: number, currency = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(value || 0);
 
+  const loadApprovedQuoteSnapshot = async (snapshotId: string) => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error("Faça login novamente para consultar a aprovação.");
+    const response = await fetch("/api/approved-snapshot?snapshotId=" + encodeURIComponent(snapshotId), {
+      headers: { Authorization: "Bearer " + token },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error || "Não foi possível recuperar a instantânea aprovada.");
+    if (data?.type !== "quote" || !data?.document) throw new Error("Instantânea de orçamento inválida.");
+    return data;
+  };
+
+  const handleApproveQuote = async () => {
+    if (!selectedQuote) return;
+    if (selectedQuote.approvedSnapshotId) {
+      showToast("Este orçamento já está aprovado e bloqueado por instantânea.", "warning");
+      return;
+    }
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Faça login novamente para aprovar o orçamento.");
+      await setDoc(doc(db, "quotes", selectedQuote.id), selectedQuote);
+      const senderSnapshot = await preparePdfSender();
+      const response = await fetch("/api/approved-snapshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ type: "quote", documentId: selectedQuote.id, senderSnapshot }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || "Não foi possível congelar o orçamento.");
+      const approved = { ...result.snapshot.document, approvedSnapshotId: result.snapshotId };
+      setSelectedQuote(approved);
+      setQuotes((previous) => previous.map((item) => item.id === approved.id ? approved : item));
+      showToast("Orçamento aprovado. Snapshot imutável criado; PDF e fatura usarão esta versão.", "success");
+    } catch (error) {
+      console.error("Quote approval failed:", error);
+      showToast((error as Error).message || "Falha ao aprovar o orçamento.", "error");
+    }
+  };
+
   // Open and View Stored PDF
   const handleOpenQuotePdf = async (quote: Quote) => {
     let target = quote;
-    if (!target.pdfDataUri) {
-      try {
-        const pdfSender = await preparePdfSender();
-        const pdfRes = buildQuotePdf(target, pdfSender);
-        target = {
-          ...target,
-          itemIds: Array.from(new Set(target.items.map((item) => item.itemId).filter((id): id is string => Boolean(id)))),
-        pdfDataUri: pdfRes.dataUri,
-          pdfFileName: pdfRes.fileName,
-          pdfGeneratedAt: new Date().toISOString(),
-          pdfFileSizeKb: pdfRes.sizeKb,
-        };
-        await setDoc(doc(db, "quotes", target.id), target);
-        if (selectedQuote?.id === target.id) {
-          setSelectedQuote(target);
-        }
-      } catch (err) {
-        console.warn("Could not pre-cache PDF data URI:", err);
+    try {
+      let sender = await preparePdfSender();
+      if (quote.approvedSnapshotId) {
+        const snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
+        target = snapshot.document as Quote;
+        sender = snapshot.senderSnapshot || target.senderSnapshot || {};
       }
+      const pdfRes = buildQuotePdf(target, sender);
+      target = {
+        ...target,
+        pdfDataUri: pdfRes.dataUri,
+        pdfFileName: pdfRes.fileName,
+        pdfGeneratedAt: new Date().toISOString(),
+        pdfFileSizeKb: pdfRes.sizeKb,
+      };
+      if (!quote.approvedSnapshotId) {
+        await setDoc(doc(db, "quotes", target.id), target);
+        if (selectedQuote?.id === target.id) setSelectedQuote(target);
+      }
+    } catch (err) {
+      console.warn("Could not prepare quote PDF from its source snapshot:", err);
+      showToast((err as Error).message || "Não foi possível preparar o PDF.", "error");
+      return;
     }
     setViewerPdfQuote(target);
     setIsPdfModalOpen(true);
@@ -277,7 +321,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   // Save Quote and its persistent PDF to Firestore
   const handleSaveQuote = async (quoteToSave?: Quote) => {
-    let target = recalculateQuote(quoteToSave || selectedQuote!);
+    const requested = quoteToSave || selectedQuote!;
+    if (requested?.approvedSnapshotId) {
+      showToast("Orçamento aprovado: alterações bloqueadas. Crie uma nova revisão para modificar valores ou itens.", "warning");
+      return;
+    }
+    let target = recalculateQuote(requested);
     try {
       // Build PDF document and serialize as data URI
       const pdfSender = await preparePdfSender();
