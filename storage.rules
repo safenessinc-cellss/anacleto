@@ -17,9 +17,22 @@ service firebase.storage {
       return owner() || (hasAdminRecord()
         && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','supervisor','colaborador','qualidade']);
     }
+    function canManageProjects() {
+      return owner() || (hasAdminRecord()
+        && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','supervisor','colaborador']);
+    }
     function canManageFinance() {
       return owner() || (hasAdminRecord()
         && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','financeiro']);
+    }
+    match /project-assets/{uid}/{projectId}/{fileName} {
+      allow read: if canManageProjects();
+      allow create, update: if canManageProjects()
+        && request.auth.uid == uid
+        && request.resource.size < 20 * 1024 * 1024
+        && (request.resource.contentType == 'application/pdf'
+          || request.resource.contentType.matches('image/(jpeg|png|webp)'));
+      allow delete: if canManageProjects() && request.auth.uid == uid;
     }
     match /purchases/{purchasePath=**} {
       allow read: if canManageFinance();
