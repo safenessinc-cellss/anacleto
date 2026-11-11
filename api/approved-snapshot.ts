@@ -215,7 +215,12 @@ export default async function handler(req: any, res: any) {
         approvedAt, approvedBy: { uid: user.uid, email: user.email, role: user.role },
         document: { ...sourceWithoutPdf, items: reviewedItems, subtotal, discountAmount, taxAmount, total, status: "approved", approvedAt, senderSnapshot },
         senderSnapshot,
-        modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.quote.model, capability: "quote", capturedAt: new Date().toISOString() },
+        modelSignatures: {
+          provider: "Vercel AI Gateway", model: AI_CONFIG.quote.model, capability: "quote",
+          temperature: AI_CONFIG.quote.temperature, maxOutputTokens: AI_CONFIG.quote.maxOutputTokens, timeoutMs: AI_CONFIG.quote.timeoutMs,
+          signature: digest({ provider: "Vercel AI Gateway", model: AI_CONFIG.quote.model, capability: "quote" }),
+          capturedAt: new Date().toISOString(),
+        },
       };
     } else {
       if (!Array.isArray(source.pieces) || source.pieces.length === 0) return send(res, 422, { error: "O desenho não possui componentes." });
@@ -242,7 +247,12 @@ export default async function handler(req: any, res: any) {
         approvedAt, approvedBy: { uid: user.uid, email: user.email, role: user.role },
         document: { ...sourceWithoutPdf, budget: source.budget ? { ...source.budget, items: reviewedBudgetItems } : source.budget, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedAt, senderSnapshot },
         senderSnapshot,
-        modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing", capturedAt: new Date().toISOString() },
+        modelSignatures: {
+          provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing",
+          temperature: AI_CONFIG.technicalDrawing.temperature, maxOutputTokens: AI_CONFIG.technicalDrawing.maxOutputTokens, timeoutMs: AI_CONFIG.technicalDrawing.timeoutMs,
+          signature: digest({ provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing" }),
+          capturedAt: new Date().toISOString(),
+        },
         drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [], budget: reviewedBudgetItems },
       };
     }
