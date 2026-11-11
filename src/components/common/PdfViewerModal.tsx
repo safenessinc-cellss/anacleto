@@ -48,6 +48,10 @@ export default function PdfViewerModal({
 
   const handleOpenInNewTab = () => {
     if (!pdfDataUri) return;
+    if (pdfDataUri.startsWith("https://") || pdfDataUri.startsWith("http://")) {
+      window.open(pdfDataUri, "_blank", "noopener,noreferrer");
+      return;
+    }
     try {
       // Convert data URI to Blob to avoid browser security restrictions with large data URIs
       const parts = pdfDataUri.split(",");
@@ -170,7 +174,7 @@ export default function PdfViewerModal({
             <span className="font-mono text-slate-300 font-bold">{fileName}</span>
             <span>•</span>
             <span className="text-emerald-400 flex items-center gap-1">
-              <CheckCircle className="w-3 h-3" /> Seguro en Firestore Cloud
+              <CheckCircle className="w-3 h-3" /> PDF armazenado no Firebase Storage
             </span>
           </div>
           <span className="font-mono text-slate-500 text-[10px]">Anacleto Pro PDF Vault</span>
