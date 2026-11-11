@@ -45,6 +45,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [debouncedCatalogSearch, setDebouncedCatalogSearch] = useState("");
   const [showCatalog, setShowCatalog] = useState(false);
   const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
 
@@ -87,6 +88,11 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [viewerPdfQuote, setViewerPdfQuote] = useState<Quote | null>(null);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedCatalogSearch(catalogSearch.trim().toLowerCase()), 250);
+    return () => window.clearTimeout(timer);
+  }, [catalogSearch]);
 
   // AI Chat Agent States
   const [aiMessage, setAiMessage] = useState("");
@@ -818,8 +824,8 @@ const handleAddItem = () => {
               <div className="max-h-60 overflow-y-auto space-y-1">
                 {catalogItems
                   .filter((i) => 
-                    i.name?.toLowerCase().includes(catalogSearch.toLowerCase()) ||
-                    i.sku?.toLowerCase().includes(catalogSearch.toLowerCase()) || i.category?.toLowerCase().includes(catalogSearch.toLowerCase()) || [i.width, i.height, i.depth].join(" ").includes(catalogSearch.toLowerCase())
+                    i.name?.toLowerCase().includes(debouncedCatalogSearch) ||
+                    i.sku?.toLowerCase().includes(debouncedCatalogSearch) || i.category?.toLowerCase().includes(debouncedCatalogSearch) || [i.width, i.height, i.depth].join(" ").includes(debouncedCatalogSearch)
                   )
                   .slice(0, 20)
                   .map((item) => (
@@ -852,7 +858,7 @@ const handleAddItem = () => {
                       <span className="font-bold text-indigo-600">R$ {item.price?.toFixed(2)}</span>
                     </button>
                   ))}
-                {catalogItems.filter((i) => i.name?.toLowerCase().includes(catalogSearch.toLowerCase()) || i.sku?.toLowerCase().includes(catalogSearch.toLowerCase()) || i.category?.toLowerCase().includes(catalogSearch.toLowerCase()) || [i.width, i.height, i.depth].join(" ").includes(catalogSearch.toLowerCase())).length === 0 && (
+                {catalogItems.filter((i) => i.name?.toLowerCase().includes(debouncedCatalogSearch) || i.sku?.toLowerCase().includes(debouncedCatalogSearch) || i.category?.toLowerCase().includes(debouncedCatalogSearch) || [i.width, i.height, i.depth].join(" ").includes(debouncedCatalogSearch)).length === 0 && (
                   <p className="text-xs text-slate-400 text-center py-4">Nenhum item encontrado. Ajuste a busca ou cadastre o item em Itens.</p>
                 )}
               </div>
