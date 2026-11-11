@@ -78,6 +78,30 @@ service cloud.firestore {
     match /material_lists/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /technical_drawings/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
 
+    // Tabela central de preços e rastreabilidade das atualizações.
+    match /price_table/{id} {
+      allow read: if canOperate() || canManageFinance();
+      allow create, update: if canManageCommercial();
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /price_history/{id} {
+      allow read: if canOperate() || canManageFinance();
+      allow create: if canManageCommercial();
+      allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    // Notificações internas geradas pelos processos agendados.
+    match /notifications/{id} {
+      allow read: if signedIn() && (
+        owner() ||
+        (resource.data.targetEmail is string && request.auth.token.email.lower() == resource.data.targetEmail.lower())
+      );
+      allow update: if signedIn()
+        && resource.data.targetEmail is string
+        && request.auth.token.email.lower() == resource.data.targetEmail.lower()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read','readAt']);
+      allow create, delete: if false;
+    }
+
     // Agenda pública: visitantes podem solicitar uma visita; só a equipa consulta e gere.
     match /visits/{id} {
       allow create: if request.resource.data.keys().hasAll(['name','phone','service','address','preferDate','preferTime'])
