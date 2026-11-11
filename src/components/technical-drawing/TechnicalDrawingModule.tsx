@@ -317,21 +317,72 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     return () => unsub();
   }, [authReady]);
 
+  const loadApprovedDrawingSnapshot = async (snapshotId: string) => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error("Faça login novamente para consultar o desenho aprovado.");
+    const response = await fetch("/api/approved-snapshot?snapshotId=" + encodeURIComponent(snapshotId), {
+      headers: { Authorization: "Bearer " + token },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error || "Não foi possível recuperar o snapshot do desenho.");
+    if (data?.type !== "drawing" || !data?.document) throw new Error("Snapshot de desenho inválido.");
+    return data;
+  };
+
+  const handleApproveDrawing = async () => {
+    if (!drawing?.id || !drawing.pieces?.length) return;
+    if (drawing.approvedSnapshotId) {
+      showToast("Este desenho já está aprovado e bloqueado para fabricação.", "warning");
+      return;
+    }
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre novamente para aprovar o desenho.");
+      const saved = await handleSaveDrawing(drawing, true);
+      if (!saved) throw new Error("Salve o desenho antes de aprová-lo.");
+      const token = await user.getIdToken();
+      const response = await fetch("/api/approved-snapshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ type: "drawing", documentId: drawing.id, senderSnapshot: senderConfig }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || "Não foi possível aprovar o desenho.");
+      const approved = { ...result.snapshot.document, approvedSnapshotId: result.snapshotId } as TechnicalDrawing;
+      setDrawing(approved);
+      setSavedDrawings((previous) => previous.map((item) => item.id === approved.id ? approved : item));
+      showToast("Plano aprovado. Snapshot imutável criado e liberado para fabricação.", "success");
+    } catch (error) {
+      console.error("Technical drawing approval failed:", error);
+      showToast((error as Error).message || "Falha ao aprovar o desenho.", "error");
+    }
+  };
+
   const handleOpenDrawingPdf = async (targetDrawing?: TechnicalDrawing) => {
-    // Sempre regenerar a partir dos dados editáveis atuais; nunca reutilizar PDF antigo/desatualizado.
     const source = targetDrawing || drawing;
     try {
-      const pdf = buildTechnicalDrawingPdf(source, senderConfig);
-      const target = { ...source, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb };
-      setDrawing(target);
+      let pdfSource = source;
+      let pdfSender = senderConfig;
+      if (source.approvedSnapshotId) {
+        const snapshot = await loadApprovedDrawingSnapshot(source.approvedSnapshotId);
+        pdfSource = snapshot.document as TechnicalDrawing;
+        pdfSender = snapshot.senderSnapshot || {};
+      }
+      const pdf = buildTechnicalDrawingPdf(pdfSource, pdfSender);
+      const target = { ...pdfSource, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb };
+      if (drawing.id === target.id) setDrawing(target);
       setIsPdfModalOpen(true);
     } catch (error) {
-      console.error("Could not build drawing preview PDF:", error);
-      showToast("Não foi possível preparar a pré-visualização PDF.", "error");
+      console.error("Could not build drawing PDF from its approved snapshot:", error);
+      showToast((error as Error).message || "Não foi possível preparar a pré-visualização PDF.", "error");
     }
   };
 
   const handleSaveDrawing = async (targetDrawing: TechnicalDrawing = drawing, silent = false): Promise<boolean> => {
+    if (targetDrawing.approvedSnapshotId || targetDrawing.status === "APPROVED_FOR_MANUFACTURING") {
+      if (!silent) showToast("Desenho aprovado: edição bloqueada. Duplique o projeto para criar uma nova revisão.", "warning");
+      return false;
+    }
     const user = auth.currentUser;
     if (!user) {
       if (!silent) showToast("Faça login novamente para salvar o projeto técnico.", "error");
@@ -377,6 +428,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   };
 
   const handleDeleteDrawing = async (item: TechnicalDrawing) => {
+    if (item.approvedSnapshotId || item.status === "APPROVED_FOR_MANUFACTURING") { showToast("Um desenho aprovado não pode ser excluído. Preserve o histórico industrial.", "warning"); return; }
     if (!auth.currentUser) { showToast("Faça login novamente para excluir o desenho.", "error"); return; }
     if (!window.confirm("Deseja excluir definitivamente o desenho “" + item.title + "”? Esta ação não pode ser desfeita.")) return;
     try {
@@ -478,6 +530,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         budget: responseBody.budget,
+        isDraft: true,
+        status: "PRELIMINARY_CONTINGENCY",
+        draftStatus: "preliminary",
+        draftLabel: "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN",
       };
       if (generationWarning || responseBody.draftStatus === "preliminary") {
         (generated as any).draftStatus = "preliminary";
