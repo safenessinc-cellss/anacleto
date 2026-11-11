@@ -46,6 +46,10 @@ export interface AIAuditContext {
   authorizationToken?: string;
 }
 const sha256 = (value: unknown): string => createHash("sha256").update(stableJson(value)).digest("hex");
+function safeTokenCount(primary?: number, fallback?: number): number {
+  const value = Number(primary ?? fallback ?? 0);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
   if (Array.isArray(value)) return "[" + value.map(stableJson).join(",") + "]";
@@ -94,8 +98,8 @@ export async function recordAIAudit(context: AIAuditContext): Promise<AIAuditRec
     timestamp: new Date().toISOString(),
     serviceName: context.serviceName,
     modelUsed: context.modelUsed,
-    promptTokens: Number(context.usage?.promptTokens ?? context.usage?.inputTokens ?? 0),
-    completionTokens: Number(context.usage?.completionTokens ?? context.usage?.outputTokens ?? 0),
+    promptTokens: safeTokenCount(context.usage?.promptTokens, context.usage?.inputTokens),
+    completionTokens: safeTokenCount(context.usage?.completionTokens, context.usage?.outputTokens),
     inputHash: sha256(context.input),
     outputHash: sha256(context.error ? { error: String(context.error) } : context.output ?? null),
     actorUid: context.actorUid,
