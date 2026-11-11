@@ -363,7 +363,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           message: userText,
           currentQuote: {
             id: selectedQuote.id, number: selectedQuote.number, clientName: selectedQuote.clientName,
-            items: selectedQuote.items.map(item => ({ id: item.id, description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
+            items: selectedQuote.items.map(item => ({ id: item.id, itemId: item.itemId || "", catalogItemId: (item as any).catalogItemId || "", sku: (item as any).sku || "", description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
             subtotal: selectedQuote.subtotal, taxRate: selectedQuote.taxRate, discountRate: selectedQuote.discountRate || 0,
             total: selectedQuote.total, currency: selectedQuote.currency, notes: selectedQuote.notes || "",
           },
@@ -406,11 +406,14 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         // If items are brand new or appended
         updated.items = data.items.map((it: any, idx: number) => ({
           id: it.id || `it_${idx + 1}`,
+          itemId: it.itemId || undefined,
+          catalogItemId: it.catalogItemId || undefined,
+          sku: it.sku || undefined,
           description: it.description,
           quantity: Number(it.quantity || 1),
           unitPrice: Number(it.unitPrice || 0),
           subtotal: Number((Number(it.quantity || 1) * Number(it.unitPrice || 0)).toFixed(2)),
-          notes: it.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : "Preço confirmado no catálogo.",
+          notes: it.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : it.priceSource === "existing" ? "Preço existente preservado; confirme o cadastro no catálogo." : "Preço confirmado no catálogo.",
         }));
       }
 
