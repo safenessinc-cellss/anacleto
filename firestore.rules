@@ -182,16 +182,6 @@ service cloud.firestore {
       allow create: if owner() || hasRole(['super_admin','super_usuario','ceo','admin']);
       allow update, delete: if owner();
     }
-    match /ai_audit_logs/{id} {
-      allow read: if hasRole(['super_admin','super_usuario','ceo','admin']);
-      allow create: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
-      allow update, delete: if false;
-    }
-    match /budget_line_audit/{id} {
-      allow read: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
-      allow create: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
-      allow update, delete: if false;
-    }
     match /sender_config/{id} { allow read: if canOperate(); allow create, update: if hasRole(['super_admin','super_usuario','ceo','admin']); allow delete: if owner(); }
 
     // Negação por padrão: nenhuma coleção não declarada fica acessível por estar autenticado.
