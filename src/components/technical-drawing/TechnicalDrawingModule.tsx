@@ -772,6 +772,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                     key={item.id}
                     onClick={() => {
                       setDrawing(item);
+                      setSelectedProjectId(item.projectId || "");
                       setCurrentStep(1);
                       showToast(`Cargado proyecto: ${item.title}`, "info");
                     }}
@@ -782,7 +783,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                     }`}
                   >
                     <div className="flex items-start justify-between gap-1">
-                      <h5 className="text-xs font-bold truncate flex-1">{item.title}</h5>
+                      <div className="min-w-0 flex-1"><h5 className="text-xs font-bold truncate">{item.title}</h5><p className="mt-1 truncate text-[10px] text-slate-500">{item.projectName || "Sem projeto associado"}</p></div>
                       {item.pdfDataUri && (
                         <button
                           onClick={(e) => {
