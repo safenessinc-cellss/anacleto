@@ -19,15 +19,17 @@ import {
   Hammer,
   Scissors,
   Check,
-  Eye
+  Eye,
+  Trash2
 } from "lucide-react";
 import { TechnicalDrawing, SenderConfig } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
-import { addDoc, collection, doc, setDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { addDoc, collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
-import { db } from "../../firebase";
+import { db, storage } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
 
@@ -298,50 +300,41 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   }, [authReady]);
 
   const handleOpenDrawingPdf = async (targetDrawing?: TechnicalDrawing) => {
-    let target = targetDrawing || drawing;
-    if (!target.pdfDataUri) {
-      try {
-        const pdfRes = buildTechnicalDrawingPdf(target, senderConfig);
-        target = {
-          ...target,
-          pdfDataUri: pdfRes.dataUri,
-          pdfFileName: pdfRes.fileName,
-          pdfGeneratedAt: new Date().toISOString(),
-          pdfFileSizeKb: pdfRes.sizeKb,
-          updatedAt: new Date().toISOString(),
-        };
-        setDrawing(target);
-        await setDoc(doc(db, "technical_drawings", target.id), target);
-      } catch (err) {
-        console.warn("Could not pre-build drawing PDF:", err);
-      }
-    }
-    setIsPdfModalOpen(true);
+    const target = targetDrawing || drawing;
+    if (!target.pdfDataUri && !(target as any).pdfUrl) { showToast("Este desenho ainda não possui PDF salvo.", "warning"); return; }
+    setDrawing(target); setIsPdfModalOpen(true);
   };
 
   const handleSaveDrawing = async () => {
+    const user = auth.currentUser;
+    if (!user) { showToast("Entre novamente para salvar o PDF.", "error"); return; }
     setIsSaving(true);
     try {
       const pdfRes = buildTechnicalDrawingPdf(drawing, senderConfig);
-      const updated: TechnicalDrawing = {
-        ...drawing,
-        pdfDataUri: pdfRes.dataUri,
-        pdfFileName: pdfRes.fileName,
-        pdfGeneratedAt: new Date().toISOString(),
-        pdfFileSizeKb: pdfRes.sizeKb,
-        updatedAt: new Date().toISOString(),
-      };
-      setDrawing(updated);
-      await setDoc(doc(db, "technical_drawings", drawing.id), updated);
-      showToast("Desenho técnico e PDF salvos com sucesso na plataforma.", "success");
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao salvar no Firestore.", "error");
-    } finally {
-      setIsSaving(false);
-    }
+      const blob = await (await fetch(pdfRes.dataUri)).blob();
+      const path = "technical-drawings/" + user.uid + "/" + drawing.id + ".pdf";
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, blob, { contentType: "application/pdf", customMetadata: { ownerUid: user.uid, drawingId: drawing.id } });
+      const pdfUrl = await getDownloadURL(fileRef);
+      const metadata = { id: drawing.id, title: drawing.title, description: drawing.description || "", projectId: drawing.projectId || "", projectName: drawing.projectName || "", category: drawing.category, unit: drawing.unit, overallDimensions: drawing.overallDimensions || null, createdAt: drawing.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), pdfUrl, pdfStoragePath: path, pdfFileName: pdfRes.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdfRes.sizeKb, storageFormat: "pdf-only" };
+      await setDoc(doc(db, "technical_drawings", drawing.id), metadata);
+      setDrawing({ ...drawing, pdfUrl, pdfStoragePath: path, pdfFileName: pdfRes.fileName, pdfFileSizeKb: pdfRes.sizeKb } as TechnicalDrawing);
+      showToast("PDF técnico armazenado. O desenho editável não foi guardado.", "success");
+    } catch (err) { console.error("Drawing PDF storage failed:", err); showToast("Não foi possível armazenar o PDF. Verifique as permissões.", "error"); }
+    finally { setIsSaving(false); }
   };
 
+  const handleDeleteDrawing = async (item: TechnicalDrawing) => {
+    if (!auth.currentUser) { showToast("Entre novamente para eliminar o PDF.", "error"); return; }
+    if (!window.confirm("Eliminar definitivamente o PDF “" + item.title + "” e o respetivo registo?")) return;
+    try {
+      const storedPath = (item as any).pdfStoragePath;
+      if (storedPath) { try { await deleteObject(storageRef(storage, storedPath)); } catch (storageError: any) { if (storageError?.code !== "storage/object-not-found") throw storageError; } }
+      await deleteDoc(doc(db, "technical_drawings", item.id));
+      if (drawing.id === item.id) { setDrawing(initialSampleDrawing); setCurrentStep(1); setIsPdfModalOpen(false); }
+      showToast("PDF e registo eliminados.", "success");
+    } catch (err) { console.error("Drawing delete failed:", err); showToast("Não foi possível eliminar o desenho.", "error"); }
+  };
   const handleGenerate = async (presetPrompt?: string) => {
     const inputPrompt = (presetPrompt || prompt).trim();
     if (!inputPrompt) {
