@@ -24,7 +24,7 @@ import {
 import { TechnicalDrawing, SenderConfig } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
-import { collection, doc, setDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { addDoc, collection, doc, setDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
 import { db } from "../../firebase";
@@ -398,7 +398,17 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     try {
       if (!generated) throw new Error("Não foi possível montar o desenho técnico.");
-      const selectedProject = projects.find((project) => project.id === selectedProjectId);
+      let selectedProject = projects.find((project) => project.id === selectedProjectId);
+      if (!selectedProject && auth.currentUser) {
+        const now = new Date().toISOString();
+        const projectRef = await addDoc(collection(db, "projects"), {
+          name: generated.title, category: generated.category, status: "Em andamento",
+          notes: generated.description, client: "", ownerUid: auth.currentUser.uid,
+          createdAt: now, updatedAt: now
+        });
+        selectedProject = { id: projectRef.id, name: generated.title };
+        setSelectedProjectId(projectRef.id);
+      }
       generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
       setDrawing(generated);
       setCurrentStep(1);
