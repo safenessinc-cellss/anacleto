@@ -177,6 +177,15 @@ export interface TechnicalDrawing {
     depth?: number;
   };
   pieces: TechnicalPiece[];
+  // Geometria vetorial específica gerada a partir do prompt, usada na tela e no PDF.
+  visualElements?: Array<Record<string, any>>;
+  modelDescription?: string;
+  finalAppearance?: string;
+  measurementPlan?: Array<Record<string, any>>;
+  cuttingPlan?: Array<Record<string, any>>;
+  manufacturingSteps?: Array<Record<string, any>>;
+  qualityChecklist?: string[];
+  assumptions?: string[];
   dimensionLines: DimensionLine[];
   assemblyInstructions: string[];
   steps: TechnicalDrawingStep[];
