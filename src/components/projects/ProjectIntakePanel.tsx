@@ -14,7 +14,8 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const safeName = (name: string) => name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(-100) || "arquivo";
 
 export default function ProjectIntakePanel({ onCreated }: Props) {
-  const picker = useRef<HTMLInputElement>(null);\n  const cameraPicker = useRef<HTMLInputElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const cameraPicker = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [name, setName] = useState("");
   const [client, setClient] = useState("");
@@ -115,7 +116,8 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
       };
       await setDoc(projectRef, project);
       setFiles([]); setName(""); setClient(""); setDescription(""); setSourceUrl("");
-      if (picker.current) picker.current.value = "";\n      if (cameraPicker.current) cameraPicker.current.value = "";
+      if (picker.current) picker.current.value = "";
+      if (cameraPicker.current) cameraPicker.current.value = "";
       setNotice(`Projeto "${projectName}" criado com ${assets.length} anexo(s)/referência(s).`);
       onCreated?.(projectRef.id);
     } catch (e) {
