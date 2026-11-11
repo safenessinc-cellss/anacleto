@@ -831,7 +831,12 @@ const handleAddItem = () => {
                           id: Math.random().toString(36).substring(2),
                           description: item.name + (item.sku ? " (" + item.sku + ")" : "") + (item.width || item.height || item.depth ? " · " + [item.width,item.height,item.depth].filter(Boolean).join(" × ") + " mm" : ""),
                           quantity: 1,
-                          unitPrice: item.price,
+                          unitPrice: Number(item.price || 0),
+                          itemId: item.itemId || (item.source === "registry_items" ? item.id : undefined),
+                          catalogSource: item.source,
+                          itemPhotoUrl: item.itemPhotoUrls?.[0],
+                          itemCategory: item.category,
+                          itemDimensions: [item.width,item.height,item.depth].filter(Boolean).join(" × "),
                         };
                         if (selectedQuote) {
                           setSelectedQuote({ ...selectedQuote, items: [...selectedQuote.items, newItem], updatedAt: new Date().toISOString() });
@@ -841,7 +846,7 @@ const handleAddItem = () => {
                       }}
                       className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 rounded flex justify-between"
                     >
-                      <span><strong>{item.sku || "Sem código"}</strong> — {item.name}{item.supplier ? " · " + item.supplier : ""}</span>
+                      <span className="flex min-w-0 items-center gap-2">{item.itemPhotoUrls?.[0] && <img src={item.itemPhotoUrls[0]} alt="" className="h-10 w-10 rounded object-cover"/>}<span><strong>{item.sku || "Sem código"}</strong> — {item.name}{item.supplier ? " · " + item.supplier : ""}{item.width || item.height || item.depth ? <small className="block text-slate-500">{[item.width,item.height,item.depth].filter(Boolean).join(" × ")} mm</small> : null}</span></span>
                       <span className="font-bold text-indigo-600">R$ {item.price?.toFixed(2)}</span>
                     </button>
                   ))}
@@ -866,6 +871,7 @@ const handleAddItem = () => {
                         key={item.id}
                         className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center gap-3"
                       >
+                        {item.itemPhotoUrl && <button type="button" onClick={() => setItemPhotoViewer([item.itemPhotoUrl!])} className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-700"><img src={item.itemPhotoUrl} alt={"Foto de " + item.description} className="h-full w-full object-cover"/></button>}
                         <input
                           type="text"
                           value={item.description}
