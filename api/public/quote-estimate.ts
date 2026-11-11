@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "../../src/server/ai-config";
+import { parseAIJson } from "../../src/server/ai-json";
 
 type RateState = { count: number; resetAt: number };
 const localWindows = new Map<string, RateState>();
@@ -23,9 +24,10 @@ async function consumePublicQuota(ip: string): Promise<boolean> {
       signal: AbortSignal.timeout(2500),
     });
     if (!response.ok) throw new Error("Distributed public rate limiter unavailable.");
-    const result = await response.json() as { result?: Array<{ result?: number }> };
-    return Number(result.result?.[0]?.result || 0) <= 3;
+    const result = await response.json() as Array<{ result?: number }>;
+    return Number(result[0]?.result || 0) <= 3;
   }
+  if (process.env.NODE_ENV === "production") throw new Error("Public quote rate limiting requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.");
   const now = Date.now();
   for (const [key, value] of localWindows) if (now >= value.resetAt) localWindows.delete(key);
   const current = localWindows.get(ip);
@@ -57,8 +59,16 @@ export default async function handler(req: any, res: any) {
       abortSignal: AbortSignal.timeout(AI_CONFIG.publicEstimate.timeoutMs),
     });
     let estimate: Record<string, unknown>;
-    try { estimate = JSON.parse(result.text); }
-    catch { return send(res, 502, { error: "Não foi possível estruturar a pré-avaliação. Tente novamente." }); }
+    try {
+      estimate = parseAIJson(result.text, (value: any) => {
+        if (!value || typeof value !== "object" || Array.isArray(value) ||
+            typeof value.scopeSummary !== "string" || !Array.isArray(value.questions) ||
+            typeof value.disclaimer !== "string") throw new Error("Invalid public estimate response schema.");
+        return value as Record<string, unknown>;
+      });
+    } catch {
+      return send(res, 502, { error: "Não foi possível estruturar a pré-avaliação. Tente novamente." });
+    }
     return send(res, 200, {
       type: "NON_BINDING_PRE_ESTIMATE",
       estimate,
