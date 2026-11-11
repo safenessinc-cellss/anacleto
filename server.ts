@@ -481,7 +481,7 @@ app.get("/api/ai/technical-drawing/jobs/:jobId", requireFirebaseAuth, async (req
     if (!user || !["super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role || "")) {
       return res.status(403).json({ error: "Sem permissão para consultar tarefas técnicas." });
     }
-    const job = await getDrawingServiceJob(String(req.params.jobId || ""));
+    const job = await getDrawingServiceJob(String(req.params.jobId || ""), String(req.headers.authorization || ""));
     return res.status(200).json(job);
   } catch (error) {
     console.error("Drawing job lookup failed:", error);
