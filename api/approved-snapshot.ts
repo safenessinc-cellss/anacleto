@@ -1,0 +1,214 @@
+import { createHash, randomUUID } from "node:crypto";
+import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
+import { AI_CONFIG } from "../src/server/ai-config";
+
+type AuthUser = { uid: string; email: string; role: string };
+const OWNER_EMAIL = "safeness.c.a@gmail.com";
+const base = () => {
+  const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
+  return "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/" + databaseId + "/documents";
+};
+function send(res: any, status: number, body: unknown) {
+  res.setHeader?.("Cache-Control", "no-store");
+  return res.status(status).json(body);
+}
+function tokenOf(req: any) {
+  const value = String(req.headers?.authorization || "");
+  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
+}
+async function authenticate(req: any): Promise<AuthUser | null> {
+  const token = tokenOf(req);
+  const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
+  if (!token || !apiKey) return null;
+  const identity = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + apiKey, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: token }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!identity.ok) return null;
+  const data = await identity.json() as { users?: Array<{ localId?: string; email?: string }> };
+  const account = data.users?.[0];
+  if (!account?.localId || !account.email) return null;
+  const email = account.email.toLowerCase();
+  if (email === OWNER_EMAIL) return { uid: account.localId, email, role: "owner" };
+  const roleResponse = await fetch(base() + "/admins/" + encodeURIComponent(email), {
+    headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(10000),
+  });
+  if (!roleResponse.ok) return null;
+  const roleDoc = await roleResponse.json() as any;
+  const role = roleDoc.fields?.role?.stringValue;
+  return role ? { uid: account.localId, email, role } : null;
+}
+function decodeValue(value: any): any {
+  if (!value || typeof value !== "object") return value;
+  if ("stringValue" in value) return value.stringValue;
+  if ("integerValue" in value) return Number(value.integerValue);
+  if ("doubleValue" in value) return value.doubleValue;
+  if ("booleanValue" in value) return value.booleanValue;
+  if ("nullValue" in value) return null;
+  if ("timestampValue" in value) return value.timestampValue;
+  if ("arrayValue" in value) return (value.arrayValue?.values || []).map(decodeValue);
+  if ("mapValue" in value) return decodeFields(value.mapValue?.fields || {});
+  return value;
+}
+function decodeFields(fields: Record<string, any> = {}) {
+  return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, decodeValue(value)]));
+}
+function encodeValue(value: any): any {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(encodeValue) } };
+  if (typeof value === "object") return { mapValue: { fields: encodeFields(value) } };
+  return { stringValue: String(value) };
+}
+function encodeFields(value: Record<string, any>) {
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, encodeValue(item)]));
+}
+async function readDocument(req: any, collection: string, id: string) {
+  const result = await fetch(base() + "/" + collection + "/" + encodeURIComponent(id), {
+    headers: { Authorization: "Bearer " + tokenOf(req) }, signal: AbortSignal.timeout(12000),
+  });
+  if (result.status === 404) return null;
+  if (!result.ok) throw new Error("Falha ao ler " + collection + " (HTTP " + result.status + ").");
+  const raw = await result.json() as any;
+  return { data: decodeFields(raw.fields || {}), updateTime: raw.updateTime, name: raw.name };
+}
+function stable(value: any): string {
+  if (Array.isArray(value)) return "[" + value.map(stable).join(",") + "]";
+  if (value && typeof value === "object") return "{" + Object.keys(value).sort().map(key => JSON.stringify(key) + ":" + stable(value[key])).join(",") + "}";
+  return JSON.stringify(value);
+}
+function digest(value: any) {
+  return createHash("sha256").update(stable(value)).digest("hex");
+}
+function catalogMatch(item: any, catalog: any[]) {
+  const id = String(item?.catalogItemId || item?.itemId || "").trim();
+  const sku = String(item?.sku || item?.code || "").trim().toLowerCase();
+  if (!id && !sku) return null;
+  return catalog.find((row: any) => {
+    const idMatch = !!id && String(row.id || "") === id;
+    const skuMatch = !!sku && String(row.sku || row.code || "").trim().toLowerCase() === sku;
+    return id && sku ? idMatch && skuMatch : id ? idMatch : skuMatch;
+  }) || null;
+}
+async function loadCatalog(req: any) {
+  const result = await fetch(base() + "/catalog?pageSize=1000", {
+    headers: { Authorization: "Bearer " + tokenOf(req) }, signal: AbortSignal.timeout(12000),
+  });
+  if (!result.ok) throw new Error("Catálogo indisponível (HTTP " + result.status + ").");
+  const payload = await result.json() as any;
+  return (payload.documents || []).map((doc: any) => ({
+    id: String(doc.name || "").split("/").pop(), ...decodeFields(doc.fields || {}),
+  }));
+}
+function canApprove(user: AuthUser, type: "quote" | "drawing") {
+  if (user.role === "owner") return true;
+  const quoteRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"];
+  const drawingRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "qualidade", "producao"];
+  return (type === "quote" ? quoteRoles : drawingRoles).includes(user.role);
+}
+async function commitSnapshot(req: any, collection: string, documentId: string, updateTime: string, snapshot: any) {
+  const snapshotId = (collection === "quotes" ? "quote_" : "drawing_") + documentId + "_" + randomUUID();
+  const snapshotName = base() + "/approved_snapshots/" + snapshotId;
+  const sourceName = base() + "/" + collection + "/" + encodeURIComponent(documentId);
+  const now = new Date().toISOString();
+  const sourceUpdate = collection === "quotes"
+    ? { status: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now }
+    : { isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now };
+  const writes = [
+    { update: { name: snapshotName, fields: encodeFields(snapshot) }, currentDocument: { exists: false } },
+    { update: { name: sourceName, fields: encodeFields(sourceUpdate) }, updateMask: { fieldPaths: Object.keys(sourceUpdate) }, currentDocument: { updateTime } },
+  ];
+  const result = await fetch(base() + ":commit", {
+    method: "POST", headers: { Authorization: "Bearer " + tokenOf(req), "Content-Type": "application/json" },
+    body: JSON.stringify({ writes }), signal: AbortSignal.timeout(15000),
+  });
+  if (!result.ok) {
+    const detail = await result.text();
+    throw new Error("Não foi possível congelar a aprovação (HTTP " + result.status + "): " + detail.slice(0, 400));
+  }
+  return snapshotId;
+}
+
+export default async function handler(req: any, res: any) {
+  try {
+    const user = await authenticate(req);
+    if (!user) return send(res, 401, { error: "Autenticação obrigatória ou sessão expirada." });
+    if (req.method === "GET") {
+      const snapshotId = String(req.query?.snapshotId || "").trim();
+      if (!snapshotId || snapshotId.length > 300 || snapshotId.includes("/")) return send(res, 400, { error: "snapshotId inválido." });
+      const found = await readDocument(req, "approved_snapshots", snapshotId);
+      if (!found) return send(res, 404, { error: "Instantânea aprovada não encontrada." });
+      return send(res, 200, found.data);
+    }
+    if (req.method !== "POST") {
+      res.setHeader?.("Allow", "GET, POST");
+      return send(res, 405, { error: "Método não permitido." });
+    }
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const type = body?.type;
+    const documentId = String(body?.documentId || "").trim();
+    if (!["quote", "drawing"].includes(type) || !documentId || documentId.length > 180 || documentId.includes("/")) {
+      return send(res, 400, { error: "Dados de aprovação inválidos." });
+    }
+    if (!canApprove(user, type)) return send(res, 403, { error: "Seu perfil não pode aprovar este documento." });
+    const collection = type === "quote" ? "quotes" : "technical_drawings";
+    const found = await readDocument(req, collection, documentId);
+    if (!found) return send(res, 404, { error: "Documento não encontrado." });
+    const source = found.data;
+    if (source.approvedSnapshotId) return send(res, 409, { error: "Documento já congelado e bloqueado.", snapshotId: source.approvedSnapshotId });
+
+    let snapshot: any;
+    if (type === "quote") {
+      if (!Array.isArray(source.items) || source.items.length === 0) return send(res, 422, { error: "O orçamento não possui itens." });
+      const catalog = await loadCatalog(req);
+      const reviewedItems = source.items.map((item: any) => {
+        const price = Number(item.unitPrice);
+        if (!Number.isFinite(price) || price < 0) throw new Error("Preço inválido no orçamento.");
+        const match = catalogMatch(item, catalog);
+        if (item.catalogItemId || item.sku || item.itemId) {
+          if (!match) throw new Error("SKU/ID sem correspondência no catálogo: " + (item.sku || item.catalogItemId || item.itemId));
+          const catalogPrice = Number(match.price);
+          if (match.price === undefined || match.price === null || String(match.price).trim() === "" || !Number.isFinite(catalogPrice) || catalogPrice < 0 || catalogPrice !== price) {
+            throw new Error("Preço não corresponde ao catálogo atual para " + (item.sku || match.id) + ".");
+          }
+          return { ...item, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice, catalogItemId: match.id, sku: String(match.sku || match.code || item.sku || "") };
+        }
+        if (item.priceSource === "pending") throw new Error("O item " + item.description + " tem preço pendente.");
+        return { ...item, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
+      });
+      const subtotal = Number(reviewedItems.reduce((sum: number, item: any) => sum + item.quantity * item.unitPrice, 0).toFixed(2));
+      const discountRate = Number(source.discountRate || 0);
+      const taxRate = Number(source.taxRate || 0);
+      if (![discountRate, taxRate].every(value => Number.isFinite(value) && value >= 0 && value <= 100)) return send(res, 422, { error: "Impostos ou descontos inválidos." });
+      const discountAmount = Number((subtotal * discountRate / 100).toFixed(2));
+      const taxAmount = Number((Math.max(0, subtotal - discountAmount) * taxRate / 100).toFixed(2));
+      const total = Number((subtotal - discountAmount + taxAmount).toFixed(2));
+      snapshot = {
+        schemaVersion: 1, type: "quote", documentId, documentNumber: source.number || "", status: "approved",
+        approvedAt: new Date().toISOString(), approvedBy: { uid: user.uid, email: user.email, role: user.role },
+        document: { ...source, items: reviewedItems, subtotal, discountAmount, taxAmount, total, status: "approved" },
+        modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.quote.model, capability: "quote", capturedAt: new Date().toISOString() },
+      };
+    } else {
+      if (!Array.isArray(source.pieces) || source.pieces.length === 0) return send(res, 422, { error: "O desenho não possui componentes." });
+      if (source.status === "APPROVED_FOR_MANUFACTURING") return send(res, 409, { error: "O desenho já foi aprovado." });
+      const budgetItems = Array.isArray(source.budget?.items) ? source.budget.items : [];
+      if (budgetItems.some((item: any) => item.priceSource === "pending")) return send(res, 422, { error: "O desenho contém preços pendentes; revise antes de aprovar." });
+      snapshot = {
+        schemaVersion: 1, type: "drawing", documentId, documentNumber: source.title || "", status: "APPROVED_FOR_MANUFACTURING",
+        approvedAt: new Date().toISOString(), approvedBy: { uid: user.uid, email: user.email, role: user.role },
+        document: { ...source, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved" },
+        modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing", capturedAt: new Date().toISOString() },
+        drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [] },
+      };
+    }
+    snapshot.contentHash = digest(snapshot);
+    const snapshotId = await commitSnapshot(req, collection, documentId, found.updateTime, snapshot);
+    return send(res, 201, { snapshotId, snapshot, immutable: true });
+  } catch (error: any) {
+    console.error("Approved snapshot operation failed:", error?.message || error);
+    return send(res, 422, { error: error?.message || "Não foi possível aprovar e congelar o documento." });
+  }
+}
