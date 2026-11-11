@@ -312,12 +312,12 @@ export default async function handler(req: any, res: any) {
           if (match.price === undefined || match.price === null || !Number.isFinite(catalogPrice) || catalogPrice < 0 || catalogPrice !== Number(item.unitPrice)) {
             throw new Error("Preço do orçamento técnico não corresponde ao catálogo.");
           }
-          return { ...item, quantity, unitPrice: catalogPrice, priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice };
+          return { ...item, quantity, unitPrice: catalogPrice, subtotal: Number((quantity * catalogPrice).toFixed(2)), priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice };
         }
         const manualPrice = Number(item.unitPrice);
         if (!Number.isFinite(manualPrice) || manualPrice < 0 || manualPrice > 1000000000) throw new Error("Preço manual inválido no orçamento técnico.");
         if (!canApproveManualPrice(user)) throw new Error("Somente direção/Financeiro pode aprovar manualmente preços sem SKU cadastrado.");
-        return { ...item, quantity, unitPrice: manualPrice, priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
+        return { ...item, quantity, unitPrice: manualPrice, subtotal: Number((quantity * manualPrice).toFixed(2)), priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
       const approvedAt = new Date().toISOString();
       const cleanVisualElements = (Array.isArray(source.visualElements) ? source.visualElements : []).filter((element: any) => element?.id !== "anacleto-draft-watermark");
