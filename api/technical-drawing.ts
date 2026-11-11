@@ -1,7 +1,7 @@
 import { generateText, gateway } from "ai";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
-type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[] };
+type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
 type WindowEntry = { startedAt: number; count: number };
 const windows = new Map<string, WindowEntry>();
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
@@ -142,6 +142,12 @@ export default async function handler(req: any, res: any) {
     }
 
     const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 200) : [];
+    const currentDrawing = body.currentDrawing && typeof body.currentDrawing === "object" &&
+      !Array.isArray(body.currentDrawing) && body.currentDrawing.id !== "draw-sample-01"
+      ? JSON.stringify(body.currentDrawing).slice(0, 18000)
+      : "";
+    const isEditRequest = /\b(altere|alterar|ajuste|ajustar|modifique|modificar|adicione|adicionar|remova|remover|mude|mudar|substitua|substituir|corrija|corrigir|aumente|aumentar|reduza|reduzir|change|update|modify|add|remove|replace|adjust|cambia|cambiar|modifica|modificar|agrega|agregar|quita|quitar)\b/i.test(prompt);
+    const drawingContext = currentDrawing && isEditRequest ? currentDrawing : "";
     const imageUrls = Array.isArray(body.images) ? body.images.slice(0, 4) : [];
     const allowedImageUrls: URL[] = [];
     for (const value of imageUrls) {
@@ -169,7 +175,7 @@ export default async function handler(req: any, res: any) {
     }
 
     stage = "ai_generation";
-    const system = `Você é o engenheiro de produto e fabricação da Anacleto Pro. Gere somente JSON válido, sem markdown. Inclua: title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array), steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions), measurementPlan (array de {point,method,tool,checks}), cuttingPlan (array de {pieceNumber,name,material,quantity,length,width,thickness,unit,cutAngle,notes}), manufacturingSteps (array de {step,title,instructions,qualityGate}), modelDescription (string), finalAppearance (string), qualityChecklist (array de strings), assumptions (array de strings). Preserve rigorosamente as dimensões e unidade informadas pelo usuário; não substitua nem estime dimensões ausentes. NÃO invente fórmulas de perfis, descontos, folgas, espessuras, tolerâncias, códigos ou ângulos de corte. Quando faltarem dados, use valores vazios/zero e liste a pendência em assumptions; qualquer lista de corte será preliminar até validar sistema, ferragens e tabelas oficiais do fabricante. Use o catálogo quando aplicável: ${JSON.stringify(catalog)}.`;
+    const system = `Você é o engenheiro de produto, projetista e especialista em fabricação da Anacleto Pro. Interprete a solicitação inteira, não apenas palavras-chave. Identifique produto, material, tipo de abertura/encaixe, quantidade de folhas/portas, divisões, posição dos componentes e todas as dimensões explicitamente informadas. Diferencie largura, altura e profundidade conforme o produto; para móveis, não confunda profundidade com altura. Preserve a unidade original e converta somente quando o usuário pedir. Se o usuário solicitar alteração de um desenho existente, modifique somente os pontos pedidos e preserve os demais dados e componentes existentes; não reinicie o projeto. Se for um novo projeto, não reutilize o desenho anterior. Nunca invente dimensões, perfis, ferragens, folgas, descontos, espessuras, tolerâncias, fórmulas ou ângulos. Se faltar informação necessária, mantenha o campo vazio/zero e registre pergunta/pendência em assumptions; não apresente suposições como medidas confirmadas. A lista de corte é preliminar até validar sistema, ferragens e tabelas oficiais do fabricante. Gere somente JSON válido, sem markdown, com: title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array), steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions), measurementPlan (array de {point,method,tool,checks}), cuttingPlan (array de {pieceNumber,name,material,quantity,length,width,thickness,unit,cutAngle,notes}), manufacturingSteps (array de {step,title,instructions,qualityGate}), modelDescription (string), finalAppearance (string), qualityChecklist (array de strings), assumptions (array de strings). Use o catálogo quando aplicável: ${JSON.stringify(catalog)}.`;
 
     const result = await generateText({
       model: gateway("openai/gpt-4o-mini"),
@@ -177,7 +183,7 @@ export default async function handler(req: any, res: any) {
       messages: [{
         role: "user",
         content: [
-          { type: "text", text: `Analise também as fotografias e imagens anexadas como referência visual. Extraia apenas cotas legíveis; nunca estime medidas que não estejam indicadas. Se houver conflito entre a descrição e a imagem, liste a divergência em assumptions. Crie o desenho técnico, despiece e cotas para: ${prompt}` },
+          { type: "text", text: `Analise as imagens anexadas como referência visual e extraia somente cotas legíveis. Se houver conflito entre texto e imagem, registre a divergência em assumptions. ${drawingContext ? `DESENHO ATUAL PARA ALTERAÇÃO (preserve tudo que não foi solicitado para mudar): ${drawingContext}. ` : "Trate como um novo projeto. "}Solicitação do usuário: ${prompt}` },
           ...allowedImageUrls.map((image) => ({ type: "image" as const, image })),
         ],
       }],
