@@ -581,7 +581,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     }
   };
 
-    const handleExportPdf = () => {
+    const handleExportPdf = async () => {
     try {
       let source = drawing;
       let sender: SenderConfig | undefined = senderConfig;
