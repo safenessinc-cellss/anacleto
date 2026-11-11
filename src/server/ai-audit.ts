@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import firebaseConfig from "../../firebase-applet-config.json" with { type: "json" };
+import firebaseConfig from "../../firebase-applet-config.json" with { type: "json" };
 
 export type AIAuditServiceName = "BUDGET" | "TECHNICAL_DRAWING";
 export type BudgetLineState = "SUGGESTED_BY_AI" | "REVIEWED_BY_ENGINEER" | "APPROVED_FOR_MANUFACTURING";
