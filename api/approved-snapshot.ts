@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 import { AI_CONFIG } from "../src/server/ai-config";
+import { loadCatalogFromFirestore } from "../src/server/firestore-data";
 
 type AuthUser = { uid: string; email: string; role: string };
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
@@ -101,16 +102,7 @@ function catalogMatch(item: any, catalog: any[]) {
     return id && sku ? idMatch && skuMatch : id ? idMatch : skuMatch;
   }) || null;
 }
-async function loadCatalog(req: any) {
-  const result = await fetch(base() + "/catalog?pageSize=1000", {
-    headers: { Authorization: "Bearer " + tokenOf(req) }, signal: AbortSignal.timeout(12000),
-  });
-  if (!result.ok) throw new Error("Catálogo indisponível (HTTP " + result.status + ").");
-  const payload = await result.json() as any;
-  return (payload.documents || []).map((doc: any) => ({
-    id: String(doc.name || "").split("/").pop(), ...decodeFields(doc.fields || {}),
-  }));
-}
+
 function canApprove(user: AuthUser, type: "quote" | "drawing") {
   if (user.role === "owner") return true;
   const quoteRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"];
@@ -182,7 +174,7 @@ export default async function handler(req: any, res: any) {
     let snapshot: any;
     if (type === "quote") {
       if (!Array.isArray(source.items) || source.items.length === 0) return send(res, 422, { error: "O orçamento não possui itens." });
-      const catalog = await loadCatalog(req);
+      const catalog = await loadCatalogFromFirestore(req);
       const reviewedItems = source.items.map((item: any) => {
         const price = Number(item.unitPrice);
         if (!Number.isFinite(price) || price < 0) throw new Error("Preço inválido no orçamento.");
@@ -220,10 +212,11 @@ export default async function handler(req: any, res: any) {
       const budgetItems = Array.isArray(source.budget?.items) ? source.budget.items : [];
       if (budgetItems.some((item: any) => item.priceSource === "pending")) return send(res, 422, { error: "O desenho contém preços pendentes; revise antes de aprovar." });
       const approvedAt = new Date().toISOString();
+      const { pdfDataUri: _pdfDataUri, pdfUrl: _pdfUrl, pdfStoragePath: _pdfStoragePath, pdfGeneratedAt: _pdfGeneratedAt, pdfFileName: _pdfFileName, pdfFileSizeKb: _pdfFileSizeKb, ...sourceWithoutPdf } = source;
       snapshot = {
         schemaVersion: 1, type: "drawing", documentId, documentNumber: source.title || "", status: "APPROVED_FOR_MANUFACTURING",
         approvedAt, approvedBy: { uid: user.uid, email: user.email, role: user.role },
-        document: { ...source, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedAt, senderSnapshot },
+        document: { ...sourceWithoutPdf, isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedAt, senderSnapshot },
         senderSnapshot,
         modelSignatures: { provider: "Vercel AI Gateway", model: AI_CONFIG.technicalDrawing.model, capability: "technicalDrawing", capturedAt: new Date().toISOString() },
         drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [] },
