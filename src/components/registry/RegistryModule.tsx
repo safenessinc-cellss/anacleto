@@ -5,7 +5,7 @@ import { auth, db, storage } from "../../firebase";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { Check, FileUp, Pencil, Plus, Search, Trash2, X, ImagePlus, ExternalLink, FileText, FileSpreadsheet, FileImage, FileArchive } from "lucide-react";
 import ImageLightbox from "../common/ImageLightbox";
-import PdfPageThumbnails from "../common/PdfPageThumbnails";
+import PdfPageThumbnails, { countPdfPages } from "../common/PdfPageThumbnails";
 import Papa from "papaparse";
 
 export type RegistryKind = "items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials";
@@ -121,7 +121,8 @@ export default function RegistryModule({ kind }: { kind: RegistryKind }) {
         const storagePath = "catalogs/" + recordRef.id + "/" + Date.now() + "-" + safeName;
         const uploaded = await uploadFile(file, storagePath);
         uploadedPaths.push(uploaded.path);
-        catalogFiles.push({ id: crypto.randomUUID(), fileName: file.name, fileType: extensionOf(file.name), mimeType: file.type || "application/octet-stream", size: file.size, storagePath: uploaded.path, downloadUrl: uploaded.url, uploadedAt: new Date().toISOString() });
+        const pageCount = extensionOf(file.name) === "pdf" ? await countPdfPages(file) : undefined;
+        catalogFiles.push({ id: crypto.randomUUID(), fileName: file.name, fileType: extensionOf(file.name), mimeType: file.type || "application/octet-stream", size: file.size, storagePath: uploaded.path, downloadUrl: uploaded.url, ...(pageCount ? { pageCount } : {}), uploadedAt: new Date().toISOString() });
         done++; setUploadProgress(Math.round(done / Math.max(total, 1) * 100));
       }
       for (const file of photoUploads) {
