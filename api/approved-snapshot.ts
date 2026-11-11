@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 import { AI_CONFIG } from "../src/server/ai-config";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data";
-import { recordBudgetLineTransition } from "../src/server/ai-audit";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger";
 
 type AuthUser = { uid: string; email: string; role: string };
@@ -135,9 +134,32 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
         approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now,
         budget: snapshot.document.budget, senderSnapshot: snapshot.senderSnapshot,
       };
+  const lines = collection === "quotes"
+    ? (Array.isArray(snapshot.document.items) ? snapshot.document.items : [])
+    : (Array.isArray(snapshot.document.budget?.items) ? snapshot.document.budget.items : []);
+  const auditWrites = lines.flatMap((line: any) => {
+    const lineId = String(line.id || line.pieceId || line.sku || "");
+    if (!lineId) return [];
+    const common = {
+      quoteId: documentId,
+      documentId,
+      documentType: collection === "quotes" ? "quote" : "drawing",
+      lineId,
+      actorUid: snapshot.approvedBy.uid,
+      actorRole: snapshot.approvedBy.role,
+      snapshotId,
+    };
+    const first = { ...common, id: randomUUID(), timestamp: now, fromState: "SUGGESTED_BY_AI", toState: "REVIEWED_BY_ENGINEER", reason: "Revisão e validação confirmadas no fluxo de aprovação do documento." };
+    const second = { ...common, id: randomUUID(), timestamp: now, fromState: "REVIEWED_BY_ENGINEER", toState: "APPROVED_FOR_MANUFACTURING", reason: "Linha incluída na instantânea imutável aprovada." };
+    return [
+      { update: { name: base() + "/budget_line_audit/" + first.id, fields: encodeFields(first) }, currentDocument: { exists: false } },
+      { update: { name: base() + "/budget_line_audit/" + second.id, fields: encodeFields(second) }, currentDocument: { exists: false } },
+    ];
+  });
   const writes = [
     { update: { name: snapshotName, fields: encodeFields(snapshot) }, currentDocument: { exists: false } },
     { update: { name: sourceName, fields: encodeFields(sourceUpdate) }, updateMask: { fieldPaths: Object.keys(sourceUpdate) }, currentDocument: { updateTime } },
+    ...auditWrites,
   ];
   const result = await fetch(base() + ":commit", {
     method: "POST", headers: { Authorization: "Bearer " + tokenOf(req), "Content-Type": "application/json" },
@@ -310,31 +332,6 @@ export default async function handler(req: any, res: any) {
     snapshot.contentHash = digest(snapshot);
     snapshot.document.snapshotContentHash = snapshot.contentHash;
     const snapshotId = await commitSnapshot(req, collection, documentId, found.updateTime, snapshot);
-    const approvedLines = type === "quote" ? snapshot.document.items : (snapshot.document.budget?.items || []);
-    await Promise.all(approvedLines.map(async (line: any) => {
-      const lineId = String(line.id || line.pieceId || line.sku || "");
-      if (!lineId) return;
-      await recordBudgetLineTransition({
-        quoteId: documentId,
-        lineId,
-        fromState: "SUGGESTED_BY_AI",
-        toState: "REVIEWED_BY_ENGINEER",
-        actorUid: user.uid,
-        actorRole: user.role,
-        reason: "Revisão e validação confirmadas no fluxo de aprovação do documento.",
-        snapshotId,
-      }, tokenOf(req));
-      await recordBudgetLineTransition({
-        quoteId: documentId,
-        lineId,
-        fromState: "REVIEWED_BY_ENGINEER",
-        toState: "APPROVED_FOR_MANUFACTURING",
-        actorUid: user.uid,
-        actorRole: user.role,
-        reason: "Linha incluída na instantânea imutável aprovada.",
-        snapshotId,
-      }, tokenOf(req));
-    }));
     return send(res, 201, { snapshotId, snapshot, immutable: true });
   } catch (error: any) {
     console.error("Approved snapshot operation failed:", error?.message || error);
