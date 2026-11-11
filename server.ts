@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "./src/server/ai-config";
 import { generateValidatedJson, parseAIJson } from "./src/server/ai-json";
+import { loadCatalogFromFirestore, loadQuoteFromFirestore } from "./src/server/firestore-data";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -173,9 +174,12 @@ function findExactCatalogItem(item: any, catalog: any[]) {
 app.post("/api/ai/quote-agent", requireFirebaseAuth, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
   try {
     const message = String(req.body?.message || "").trim();
-    const currentQuote = req.body?.currentQuote || {};
+    const requestedQuote = req.body?.currentQuote || {};
+    const currentQuote = requestedQuote && typeof requestedQuote === "object" ? requestedQuote : {};
+    const storedQuote = await loadQuoteFromFirestore(req, currentQuote.id);
+    const storedQuoteItems = Array.isArray(storedQuote?.items) ? storedQuote.items : [];
     if (!message) return res.status(400).json({ error: "Mensagem obrigatória." });
-    const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
+    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 250);
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((entry: any) => ({
       role: entry?.role === "assistant" ? "assistant" : "user",
       text: String(entry?.text || "").slice(0, 2000),
@@ -219,8 +223,10 @@ Regras obrigatórias:
         : undefined;
       const catalogPrice = match ? Number(match.price) : 0;
       const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
-      const existingPrice = Number(existingItem?.unitPrice);
-      const preservedExistingPrice = !confirmed && !!existingItem && Number.isFinite(existingPrice) && existingPrice >= 0;
+      const storedExistingItem = storedQuoteItems.find((row: any) => String(row?.id || "") === String(existingItem?.id || ""));
+      const existingPrice = Number(storedExistingItem?.unitPrice);
+      const hasStoredPrice = storedExistingItem?.unitPrice !== undefined && storedExistingItem?.unitPrice !== null && String(storedExistingItem.unitPrice).trim() !== "";
+      const preservedExistingPrice = !confirmed && !!storedExistingItem && hasStoredPrice && Number.isFinite(existingPrice) && existingPrice >= 0;
       const unitPrice = confirmed ? catalogPrice : preservedExistingPrice ? existingPrice : 0;
       return {
         id: String(item.id || `ai-${index + 1}`),
@@ -382,7 +388,8 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, rateLimitByUser("project
 // ----------------------------------------------------
 app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("technical-drawing", 12, 60_000), async (req, res) => {
   try {
-    const { prompt, currentDrawing, catalog = [] } = req.body;
+    const { prompt, currentDrawing } = req.body;
+    const catalog = await loadCatalogFromFirestore(req);
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
       return res.status(400).json({ error: "Descripción técnica requerida" });
