@@ -76,7 +76,7 @@ service cloud.firestore {
     match /cut_plans/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /profile_optimization/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /material_lists/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /technical_drawings/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /technical_drawings/{id} { allow read: if canOperate(); allow create, update, delete: if canManageCommercial(); }
 
     // Tabela central de preços e rastreabilidade das atualizações.
     match /price_table/{id} {
