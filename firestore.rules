@@ -91,7 +91,7 @@ service cloud.firestore {
       allow delete: if canManageCommercial() && !('approvedSnapshotId' in resource.data);
     }
     match /approved_snapshots/{id} {
-      allow read: if canOperate() || canManageFinance() || canManageQuality() || canManageProduction();
+      allow read: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
       allow create: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
       allow update, delete: if false;
     }
