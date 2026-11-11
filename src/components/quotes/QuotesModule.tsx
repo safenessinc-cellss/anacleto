@@ -241,9 +241,9 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         if (popup) popup.location.href = url;
         else window.location.href = url;
       } else {
-        const subject = encodeURIComponent(`Orçamento ${selectedQuote.number} - Anacleto Esquadrias`);
+        const subject = encodeURIComponent(`Orçamento ${pdfQuote.number} - Anacleto Esquadrias`);
         const body = encodeURIComponent(`${message}\n\nAtenciosamente,\nAnacleto Esquadrias\n\nAnexe o PDF baixado antes de enviar.`);
-        const url = `mailto:${encodeURIComponent(selectedQuote.clientEmail || "")}?subject=${subject}&body=${body}`;
+        const url = `mailto:${encodeURIComponent(pdfQuote.clientEmail || "")}?subject=${subject}&body=${body}`;
         if (popup) popup.location.href = url;
         else window.location.href = url;
       }
