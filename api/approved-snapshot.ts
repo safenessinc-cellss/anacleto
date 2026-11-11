@@ -3,6 +3,7 @@ import firebaseConfig from "../firebase-applet-config.json" with { type: "json" 
 import { AI_CONFIG } from "../src/server/ai-config";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data";
 import { recordBudgetLineTransition } from "../src/server/ai-audit";
+import { createBudgetSnapshot } from "../src/server/snapshot-ledger";
 
 type AuthUser = { uid: string; email: string; role: string };
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
@@ -252,6 +253,13 @@ export default async function handler(req: any, res: any) {
           capturedAt: new Date().toISOString(),
         },
       };
+      snapshot.budgetSnapshot = createBudgetSnapshot({
+        documentId, documentNumber: String(source.number || ""), approvedAt,
+        approvedBy: snapshot.approvedBy, currency: String(source.currency || "BRL"),
+        lines: reviewedItems, subtotal, discountAmount, taxAmount, total,
+        technicalDrawing: source.technicalDrawing || null,
+        modelSignature: snapshot.modelSignatures,
+      });
     } else {
       if (!Array.isArray(source.pieces) || source.pieces.length === 0) return send(res, 422, { error: "O desenho não possui componentes." });
       if (source.isDraft === false || source.status === "APPROVED_FOR_MANUFACTURING") return send(res, 409, { error: "O desenho já foi aprovado e não pode ser reaprovado." });
@@ -290,6 +298,14 @@ export default async function handler(req: any, res: any) {
         },
         drawingMetadata: { dimensions: source.overallDimensions, pieces: source.pieces, visualElements: source.visualElements || [], cuttingPlan: source.cuttingPlan || [], measurementPlan: source.measurementPlan || [], assumptions: source.assumptions || [], budget: reviewedBudgetItems },
       };
+      const drawingSubtotal = Number(reviewedBudgetItems.reduce((sum: number, item: any) => sum + Number(item.quantity) * Number(item.unitPrice), 0).toFixed(2));
+      snapshot.budgetSnapshot = createBudgetSnapshot({
+        documentId, documentNumber: String(source.title || ""), approvedAt,
+        approvedBy: snapshot.approvedBy, currency: String(source.budget?.currency || "BRL"),
+        lines: reviewedBudgetItems, subtotal: drawingSubtotal, discountAmount: 0, taxAmount: 0, total: drawingSubtotal,
+        technicalDrawing: snapshot.document,
+        modelSignature: snapshot.modelSignatures,
+      });
     }
     snapshot.contentHash = digest(snapshot);
     snapshot.document.snapshotContentHash = snapshot.contentHash;
