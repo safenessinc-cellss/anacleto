@@ -310,33 +310,68 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   const handleSaveDrawing = async () => {
     const user = auth.currentUser;
-    if (!user) { showToast("Entre novamente para salvar o PDF.", "error"); return; }
+    if (!user) { showToast("Faça login novamente para salvar o projeto técnico.", "error"); return; }
+    if (!drawing.pieces?.length) { showToast("O desenho não possui peças para salvar.", "warning"); return; }
     setIsSaving(true);
     try {
+      const now = new Date().toISOString();
       const pdfRes = buildTechnicalDrawingPdf(drawing, senderConfig);
       const blob = await (await fetch(pdfRes.dataUri)).blob();
-      const path = "technical-drawings/" + user.uid + "/" + drawing.id + ".pdf";
-      const fileRef = storageRef(storage, path);
+      const storagePath = "technical-drawings/" + user.uid + "/" + drawing.id + ".pdf";
+      const fileRef = storageRef(storage, storagePath);
       await uploadBytes(fileRef, blob, { contentType: "application/pdf", customMetadata: { ownerUid: user.uid, drawingId: drawing.id } });
       const pdfUrl = await getDownloadURL(fileRef);
-      const metadata = { id: drawing.id, title: drawing.title, description: drawing.description || "", projectId: drawing.projectId || "", projectName: drawing.projectName || "", category: drawing.category, unit: drawing.unit, overallDimensions: drawing.overallDimensions || null, createdAt: drawing.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), pdfUrl, pdfStoragePath: path, pdfFileName: pdfRes.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdfRes.sizeKb, storageFormat: "pdf-only" };
-      await setDoc(doc(db, "technical_drawings", drawing.id), metadata);
-      setDrawing({ ...drawing, pdfUrl, pdfStoragePath: path, pdfFileName: pdfRes.fileName, pdfFileSizeKb: pdfRes.sizeKb } as TechnicalDrawing);
-      showToast("PDF técnico armazenado. O desenho editável não foi guardado.", "success");
-    } catch (err) { console.error("Drawing PDF storage failed:", err); showToast("Não foi possível armazenar o PDF. Verifique as permissões.", "error"); }
+      // Persistência completa: geometria, peças, cotas e fases continuam editáveis após reabrir.
+      const savedDrawing: TechnicalDrawing = {
+        ...drawing,
+        createdAt: drawing.createdAt || now,
+        updatedAt: now,
+        pdfUrl,
+        pdfStoragePath: storagePath,
+        pdfFileName: pdfRes.fileName,
+        pdfGeneratedAt: now,
+        pdfFileSizeKb: pdfRes.sizeKb,
+      };
+      await setDoc(doc(db, "technical_drawings", drawing.id), savedDrawing);
+      setDrawing(savedDrawing);
+      showToast("Projeto técnico salvo com desenho editável e PDF.", "success");
+    } catch (err) { console.error("Technical drawing save failed:", err); showToast("Não foi possível salvar o projeto técnico. Verifique as permissões.", "error"); }
     finally { setIsSaving(false); }
   };
 
   const handleDeleteDrawing = async (item: TechnicalDrawing) => {
-    if (!auth.currentUser) { showToast("Entre novamente para eliminar o PDF.", "error"); return; }
-    if (!window.confirm("Eliminar definitivamente o PDF “" + item.title + "” e o respetivo registo?")) return;
+    if (!auth.currentUser) { showToast("Faça login novamente para excluir o desenho.", "error"); return; }
+    if (!window.confirm("Deseja excluir definitivamente o desenho “" + item.title + "”? Esta ação não pode ser desfeita.")) return;
     try {
       const storedPath = (item as any).pdfStoragePath;
-      if (storedPath) { try { await deleteObject(storageRef(storage, storedPath)); } catch (storageError: any) { if (storageError?.code !== "storage/object-not-found") throw storageError; } }
+      if (storedPath) {
+        try { await deleteObject(storageRef(storage, storedPath)); }
+        catch (storageError: any) { if (storageError?.code !== "storage/object-not-found") throw storageError; }
+      }
       await deleteDoc(doc(db, "technical_drawings", item.id));
       if (drawing.id === item.id) { setDrawing(initialSampleDrawing); setCurrentStep(1); setIsPdfModalOpen(false); }
-      showToast("PDF e registo eliminados.", "success");
-    } catch (err) { console.error("Drawing delete failed:", err); showToast("Não foi possível eliminar o desenho.", "error"); }
+      showToast("Desenho excluído com sucesso.", "success");
+    } catch (err) { console.error("Drawing delete failed:", err); showToast("Não foi possível excluir o desenho.", "error"); }
+  };
+
+  const handleOpenSavedDrawing = (item: TechnicalDrawing) => {
+    // Registros novos contêm o desenho completo e podem voltar ao editor.
+    if (Array.isArray(item.pieces) && item.pieces.length > 0) {
+      setDrawing(item);
+      setSelectedProjectId(item.projectId || "");
+      setCurrentStep(Math.min(Math.max(Number(item.currentStep) || 1, 1), 5));
+      setIsPdfModalOpen(false);
+      showToast("Projeto técnico carregado para edição.", "success");
+      return;
+    }
+    // Compatibilidade com os registros antigos que armazenavam somente o PDF.
+    if ((item as any).pdfUrl || item.pdfDataUri) {
+      setDrawing(item);
+      handleOpenDrawingPdf(item);
+      showToast("Este projeto antigo contém somente o PDF. O arquivo foi aberto para consulta.", "info");
+      return;
+    }
+    showToast("Este registro não contém dados suficientes para abrir o desenho.", "warning");
   };
   const handleGenerate = async (presetPrompt?: string) => {
     const inputPrompt = (presetPrompt || prompt).trim();
@@ -411,7 +446,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (!presetPrompt) setPrompt("");
 
       setDrawing(generated);
-      showToast("Desenho gerado. Revise e use “Salvar somente PDF” para armazenar o documento final.", "success");
+      showToast("Desenho gerado. Revise e use “Salvar desenho” para armazenar o documento final.", "success");
     } finally {
       setIsLoading(false);
     }
@@ -728,56 +763,55 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             </div>
           </div>
 
-          {/* Saved Projects Drawer / Quick Switcher */}
-          {savedDrawings.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4 text-amber-400" />
-                  Proyectos Técnicos Guardados ({savedDrawings.length})
+          {/* Projetos técnicos salvos: lista completa, mais recente primeiro */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-3xl shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div>
+                <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <FolderOpen className="w-4 h-4 text-blue-600" />
+                  Projetos Técnicos Salvos ({savedDrawings.length})
                 </h4>
-                <span className="text-[10px] font-mono text-slate-500">Carregar com um clique</span>
+                <p className="text-[11px] text-slate-500 mt-1">O projeto salvo mais recentemente aparece primeiro.</p>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                {savedDrawings.slice(0, 6).map((item) => (
-                  <div
-                    key={item.id}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handleOpenDrawingPdf(item); } }}
-                    onClick={() => {
-                      setDrawing(item);
-                      setSelectedProjectId(item.projectId || "");
-                      setCurrentStep(1);
-                      handleOpenDrawingPdf(item);
-                    }}
-                    className={`p-3 rounded-2xl border text-left transition relative group ${
-                      drawing.id === item.id
-                        ? "bg-amber-500/10 border-amber-500/40 text-white"
-                        : "bg-slate-950/80 hover:bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <div className="min-w-0 flex-1"><h5 className="text-xs font-bold truncate">{item.title}</h5><p className="mt-1 truncate text-[10px] text-slate-500">{item.projectName || "Sem projeto associado"}</p></div>
-                      <span className="flex items-center gap-1">
-                        {(item.pdfDataUri || (item as any).pdfUrl) && <Eye className="h-3.5 w-3.5 text-emerald-400" />}
-                        <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteDrawing(item); }} title="Eliminar PDF" className="rounded-md p-1 text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-1">
-                      <span>{item.overallDimensions?.width}×{item.overallDimensions?.height} {item.unit}</span>
-                      {(item.pdfDataUri || (item as any).pdfUrl) && (
-                        <span className="text-[9px] text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20">
-                          PDF ({item.pdfFileSizeKb || 40} KB)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {savedDrawings[0] && (
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
+                  Último salvo: {new Date(savedDrawings[0].updatedAt || savedDrawings[0].createdAt).toLocaleString("pt-BR")}
+                </span>
+              )}
             </div>
-          )}
+
+            {savedDrawings.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center">
+                <FolderOpen className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Nenhum desenho salvo ainda</p>
+                <p className="text-xs text-slate-500 mt-1">Depois de gerar um desenho, clique em “Salvar desenho”.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
+                {savedDrawings.map((item) => {
+                  const editable = Array.isArray(item.pieces) && item.pieces.length > 0;
+                  const savedAt = item.updatedAt || item.createdAt;
+                  return (
+                    <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl border ${drawing.id === item.id ? "border-blue-300 bg-blue-50/70 dark:border-blue-700 dark:bg-blue-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"}`}>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title || "Projeto técnico sem título"}</p>
+                        <p className="text-[11px] text-slate-500 truncate">{item.projectName || "Sem projeto associado"} · {savedAt ? new Date(savedAt).toLocaleString("pt-BR") : "Data não informada"}</p>
+                        <p className="text-[10px] text-slate-500 mt-1">{item.overallDimensions?.width || "—"} × {item.overallDimensions?.height || "—"}{item.overallDimensions?.depth ? ` × ${item.overallDimensions.depth}` : ""} {item.unit || "cm"} · {editable ? "Desenho editável" : "PDF legado para consulta"}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button type="button" onClick={() => handleOpenSavedDrawing(item)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-2 text-xs font-bold text-white transition">
+                          <FolderOpen className="w-3.5 h-3.5" /> {editable ? "Abrir / editar" : "Abrir PDF"}
+                        </button>
+                        <button type="button" onClick={() => handleDeleteDrawing(item)} title="Excluir desenho" aria-label={`Excluir desenho ${item.title}`} className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-white hover:bg-rose-50 dark:border-rose-900 dark:bg-slate-900 p-2 text-rose-600 transition">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
