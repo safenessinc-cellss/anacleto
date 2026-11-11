@@ -223,12 +223,14 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     if (!selectedQuote) return;
     const popup = window.open("about:blank", "_blank");
     try {
-      let pdfSender = await preparePdfSender();
+      let pdfSender: SenderConfig = {};
       let pdfQuote = recalculateQuote(selectedQuote);
       if (selectedQuote.approvedSnapshotId) {
         const snapshot = await loadApprovedQuoteSnapshot(selectedQuote.approvedSnapshotId);
         pdfQuote = snapshot.document as Quote;
         pdfSender = snapshot.senderSnapshot || {};
+      } else {
+        pdfSender = await preparePdfSender();
       }
       const pdf = buildQuotePdf(pdfQuote, pdfSender);
       pdf.doc.save(pdf.fileName);
@@ -314,11 +316,13 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const handleOpenQuotePdf = async (quote: Quote) => {
     let target = quote;
     try {
-      let sender = await preparePdfSender();
+      let sender: SenderConfig = {};
       if (quote.approvedSnapshotId) {
         const snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
         target = snapshot.document as Quote;
         sender = snapshot.senderSnapshot || target.senderSnapshot || {};
+      } else {
+        sender = await preparePdfSender();
       }
       const pdfRes = buildQuotePdf(target, sender);
       target = {
