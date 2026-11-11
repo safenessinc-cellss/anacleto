@@ -193,6 +193,7 @@ function hasVerifiedCatalogPrice(row: any): boolean {
 // ----------------------------------------------------
 app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
   const aiStartedAt = Date.now();
+  const aiUsage = { inputTokens: 0, outputTokens: 0 };
   try {
     const message = String(req.body?.message || "").trim();
     const requestedQuote = req.body?.currentQuote && typeof req.body.currentQuote === "object" ? req.body.currentQuote : {};
@@ -228,6 +229,10 @@ Regras obrigatórias:
       capability: "quote",
       system: systemPrompt,
       prompt: `Histórico recente:\\n${transcript}\\n\\nSolicitação atual: ${message}`,
+      onGeneration: ({ usage }) => {
+        aiUsage.inputTokens += Number(usage?.inputTokens ?? usage?.promptTokens ?? 0);
+        aiUsage.outputTokens += Number(usage?.outputTokens ?? usage?.completionTokens ?? 0);
+      },
       validate: (value: any) => {
         if (!value || typeof value !== "object" || !Array.isArray(value.items)) throw new Error("Resposta de orçamento incompleta.");
         if (value.items.length > 150) throw new Error("O orçamento excede o limite de 150 linhas.");
@@ -241,7 +246,7 @@ Regras obrigatórias:
     await recordAIAudit({
       serviceName: "BUDGET", modelUsed: AI_CONFIG.quote.model,
       input: { message, history, currentQuote },
-      output: parsed, actorUid: res.locals.firebaseUser?.uid,
+      output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
       requestId: String(req.headers["x-request-id"] || ""),
       startedAt: aiStartedAt,
       authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""),
@@ -308,6 +313,7 @@ Regras obrigatórias:
 
 app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
   const aiStartedAt = Date.now();
+  const aiUsage = { inputTokens: 0, outputTokens: 0 };
   try {
     const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
@@ -317,6 +323,10 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
       capability: "budget",
       system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Só associe item do catálogo por SKU/código, ID ou nome completo EXATO. Informe sku/catalogItemId para validação. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
       prompt,
+      onGeneration: ({ usage }) => {
+        aiUsage.inputTokens += Number(usage?.inputTokens ?? usage?.promptTokens ?? 0);
+        aiUsage.outputTokens += Number(usage?.outputTokens ?? usage?.completionTokens ?? 0);
+      },
       validate: (value: any) => {
         if (!Array.isArray(value?.items) || !value.items.length || value.items.length > 150) throw new Error("A IA não retornou uma lista válida de itens.");
         for (const item of value.items) {
@@ -329,7 +339,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
     await recordAIAudit({
       serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
       input: { prompt, language, catalogCount: catalog.length },
-      output: parsed, actorUid: res.locals.firebaseUser?.uid,
+      output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
       requestId: String(req.headers["x-request-id"] || ""),
       startedAt: aiStartedAt,
       authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""),
