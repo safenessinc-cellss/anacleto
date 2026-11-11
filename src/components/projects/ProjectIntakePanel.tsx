@@ -59,7 +59,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
       }
 
             let aiData: any = {};
-      if (description.trim()) {
+      if (description.trim() || textImports.length > 0) {
         const token = await user.getIdToken();
         const response = await fetch("/api/ai/project-intake", {
           method: "POST",
