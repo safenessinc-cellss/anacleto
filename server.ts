@@ -8,6 +8,7 @@ import { AI_CONFIG, getAIModel } from "./src/server/ai-config";
 import { generateValidatedJson, parseAIJson } from "./src/server/ai-json";
 import { loadCatalogFromFirestore, loadQuoteFromFirestore } from "./src/server/firestore-data";
 import technicalDrawingHandler from "./api/technical-drawing";
+import approvedSnapshotHandler from "./api/approved-snapshot";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -396,6 +397,7 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, rateLimitByUser("project
 // 4. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
 app.post("/api/ai/technical-drawing", (req, res) => technicalDrawingHandler(req, res));
+app.all("/api/approved-snapshot", (req, res) => approvedSnapshotHandler(req, res));
 
 // Setup Vite Dev Server / Serve build static files
 const startServer = async () => {
