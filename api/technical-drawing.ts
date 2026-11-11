@@ -60,6 +60,52 @@ function allowRequest(uid: string): boolean {
   return true;
 }
 
+function normalizeName(value: unknown): string {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function buildTechnicalBudget(pieces: any[], catalog: any[]) {
+  const items = (Array.isArray(pieces) ? pieces : []).map((piece: any, index: number) => {
+    const quantity = Math.max(1, Number(piece?.quantity) || 1);
+    const sku = String(piece?.sku || piece?.code || "").trim().toLowerCase();
+    const itemId = String(piece?.catalogItemId || piece?.itemId || "").trim();
+    const description = normalizeName(piece?.name || piece?.material);
+    const match = (Array.isArray(catalog) ? catalog : []).find((row: any) => {
+      const rowSku = String(row?.sku || row?.code || "").trim().toLowerCase();
+      const idMatch = !!itemId && String(row?.id || "") === itemId;
+      const skuMatch = !!sku && !!rowSku && sku === rowSku;
+      if (itemId && sku) return idMatch && skuMatch;
+      if (itemId) return idMatch;
+      if (sku) return skuMatch;
+      const rowName = normalizeName(row?.name || row?.description);
+      return !!description && !!rowName && description === rowName;
+    });
+    const rawPrice = match?.price;
+    const priceVerified = rawPrice !== undefined && rawPrice !== null && String(rawPrice).trim() !== "" && Number.isFinite(Number(rawPrice)) && Number(rawPrice) >= 0;
+    const unitPrice = priceVerified ? Number(rawPrice) : 0;
+    return {
+      id: String(piece?.id || "piece-" + (index + 1)),
+      pieceId: String(piece?.id || ""),
+      description: String(piece?.name || piece?.material || "Componente técnico"),
+      sku: priceVerified ? String(match.sku || match.code || "") : String(piece?.sku || ""),
+      catalogItemId: priceVerified ? String(match.id || "") : "",
+      quantity,
+      unitPrice,
+      subtotal: Number((quantity * unitPrice).toFixed(2)),
+      priceSource: priceVerified ? "catalog" : "pending",
+    };
+  });
+  const subtotal = Number(items.reduce((sum: number, item: any) => sum + item.subtotal, 0).toFixed(2));
+  return {
+    currency: "BRL",
+    items,
+    subtotal,
+    labor: 0,
+    total: subtotal,
+    notes: "Preços aplicados exclusivamente por correspondência exata no catálogo Firestore. Itens pendentes exigem revisão manual; mão de obra não informada não foi estimada.",
+  };
+}
+
 function localFallback(prompt: string) {
   const text = prompt.toLowerCase();
   const match = text.match(/(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?))?/);
@@ -103,6 +149,7 @@ function localFallback(prompt: string) {
     title: isWindow ? "Esquadria / janela sob medida" : isDoor ? "Porta sob medida" : isTable ? "Mesa sob medida" : isCabinet ? "Armário sob medida" : "Projeto técnico sob medida",
     description: `Projeto preliminar criado a partir de: ${prompt}`,
     category, unit, overallDimensions: { width, height, depth }, pieces,
+    budget: buildTechnicalBudget(pieces, []),
     dimensionLines: [
       { id: "d1", label: `${width} ${unit}`, value: width, unit, orientation: "horizontal", start: { x: 80, y: 50 }, end: { x: 520, y: 50 } },
       { id: "d2", label: `${height} ${unit}`, value: height, unit, orientation: "vertical", start: { x: 50, y: 80 }, end: { x: 50, y: 380 } },
@@ -231,6 +278,7 @@ export default async function handler(req: any, res: any) {
     drawing.steps = Array.isArray(drawing.steps) ? drawing.steps.slice(0, 5) : [];
     if (drawing.steps.length !== 5) throw new Error("A IA não retornou as cinco fases do desenho.");
     drawing.assemblyInstructions = Array.isArray(drawing.assemblyInstructions) ? drawing.assemblyInstructions : [];
+    drawing.budget = buildTechnicalBudget(drawing.pieces, catalog);
     const requiredArrays = ["measurementPlan", "cuttingPlan", "manufacturingSteps", "qualityChecklist", "assumptions"];
     for (const field of requiredArrays) {
       if (!Array.isArray(drawing[field]) || drawing[field].length === 0) {
@@ -258,6 +306,7 @@ export default async function handler(req: any, res: any) {
         const fallback = localFallback(prompt);
         return json(res, 200, {
           ...fallback,
+          budget: buildTechnicalBudget(fallback.pieces, catalog),
           warning: "A IA está temporariamente indisponível. Foi criado um desenho preliminar local; confira todas as medidas antes de fabricar.",
           fallbackReason: stage,
         });
