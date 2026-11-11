@@ -374,22 +374,31 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // Convert Approved Quote to Invoice (with persistent PDF attached)
   const handleConvertQuoteToInvoice = async (quote: Quote) => {
     try {
-      const quoteRef = doc(db, "quotes", quote.id);
+      let approvedQuote = quote;
+      let invoiceSender: SenderConfig = senderConfig;
+      if (quote.approvedSnapshotId) {
+        const snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
+        approvedQuote = snapshot.document as Quote;
+        invoiceSender = snapshot.senderSnapshot || senderConfig;
+      } else {
+        throw new Error("A fatura só pode ser emitida a partir de um orçamento aprovado e congelado.");
+      }
+      const quoteRef = doc(db, "quotes", approvedQuote.id);
       const invoiceRef = doc(collection(db, "invoices"));
       const invoiceId = invoiceRef.id;
       const invoiceNumber = "FAT-" + new Date().getFullYear() + "-" + invoiceId.slice(-8).toUpperCase();
       const baseInvoice: Invoice = {
-        id: invoiceId, number: invoiceNumber, quoteId: quote.id, companyId: quote.companyId,
-        clientName: quote.clientName, clientEmail: quote.clientEmail, clientTaxId: quote.clientTaxId,
-        clientAddress: quote.clientAddress, date: new Date().toISOString().split("T")[0],
+        id: invoiceId, number: invoiceNumber, quoteId: approvedQuote.id, companyId: approvedQuote.companyId,
+        clientName: approvedQuote.clientName, clientEmail: approvedQuote.clientEmail, clientTaxId: approvedQuote.clientTaxId,
+        clientAddress: approvedQuote.clientAddress, date: new Date().toISOString().split("T")[0],
         dueDate: new Date(Date.now() + 15 * 24 * 3600 * 1000).toISOString().split("T")[0],
-        items: quote.items, subtotal: quote.subtotal, taxRate: quote.taxRate, taxAmount: quote.taxAmount,
-        discountRate: quote.discountRate, discountAmount: quote.discountAmount, total: quote.total,
-        currency: quote.currency, senderSnapshot: senderConfig, status: "pendente", paymentMethod: "Transferência Bancária",
-        notes: `Fatura gerada a partir do orçamento ${quote.number}.`,
+        items: approvedQuote.items, subtotal: approvedQuote.subtotal, taxRate: approvedQuote.taxRate, taxAmount: approvedQuote.taxAmount,
+        discountRate: approvedQuote.discountRate, discountAmount: approvedQuote.discountAmount, total: approvedQuote.total,
+        currency: approvedQuote.currency, senderSnapshot: invoiceSender, status: "pendente", paymentMethod: "Transferência Bancária",
+        notes: `Fatura gerada a partir do orçamento ${approvedQuote.number}.`,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
-      const pdf = buildInvoicePdf(baseInvoice, senderConfig);
+      const pdf = buildInvoicePdf(baseInvoice, invoiceSender);
       const finalInvoice: Invoice = { ...baseInvoice, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdf.sizeKb };
       await runTransaction(db, async tx => {
         const current = await tx.get(quoteRef);
@@ -398,10 +407,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         if (!["accepted", "approved", "aprovado"].includes(String(current.data().status || ""))) throw new Error("Aprove o orçamento antes de gerar a fatura.");
         tx.set(invoiceRef, finalInvoice);
         tx.set(doc(db, "receivables", invoiceId), {
-          clientId: quote.companyId || "", clientName: quote.clientName || "Cliente",
-          description: `Fatura ${invoiceNumber} · Orçamento ${quote.number}`,
-          amount: Number(quote.total || 0), receivedAmount: 0, dueDate: baseInvoice.dueDate,
-          paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: quote.id,
+          clientId: approvedQuote.companyId || "", clientName: approvedQuote.clientName || "Cliente",
+          description: `Fatura ${invoiceNumber} · Orçamento ${approvedQuote.number}`,
+          amount: Number(approvedQuote.total || 0), receivedAmount: 0, dueDate: baseInvoice.dueDate,
+          paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: approvedQuote.id,
           notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
         tx.update(quoteRef, { status: "invoiced", invoiceId, invoicedAt: serverTimestamp(), updatedAt: serverTimestamp() });
