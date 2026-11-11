@@ -12,6 +12,7 @@ import approvedSnapshotHandler from "./api/approved-snapshot";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate";
 import { recordAIAudit, recordBudgetLineTransition } from "./src/server/ai-audit";
 import { verifyServiceRequest, SERVICE_SIGNATURE_HEADER, SERVICE_TIMESTAMP_HEADER } from "./src/server/service-auth";
+import { requestDrawingService, getDrawingServiceJob } from "./src/server/drawing-service-client";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -446,7 +447,37 @@ app.post("/api/internal/technical-drawing", (req, res, next) => {
   return technicalDrawingHandler(req, res);
 });
 
-app.post("/api/ai/technical-drawing", (req, res) => technicalDrawingHandler(req, res));
+app.post("/api/ai/technical-drawing", async (req, res) => {
+  if (!process.env.ANACLETO_DRAWING_SERVICE_URL) return technicalDrawingHandler(req, res);
+  try {
+    const job = await requestDrawingService(req.body, 5000, String(req.headers.authorization || ""));
+    if (job.status === "JOB_PROCESSING") {
+      return res.status(202).json({
+        status: "JOB_PROCESSING",
+        jobId: job.jobId,
+        pollUrl: job.pollUrl,
+        message: "O desenho continua sendo processado. Consulte o estado pelo identificador da tarefa.",
+      });
+    }
+    return res.status(200).json(job.result);
+  } catch (error) {
+    console.error("Independent drawing service request failed:", error);
+    return res.status(503).json({ error: "Serviço independente de desenho temporariamente indisponível.", code: "DRAWING_SERVICE_UNAVAILABLE" });
+  }
+});
+app.get("/api/ai/technical-drawing/jobs/:jobId", requireFirebaseAuth, async (req, res) => {
+  try {
+    const user = res.locals.firebaseUser as { role?: string } | undefined;
+    if (!user || !["super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role || "")) {
+      return res.status(403).json({ error: "Sem permissão para consultar tarefas técnicas." });
+    }
+    const job = await getDrawingServiceJob(String(req.params.jobId || ""));
+    return res.status(200).json(job);
+  } catch (error) {
+    console.error("Drawing job lookup failed:", error);
+    return res.status(503).json({ error: "Não foi possível consultar a tarefa técnica.", code: "DRAWING_JOB_LOOKUP_FAILED" });
+  }
+});
 app.all("/api/approved-snapshot", (req, res) => approvedSnapshotHandler(req, res));
 
 // Setup Vite Dev Server / Serve build static files
