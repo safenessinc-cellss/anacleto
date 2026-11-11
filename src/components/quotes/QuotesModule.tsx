@@ -68,6 +68,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", source: "registry_items" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "registry_items"), ...list]);
       }, (err) => console.warn("Items registry listener (quotes):", err)),
+      onSnapshot(collection(db, "price_table"), (snap) => {
+        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", supplier: data.priceSupplier || data.supplier || "", source: "price_table" }; });
+        setCatalogItems((current) => [...current.filter((item) => item.source !== "price_table"), ...list]);
+      }, (err) => console.warn("Price table listener (quotes):", err)),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, []);
@@ -395,6 +399,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           quantity: Number(it.quantity || 1),
           unitPrice: Number(it.unitPrice || 0),
           subtotal: Number((Number(it.quantity || 1) * Number(it.unitPrice || 0)).toFixed(2)),
+          notes: it.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : "Preço confirmado no catálogo.",
         }));
       }
 
