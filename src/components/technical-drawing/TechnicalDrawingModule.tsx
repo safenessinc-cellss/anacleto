@@ -259,9 +259,18 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const [currentStep, setCurrentStep] = useState(1);
   const [drawing, setDrawing] = useState<TechnicalDrawing>(initialSampleDrawing);
   const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
+  const [projects, setProjects] = useState<Array<{id:string;name:string}>>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!authReady) return;
+    return onSnapshot(query(collection(db, "projects"), orderBy("createdAt", "desc")), (snap) => {
+      setProjects(snap.docs.map((item) => ({ id: item.id, name: String(item.data().name || "Projeto sem nome") })));
+    }, (err) => console.warn("Projects list load notice:", err));
+  }, [authReady]);
 
   useEffect(() => {
     if (!authReady) return;
@@ -389,6 +398,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     try {
       if (!generated) throw new Error("Não foi possível montar o desenho técnico.");
+      const selectedProject = projects.find((project) => project.id === selectedProjectId);
+      generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
       setDrawing(generated);
       setCurrentStep(1);
       if (!presetPrompt) setPrompt("");
@@ -514,6 +525,11 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             <p className="text-xs text-slate-400 mb-3 leading-relaxed">
               Describe en lenguaje natural cualquier pieza arquitectónica, ventana de aluminio o mueble con sus medidas:
             </p>
+            <label className="mb-3 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Guardar este modelo en projeto</label>
+            <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="mb-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs text-white">
+              <option value="">Sem projeto associado</option>
+              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+            </select>
 
             {/* Quick Preset Pills */}
             <div className="flex flex-wrap gap-1.5 mb-3.5">
