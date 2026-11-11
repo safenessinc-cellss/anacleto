@@ -176,6 +176,7 @@ export default async function handler(req: any, res: any) {
   const requestId = String(req.headers?.["x-vercel-id"] || req.headers?.["x-request-id"] || "unknown");
   let prompt = "";
   let authenticated = false;
+  let catalog: any[] = [];
   let actorUid = "";
   let auditRecorded = false;
   let stage = "request";
