@@ -74,10 +74,13 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
           file.type === "application/json" || file.type.startsWith("text/");
         if (!allowed) throw new Error(`Formato não suportado: ${file.name}. Use PDF, imagem, JSON ou texto.`);
         if (file.type === "application/json" || file.type.startsWith("text/")) {
-          assets.push({
-            id: crypto.randomUUID(), name: file.name, kind: "document", source: "device",
-            url: "", contentType: file.type, size: file.size, createdAt: now, createdBy: user.uid
-          });
+          const content = await file.text();
+          if (file.type === "application/json" || file.name.toLowerCase().endsWith(".json")) {
+            const parsed = JSON.parse(content);
+            if (parsed && typeof parsed === "object") imported = parsed.project && typeof parsed.project === "object" ? parsed.project : parsed;
+          } else {
+            textImports.push("[Arquivo: " + file.name + "]\\n" + content.slice(0, 12000));
+          }
           continue;
         }
         const id = crypto.randomUUID();
@@ -138,8 +141,8 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
     <div className="grid gap-3 md:grid-cols-2">
       <div className="rounded-xl border bg-white p-3 space-y-2">
         <p className="flex items-center gap-2 text-sm font-semibold text-slate-800"><UploadCloud className="h-4 w-4 text-blue-600"/> Arquivos do PC ou celular</p>
-        <input ref={picker} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.json,.txt,.csv,application/pdf,application/json,text/plain,text/csv,image/*" capture="environment" onChange={e=>selectFiles(e.target.files)} className="block w-full text-xs"/>
-        <p className="text-xs text-slate-500">PDF, imagens/câmera, JSON e texto • até 20 MB por arquivo</p>
+        <input ref={picker} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.json,.txt,.csv,application/pdf,application/json,text/plain,text/csv,image/*" onChange={e=>selectFiles(e.target.files)} className="block w-full text-xs"/>
+        <p className="text-xs text-slate-500">PDF, imagens, JSON e texto • até 20 MB por arquivo. No celular, escolha câmera ou galeria pelo seletor do navegador.</p>
         {files.map((file,index)=><div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between gap-2 text-xs"><span className="truncate">{file.name}</span><button type="button" onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))} aria-label="Remover arquivo"><X className="h-3.5 w-3.5"/></button></div>)}
       </div>
       <div className="rounded-xl border bg-white p-3 space-y-2">
