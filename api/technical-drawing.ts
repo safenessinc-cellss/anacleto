@@ -112,8 +112,6 @@ function localFallback(prompt: string) {
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return json(res, 405, { error: "Método não permitido." });
 
-  // Capture and validate the drawing request before any external auth/provider call.
-  // This guarantees a useful local draft even if Firebase Identity Toolkit is temporarily unavailable.
   const body = (req.body || {}) as DrawingRequest;
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (prompt.length < 3) return json(res, 400, { error: "Descreva a peça e suas dimensões." });
@@ -124,37 +122,36 @@ export default async function handler(req: any, res: any) {
     user = await authenticate(req);
   } catch (authError) {
     console.error("Technical drawing authentication service unavailable:", authError);
-    return json(res, 503, { error: "Não foi possível validar sua sessão agora. Tente novamente em instantes.", code: "AUTH_SERVICE_UNAVAILABLE" });
+    return json(res, 503, {
+      error: "Não foi possível validar sua sessão agora. Tente novamente em instantes.",
+      code: "AUTH_SERVICE_UNAVAILABLE"
+    });
   }
   if (!user) return json(res, 401, { error: "Sessão inválida ou acesso não autorizado. Entre novamente." });
   if (!allowRequest(user.uid)) return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente." });
 
   try {
-      const system = `Você é o engenheiro de desenho técnico da Anacleto Pro. Gere somente JSON válido, sem markdown, com title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array) e steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions). Preserve rigorosamente as dimensões e unidade informadas pelo usuário; não substitua medidas. Use o catálogo quando aplicável: ${JSON.stringify(catalog)}. Marque especificações não confirmadas como preliminares.`;
-      const result = await generateText({
-        model: gateway("openai/gpt-4o-mini"),
-        system,
-        prompt: `Crie o desenho técnico, despiece e cotas para: ${prompt}`,
-        temperature: 0.2,
-      });
-      const raw = (result.text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-      const drawing = JSON.parse(raw);
-      const dims = drawing.overallDimensions || {};
-      if (!Array.isArray(drawing.pieces) || !drawing.pieces.length ||
-          !Number.isFinite(Number(dims.width)) || Number(dims.width) <= 0 ||
-          !Number.isFinite(Number(dims.height)) || Number(dims.height) <= 0) {
-        throw new Error("Resposta da IA sem dimensões ou componentes válidos.");
-      }
-      drawing.steps = Array.isArray(drawing.steps) ? drawing.steps.slice(0, 5) : [];
-      if (drawing.steps.length !== 5) throw new Error("A IA não retornou as cinco fases do desenho.");
-      drawing.assemblyInstructions = Array.isArray(drawing.assemblyInstructions) ? drawing.assemblyInstructions : [];
-      return json(res, 200, drawing);
-    } catch (aiError) {
-      console.error("Technical drawing provider fallback:", aiError);
-      return json(res, 200, localFallback(prompt));
+    const system = `Você é o engenheiro de desenho técnico da Anacleto Pro. Gere somente JSON válido, sem markdown, com title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array) e steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions). Preserve rigorosamente as dimensões e unidade informadas pelo usuário; não substitua medidas. Use o catálogo quando aplicável: ${JSON.stringify(catalog)}. Marque especificações não confirmadas como preliminares.`;
+    const result = await generateText({
+      model: gateway("openai/gpt-4o-mini"),
+      system,
+      prompt: `Crie o desenho técnico, despiece e cotas para: ${prompt}`,
+      temperature: 0.2,
+    });
+    const raw = (result.text || "").replace(/^```(?:json)?\\s*/i, "").replace(/\\s*```$/i, "").trim();
+    const drawing = JSON.parse(raw);
+    const dims = drawing.overallDimensions || {};
+    if (!Array.isArray(drawing.pieces) || !drawing.pieces.length ||
+        !Number.isFinite(Number(dims.width)) || Number(dims.width) <= 0 ||
+        !Number.isFinite(Number(dims.height)) || Number(dims.height) <= 0) {
+      throw new Error("Resposta da IA sem dimensões ou componentes válidos.");
     }
-  } catch (error) {
-    console.error("Technical drawing endpoint fallback:", error);
+    drawing.steps = Array.isArray(drawing.steps) ? drawing.steps.slice(0, 5) : [];
+    if (drawing.steps.length !== 5) throw new Error("A IA não retornou as cinco fases do desenho.");
+    drawing.assemblyInstructions = Array.isArray(drawing.assemblyInstructions) ? drawing.assemblyInstructions : [];
+    return json(res, 200, drawing);
+  } catch (aiError) {
+    console.error("Technical drawing provider fallback:", aiError);
     try {
       return json(res, 200, localFallback(prompt));
     } catch (fallbackError) {
