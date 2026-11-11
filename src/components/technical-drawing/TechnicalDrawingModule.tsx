@@ -50,7 +50,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p1",
       pieceNumber: 1,
-      name: "Peça 1 - Tablero superior",
+      name: "Peça 1 - Tampo superior",
       quantity: 1,
       dimensions: { width: 120, height: 4, depth: 80, unit: "cm" },
       material: "Madeira maciça de carvalho 40mm",
@@ -61,7 +61,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p2",
       pieceNumber: 2,
-      name: "Peça 2 - Pata delantera izq.",
+      name: "Peça 2 - Perna dianteira esquerda",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
@@ -71,7 +71,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p3",
       pieceNumber: 3,
-      name: "Peça 3 - Pata delantera der.",
+      name: "Peça 3 - Perna dianteira direita",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
@@ -81,7 +81,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p4",
       pieceNumber: 4,
-      name: "Peça 4 - Pata trasera izq.",
+      name: "Peça 4 - Perna traseira esquerda",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
@@ -91,7 +91,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p5",
       pieceNumber: 5,
-      name: "Peça 5 - Pata trasera der.",
+      name: "Peça 5 - Perna traseira direita",
       quantity: 1,
       dimensions: { width: 8, height: 71, depth: 8, unit: "cm" },
       material: "Madeira maciça torneada",
@@ -101,7 +101,7 @@ const initialSampleDrawing: TechnicalDrawing = {
     {
       id: "p6",
       pieceNumber: 6,
-      name: "Peça 6 - Faldones de unión longitudinal",
+      name: "Peça 6 - Travessas longitudinais de união",
       quantity: 2,
       dimensions: { width: 104, height: 10, depth: 3, unit: "cm" },
       material: "Madeira maciça de carvalho",
@@ -114,9 +114,9 @@ const initialSampleDrawing: TechnicalDrawing = {
     { id: "d2", label: "75 cm", value: 75, unit: "cm", orientation: "vertical", start: { x: 50, y: 80 }, end: { x: 50, y: 380 } },
   ],
   assemblyInstructions: [
-    "Montar las 4 patas uniendo los faldones longitudinales.",
+    "Montar as quatro pernas unindo as travessas longitudinais.",
     "Comprobar las escuadras en diagonal (máx. 1 mm de diferencia).",
-    "Fijar el tablero superior mediante conectores ocultos en z.",
+    "Fixar o tampo superior com conectores ocultos em Z.",
   ],
   steps: [
     {
@@ -128,28 +128,28 @@ const initialSampleDrawing: TechnicalDrawing = {
     },
     {
       stepNumber: 2,
-      phaseName: "Passo 2: Despiece",
-      title: "Lista de piezas identificadas tipo puzzle",
-      description: "Inventario técnico con 6 componentes rotulados, identificados y cubicados.",
-      instructions: ["Inspeccionar material de origen.", "Marcar piezas con su número identificador."],
+      phaseName: "Passo 2: Lista de componentes",
+      title: "Lista de peças identificadas para montagem",
+      description: "Inventário técnico com seis componentes identificados, etiquetados e dimensionados.",
+      instructions: ["Inspecionar o material de origem.", "Marcar as peças com seus respectivos números de identificação."],
     },
     {
       stepNumber: 3,
-      phaseName: "Passo 3: Corte de cada pieza con sus cotas",
-      title: "Dimensionado individual y mecanizado",
+      phaseName: "Passo 3: Corte de cada peça com suas medidas",
+      title: "Dimensionamento individual e usinagem",
       description: "Cortes con precisión milimétrica, ingletes y ranurados para fijación.",
       instructions: ["Ejecutar cortes siguiendo las cotas individuales.", "Limpiar rebabas y perfilar cantos."],
     },
     {
       stepNumber: 4,
-      phaseName: "Passo 4: Ensamblaje tipo puzzle",
+      phaseName: "Passo 4: Montagem por encaixe",
       title: "Secuencia de montaje y unión",
       description: "Montaje secuencial con flechas de ensamble y ajuste de fijaciones.",
-      instructions: ["Presentar las piezas en seco.", "Ajustar uniones mediante fijaciones ocultas."],
+      instructions: ["Posicionar as peças sem fixação definitiva.", "Ajustar as uniões com fixadores ocultos."],
     },
     {
       stepNumber: 5,
-      phaseName: "Passo 5: Resultado final con vista completa y medidas totales",
+      phaseName: "Passo 5: Resultado final com vista completa e medidas totais",
       title: "Producto terminado y revisión de calidad",
       description: "Estructura final consolidada con todas las cotas y verificación de aplomo.",
       instructions: ["Comprobación de solidez mecánica.", "Limpieza final y entrega."],
@@ -248,7 +248,7 @@ function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
 }
 
 export default function TechnicalDrawingModule({ senderConfig, language = "pt"}: TechnicalDrawingModuleProps) {
-  // Esperar autenticación antes de escuchar Firestore
+  // Aguardar a autenticação antes de iniciar os listeners do Firestore
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setAuthReady(!!u));
@@ -465,7 +465,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       showToast("Desenho técnico e memorial exportados para PDF.", "success");
     } catch (err) {
       console.error(err);
-      showToast("Error al exportar PDF.", "error");
+      showToast("Erro ao exportar o PDF.", "error");
     }
   };
 
@@ -500,7 +500,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               )}
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Desenho Técnico & Despiece Inteligente
+              Desenho Técnico e Lista de Componentes Inteligente
             </h1>
           </div>
         </div>
@@ -548,9 +548,9 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             </div>
 
             <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-              Describe en lenguaje natural cualquier pieza arquitectónica, ventana de aluminio o mueble con sus medidas:
+              Descreva em linguagem natural qualquer peça arquitetônica, esquadria de alumínio ou móvel com suas medidas:
             </p>
-            <label className="mb-3 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Guardar este modelo en projeto</label>
+            <label className="mb-3 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Associar este modelo a um projeto</label>
             <select value={selectedProjectId} onChange={(e) => { const id = e.target.value; const project = projects.find((item) => item.id === id); setSelectedProjectId(id); setDrawing((current) => ({ ...current, projectId: project?.id, projectName: project?.name, updatedAt: new Date().toISOString() })); }} className="mb-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs text-white">
               <option value="">Sem projeto associado</option>
               {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
@@ -641,7 +641,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               {currentStepData?.instructions && currentStepData.instructions.length > 0 && (
                 <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Instrucciones Técnicas de Taller:
+                    Instruções técnicas de fabricação:
                   </span>
                   {currentStepData.instructions.map((inst, idx) => (
                     <div key={idx} className="flex items-start gap-2 text-[11px] text-slate-300">
@@ -667,17 +667,17 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 disabled={currentStep === 5}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-xs font-black text-slate-950 transition shadow-md"
               >
-                Siguiente Passo <ChevronRight className="w-4 h-4" />
+                Próximo passo <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Despiece Summary (Pieces / BOM) */}
+          {/* Resumo das peças (lista técnica / BOM) */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black uppercase tracking-wider text-slate-200 flex items-center gap-2">
                 <Box className="w-4 h-4 text-amber-400" />
-                Despiece Tipo Quebra-cabeça ({drawing.pieces?.length || 0} Peças)
+                Lista de peças para montagem ({drawing.pieces?.length || 0} Peças)
               </h3>
               <span className="text-[10px] font-mono text-slate-400">BOM Técnico</span>
             </div>
@@ -776,7 +776,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               <div>
                 <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                   <FolderOpen className="w-4 h-4 text-blue-600" />
-                  Projetos Técnicos Salvos ({savedDrawings.length})
+                  Projetos Técnicos Guardados ({savedDrawings.length})
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-1">O projeto salvo mais recentemente aparece primeiro.</p>
               </div>
@@ -804,6 +804,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                         <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title || "Projeto técnico sem título"}</p>
                         <p className="text-[11px] text-slate-500 truncate">{item.projectName || "Sem projeto associado"} · {savedAt ? new Date(savedAt).toLocaleString("pt-BR") : "Data não informada"}</p>
                         <p className="text-[10px] text-slate-500 mt-1">{item.overallDimensions?.width || "—"} × {item.overallDimensions?.height || "—"}{item.overallDimensions?.depth ? ` × ${item.overallDimensions.depth}` : ""} {item.unit || "cm"} · {editable ? "Desenho editável" : "PDF legado para consulta"}</p>
+                        <p className="text-[10px] text-slate-500 mt-1">{item.pdfFileName || "Arquivo PDF"}{item.pdfFileSizeKb ? ` · PDF (${item.pdfFileSizeKb} KB)` : " · Tamanho do PDF indisponível"}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <button type="button" onClick={() => handleOpenSavedDrawing(item)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-2 text-xs font-bold text-white transition">
@@ -829,7 +830,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         title={drawing.title}
         subtitle={`Dimensões: ${drawing.overallDimensions?.width || 0}×${drawing.overallDimensions?.height || 0} cm • ${drawing.pieces?.length || 0} peças tipo encaixe • Memorial técnico`}
         pdfDataUri={drawing.pdfDataUri || (drawing as any).pdfUrl}
-        fileName={drawing.pdfFileName || `Plano_Tecnico_${(drawing.title || "Proyecto").replace(/\s+/g, "_")}.pdf`}
+        fileName={drawing.pdfFileName || `Plano_Tecnico_${(drawing.title || "Projeto").replace(/\s+/g, "_")}.pdf`}
         fileSizeKb={drawing.pdfFileSizeKb}
         storedAt={drawing.pdfGeneratedAt || drawing.updatedAt}
         type="drawing"
