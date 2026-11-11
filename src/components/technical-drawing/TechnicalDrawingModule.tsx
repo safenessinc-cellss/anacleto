@@ -428,10 +428,9 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         budget: responseBody.budget,
       };
     } catch (error) {
-      console.error("Technical drawing AI request failed:", error);
-      showToast(error instanceof Error ? error.message : "A IA não conseguiu gerar o desenho. Nenhum desenho fictício foi criado.", "error");
-      setIsLoading(false);
-      return;
+      console.warn("Serviço de desenho por IA indisponível; usando o gerador paramétrico local:", error);
+      generated = buildLocalTechnicalDrawing(inputPrompt);
+      showToast("O serviço de IA está indisponível. Foi criado um desenho técnico preliminar a partir das medidas e do tipo de produto informados; revise as cotas antes de fabricar.", "warning");
     }
 
     try {
