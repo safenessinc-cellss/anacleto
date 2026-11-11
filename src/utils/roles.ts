@@ -121,7 +121,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 20,
     color: "bg-emerald-100 text-emerald-800 border-emerald-300",
     description: "Empleado. Crea presupuestos, facturas, dibujos y gestiona catálogo. Sin finanzas.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions", "deliveries"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "tipologias", "projects", "profile", "suggestions", "deliveries", "price_table"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
