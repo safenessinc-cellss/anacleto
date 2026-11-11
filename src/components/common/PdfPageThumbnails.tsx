@@ -4,6 +4,16 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+export async function countPdfPages(file: File): Promise<number> {
+  const loadingTask = getDocument({ data: await file.arrayBuffer() });
+  try {
+    const pdf = await loadingTask.promise;
+    return pdf.numPages;
+  } finally {
+    await loadingTask.destroy();
+  }
+}
+
 interface PdfPageThumbnailsProps {
   url: string;
   pageLimit?: number;
