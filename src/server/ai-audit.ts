@@ -73,7 +73,7 @@ async function appendFirestore(collection: string, record: Record<string, unknow
     if (!serviceAccount) throw new Error("AI audit persistence requires a Firebase service account when no user token is available.");
     const app = getApps().find(candidate => candidate.name === "anacleto-audit") ||
       initializeApp({ credential: cert(serviceAccount), projectId: serviceAccount.project_id || firebaseConfig.projectId }, "anacleto-audit");
-    await getFirestore(app).collection(collection).doc(String(record.id)).create(record);
+    await getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)").collection(collection).doc(String(record.id)).create(record);
     return;
   }
   const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
