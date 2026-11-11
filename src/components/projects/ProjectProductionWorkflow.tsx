@@ -66,6 +66,7 @@ export default function ProjectProductionWorkflow({projectId,projectName,project
 
   const save=async()=>{
     if(!drawing||!plan)return;
+    if(approved && (form.measurementSource==="estimate" || !form.profileSystem.trim() || form.profileSystem.toLowerCase().startsWith("a definir") || !plan.measurementPlan?.length || !plan.cuttingPlan?.length || !plan.manufacturingSteps?.length || !plan.qualityChecklist?.length || checked.length < plan.qualityChecklist.length)){setError("Não é possível aprovar: confirme medidas reais, sistema de perfis, plano de medição, corte, fabricação e todos os itens do checklist.");return;}
     const user=auth.currentUser;if(!user){setError("Sessão expirada.");return;}
     setSaving(true);setError("");setNotice("");
     try{
