@@ -248,7 +248,7 @@ Regras obrigatórias:
       output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
       requestId: String(req.headers["x-request-id"] || ""),
       startedAt: aiStartedAt,
-      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""),
+      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
     });
     const items = parsed.items.map((item: any, index: number) => {
       const quantity = Number(item.quantity);
@@ -341,7 +341,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
       output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
       requestId: String(req.headers["x-request-id"] || ""),
       startedAt: aiStartedAt,
-      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\\s+/i, ""),
+      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
     });
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
