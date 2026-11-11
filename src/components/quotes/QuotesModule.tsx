@@ -839,7 +839,7 @@ const handleAddItem = () => {
                           itemDimensions: [item.width,item.height,item.depth].filter(Boolean).join(" × "),
                         };
                         if (selectedQuote) {
-                          setSelectedQuote({ ...selectedQuote, items: [...selectedQuote.items, newItem], updatedAt: new Date().toISOString() });
+                          setSelectedQuote(recalculateQuote({ ...selectedQuote, items: [...selectedQuote.items, newItem] }));
                         }
                         setShowCatalog(false);
                         setCatalogSearch("");
@@ -850,8 +850,8 @@ const handleAddItem = () => {
                       <span className="font-bold text-indigo-600">R$ {item.price?.toFixed(2)}</span>
                     </button>
                   ))}
-                {catalogItems.length === 0 && (
-                  <p className="text-xs text-slate-400 text-center py-4">Não há itens no catálogo. Cadastre-os em Itens.</p>
+                {catalogItems.filter((i) => i.name?.toLowerCase().includes(catalogSearch.toLowerCase()) || i.sku?.toLowerCase().includes(catalogSearch.toLowerCase()) || i.category?.toLowerCase().includes(catalogSearch.toLowerCase()) || [i.width, i.height, i.depth].join(" ").includes(catalogSearch.toLowerCase())).length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-4">Nenhum item encontrado. Ajuste a busca ou cadastre o item em Itens.</p>
                 )}
               </div>
             </div>
@@ -940,7 +940,6 @@ const handleAddItem = () => {
                 </div>
               </div>
 
-              {itemPhotoViewer && <ImageLightbox images={itemPhotoViewer} onClose={() => setItemPhotoViewer(null)} />}
               {itemPhotoViewer && <ImageLightbox images={itemPhotoViewer} onClose={() => setItemPhotoViewer(null)} />}
               {/* AI Real-Time Quote Copilot Chat */}
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-4">
