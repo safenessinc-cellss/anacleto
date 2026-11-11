@@ -296,6 +296,16 @@ Regras obrigatórias:
       notes: String(parsed.notes || ""),
     });
   } catch (err: any) {
+    try {
+      await recordAIAudit({
+        serviceName: "BUDGET", modelUsed: AI_CONFIG.quote.model,
+        input: req.body || null, error: err,
+        actorUid: res.locals.firebaseUser?.uid,
+        requestId: String(req.headers["x-request-id"] || ""),
+        startedAt: aiStartedAt,
+        authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+      });
+    } catch (auditError) { console.error("Quote failure audit could not be persisted:", auditError); }
     console.error("Quote agent error:", {
       message: err?.message || String(err),
       name: err?.name || "Error",
@@ -360,6 +370,16 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
     });
     return res.json({ items, notes: String(parsed.notes || "") });
   } catch (err: any) {
+    try {
+      await recordAIAudit({
+        serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
+        input: req.body || null, error: err,
+        actorUid: res.locals.firebaseUser?.uid,
+        requestId: String(req.headers["x-request-id"] || ""),
+        startedAt: aiStartedAt,
+        authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+      });
+    } catch (auditError) { console.error("Budget failure audit could not be persisted:", auditError); }
     console.error("Budget items AI error:", err?.message || err);
     return res.status(502).json({ error: "Falha ao gerar os itens do orçamento. Nenhum preço sem confirmação no catálogo foi aplicado.", code: "BUDGET_AI_UNAVAILABLE" });
   }
