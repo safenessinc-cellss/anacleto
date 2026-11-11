@@ -176,9 +176,15 @@ export default function DrawingSvgCanvas({
     return <g>
       <text x="55" y="58" fill="#f8fafc" fontSize="19" fontWeight="800">VISTA FINAL DO PRODUTO</text>
       <text x="55" y="82" fill="#94a3b8" fontSize="12">{drawing.title} — {fmt(W)} × {fmt(H)} × {fmt(D)} {unit}</text>
-      <polygon points={`${x},${y} ${x+side},${y-side/2} ${x+w+side},${y-side/2} ${x+w},${y}`} fill="#64748b" fillOpacity=".35" stroke={frame} strokeWidth="1.5"/>
-      <polygon points={`${x+w},${y} ${x+w+side},${y-side/2} ${x+w+side},${y+h-side/2} ${x+w},${y+h}`} fill="#334155" fillOpacity=".75" stroke={frame} strokeWidth="1.5"/>
-      <rect x={x} y={y} width={w} height={h} fill="#0f172a" stroke={frame} strokeWidth="4" rx="2"/>
+      {visualElements.length > 0 ? (
+        <rect x={x} y={y} width={w} height={h} fill="#0f172a" stroke={frame} strokeWidth="1.5" rx="2" />
+      ) : (
+        <>
+          <polygon points={`${x},${y} ${x+side},${y-side/2} ${x+w+side},${y-side/2} ${x+w},${y}`} fill="#64748b" fillOpacity=".35" stroke={frame} strokeWidth="1.5"/>
+          <polygon points={`${x+w},${y} ${x+w+side},${y-side/2} ${x+w+side},${y+h-side/2} ${x+w},${y+h}`} fill="#334155" fillOpacity=".75" stroke={frame} strokeWidth="1.5"/>
+          <rect x={x} y={y} width={w} height={h} fill="#0f172a" stroke={frame} strokeWidth="4" rx="2"/>
+        </>
+      )}
       {visualElements.length > 0 ? <g>
         {visualElements.map((element: any, index: number) => {
           const type = String(element.type || "rect").toLowerCase();
