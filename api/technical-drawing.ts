@@ -315,16 +315,15 @@ export default async function handler(req: any, res: any) {
       return json(res, 403, { error: "Seu perfil não possui permissão para operações de desenho técnico.", code: "ROLE_FORBIDDEN" });
     }
     catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
+    if (!allowRequest(user.uid)) {
+      return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
+    }
     if (serviceSignature) {
       const requestedJobId = String(body.requestId || req.headers?.["x-request-id"] || "");
       if (!/^[0-9a-f-]{36}$/i.test(requestedJobId)) return json(res, 400, { error: "Identificador de tarefa inválido.", code: "INVALID_JOB_ID" });
       drawingJobId = requestedJobId;
       await createDrawingJob(req, drawingJobId, user.uid);
       jobPersisted = true;
-    }
-
-    if (!allowRequest(user.uid)) {
-      return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
     }
 
     stage = "ai_generation";
