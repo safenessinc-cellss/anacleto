@@ -186,7 +186,7 @@ export default async function handler(req: any, res: any) {
     });
 
     stage = "validate_ai_response";
-    const raw = (result.text || "").replace(/^\`\`\`(?:json)?\\s*/i, "").replace(/\\s*\`\`\`$/i, "").trim();
+    const raw = (result.text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     const drawing = JSON.parse(raw);
     const dims = drawing?.overallDimensions || {};
     if (!drawing || !Array.isArray(drawing.pieces) || !drawing.pieces.length ||
