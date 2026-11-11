@@ -941,6 +941,7 @@ const handleAddItem = () => {
               </div>
 
               {itemPhotoViewer && <ImageLightbox images={itemPhotoViewer} onClose={() => setItemPhotoViewer(null)} />}
+              {itemPhotoViewer && <ImageLightbox images={itemPhotoViewer} onClose={() => setItemPhotoViewer(null)} />}
               {/* AI Real-Time Quote Copilot Chat */}
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
