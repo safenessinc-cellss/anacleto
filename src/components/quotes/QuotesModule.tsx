@@ -100,7 +100,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [aiChatHistory, setAiChatHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([
     {
       role: "assistant",
-      text: "Olá! Sou seu Agente Técnico de Orçamentos da Anacleto Pro. Você pode me pedir coisas como: 'Adicione 3 janelas de alumínio de 120x100', 'mude o IVA para 21%', 'adicione um desconto de 10%' ou 'gere a fatura deste orçamento'.",
+      text: "Olá! Sou seu Agente Técnico de Orçamentos da Anacleto Pro. Você pode me pedir coisas como: 'Adicione 3 janelas de alumínio de 120x100', 'mude o imposto para 21%', 'adicione um desconto de 10%' ou 'gere a fatura deste orçamento'.",
     },
   ]);
 
@@ -957,11 +957,11 @@ const handleAddItem = () => {
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
-                      Agente de IA para Orçamentos y Facturas (Gemini)
+                      Agente de IA para Orçamentos e Faturas (Gemini)
                     </h3>
                   </div>
                   <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Activo
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ativo
                   </span>
                 </div>
 
@@ -990,7 +990,7 @@ const handleAddItem = () => {
                 {/* Prompt Suggestions */}
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    "mude o IVA para 21%",
+                    "mude o imposto para 21%",
                     "adicione um desconto de 10%",
                     "gere a fatura deste orçamento",
                     "adicione 2 janelas de correr de 150x120",
