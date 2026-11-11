@@ -322,8 +322,9 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       await uploadBytes(fileRef, blob, { contentType: "application/pdf", customMetadata: { ownerUid: user.uid, drawingId: drawing.id } });
       const pdfUrl = await getDownloadURL(fileRef);
       // Persistência completa: geometria, peças, cotas e fases continuam editáveis após reabrir.
+      const { pdfDataUri: _temporaryPdfDataUri, ...editableDrawing } = drawing;
       const savedDrawing: TechnicalDrawing = {
-        ...drawing,
+        ...editableDrawing,
         createdAt: drawing.createdAt || now,
         updatedAt: now,
         pdfUrl,
@@ -368,7 +369,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     if ((item as any).pdfUrl || item.pdfDataUri) {
       setDrawing(item);
       handleOpenDrawingPdf(item);
-      showToast("Este projeto antigo contém somente o PDF. O arquivo foi aberto para consulta.", "info");
+      showToast("Este projeto antigo contém somente o PDF. O arquivo foi aberto para consulta.", "warning");
       return;
     }
     showToast("Este registro não contém dados suficientes para abrir o desenho.", "warning");
