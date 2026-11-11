@@ -232,6 +232,8 @@ export interface TechnicalDrawing {
   pdfFileSizeKb?: number;
   projectId?: string;
   projectName?: string;
+  ownerUid?: string;
+  schemaVersion?: number;
 }
 
 export interface LedgerEntry {
