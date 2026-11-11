@@ -10,7 +10,7 @@ type Notice={id:string;title:string;message:string;createdAt:string;read?:boolea
 type PriceHistory={id:string;itemName:string;oldPrice:number;newPrice:number;source?:string;changedAt:string};
 const norm=(v:unknown)=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
 const keyOf=(r:any)=>r.code? "code:"+norm(r.code):"name:"+norm(r.name)+"|"+norm(r.category)+"|"+norm(r.unit);
-const parsePrice=(v:unknown)=>{const s=String(v??"0").replace(/R\$\s?/gi,"").replace(/\./g,"").replace(",",".").replace(/[^0-9.-]/g,"");return Math.max(0,Number.parseFloat(s)||0);};
+const parsePrice=(v:unknown):number|null=>{const raw=String(v??"").trim();if(!raw)return null;const s=raw.replace(/R\$\s?/gi,"").replace(/\./g,"").replace(",",".").replace(/[^0-9.-]/g,"");const value=Number.parseFloat(s);return Number.isFinite(value)&&value>=0?value:null;};
 const money=(n:number)=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 export default function PriceTableModule(){
  const [collectionRows,setCollectionRows]=useState<Record<string,PriceItem[]>>({});const [uid,setUid]=useState("");const [email,setEmail]=useState("");const [search,setSearch]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [notice,setNotice]=useState("");const [alerts,setAlerts]=useState<Notice[]>([]);const [history,setHistory]=useState<PriceHistory[]>([]);
@@ -38,7 +38,7 @@ export default function PriceTableModule(){
  const importCsv=(file?:File)=>{
   if(!file)return;setBusy(true);setError("");setNotice("");
   Papa.parse<Record<string,string>>(file,{header:true,skipEmptyLines:true,complete:async result=>{
-   const rows=result.data.map(raw=>{const r:Record<string,string>={};Object.entries(raw).forEach(([k,v])=>r[norm(k)]=String(v??"").trim());return{name:r.nome||r.descricao||r.item||r.name||r.description||"",code:r.codigo||r.cod||r.code||r.sku||"",category:r.categoria||r.tipo||r.category||"Componente",unit:r.unidade||r.unit||"un",price:parsePrice(r.preco||r.valor||r.price),supplier:r.fornecedor||r.supplier||"",validUntil:r.validade||r.vencimento||r.validuntil||"",source:file.name};}).filter(r=>r.name);
+   const rows=result.data.map(raw=>{const r:Record<string,string>={};Object.entries(raw).forEach(([k,v])=>r[norm(k)]=String(v??"").trim());return{name:r.nome||r.descricao||r.item||r.name||r.description||"",code:r.codigo||r.cod||r.code||r.sku||"",category:r.categoria||r.tipo||r.category||"Componente",unit:r.unidade||r.unit||"un",price:parsePrice(r.preco||r.valor||r.price),supplier:r.fornecedor||r.supplier||"",validUntil:r.validade||r.vencimento||r.validuntil||"",source:file.name};}).filter(r=>r.name&&r.price!==null);
    if(!rows.length){setError("CSV sem itens válidos. Esperado: nome, código, categoria, unidade, preço e validade.");setBusy(false);return;}
    try{
     const [priceSnap,registrySnap,supplierSnap,catalogSnap]=await Promise.all(["price_table","registry_items","supplier_catalog","catalog"].map(c=>getDocs(collection(db,c))));
