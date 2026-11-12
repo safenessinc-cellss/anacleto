@@ -60,6 +60,79 @@ const previewFromRow = (row: Record<string, any>, supplier: string): PreviewItem
   };
 };
 
+async function readXlsxRows(file: File): Promise<Record<string, string>[]> {
+  if (typeof DecompressionStream === "undefined") throw new Error("Este navegador não oferece suporte à leitura local de Excel (.xlsx). Exporte a planilha como CSV.");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const view = new DataView(bytes.buffer);
+  let eocd = -1;
+  for (let i = Math.max(0, bytes.length - 65557); i <= bytes.length - 22; i += 1) {
+    if (view.getUint32(i, true) === 0x06054b50) eocd = i;
+  }
+  if (eocd < 0) throw new Error("Arquivo Excel inválido ou não suportado.");
+  const count = view.getUint16(eocd + 10, true);
+  let offset = view.getUint32(eocd + 16, true);
+  const entries = new Map<string, { method: number; size: number; localOffset: number }>();
+  for (let i = 0; i < count; i += 1) {
+    if (view.getUint32(offset, true) !== 0x02014b50) break;
+    const method = view.getUint16(offset + 10, true);
+    const size = view.getUint32(offset + 20, true);
+    const nameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localOffset = view.getUint32(offset + 42, true);
+    const name = new TextDecoder().decode(bytes.subarray(offset + 46, offset + 46 + nameLength));
+    entries.set(name, { method, size, localOffset });
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  const readEntry = async (name: string): Promise<string> => {
+    const entry = entries.get(name);
+    if (!entry) return "";
+    const local = entry.localOffset;
+    if (view.getUint32(local, true) !== 0x04034b50) throw new Error("Estrutura interna do Excel inválida.");
+    const nameLength = view.getUint16(local + 26, true);
+    const extraLength = view.getUint16(local + 28, true);
+    const start = local + 30 + nameLength + extraLength;
+    const compressedSize = view.getUint32(local + 18, true);
+    const compressed = bytes.slice(start, start + compressedSize);
+    if (entry.method === 0) return new TextDecoder().decode(compressed);
+    if (entry.method !== 8) throw new Error("Método de compressão Excel não suportado.");
+    const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("deflate-raw" as CompressionFormat));
+    return await new Response(stream).text();
+  };
+  const parser = new DOMParser();
+  const sharedXml = await readEntry("xl/sharedStrings.xml");
+  const shared = sharedXml ? Array.from(parser.parseFromString(sharedXml, "application/xml").getElementsByTagName("si")).map(node => node.textContent || "") : [];
+  const workbookXml = await readEntry("xl/workbook.xml");
+  const relsXml = await readEntry("xl/_rels/workbook.xml.rels");
+  let sheetPath = "xl/worksheets/sheet1.xml";
+  if (workbookXml && relsXml) {
+    const workbook = parser.parseFromString(workbookXml, "application/xml");
+    const rels = parser.parseFromString(relsXml, "application/xml");
+    const firstSheet = workbook.getElementsByTagName("sheet")[0];
+    const relId = firstSheet?.getAttribute("r:id") || firstSheet?.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+    const relation = Array.from(rels.getElementsByTagName("Relationship")).find(node => node.getAttribute("Id") === relId);
+    const target = relation?.getAttribute("Target");
+    if (target) sheetPath = target.startsWith("/") ? target.slice(1) : target.startsWith("xl/") ? target : "xl/" + target.replace(/^\\.\\//, "");
+  }
+  const sheetXml = await readEntry(sheetPath);
+  if (!sheetXml) throw new Error("A primeira planilha do Excel está vazia ou não pôde ser lida.");
+  const sheet = parser.parseFromString(sheetXml, "application/xml");
+  const matrix = Array.from(sheet.getElementsByTagName("row")).map(row => {
+    const values: string[] = [];
+    Array.from(row.getElementsByTagName("c")).forEach(cell => {
+      const reference = cell.getAttribute("r") || "";
+      const letters = reference.replace(/[0-9]/g, "");
+      const column = letters.split("").reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+      const type = cell.getAttribute("t");
+      const value = cell.getElementsByTagName("v")[0]?.textContent || cell.getElementsByTagName("is")[0]?.textContent || "";
+      values[column] = type === "s" ? (shared[Number(value)] || "") : value;
+    });
+    return values;
+  });
+  const headers = (matrix.shift() || []).map(value => norm(String(value || "")).replace(/[^a-z0-9]/g, ""));
+  return matrix.map(values => Object.fromEntries(headers.map((header, index) => [header, String(values[index] || "")])).filter(([header]) => !!header) as Record<string, string>);
+}
+
 export default function SupplierSuperCatalog({ onNavigateQuotes }: { onNavigateQuotes: () => void }) {
   const [rows, setRows] = useState<SupplierProduct[]>([]);
   const [authReady, setAuthReady] = useState(false);
@@ -179,7 +252,12 @@ export default function SupplierSuperCatalog({ onNavigateQuotes }: { onNavigateQ
     try {
       if (file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf") await importPdf(file);
       else if (file.name.toLowerCase().endsWith(".csv") || file.type === "text/csv") importCsv(file);
-      else throw new Error("Formato não suportado. Importe PDF ou CSV.");
+      else if (file.name.toLowerCase().endsWith(".xlsx") || file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+        const rows = await readXlsxRows(file);
+        const mapped = rows.map(row => previewFromRow(row, detectedSupplier)).filter(Boolean) as PreviewItem[];
+        if (!mapped.length) throw new Error("Nenhuma linha de catálogo válida foi encontrada na planilha.");
+        setPreviewRows(mapped); setPreviewSource(file.name); setNotice(mapped.length + " itens preparados da planilha. Revise antes de confirmar.");
+      } else throw new Error("Formato não suportado. Importe PDF, CSV ou Excel (.xlsx).");
     } catch (e) { setError(e instanceof Error ? e.message : "Falha ao importar arquivo."); setImportBusy(false); }
   };
 
@@ -228,12 +306,12 @@ export default function SupplierSuperCatalog({ onNavigateQuotes }: { onNavigateQ
 
   return <section className="space-y-6 text-slate-900 dark:text-slate-100">
     <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div><p className="text-xs font-bold uppercase tracking-wider text-blue-600">ANACLETO ESQUADRIAS · COMPRAS</p><h1 className="mt-1 text-3xl font-black">Catálogo de Fornecedores</h1><p className="mt-2 text-sm text-slate-500">Importe PDF e CSV, revise os dados extraídos e salve itens pesquisáveis para os orçamentos.</p></div>
+      <div><p className="text-xs font-bold uppercase tracking-wider text-blue-600">ANACLETO ESQUADRIAS · COMPRAS</p><h1 className="mt-1 text-3xl font-black">Catálogo de Fornecedores</h1><p className="mt-2 text-sm text-slate-500">Importe PDF, CSV e Excel, revise os dados extraídos e salve itens pesquisáveis para os orçamentos.</p></div>
       <div className="flex flex-wrap gap-2">
         <input value={supplierName} onChange={e => setSupplierName(e.target.value)} placeholder="Nome do fornecedor" className="min-w-44 rounded-xl border bg-white px-3 py-2.5 text-sm dark:bg-slate-900"/>
-        <button disabled={importBusy} onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-50"><Upload className="h-4 w-4"/> Importar PDF / CSV</button>
+        <button disabled={importBusy} onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-50"><Upload className="h-4 w-4"/> Importar PDF / CSV / Excel</button>
         <button onClick={() => setFormOpen(!formOpen)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white"><Plus className="h-4 w-4"/> Novo item</button>
-        <input ref={fileRef} hidden type="file" accept=".pdf,.csv,application/pdf,text/csv" onChange={e => { void handleImportFile(e.target.files?.[0]); e.currentTarget.value = ""; }}/>
+        <input ref={fileRef} hidden type="file" accept=".pdf,.csv,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => { void handleImportFile(e.target.files?.[0]); e.currentTarget.value = ""; }}/>
       </div>
     </header>
     <div className="grid gap-3 sm:grid-cols-3">{[{label:"Produtos",value:rows.length},{label:"Fornecedores",value:new Set(rows.map(p=>p.supplier)).size},{label:"Categorias",value:new Set(rows.map(p=>p.category)).size}].map(x=><div key={x.label} className="rounded-2xl border bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><p className="text-xs text-slate-500">{x.label} no catálogo</p><p className="mt-1 text-2xl font-black">{x.value}</p></div>)}</div>
