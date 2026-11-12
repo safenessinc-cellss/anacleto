@@ -18,8 +18,8 @@ export const DEFAULT_THEME: ThemeConfig = {
   primaryLight: "#E8F0FE",
   accent: "#EA4335",
   accentLight: "#FCE8E6",
-  bg: "#F8F9FA",
-  cardBg: "#FFFFFF",
+  bg: "#EEF2F6",
+  cardBg: "#F8FAFC",
   radius: 8,
   density: "normal",
 };
@@ -72,7 +72,7 @@ export function applyTheme(config: ThemeConfig): void {
     html:not(.dark) .dark\\:border-slate-800,
     html:not(.dark) .dark\\:border-slate-700,
     html:not(.dark) .dark\\:border-slate-600 {
-      border-color: #e2e8f0 !important;
+      border-color: rgba(203, 213, 225, .8) !important;
     }
 
     /* ========== TARJETAS Y CONTENEDORES (modo claro) ========== */
@@ -81,7 +81,11 @@ export function applyTheme(config: ThemeConfig): void {
     }
     html:not(.dark) .bg-slate-50,
     html:not(.dark) .bg-slate-100 {
-      background-color: ${config.primaryLight} !important;
+      background-color: ${config.cardBg} !important;
+    }
+    html:not(.dark) .border:not([class*="border-"]),
+    html:not(.dark) [class*="border-slate-"] {
+      border-color: rgba(203, 213, 225, .8) !important;
     }
 
     /* ========== PRIMARY ========== */
@@ -143,7 +147,10 @@ export function loadSavedTheme(): ThemeConfig | null {
     const saved = localStorage.getItem("anacleto_theme");
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...DEFAULT_THEME, ...parsed };
+      const config = { ...DEFAULT_THEME, ...parsed };
+      if (parsed?.bg === "#F8F9FA") config.bg = DEFAULT_THEME.bg;
+      if (parsed?.cardBg === "#FFFFFF") config.cardBg = DEFAULT_THEME.cardBg;
+      return config;
     }
   } catch {}
   return null;

@@ -19,7 +19,7 @@ export function sanitizeFirestoreData<T>(value: T): T {
 
     return Object.fromEntries(
       Object.entries(current as Record<string, unknown>)
-        .filter(([key, child]) => child !== undefined && !isOmittedReferenceValue(key, child) &&
+        .filter(([key, child]) => key.toLowerCase() !== "pdfdatauri" && child !== undefined && !isOmittedReferenceValue(key, child) &&
           !(typeof child === "string" && child.trim() === "" && /^(drawingId|referenceCode|reference|tipologia|medidas|linha|cor|vidro)$/i.test(key)))
         .map(([key, child]) => [key, sanitize(child)])
         .filter(([, child]) => child !== undefined),

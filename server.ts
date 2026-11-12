@@ -559,7 +559,16 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLi
 app.post("/api/public/quote-estimate", (req, res) => publicQuoteEstimateHandler(req, res));
 app.all("/api/proposta", (req, res) => publicProposalHandler(req, res));
 
-app.post("/api/ai/technical-drawing",(req,res)=>technicalDrawingHandler(req,res));
+app.post("/api/ai/technical-drawing", async (req, res) => {
+  try {
+    await technicalDrawingHandler(req, res);
+  } catch (error) {
+    console.error("Unhandled technical drawing route failure:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "O serviço de desenho técnico encontrou uma falha inesperada.", code: "TECHNICAL_DRAWING_INTERNAL_ERROR" });
+    }
+  }
+});
 app.all("/api/approved-snapshot", (req, res) => approvedSnapshotHandler(req, res));
 
 // Setup Vite Dev Server / Serve build static files

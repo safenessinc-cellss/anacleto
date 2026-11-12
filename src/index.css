@@ -78,11 +78,16 @@ body {
     color-scheme: light;
   }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply text-slate-900 antialiased;
+    background-color: #EEF2F6;
     font-feature-settings: "cv11", "ss01";
   }
   /* Forzar contraste en fondos claros */
-  .bg-white, .bg-slate-50, .bg-slate-100 {
+  .bg-white {
+    background-color: #F8FAFC;
+    @apply text-slate-900;
+  }
+  .bg-slate-50, .bg-slate-100 {
     @apply text-slate-900;
   }
   /* Inputs legibles siempre */
@@ -98,6 +103,10 @@ body {
    FORCE CLEAN LIGHT MODE - ANACLETO
    ============================================ */
 html:not(.dark) { color-scheme: light; }
+html:not(.dark) .border:not([class*="border-"]),
+html:not(.dark) [class*="border-slate-"] {
+  border-color: rgba(203, 213, 225, .8) !important;
+}
 html.dark { color-scheme: dark; }
 
 html:not(.dark) body,

@@ -63,13 +63,13 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   const heightMatch = prompt.match(/altura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
   const width = toMm(widthMatch?.[1] || match?.[1], widthMatch?.[2] || match?.[2], 0);
   const height = toMm(heightMatch?.[1] || match?.[3], heightMatch?.[2] || match?.[4], 0);
-  const namedLine = prompt.match(/\b(linha\s+\d+|suprema|gold)\b/i)?.[1];
+  const namedLine = prompt.match(/\blinha\s+(suprema|gold|\d+)\b/i)?.[1] || prompt.match(/\b(suprema|gold)\b/i)?.[1];
   const glassType = text.match(/\b(duplo|laminado|temperado|insulado|comum|float)\b/)?.[1];
   const thickness = text.match(/(?:vidro\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\s+)?(?:de\s*)?|espessura\s*(?:de\s*)?)(\d+(?:[.,]\d+)?)\s*mm/)?.[1]
     || text.match(/(\d+(?:[.,]\d+)?)\s*mm\s*(?:de\s*)?(?:vidro|espessura)\b/)?.[1];
   return {
     tipologia,
-    linha_aluminio: namedLine ? namedLine.replace(/^linha/i, "Linha").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Linha a definir",
+    linha_aluminio: namedLine ? `Linha ${namedLine.replace(/\b\w/g, (letter) => letter.toUpperCase())}` : "Linha a definir",
     cor_perfil: /preto/.test(text) ? "#1f2937" : /branco/.test(text) ? "#f8fafc" : "#94a3b8",
     cor_vidro: text.match(/\b(incolor|bronze|verde|fum[eê]|cinza)\b/i)?.[1]?.toLowerCase() || "a definir",
     largura_mm: width,

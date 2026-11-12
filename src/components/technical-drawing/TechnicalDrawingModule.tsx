@@ -46,7 +46,7 @@ interface TechnicalDrawingModuleProps {
 }
 
 // Initial sample project for instantaneous feedback
-const initialSampleDrawing: TechnicalDrawing = {
+const furnitureSampleDrawing: TechnicalDrawing = {
   id: "draw-sample-01",
   title: "Mesa de Madeira Maciça 120×80×75 cm",
   description: "Estrutura arquitetônica em madeira de carvalho com encaixes tipo caixa e espiga e saias perimetrais.",
@@ -167,6 +167,27 @@ const initialSampleDrawing: TechnicalDrawing = {
   updatedAt: new Date().toISOString(),
 };
 
+const defaultCadPrompt = "Janela de Correr 2 Folhas - Linha Suprema - 1500x1200mm - Vidro Incolor 8mm";
+const defaultCadSpec = {
+  tipologia: "janela_correr",
+  linha_aluminio: "Linha Suprema",
+  cor_perfil: "#94a3b8",
+  cor_vidro: "incolor",
+  largura_mm: 1500,
+  altura_mm: 1200,
+  folhas: 2,
+  modulo_fixo: false,
+  tipo_vidro: "comum",
+  espessura_mm: 8,
+  abertura: "central",
+} as const;
+const initialSampleDrawing: TechnicalDrawing = {
+  ...buildParametricDrawing(defaultCadSpec, defaultCadPrompt),
+  id: "draw-sample-01",
+  title: defaultCadPrompt,
+  description: defaultCadPrompt,
+};
+
 function enrichDrawingBudget(
   budget: NonNullable<TechnicalDrawing["budget"]>,
   catalog: any[],
@@ -276,7 +297,7 @@ function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
       piece("p3", "Reforços / uniões", 2, Math.max(1, width / 5), Math.max(1, height / 5), Math.max(1, depth / 5), "#94A3B8")
     ];
   }
-  const steps = initialSampleDrawing.steps.map((step, index) => ({
+  const steps = furnitureSampleDrawing.steps.map((step, index) => ({
     ...step,
     stepNumber: index + 1,
     phaseName: ["Definição das dimensões gerais", "Lista de peças e componentes", "Corte e cotagem individual", "Encaixe e montagem", "Vista final e conferência"][index],
@@ -320,7 +341,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   }, []);
 
   const { showToast } = useToast();
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(defaultCadPrompt);
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [drawing, setDrawing] = useState<TechnicalDrawing>(initialSampleDrawing);
@@ -371,6 +392,17 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     });
   }, [authReady, showToast]);
 
+  useEffect(() => {
+    if (!supplierCatalog.length && !catalogItems.length) return;
+    setDrawing((current) => {
+      if (!current.parametricSpec || !current.budget) return current;
+      return {
+        ...current,
+        budget: enrichDrawingBudget(current.budget, [...catalogItems, ...supplierCatalog], aluminumPricePerKg),
+      };
+    });
+  }, [catalogItems, supplierCatalog, aluminumPricePerKg]);
+
   const updateBudget = (change: (budget: NonNullable<TechnicalDrawing["budget"]>) => NonNullable<TechnicalDrawing["budget"]>) => {
     setDrawing((current) => {
       const currentBudget = current.budget || { currency: "BRL", items: [], subtotal: 0, labor: 0, total: 0 };
@@ -391,6 +423,66 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       ...budget,
       items: budget.items.map((item) => item.id === itemId ? { ...item, [field]: ["quantity", "unitPrice", "cutLengthMm"].includes(field) ? Number(value) || 0 : value } : item),
     }));
+  };
+
+  const rebuildParametricPreview = (
+    current: TechnicalDrawing,
+    spec: typeof defaultCadSpec | ReturnType<typeof localParametricSpec>,
+    description: string,
+  ): TechnicalDrawing => {
+    const updated = buildParametricDrawing(spec, description, [...catalogItems, ...supplierCatalog]);
+    const generatedIds = new Set(updated.budget?.items.map((item) => item.id) || []);
+    const retainedItems = (current.budget?.items || []).filter((item) =>
+      !item.pieceId && !item.id.startsWith("budget-") && !generatedIds.has(item.id)
+    );
+    const budget = updated.budget && current.budget
+      ? enrichDrawingBudget({
+        ...updated.budget,
+        items: [...updated.budget.items, ...retainedItems],
+        labor: current.budget.labor,
+        marginRate: current.budget.marginRate,
+        freight: current.budget.freight,
+        taxRate: current.budget.taxRate,
+      }, [...catalogItems, ...supplierCatalog], aluminumPricePerKg)
+      : updated.budget;
+    return {
+      ...updated,
+      ...(budget ? { budget } : {}),
+      id: current.id === "draw-sample-01" ? `draw_local_${Date.now()}` : current.id,
+      createdAt: current.createdAt || updated.createdAt,
+      updatedAt: new Date().toISOString(),
+      projectId: current.projectId,
+      projectName: current.projectName,
+    };
+  };
+
+  const updatePromptPreview = (value: string) => {
+    setPrompt(value);
+    if (!isAluminumPrompt(value)) return;
+    setDrawing((current) => {
+      if (current.approvedSnapshotId || current.status === "APPROVED_FOR_MANUFACTURING") return current;
+      const currentSpec = current.parametricSpec || defaultCadSpec;
+      const parsed = localParametricSpec(value);
+      const hasProfileColor = /\b(preto|branco)\b/i.test(value);
+      return rebuildParametricPreview(current, {
+        ...parsed,
+        largura_mm: parsed.largura_mm || currentSpec.largura_mm || defaultCadSpec.largura_mm,
+        altura_mm: parsed.altura_mm || currentSpec.altura_mm || defaultCadSpec.altura_mm,
+        linha_aluminio: parsed.linha_aluminio === "Linha a definir" ? currentSpec.linha_aluminio : parsed.linha_aluminio,
+        cor_perfil: hasProfileColor ? parsed.cor_perfil : currentSpec.cor_perfil,
+        tipo_vidro: parsed.tipo_vidro === "a definir" ? currentSpec.tipo_vidro : parsed.tipo_vidro,
+        cor_vidro: parsed.cor_vidro === "a definir" ? currentSpec.cor_vidro : parsed.cor_vidro,
+      }, value);
+    });
+  };
+
+  const updateParametricField = (field: "largura_mm" | "altura_mm" | "folhas", value: number) => {
+    if (!Number.isFinite(value) || value <= 0 || drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") return;
+    const boundedValue = field === "folhas" ? Math.min(8, value) : Math.min(20_000, value);
+    setDrawing((current) => {
+      const spec = current.parametricSpec || defaultCadSpec;
+      return rebuildParametricPreview(current, { ...spec, [field]: Math.round(boundedValue) }, current.description || defaultCadPrompt);
+    });
   };
 
   const addSupplierBudgetItem = (productId: string) => {
@@ -705,8 +797,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       const res = await fetch("/api/ai/technical-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: [...catalogItems, ...supplierCatalog] }),
-        signal: AbortSignal.timeout(8_000),
+        body: JSON.stringify({ prompt: inputPrompt, currentDrawing: localDrawing, catalog: [...catalogItems, ...supplierCatalog] }),
+        signal: AbortSignal.timeout(4_000),
       });
       let responseBody = await res.json().catch(() => null);
       if (res.status === 202 && responseBody?.status === "JOB_PROCESSING" && responseBody?.jobId && responseBody?.pollUrl) {
@@ -750,7 +842,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         assumptions: Array.isArray(responseBody.assumptions) ? responseBody.assumptions : [],
         dimensionLines: Array.isArray(responseBody.dimensionLines) ? responseBody.dimensionLines : [],
         assemblyInstructions: Array.isArray(responseBody.assemblyInstructions) ? responseBody.assemblyInstructions : [],
-        steps: Array.isArray(responseBody.steps) && responseBody.steps.length >= 5 ? responseBody.steps.slice(0, 5) : initialSampleDrawing.steps,
+        steps: Array.isArray(responseBody.steps) && responseBody.steps.length >= 5 ? responseBody.steps.slice(0, 5) : furnitureSampleDrawing.steps,
         currentStep: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -828,6 +920,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   };
 
   const currentStepData = drawing.steps?.[currentStep - 1];
+  const parametricSpec = drawing.parametricSpec || defaultCadSpec;
+  const canEditParametric = !drawing.approvedSnapshotId && drawing.status !== "APPROVED_FOR_MANUFACTURING";
 
   const presets = [
     "una mesa de madera de 120x80x75 cm con 4 patas",
@@ -933,7 +1027,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             >
               <textarea
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => updatePromptPreview(e.target.value)}
                 placeholder="Ex: uma mesa de madeira de 120x80x75 cm com 4 pernas..."
                 rows={3}
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-800 focus:border-amber-500/60 rounded-2xl text-xs text-white placeholder-slate-500 outline-none resize-none transition pr-12"
@@ -947,6 +1041,16 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               </button>
             </form>
           </div>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 className="text-sm font-bold text-slate-900">Geometria paramétrica · edição local</h3>
+            <p className="mt-1 text-xs text-slate-500">A vista, o orçamento e o roteiro de corte são atualizados sem aguardar a IA.</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <label className="text-[10px] font-semibold text-slate-500">Largura (mm)<input type="number" min="1" max="20000" value={parametricSpec.largura_mm} disabled={!canEditParametric} onChange={(event) => updateParametricField("largura_mm", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
+              <label className="text-[10px] font-semibold text-slate-500">Altura (mm)<input type="number" min="1" max="20000" value={parametricSpec.altura_mm} disabled={!canEditParametric} onChange={(event) => updateParametricField("altura_mm", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
+              <label className="text-[10px] font-semibold text-slate-500">Folhas<input type="number" min="1" max="8" value={parametricSpec.folhas} disabled={!canEditParametric} onChange={(event) => updateParametricField("folhas", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
+            </div>
+          </section>
 
           {/* 5-Step Phase Controller */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-4">

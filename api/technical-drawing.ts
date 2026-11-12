@@ -307,6 +307,33 @@ function localFallback(prompt: string) {
   };
 }
 
+function localTechnicalFallback(prompt: string, catalog: any[]) {
+  if (isAluminumPrompt(prompt)) {
+    const extracted = localParametricSpec(prompt);
+    const spec = {
+      ...extracted,
+      largura_mm: extracted.largura_mm > 0 && extracted.largura_mm <= 20_000 ? extracted.largura_mm : 1000,
+      altura_mm: extracted.altura_mm > 0 && extracted.altura_mm <= 20_000 ? extracted.altura_mm : 1000,
+    };
+    const drawing = buildParametricDrawing(spec, prompt, catalog);
+    return {
+      ...drawing,
+      _fallback: true,
+      isDraft: true,
+      draftStatus: "preliminary",
+      draftLabel: "RASCUNHO PARAMÉTRICO LOCAL — VALIDAR ANTES DE FABRICAR",
+      assumptions: [
+        "A extração de IA não ficou disponível; os dados foram identificados localmente por palavras-chave.",
+        ...(extracted.largura_mm > 0 && extracted.altura_mm > 0 ? [] : ["Dimensões ausentes ou inválidas: foi usada a medida provisória de 1000 mm; informe as medidas reais antes de fabricar."]),
+        "Confirme tipologia, linha, cotas, folgas, perfis, ferragens e vidro antes da fabricação.",
+      ],
+    };
+  }
+  const drawing: any = localFallback(prompt);
+  drawing.budget = buildTechnicalBudget(drawing.pieces, catalog);
+  return drawing;
+}
+
 export default async function handler(req: any, res: any) {
   const requestId = String(req.headers?.["x-vercel-id"] || req.headers?.["x-request-id"] || "unknown");
   let prompt = "";
@@ -369,6 +396,7 @@ export default async function handler(req: any, res: any) {
     if (!["owner","super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role)) {
       return json(res, 403, { error: "Seu perfil não possui permissão para operações de desenho técnico.", code: "ROLE_FORBIDDEN" });
     }
+    stage = "catalog_loading";
     catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
     if (!allowRequest(user.uid)) {
       return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
@@ -419,7 +447,8 @@ export default async function handler(req: any, res: any) {
         return value;
       });
       if (spec.largura_mm <= 0 || spec.altura_mm <= 0) {
-        return json(res, 422, { error: "Informe largura e altura explícitas em milímetros para gerar o desenho paramétrico.", code: "DIMENSIONS_REQUIRED" });
+        const fallback = localTechnicalFallback(prompt, catalog);
+        return json(res, 200, withDraftVectorWatermark(fallback));
       }
       const responseDrawing = withDraftVectorWatermark(buildParametricDrawing(spec, prompt, catalog));
       return json(res, 200, responseDrawing);
@@ -541,18 +570,7 @@ export default async function handler(req: any, res: any) {
       }
       // Rascunho local temporário: nunca liberado para fabricação sem validação técnica.
       try {
-        if (isAluminumPrompt(prompt)) {
-          const localSpec = localParametricSpec(prompt);
-          if (localSpec.largura_mm <= 0 || localSpec.altura_mm <= 0) {
-            return json(res, 422, { error: "Não consegui extrair as dimensões da descrição. Informe largura e altura para continuar.", code: "DIMENSIONS_REQUIRED" });
-          }
-          const local = buildParametricDrawing(localSpec, prompt, catalog);
-          local.status = "PRELIMINARY_CONTINGENCY";
-          local.draftLabel = "RASCUNHO PARAMÉTRICO LOCAL — VALIDAR ANTES DE FABRICAR";
-          local.assumptions = ["A extração de IA não ficou disponível; os dados foram identificados localmente por palavras-chave. Confirme tipologia e cotas antes da fabricação."];
-          return json(res, 200, withDraftVectorWatermark(local));
-        }
-        const fallback: any = localFallback(prompt);
+        const fallback: any = localTechnicalFallback(prompt, catalog);
         fallback.isDraft = true;
         fallback.status = "LOCAL_PRELIMINARY_FALLBACK";
         fallback.draftStatus = "preliminary";
@@ -561,7 +579,12 @@ export default async function handler(req: any, res: any) {
         return json(res, 200, withDraftVectorWatermark(fallback));
       } catch (fallbackError) {
         console.error("Local drawing fallback failed:", fallbackError);
-        return json(res, 503, { error: "IA indisponível e falha no rascunho local.", code: "TECHNICAL_DRAWING_UNAVAILABLE" });
+        const fallback = localFallback(prompt);
+        fallback.isDraft = true;
+        fallback._fallback = true;
+        fallback.draftStatus = "preliminary";
+        fallback.draftLabel = "RASCUNHO LOCAL — NÃO UTILIZAR PARA FABRICAÇÃO";
+        return json(res, 200, withDraftVectorWatermark(fallback));
       }
     }
 
