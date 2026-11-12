@@ -3,7 +3,15 @@ import http from "http";
 import path from "path";
 import dotenv from "dotenv";
 // import estático de vite eliminado - se usa import dinámico en desarrollo
-import { generateText, gateway } from "ai";
+import { generateText } from "ai";
+import { AI_CONFIG, getAIModel } from "./src/server/ai-config";
+import { generateValidatedJson, parseAIJson } from "./src/server/ai-json";
+import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore } from "./src/server/firestore-data";
+import technicalDrawingHandler from "./api/technical-drawing";
+import approvedSnapshotHandler from "./api/approved-snapshot";
+import publicQuoteEstimateHandler from "./api/public/quote-estimate";
+import { recordAIAudit } from "./src/server/ai-audit";
+import { requestDrawingService, getDrawingServiceJob } from "./src/server/drawing-service-client";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -19,7 +27,7 @@ app.use(express.json({ limit: "16mb" }));
 const PORT = 3000;
 
 // Vercel AI Gateway supplies authentication in previews and deployments.
-const aiModel = gateway(process.env.ANACLETO_AI_MODEL || "google/gemini-2.5-flash");
+const aiModel = getAIModel("default");
 
 const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
 const ownerEmail = "safeness.c.a@gmail.com";
@@ -63,6 +71,12 @@ const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
   }
 };
 
+const requireQuoteRole: express.RequestHandler = (_req, res, next) => {
+  const user = res.locals.firebaseUser as { role?: string } | undefined;
+  if (user && ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"].includes(user.role || "")) return next();
+  return res.status(403).json({ error: "Seu perfil não tem autorização para operações comerciais e orçamentos." });
+};
+
 const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
   const user = res.locals.firebaseUser as { role?: string } | undefined;
   if (user && ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role || "")) return next();
@@ -70,25 +84,104 @@ const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
 };
 
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
-const rateLimitByUser = (bucket: string, limit: number, windowMs: number): express.RequestHandler => (req, res, next) => {
-  const user = res.locals.firebaseUser as { uid?: string } | undefined;
-  const key = `${bucket}:${user?.uid || req.ip}`;
-  const now = Date.now();
-  if (requestWindows.size > 5000) {
-    for (const [entry, window] of requestWindows) {
-      if (now - window.startedAt >= windowMs) requestWindows.delete(entry);
+
+function compactFinancialRows(rows: any[], fields: string[]) {
+  return rows.slice(0, 120).map(row => Object.fromEntries(fields.filter(key => row[key] !== undefined).map(key => [key, row[key]])));
+}
+
+// Assistente Financeiro: answers only from the authenticated user's live business records.
+app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("financial-assistant", 15, 60_000), async (req, res) => {
+  const startedAt = Date.now();
+  const user = res.locals.firebaseUser as { uid?: string; email?: string };
+  const question = String(req.body?.message || "").trim().slice(0, 3000);
+  const language = String(req.body?.language || "pt").toLowerCase().startsWith("es") ? "es" : "pt";
+  if (question.length < 3) return res.status(400).json({ error: "Digite uma pergunta financeira." });
+  try {
+    const names = ["quotes", "invoices", "inventory_items", "inventory_movements", "ledger_entries", "payables", "receivables", "purchase_orders"];
+    const [loaded, catalogRows] = await Promise.all([
+      Promise.all(names.map(name => loadCollectionFromFirestore(req, name, 250))),
+      loadCatalogFromFirestore(req),
+    ]);
+    const data = Object.fromEntries(names.map((name, index) => [name, loaded[index]]));
+    const catalog = catalogRows.slice(0, 250).map(row => ({
+      name: String(row.name || row.description || "Item"),
+      sku: String(row.sku || row.code || ""),
+      category: String(row.category || ""),
+      unit: String(row.unit || "un"),
+      price: Number(row.price || 0),
+      supplier: String(row.supplier || ""),
+      source: String(row.source || ""),
+    }));
+    const ledger = data.ledger_entries as any[];
+    const cashIn = ledger.filter(x => ["inflow","income","entrada","in"].includes(String(x.direction || x.type || "").toLowerCase()) && !["void","cancelled","cancelado","estornado"].includes(String(x.status || "").toLowerCase())).reduce((s,x)=>s+Math.max(0,Number(x.amount||0)),0);
+    const cashOut = ledger.filter(x => ["outflow","expense","saida","saída","out"].includes(String(x.direction || x.type || "").toLowerCase()) && !["void","cancelled","cancelado","estornado"].includes(String(x.status || "").toLowerCase())).reduce((s,x)=>s+Math.max(0,Number(x.amount||0)),0);
+    const stock = (data.inventory_items as any[]).map(x => ({
+      name: String(x.name || x.description || "Item"),
+      sku: String(x.sku || x.code || ""),
+      quantity: Number(x.quantity || 0),
+      reservedQuantity: Number(x.reservedQuantity || 0),
+      available: Math.max(0, Number(x.quantity || 0) - Number(x.reservedQuantity || 0)),
+      minimumStock: Number(x.minimumStock || 0),
+      unitCost: Number(x.unitCost ?? x.costPrice ?? x.averageCost ?? 0),
+      unit: String(x.unit || "un"),
+    }));
+    const stockCostKnown = stock.filter(x => x.unitCost > 0).reduce((s,x)=>s+x.quantity*x.unitCost,0);
+    const context = {
+      currency: "BRL",
+      collectionCounts: Object.fromEntries(names.map(name => [name, (data as any)[name].length])),
+      cashLedger: { receivedRecorded: cashIn, paidRecorded: cashOut, netRecorded: cashIn - cashOut, note: "Calculado exclusivamente dos lançamentos efetivos em ledger_entries; não equivale ao lucro contábil." },
+      quotes: compactFinancialRows(data.quotes, ["number","clientName","date","status","subtotal","taxAmount","discountAmount","total","currency","items"]),
+      invoices: compactFinancialRows(data.invoices, ["number","clientName","date","dueDate","status","subtotal","taxAmount","total","currency","items"]),
+      inventory: stock.slice(0, 150),
+      catalog,
+      inventoryMovements: compactFinancialRows(data.inventory_movements, ["itemName","type","quantity","reason","createdAt"]),
+      payables: compactFinancialRows(data.payables, ["description","supplierName","amount","total","dueDate","status","paidAt"]),
+      receivables: compactFinancialRows(data.receivables, ["description","clientName","amount","receivedAmount","dueDate","status","receivedAt"]),
+      purchaseOrders: compactFinancialRows(data.purchase_orders, ["number","supplierName","documentNumber","issueDate","dueDate","status","subtotal","tax","total","items"]),
+      inventoryKnownCostEstimate: stockCostKnown,
+      inventoryCostCoverage: stock.length ? stock.filter(x => x.unitCost > 0).length + "/" + stock.length + " itens com custo unitário informado" : "sem itens",
+    };
+    const history = Array.isArray(req.body?.history) ? req.body.history.slice(-8).map((m:any)=>({role:m?.role==="assistant"?"assistant":"user",text:String(m?.text||"").slice(0,1200)})) : [];
+    const result = await generateValidatedJson({
+      capability: "chat",
+      system: `Você é o Assistente Financeiro da Anacleto Esquadrias. Responda no idioma ${language === "es" ? "espanhol" : "português brasileiro"}. Use EXCLUSIVAMENTE os dados reais fornecidos no contexto. Não invente custos, preços, impostos, margens, lucros, datas ou saldos. Diferencie faturamento emitido, valores efetivamente recebidos, contas em aberto, compras registradas e pagamentos efetivos. Lucro só pode ser afirmado quando houver receita e custos efetivos suficientemente completos no ledger; caso contrário, explique a limitação. Para custo de alumínio/vidro, procure itens identificados no estoque e catálogo; se não houver custo unitário confiável, informe que o dado não está cadastrado. A resposta deve ser objetiva, explicar cálculos e apontar dados faltantes. Retorne somente JSON com answer (string), metrics (array de {label,value,explanation}), warnings (array de strings).`,
+      prompt: `Dados atuais do sistema (BRL): ${JSON.stringify(context)}\nHistórico recente: ${JSON.stringify(history)}\nPergunta: ${question}`,
+      responseSchema: FINANCIAL_ASSISTANT_SCHEMA,
+      validate: (value:any) => {
+        if (!value || typeof value.answer !== "string" || !value.answer.trim() || !Array.isArray(value.metrics) || !Array.isArray(value.warnings)) throw new Error("Resposta financeira incompleta.");
+        return { answer: value.answer.slice(0,8000), metrics: value.metrics.slice(0,8).map((m:any)=>({label:String(m?.label||"").slice(0,100),value:String(m?.value??"").slice(0,120),explanation:String(m?.explanation||"").slice(0,300)})), warnings: value.warnings.slice(0,8).map((w:any)=>String(w).slice(0,300)) };
+      },
+    });
+    await recordAIAudit({serviceName:"FINANCIAL_ASSISTANT",modelUsed:AI_CONFIG.chat.model,input:{question,collectionCounts:context.collectionCounts},output:result,actorUid:user.uid,requestId:String(req.headers["x-request-id"]||""),startedAt,authorizationToken:String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"")});
+    return res.json(result);
+  } catch (error:any) {
+    try { await recordAIAudit({serviceName:"FINANCIAL_ASSISTANT",modelUsed:AI_CONFIG.chat.model,input:{question},error,actorUid:user.uid,requestId:String(req.headers["x-request-id"]||""),startedAt,authorizationToken:String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"")}); } catch {}
+    console.error("Financial assistant failed:", error?.message || error);
+    return res.status(502).json({error:"O Assistente Financeiro não conseguiu consultar os dados agora. Verifique a conexão e tente novamente.",code:"FINANCIAL_ASSISTANT_UNAVAILABLE"});
+  }
+});
+
+function rateLimitByUser(bucket: string, limit: number, windowMs: number): express.RequestHandler {
+  return (req, res, next) => {
+    const user = res.locals.firebaseUser as { uid?: string } | undefined;
+    const key = `${bucket}:${user?.uid || req.ip}`;
+    const now = Date.now();
+    if (requestWindows.size > 5000) {
+      for (const [entry, window] of requestWindows) {
+        if (now - window.startedAt >= windowMs) requestWindows.delete(entry);
+      }
     }
-  }
-  const current = requestWindows.get(key);
-  if (!current && requestWindows.size >= 10000) return res.status(429).json({ error: "Limite temporário de solicitações atingido. Tente novamente em instantes." });
-  if (!current || now - current.startedAt >= windowMs) {
-    requestWindows.set(key, { startedAt: now, count: 1 });
+    const current = requestWindows.get(key);
+    if (!current && requestWindows.size >= 10000) return res.status(429).json({ error: "Limite temporário de solicitações atingido. Tente novamente em instantes." });
+    if (!current || now - current.startedAt >= windowMs) {
+      requestWindows.set(key, { startedAt: now, count: 1 });
+      return next();
+    }
+    if (current.count >= limit) return res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente." });
+    current.count += 1;
     return next();
-  }
-  if (current.count >= limit) return res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente." });
-  current.count += 1;
-  return next();
-};
+  };
+}
 
 
 // ----------------------------------------------------
@@ -125,7 +218,7 @@ app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
     });
 
     const response = await generateText({
-      model: aiModel,
+      model: getAIModel("chat"),
       system: systemInstruction,
       messages: contents.map((content) => ({
         role: content.role === "model" ? "assistant" : content.role,
@@ -149,44 +242,88 @@ app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
 
+
+const QUOTE_AGENT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    reply: {type:"STRING"}, action: {type:"STRING",enum:["update_quote","generate_invoice","none"]},
+    items: {type:"ARRAY",items:{type:"OBJECT",properties:{
+      id:{type:"STRING"},description:{type:"STRING"},sku:{type:"STRING"},catalogItemId:{type:"STRING"},catalogSource:{type:"STRING"},
+      quantity:{type:"NUMBER"},unitPrice:{type:"NUMBER"},subtotal:{type:"NUMBER"},priceSource:{type:"STRING",enum:["catalog","pending","existing","manual"]}
+    },required:["description","quantity","unitPrice"]}},
+    taxRate:{type:"NUMBER"},discountRate:{type:"NUMBER"},notes:{type:"STRING"}
+  }, required:["reply","action","items","taxRate","discountRate","notes"]
+};
+const BUDGET_ITEMS_SCHEMA = {
+  type:"OBJECT",
+  properties:{items:{type:"ARRAY",items:{type:"OBJECT",properties:{description:{type:"STRING"},qty:{type:"NUMBER"},price:{type:"NUMBER"},sku:{type:"STRING"},catalogItemId:{type:"STRING"},priceSource:{type:"STRING",enum:["catalog","pending"]}},required:["description","qty","price"]}},notes:{type:"STRING"}},
+  required:["items","notes"]
+};
+const FINANCIAL_ASSISTANT_SCHEMA = {
+  type:"OBJECT",
+  properties:{
+    answer:{type:"STRING"},
+    metrics:{type:"ARRAY",items:{type:"OBJECT",properties:{label:{type:"STRING"},value:{type:"STRING"},explanation:{type:"STRING"}},required:["label","value","explanation"]}},
+    warnings:{type:"ARRAY",items:{type:"STRING"}}
+  }, required:["answer","metrics","warnings"]
+};
+
 function normalizeCatalogName(value: unknown) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 function findExactCatalogItem(item: any, catalog: any[]) {
   const sku = String(item?.sku || item?.code || "").trim().toLowerCase();
-  const catalogId = String(item?.catalogItemId || "").trim();
+  const catalogId = String(item?.catalogItemId || item?.itemId || "").trim();
+  const source = String(item?.catalogSource || item?.source || "").trim();
   const description = normalizeCatalogName(item?.description);
   return catalog.find((row: any) => {
+    if (source && row?.source && String(row.source) !== source) return false;
     const rowSku = String(row?.sku || row?.code || "").trim().toLowerCase();
-    if (catalogId && String(row?.id || "") === catalogId) return true;
-    if (sku && rowSku && sku === rowSku) return true;
+    const idMatches = !!catalogId && String(row?.id || "") === catalogId;
+    const skuMatches = !!sku && !!rowSku && sku === rowSku;
+    if (catalogId && sku) return idMatches && skuMatches;
+    if (catalogId) return idMatches;
+    if (sku) return skuMatches;
     const rowName = normalizeCatalogName(row?.name || row?.description);
     return !!description && !!rowName && description === rowName;
   });
+}
+function hasVerifiedCatalogPrice(row: any): boolean {
+  if (!row || row.price === undefined || row.price === null || String(row.price).trim() === "") return false;
+  const price = Number(row.price);
+  return Number.isFinite(price) && price >= 0;
 }
 
 // ----------------------------------------------------
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
-app.post("/api/ai/quote-agent", requireFirebaseAuth, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
+app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
+  const aiStartedAt = Date.now();
+  const aiUsage = { inputTokens: 0, outputTokens: 0 };
   try {
     const message = String(req.body?.message || "").trim();
-    const currentQuote = req.body?.currentQuote || {};
+    const requestedQuote = req.body?.currentQuote && typeof req.body.currentQuote === "object" ? req.body.currentQuote : {};
+    const quoteId = String(requestedQuote.id || "").trim();
+    if (!quoteId) return res.status(400).json({ error: "Selecione um orçamento salvo antes de usar o agente." });
+    const storedQuote = await loadQuoteFromFirestore(req, quoteId);
+    if (!storedQuote) return res.status(404).json({ error: "Orçamento não encontrado no banco de dados." });
+    const currentQuote = { ...storedQuote, id: quoteId };
+    const storedQuoteItems = Array.isArray(storedQuote.items) ? storedQuote.items : [];
     if (!message) return res.status(400).json({ error: "Mensagem obrigatória." });
-    const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
+    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 250);
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((entry: any) => ({
       role: entry?.role === "assistant" ? "assistant" : "user",
       text: String(entry?.text || "").slice(0, 2000),
     })) : [];
     const systemPrompt = `
 Você é o agente técnico de orçamentos da Anacleto Esquadrias.
-Responda exclusivamente JSON válido: {"reply":"...","action":"update_quote|generate_invoice|none","items":[{"id":"...","description":"nome EXATO do catálogo quando houver correspondência","sku":"","catalogItemId":"","quantity":1,"unitPrice":0,"subtotal":0,"priceSource":"catalog|pending"}],"taxRate":0,"discountRate":0,"notes":""}.
+Responda exclusivamente JSON válido: {"reply":"...","action":"update_quote|generate_invoice|none","items":[{"id":"...","description":"nome EXATO do catálogo quando houver correspondência","sku":"","catalogItemId":"","catalogSource":"","quantity":1,"unitPrice":0,"subtotal":0,"priceSource":"catalog|pending"}],"taxRate":0,"discountRate":0,"notes":""}.
 Orçamento atual: ${JSON.stringify(currentQuote)}
 Catálogo real: ${JSON.stringify(catalog)}
 Regras obrigatórias:
 - Preserve TODAS as linhas atuais, seus IDs, quantidades e preços quando o usuário não pedir alteração.
 - Ao adicionar itens, devolva também todas as linhas que já existiam sem alterações.
-- Use somente itens do catálogo com correspondência exata por SKU/código, ID ou nome completo. Informe sku e catalogItemId quando existirem.
+- Use somente itens do catálogo com correspondência exata por SKU/código, ID ou nome completo. Informe sku, catalogItemId e catalogSource quando existirem.
 - O servidor validará os preços contra o catálogo. Se não houver correspondência exata, unitPrice=0 e priceSource="pending".
 - Nunca estime/invente preços, impostos, medidas ou custos. Medidas ausentes devem aparecer em notes como pendências.
 - Só altere imposto ou desconto quando o usuário solicitar explicitamente.
@@ -194,34 +331,78 @@ Regras obrigatórias:
 - Se não houver alteração solicitada, use action="none".
 `;
     const transcript = history.map((entry: any) => `${entry.role}: ${entry.text}`).join("\\n");
-    const response = await generateText({
-      model: aiModel,
+    const parsed = await generateValidatedJson({
+      capability: "quote",
       system: systemPrompt,
       prompt: `Histórico recente:\\n${transcript}\\n\\nSolicitação atual: ${message}`,
-      temperature: 0.1,
+      responseSchema: QUOTE_AGENT_SCHEMA,
+      onGeneration: ({ usage }) => {
+        aiUsage.inputTokens += Number(usage?.inputTokens ?? usage?.promptTokens ?? 0);
+        aiUsage.outputTokens += Number(usage?.outputTokens ?? usage?.completionTokens ?? 0);
+      },
+      validate: (value: any) => {
+        if (!value || typeof value !== "object" || !Array.isArray(value.items)) throw new Error("Resposta de orçamento incompleta.");
+        if (value.items.length > 150) throw new Error("O orçamento excede o limite de 150 linhas.");
+        for (const item of value.items) {
+          const quantity = Number(item?.quantity);
+          if (!String(item?.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0) throw new Error("A IA retornou uma linha de orçamento inválida.");
+        }
+        return value;
+      },
     });
-    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) throw new Error("Resposta de orçamento incompleta.");
+    await recordAIAudit({
+      serviceName: "BUDGET", modelUsed: AI_CONFIG.quote.model,
+      input: { message, history, currentQuote },
+      output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
+      requestId: String(req.headers["x-request-id"] || ""),
+      startedAt: aiStartedAt,
+      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+    });
     const items = parsed.items.map((item: any, index: number) => {
       const quantity = Number(item.quantity);
       if (!String(item.description || "").trim() || !Number.isFinite(quantity) || quantity <= 0) throw new Error("A IA retornou uma linha de orçamento inválida.");
       const match = findExactCatalogItem(item, catalog);
+      const existingItem = Array.isArray(currentQuote.items)
+        ? currentQuote.items.find((row: any) => String(row?.id || "") === String(item.id || ""))
+        : undefined;
       const catalogPrice = match ? Number(match.price) : 0;
-      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const storedExistingItem = storedQuoteItems.find((row: any) => String(row?.id || "") === String(existingItem?.id || ""));
+      const normalizeIdentity = (value: unknown) => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase();
+      const sameExistingIdentity = !!storedExistingItem &&
+        (item.sku === undefined || normalizeIdentity(item.sku) === normalizeIdentity(storedExistingItem.sku)) &&
+        (item.catalogItemId === undefined || String(item.catalogItemId || "") === String(storedExistingItem.catalogItemId || "")) &&
+        (item.itemId === undefined || String(item.itemId || "") === String(storedExistingItem.itemId || "")) &&
+        (item.description === undefined || normalizeIdentity(item.description) === normalizeIdentity(storedExistingItem.description));
+      const existingPrice = Number(storedExistingItem?.unitPrice);
+      const hasStoredPrice = storedExistingItem?.unitPrice !== undefined && storedExistingItem?.unitPrice !== null && String(storedExistingItem.unitPrice).trim() !== "";
+      const preservedExistingPrice = !confirmed && sameExistingIdentity && hasStoredPrice && Number.isFinite(existingPrice) && existingPrice >= 0;
+      const unitPrice = confirmed ? catalogPrice : preservedExistingPrice ? existingPrice : 0;
       return {
         id: String(item.id || `ai-${index + 1}`),
+        itemId: String(match?.id || item.itemId || (sameExistingIdentity ? existingItem?.itemId : "") || ""),
         description: String(item.description).slice(0, 500),
         quantity,
-        unitPrice: confirmed ? catalogPrice : 0,
-        subtotal: Number((quantity * (confirmed ? catalogPrice : 0)).toFixed(2)),
-        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
-        catalogItemId: confirmed ? String(match.id || "") : "",
-        priceSource: confirmed ? "catalog" : "pending",
+        unitPrice,
+        subtotal: Number((quantity * unitPrice).toFixed(2)),
+        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || (sameExistingIdentity ? existingItem?.sku : "") || ""),
+        catalogItemId: confirmed ? String(match.id || "") : String(item.catalogItemId || (sameExistingIdentity ? existingItem?.catalogItemId : "") || ""),
+        catalogSource: confirmed ? String(match.source || "") : String(item.catalogSource || (sameExistingIdentity ? existingItem?.catalogSource : "") || ""),
+        priceSource: confirmed ? "catalog" : preservedExistingPrice ? "existing" : "pending",
       };
     });
-    const taxRate = parsed.taxRate === undefined ? Number(currentQuote.taxRate || 0) : Number(parsed.taxRate);
-    const discountRate = parsed.discountRate === undefined ? Number(currentQuote.discountRate || 0) : Number(parsed.discountRate);
+    // Não permita que valores padrão do JSON da IA zerem taxas existentes.
+    // Só aceite uma alteração quando a solicitação mencionar o campo e indicar uma mudança explícita.
+    const normalizedRequest = normalizeCatalogName(message);
+    const changeVerb = /(mude|alter|ajust|defin|coloque|apliqu|remov|retir|zer|reduz|aument|troqu)/.test(normalizedRequest);
+    const taxMentioned = /(imposto|tributo|taxa|icms|ipi|iss)/.test(normalizedRequest);
+    const discountMentioned = /(desconto|abatimento)/.test(normalizedRequest);
+    const taxChangeRequested = taxMentioned && (changeVerb || /\d/.test(message));
+    const discountChangeRequested = discountMentioned && (changeVerb || /\d/.test(message));
+    const taxRate = taxChangeRequested && parsed.taxRate !== undefined && parsed.taxRate !== null
+      ? Number(parsed.taxRate) : Number(currentQuote.taxRate || 0);
+    const discountRate = discountChangeRequested && parsed.discountRate !== undefined && parsed.discountRate !== null
+      ? Number(parsed.discountRate) : Number(currentQuote.discountRate || 0);
     if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100 || !Number.isFinite(discountRate) || discountRate < 0 || discountRate > 100) {
       throw new Error("Percentual de imposto ou desconto inválido.");
     }
@@ -234,12 +415,22 @@ Regras obrigatórias:
       notes: String(parsed.notes || ""),
     });
   } catch (err: any) {
+    try {
+      await recordAIAudit({
+        serviceName: "BUDGET", modelUsed: AI_CONFIG.quote.model,
+        input: req.body || null, error: err,
+        actorUid: res.locals.firebaseUser?.uid,
+        requestId: String(req.headers["x-request-id"] || ""),
+        startedAt: aiStartedAt,
+        authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+      });
+    } catch (auditError) { console.error("Quote failure audit could not be persisted:", auditError); }
     console.error("Quote agent error:", {
       message: err?.message || String(err),
       name: err?.name || "Error",
       cause: err?.cause?.message || err?.cause || null,
       statusCode: err?.statusCode || err?.status || null,
-      model: process.env.ANACLETO_AI_MODEL || "google/gemini-2.5-flash",
+      model: AI_CONFIG.quote.model,
     });
     return res.status(502).json({
       error: "O agente de orçamento está temporariamente indisponível. Verifique a configuração do Vercel AI Gateway e tente novamente.",
@@ -248,27 +439,46 @@ Regras obrigatórias:
   }
 });
 
-app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
+app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
+  const aiStartedAt = Date.now();
+  const aiUsage = { inputTokens: 0, outputTokens: 0 };
   try {
     const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
-    const catalog = Array.isArray(req.body?.catalog) ? req.body.catalog.slice(0, 250) : [];
+    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 250);
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
-    const response = await generateText({
-      model: aiModel,
-      temperature: 0.1,
+    const parsed = await generateValidatedJson({
+      capability: "budget",
       system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Só associe item do catálogo por SKU/código, ID ou nome completo EXATO. Informe sku/catalogItemId para validação. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
       prompt,
+      responseSchema: BUDGET_ITEMS_SCHEMA,
+      onGeneration: ({ usage }) => {
+        aiUsage.inputTokens += Number(usage?.inputTokens ?? usage?.promptTokens ?? 0);
+        aiUsage.outputTokens += Number(usage?.outputTokens ?? usage?.completionTokens ?? 0);
+      },
+      validate: (value: any) => {
+        if (!Array.isArray(value?.items) || !value.items.length || value.items.length > 150) throw new Error("A IA não retornou uma lista válida de itens.");
+        for (const item of value.items) {
+          const qty = Number(item?.qty);
+          if (!String(item?.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
+        }
+        return value;
+      },
     });
-    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed.items) || !parsed.items.length) throw new Error("A IA não retornou itens.");
+    await recordAIAudit({
+      serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
+      input: { prompt, language, catalogCount: catalog.length },
+      output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
+      requestId: String(req.headers["x-request-id"] || ""),
+      startedAt: aiStartedAt,
+      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+    });
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
       if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
       const match = findExactCatalogItem(item, catalog);
       const catalogPrice = match ? Number(match.price) : 0;
-      const confirmed = !!match && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
       return {
         description: String(item.description).slice(0, 500),
         qty,
@@ -280,6 +490,16 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
     });
     return res.json({ items, notes: String(parsed.notes || "") });
   } catch (err: any) {
+    try {
+      await recordAIAudit({
+        serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
+        input: req.body || null, error: err,
+        actorUid: res.locals.firebaseUser?.uid,
+        requestId: String(req.headers["x-request-id"] || ""),
+        startedAt: aiStartedAt,
+        authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+      });
+    } catch (auditError) { console.error("Budget failure audit could not be persisted:", auditError); }
     console.error("Budget items AI error:", err?.message || err);
     return res.status(502).json({ error: "Falha ao gerar os itens do orçamento. Nenhum preço sem confirmação no catálogo foi aplicado.", code: "BUDGET_AI_UNAVAILABLE" });
   }
@@ -287,28 +507,29 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, rateLimitByUser("budget-it
 
 function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[]) {
   const catalogRows = Array.isArray(catalog) ? catalog : [];
-  const rawItems = Array.isArray(rawBudget?.items) ? rawBudget.items : pieces.map((piece: any) => {
-    const material = String(piece.material || piece.name || "").toLowerCase();
-    const match = catalogRows.find((item: any) => {
-      const haystack = `${item.name || ""} ${item.sku || ""} ${item.category || ""}`.toLowerCase();
-      return material.split(/\s+/).some((word) => word.length > 3 && haystack.includes(word));
-    });
-    const quantity = Math.max(1, Number(piece.quantity) || 1);
-    const unitPrice = Number(match?.price) || 0;
+  const rawItems = Array.isArray(rawBudget?.items) ? rawBudget.items : pieces.map((piece: any) => ({
+    pieceId: piece.id,
+    description: piece.name || piece.material || "Componente técnico",
+    quantity: Math.max(1, Number(piece.quantity) || 1),
+  }));
+  // Preços do orçamento técnico só podem vir de uma correspondência exata no catálogo.
+  // Nunca aceitar preço estimado pela IA nem associação por palavras parcialmente coincidentes.
+  const items = rawItems.map((item: any, index: number) => {
+    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const match = findExactCatalogItem(item, catalogRows);
+    const catalogPrice = match ? Number(match.price) : 0;
+    const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+    const unitPrice = confirmed ? catalogPrice : 0;
     return {
-      pieceId: piece.id,
-      description: piece.name || piece.material || "Componente técnico",
-      sku: match?.sku || "",
+      ...item,
+      id: item.id || `budget-${index + 1}`,
+      sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
+      catalogItemId: confirmed ? String(match.id || "") : "",
       quantity,
       unitPrice,
       subtotal: quantity * unitPrice,
-      priceSource: match ? "catalogo" : "estimado",
+      priceSource: confirmed ? "catalogo" : "pendente",
     };
-  });
-  const items = rawItems.map((item: any, index: number) => {
-    const quantity = Math.max(1, Number(item.quantity) || 1);
-    const unitPrice = Math.max(0, Number(item.unitPrice) || 0);
-    return { ...item, id: item.id || `budget-${index + 1}`, quantity, unitPrice, subtotal: quantity * unitPrice };
   });
   const subtotal = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
   const labor = Math.max(0, Number(rawBudget?.labor) || 0);
@@ -318,7 +539,7 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
 // ----------------------------------------------------
 // 3. Project intake AI (/api/ai/project-intake)
 // ----------------------------------------------------
-app.post("/api/ai/project-intake", requireFirebaseAuth, rateLimitByUser("project-intake", 20, 60_000), async (req, res) => {
+app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("project-intake", 20, 60_000), async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim().slice(0, 180);
     const description = String(req.body?.description || "").trim().slice(0, 10000);
@@ -329,14 +550,17 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, rateLimitByUser("project
       try { parsed = new URL(sourceUrl); } catch { return res.status(400).json({ error: "Endereço de referência inválido." }); }
       if (!["http:", "https:"].includes(parsed.protocol)) return res.status(400).json({ error: "O endereço deve usar HTTP ou HTTPS." });
     }
-    const response = await generateText({
-      model: aiModel,
+    const project = await generateValidatedJson({
+      capability: "projectIntake",
       system: "Você é um analista de projetos. Organize os dados informados em JSON estrito. Não invente dimensões, cliente, preço ou código. Use strings vazias e zero quando desconhecidos. Responda somente com {name,code,category,client,summary,width,height,quantity,price}. width e height são milímetros quando explicitamente informados; price é BRL apenas se o usuário informar.",
       prompt: JSON.stringify({ name, description, sourceUrl }),
-      temperature: 0.2,
+      validate: (value: any) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Resposta da IA inválida.");
+        for (const field of ["name", "code", "category", "client", "summary"]) if (value[field] !== undefined && typeof value[field] !== "string") throw new Error("Campo textual inválido: " + field);
+        for (const field of ["width", "height", "quantity", "price"]) if (value[field] !== undefined && !Number.isFinite(Number(value[field]))) throw new Error("Campo numérico inválido: " + field);
+        return value;
+      },
     });
-    const raw = String(response.text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const project = JSON.parse(raw);
     if (!project || typeof project !== "object" || Array.isArray(project)) throw new Error("Resposta da IA inválida.");
     return res.json({ project: {
       name: String(project.name || name || "Novo projeto").slice(0, 180),
@@ -358,255 +582,40 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, rateLimitByUser("project
 // ----------------------------------------------------
 // 4. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
-app.post("/api/ai/technical-drawing", requireFirebaseAuth, rateLimitByUser("technical-drawing", 12, 60_000), async (req, res) => {
+app.post("/api/public/quote-estimate", (req, res) => publicQuoteEstimateHandler(req, res));
+
+app.post("/api/ai/technical-drawing", async (req, res) => {
+  if (!process.env.ANACLETO_DRAWING_SERVICE_URL) return technicalDrawingHandler(req, res);
   try {
-    const { prompt, currentDrawing, catalog = [] } = req.body;
-
-    if (!prompt || typeof prompt !== "string" || prompt.trim().length < 3) {
-      return res.status(400).json({ error: "Descripción técnica requerida" });
+    const job = await requestDrawingService(req.body, 5000, String(req.headers.authorization || ""));
+    if (job.status === "JOB_PROCESSING") {
+      return res.status(202).json({
+        status: "JOB_PROCESSING",
+        jobId: job.jobId,
+        pollUrl: job.pollUrl,
+        message: "O desenho continua sendo processado. Consulte o estado pelo identificador da tarefa.",
+      });
     }
-
-
-    const systemPrompt = `
-      Eres el Arquitecto e Ingeniero de Dibujo Técnico de "Anacleto Pro".
-      El usuario describirá en lenguaje natural una pieza arquitectónica, mueble o estructura:
-      (ej: "una mesa de madera de 120x80x75 cm con 4 patas", "un armario de 2 puertas de 180x60x200 cm", "una pieza en L de 90x90 cm con un corte a 45°", "ventana de aluminio corrediza de 150x120 cm con 2 hojas", etc.).
-
-      Debes generar un proyecto técnico completo con TODAS las siguientes especificaciones.
-      Catálogo disponible del taller (usa sus nombres, SKU y precios cuando coincidan; no inventes precios si hay coincidencia):
-      ${JSON.stringify(Array.isArray(catalog) ? catalog.slice(0, 200) : [])}
-      La salida también debe incluir presupuesto materializado con líneas, precio unitario, subtotal y total en BRL. Si no existe precio para una pieza, marca priceSource como "estimado" y usa un valor prudente.
-      1. Título y categoría de la pieza.
-      2. Dimensiones generales (ancho, alto, profundidad, unidad en cm o mm).
-      3. Despiece detallado (BOM): Lista de componentes donde cada pieza tiene:
-         - pieceNumber: 1, 2, 3...
-         - name: tipo puzzle con número (ej: "Pieza 1 - Tablero superior", "Pieza 2 - Pata frontal izquierda", "Pieza 3 - Estante regulable", "Pieza 4 - Puerta batiente izquierda")
-         - quantity: número de piezas
-         - dimensions: { width, height, thickness, depth, unit }
-         - material: tipo de material (ej: "Madera maciza de roble 30mm", "Aluminio serie 40 lacado negro", "Vidrio templado 8mm")
-         - color: color hexadecimal elegante o tono para diferenciar en el dibujo
-         - cutAngle: tipo de corte si aplica (ej: "90° recto", "Inglete a 45°")
-      4. Cotas (dimension lines): Líneas de cota con flechas en los extremos y el valor numérico visible y legible.
-      5. Proceso paso a paso estructurado exactamente en 5 fases de construcción:
-         - Paso 1: "Definición de dimensiones generales" (muestra el volumen perimetral exterior con cotas principales ancho x alto x profundidad).
-         - Paso 2: "Despiece" (muestra cada pieza separada, etiquetada con su nombre tipo puzzle, medidas y cantidad).
-         - Paso 3: "Corte de cada pieza con sus cotas" (detalle de corte, ángulos como 45° o 90°, espesores y mecanizados).
-         - Paso 4: "Ensamblaje tipo puzzle" (diagrama explosionado de ensamble con flechas de unión, orden de montaje y encaje).
-         - Paso 5: "Resultado final con vista completa y medidas totales" (pieza 100% ensamblada, acabada con cotas finales y render técnico).
-      6. Cada paso debe contener instrucciones claras y elementos de dibujo vectorial simples (rectángulos, líneas, textos, cotas) listos para renderizar en el lienzo SVG.
-
-      RESPONDE ÚNICAMENTE EN JSON con la siguiente estructura:
-      {
-        "title": "Nombre descriptivo de la pieza",
-        "assemblyInstructions": ["Instrucción de montaje 1"],
-        "budget": {
-          "currency": "BRL",
-          "items": [{ "pieceId": "p1", "description": "Perfil", "sku": "", "quantity": 1, "unitPrice": 0, "subtotal": 0, "priceSource": "catalogo" }],
-          "subtotal": 0,
-          "labor": 0,
-          "total": 0,
-          "notes": ""
-        },
-        "description": "Descripción arquitectónica resumida",
-        "category": "furniture" | "architectural" | "aluminum_window" | "glass_door" | "custom",
-        "unit": "cm",
-        "overallDimensions": { "width": 120, "height": 75, "depth": 80 },
-        "pieces": [
-          {
-            "id": "p1",
-            "pieceNumber": 1,
-            "name": "Pieza 1 - Tablero superior",
-            "quantity": 1,
-            "dimensions": { "width": 120, "height": 3, "depth": 80, "unit": "cm" },
-            "material": "Madera maciza / Aluminio",
-            "color": "#D4AF37",
-            "cutAngle": "90° recto"
-          }
-        ],
-        "dimensionLines": [
-          {
-            "id": "dim-1",
-            "label": "120 cm",
-            "value": 120,
-            "unit": "cm",
-            "orientation": "horizontal",
-            "start": { "x": 100, "y": 80 },
-            "end": { "x": 500, "y": 80 },
-            "offset": 20
-          }
-        ],
-        "steps": [
-          {
-            "stepNumber": 1,
-            "phaseName": "Paso 1: Definición de dimensiones generales",
-            "title": "Dimensiones exteriores y envolvente",
-            "description": "Verificación del espacio, cotas perimetrales y volumen total de trabajo.",
-            "instructions": ["Comprobar escuadras y tolerancias perimetrales.", "Marcar cotas exteriores."]
-          },
-          {
-            "stepNumber": 2,
-            "phaseName": "Paso 2: Despiece",
-            "title": "Lista de piezas identificadas tipo puzzle",
-            "description": "Clasificación de tableros, perfiles, herrajes y elementos estructurales.",
-            "instructions": ["Verificar cantidades de cada pieza según plano de corte."]
-          },
-          {
-            "stepNumber": 3,
-            "phaseName": "Paso 3: Corte de cada pieza con sus cotas",
-            "title": "Dimensionado individual y mecanizado",
-            "description": "Cortes rectos a 90° e ingletes a 45° con tolerancias milimétricas.",
-            "instructions": ["Aplicar línea de corte limpia.", "Rotular cada pieza con su ID."]
-          },
-          {
-            "stepNumber": 4,
-            "phaseName": "Paso 4: Ensamblaje tipo puzzle",
-            "title": "Secuencia de montaje y unión",
-            "description": "Diagrama explosionado que indica el orden de unión y ajuste.",
-            "instructions": ["Montar estructura base.", "Alinear uniones y asegurar fijaciones."]
-          },
-          {
-            "stepNumber": 5,
-            "phaseName": "Paso 5: Resultado final con vista completa y medidas totales",
-            "title": "Producto terminado y revisión de calidad",
-            "description": "Vista global ensamblada con verificación de cotas y solidez estructural.",
-            "instructions": ["Comprobación final de estabilidad y cotas generales."]
-          }
-        ]
-      }
-    `;
-
-    const response = await generateText({
-      model: aiModel,
-      system: systemPrompt,
-      prompt: `Diseña y despieza la siguiente pieza arquitectónica o mueble: "${prompt}"`,
-      temperature: 0.2,
-    });
-
-    const rawText = response.text || "{}";
-    const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    const drawingData = JSON.parse(jsonText);
-    const pieces = Array.isArray(drawingData.pieces) ? drawingData.pieces : [];
-    drawingData.assemblyInstructions = Array.isArray(drawingData.assemblyInstructions)
-      ? drawingData.assemblyInstructions
-      : drawingData.steps?.flatMap((step: any) => step.instructions || []) || [];
-    drawingData.budget = normalizeTechnicalBudget(drawingData.budget, pieces, catalog);
-    return res.status(200).json(drawingData);
-  } catch (err: any) {
-    console.error("Technical drawing AI error:", err);
-    // Sophisticated smart fallback generator based on the prompt keywords
-    const p = (req.body?.prompt || "").toLowerCase();
-    const isTable = p.includes("mesa");
-    const isWindow = p.includes("ventana") || p.includes("esquadria");
-    const isWardrobe = p.includes("armario") || p.includes("closet");
-    const isLPiece = p.includes("l") || p.includes("45");
-
-    let title = "Pieza en L Arquitectónica con Corte a 45°";
-    let width = 90;
-    let height = 90;
-    let depth = 40;
-    let pieces: any[] = [];
-
-    if (isTable) {
-      title = "Mesa de Madera Maciza 120x80x75 cm";
-      width = 120;
-      height = 75;
-      depth = 80;
-      pieces = [
-        { id: "p1", pieceNumber: 1, name: "Pieza 1 - Tablero superior", quantity: 1, dimensions: { width: 120, height: 4, depth: 80, unit: "cm" }, material: "Madera maciza de roble", color: "#C5A850", cutAngle: "90° recto" },
-        { id: "p2", pieceNumber: 2, name: "Pieza 2 - Pata delantera izq.", quantity: 1, dimensions: { width: 8, height: 71, depth: 8, unit: "cm" }, material: "Madera de roble torneada", color: "#8C6D37", cutAngle: "90° recto" },
-        { id: "p3", pieceNumber: 3, name: "Pieza 3 - Pata delantera der.", quantity: 1, dimensions: { width: 8, height: 71, depth: 8, unit: "cm" }, material: "Madera de roble torneada", color: "#8C6D37", cutAngle: "90° recto" },
-        { id: "p4", pieceNumber: 4, name: "Pieza 4 - Pata trasera izq.", quantity: 1, dimensions: { width: 8, height: 71, depth: 8, unit: "cm" }, material: "Madera de roble torneada", color: "#735728", cutAngle: "90° recto" },
-        { id: "p5", pieceNumber: 5, name: "Pieza 5 - Pata trasera der.", quantity: 1, dimensions: { width: 8, height: 71, depth: 8, unit: "cm" }, material: "Madera de roble torneada", color: "#735728", cutAngle: "90° recto" },
-        { id: "p6", pieceNumber: 6, name: "Pieza 6 - Faldón de unión", quantity: 2, dimensions: { width: 104, height: 10, depth: 3, unit: "cm" }, material: "Madera maciza de roble", color: "#A88440", cutAngle: "90° recto" },
-      ];
-    } else if (isWardrobe) {
-      title = "Armario de 2 Puertas 180x60x200 cm";
-      width = 180;
-      height = 200;
-      depth = 60;
-      pieces = [
-        { id: "p1", pieceNumber: 1, name: "Pieza 1 - Panel lateral izquierdo", quantity: 1, dimensions: { width: 60, height: 200, depth: 2, unit: "cm" }, material: "Tablero melamina alta densidad", color: "#334155", cutAngle: "90° recto" },
-        { id: "p2", pieceNumber: 2, name: "Pieza 2 - Panel lateral derecho", quantity: 1, dimensions: { width: 60, height: 200, depth: 2, unit: "cm" }, material: "Tablero melamina alta densidad", color: "#334155", cutAngle: "90° recto" },
-        { id: "p3", pieceNumber: 3, name: "Pieza 3 - Techo y suelo superior/inferior", quantity: 2, dimensions: { width: 176, height: 60, depth: 2, unit: "cm" }, material: "Tablero melamina 19mm", color: "#475569", cutAngle: "90° recto" },
-        { id: "p4", pieceNumber: 4, name: "Pieza 4 - Puerta batiente izq.", quantity: 1, dimensions: { width: 88, height: 194, depth: 2, unit: "cm" }, material: "Madera lacada con jaladera embutida", color: "#C5A850", cutAngle: "90° recto" },
-        { id: "p5", pieceNumber: 5, name: "Pieza 5 - Puerta batiente der.", quantity: 1, dimensions: { width: 88, height: 194, depth: 2, unit: "cm" }, material: "Madera lacada con jaladera embutida", color: "#C5A850", cutAngle: "90° recto" },
-      ];
-    } else if (isWindow) {
-      title = "Ventana de Aluminio Corrediza 150x120 cm";
-      width = 150;
-      height = 120;
-      depth = 12;
-      pieces = [
-        { id: "p1", pieceNumber: 1, name: "Pieza 1 - Marco perimetral superior", quantity: 1, dimensions: { width: 150, height: 8, depth: 12, unit: "cm" }, material: "Perfil Aluminio Linha Suprema", color: "#1e293b", cutAngle: "Corte a 45° inglete" },
-        { id: "p2", pieceNumber: 2, name: "Pieza 2 - Marco perimetral inferior c/ desague", quantity: 1, dimensions: { width: 150, height: 8, depth: 12, unit: "cm" }, material: "Perfil Aluminio Linha Suprema", color: "#1e293b", cutAngle: "Corte a 45° inglete" },
-        { id: "p3", pieceNumber: 3, name: "Pieza 3 - Jambas laterales izq/der", quantity: 2, dimensions: { width: 8, height: 120, depth: 12, unit: "cm" }, material: "Perfil Aluminio Linha Suprema", color: "#1e293b", cutAngle: "Corte a 45° inglete" },
-        { id: "p4", pieceNumber: 4, name: "Pieza 4 - Hoja corrediza izquierda", quantity: 1, dimensions: { width: 77, height: 114, depth: 4, unit: "cm" }, material: "Aluminio + Felpas acústicas", color: "#C5A850", cutAngle: "90° recto" },
-        { id: "p5", pieceNumber: 5, name: "Pieza 5 - Hoja corrediza derecha", quantity: 1, dimensions: { width: 77, height: 114, depth: 4, unit: "cm" }, material: "Aluminio + Cierre caracol", color: "#C5A850", cutAngle: "90° recto" },
-        { id: "p6", pieceNumber: 6, name: "Pieza 6 - Vidrio templado incoloro 6mm", quantity: 2, dimensions: { width: 70, height: 107, depth: 0.6, unit: "cm" }, material: "Vidrio templado NBR 7199", color: "#60a5fa", cutAngle: "Bordes pulidos" },
-      ];
-    } else {
-      pieces = [
-        { id: "p1", pieceNumber: 1, name: "Pieza 1 - Tramo principal A", quantity: 1, dimensions: { width: 90, height: 40, depth: 5, unit: "cm" }, material: "Estructura arquitectónica", color: "#C5A850", cutAngle: "Corte a 45° inglete" },
-        { id: "p2", pieceNumber: 2, name: "Pieza 2 - Tramo en retorno B", quantity: 1, dimensions: { width: 90, height: 40, depth: 5, unit: "cm" }, material: "Estructura arquitectónica", color: "#38bdf8", cutAngle: "Corte a 45° inglete" },
-        { id: "p3", pieceNumber: 3, name: "Pieza 3 - Escuadra interior de refuerzo", quantity: 2, dimensions: { width: 15, height: 15, depth: 3, unit: "cm" }, material: "Chapa de acero galvanizado", color: "#94a3b8", cutAngle: "90° recto" },
-      ];
-    }
-
-    // The AI service is optional: always return a valid drawing so a provider
-    // timeout, quota error, or malformed model response never becomes a 500.
-    return res.status(200).json({
-      _fallback: true,
-      title: title,
-      description: "Generado con motor técnico de arquitectura e ingeniería Anacleto Pro.",
-      category: isWindow ? "aluminum_window" : isTable ? "furniture" : "architectural",
-      unit: "cm",
-      overallDimensions: { width, height, depth },
-      pieces: pieces,
-      dimensionLines: [
-        { id: "d1", label: `${width} cm (Ancho total)`, value: width, unit: "cm", orientation: "horizontal", start: { x: 80, y: 50 }, end: { x: 520, y: 50 }, offset: 25 },
-        { id: "d2", label: `${height} cm (Alto total)`, value: height, unit: "cm", orientation: "vertical", start: { x: 50, y: 80 }, end: { x: 50, y: 380 }, offset: 25 },
-        { id: "d3", label: `${depth} cm (Profundidad)`, value: depth, unit: "cm", orientation: "diagonal", start: { x: 540, y: 80 }, end: { x: 570, y: 50 }, offset: 20 },
-      ],
-      steps: [
-        {
-          stepNumber: 1,
-          phaseName: "Paso 1: Definición de dimensiones generales",
-          title: "Delimitación perimetral y cotas envolventes",
-          description: `Dimensiones nominales verificadas: ${width} cm de ancho x ${height} cm de alto x ${depth} cm de fondo.`,
-          instructions: ["Comprobar espacio físico disponible.", "Verificar escuadras y tolerancias perimetrales."]
-        },
-        {
-          stepNumber: 2,
-          phaseName: "Paso 2: Despiece",
-          title: "Lista de piezas identificadas tipo puzzle",
-          description: `Inventario técnico con ${pieces.length} componentes rotulados y cubicados.`,
-          instructions: ["Inspeccionar material de origen.", "Marcar piezas con su número identificador."]
-        },
-        {
-          stepNumber: 3,
-          phaseName: "Paso 3: Corte de cada pieza con sus cotas",
-          title: "Dimensionado individual y mecanizado",
-          description: "Cortes con precisión milimétrica, ingletes a 45° y taladros para fijación.",
-          instructions: ["Ejecutar cortes siguiendo las cotas individuales.", "Limpiar rebabas y perfilar cantos."]
-        },
-        {
-          stepNumber: 4,
-          phaseName: "Paso 4: Ensamblaje tipo puzzle",
-          title: "Secuencia de montaje y unión",
-          description: "Montaje secuencial con flechas de ensamble y ajuste de fijaciones.",
-          instructions: ["Presentar las piezas en seco.", "Ajustar uniones mediante fijaciones ocultas.", "Comprobar ángulos a 90°."]
-        },
-        {
-          stepNumber: 5,
-          phaseName: "Paso 5: Resultado final con vista completa y medidas totales",
-          title: "Producto terminado y revisión de calidad",
-          description: "Estructura final consolidada con todas las cotas y verificación de aplomo.",
-          instructions: ["Comprobación de solidez mecánica.", "Limpieza final y entrega."]
-        }
-      ]
-    });
+    return res.status(200).json(job.result);
+  } catch (error) {
+    console.error("Independent drawing service request failed:", error);
+    return res.status(503).json({ error: "Serviço independente de desenho temporariamente indisponível.", code: "DRAWING_SERVICE_UNAVAILABLE" });
   }
 });
+app.get("/api/ai/technical-drawing/jobs/:jobId", requireFirebaseAuth, async (req, res) => {
+  try {
+    const user = res.locals.firebaseUser as { role?: string } | undefined;
+    if (!user || !["super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role || "")) {
+      return res.status(403).json({ error: "Sem permissão para consultar tarefas técnicas." });
+    }
+    const job = await getDrawingServiceJob(String(req.params.jobId || ""), String(req.headers.authorization || ""));
+    return res.status(200).json(job);
+  } catch (error) {
+    console.error("Drawing job lookup failed:", error);
+    return res.status(503).json({ error: "Não foi possível consultar a tarefa técnica.", code: "DRAWING_JOB_LOOKUP_FAILED" });
+  }
+});
+app.all("/api/approved-snapshot", (req, res) => approvedSnapshotHandler(req, res));
 
 // Setup Vite Dev Server / Serve build static files
 const startServer = async () => {
@@ -709,14 +718,28 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
     ? { type: "file" as const, data: binary, mediaType: mimeType, filename: fileName.slice(0, 120) }
     : { type: "image" as const, image: binary, mediaType: mimeType };
   const response = await generateText({
-    model: gateway("google/gemini-2.5-flash"),
+    model: getAIModel("documentExtraction"),
     messages: [{ role: "user", content: [{ type: "text", text: prompt }, attachment] }],
     temperature: 0.1,
     maxOutputTokens,
   });
-  const raw = response.text || "";
-  const match = raw.match(/\{[\s\S]*\}/);
-  return JSON.parse(match ? match[0] : raw);
+  const validate = (value: any) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Documento sem objeto de dados válido.");
+    return value;
+  };
+  try {
+    return parseAIJson(response.text, validate);
+  } catch (firstError) {
+    const repaired = await generateText({
+      model: getAIModel("documentExtraction"),
+      system: "Corrija somente a estrutura JSON da extração. Não invente, complete ou altere nenhum dado do documento. Retorne apenas JSON válido.",
+      prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "\nResposta original:\n" + String(response.text || "").slice(0, 30000),
+      temperature: 0,
+      maxOutputTokens,
+      abortSignal: AbortSignal.timeout(AI_CONFIG.documentExtraction.timeoutMs),
+    });
+    return parseAIJson(repaired.text, validate);
+  }
 }
 
 // ============ FINANCIAL AI: Extraer datos de boleto ============

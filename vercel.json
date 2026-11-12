@@ -10,12 +10,19 @@
     },
     "api/technical-drawing.ts": {
       "maxDuration": 60
+    },
+    "api/approved-snapshot.ts": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
     {
       "source": "/api/ai/technical-drawing",
       "destination": "/api/technical-drawing"
+    },
+    {
+      "source": "/api/approved-snapshot",
+      "destination": "/api/approved-snapshot"
     },
     {
       "source": "/api/(.*)",

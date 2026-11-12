@@ -24,7 +24,9 @@ import {
 } from "lucide-react";
 import { TechnicalDrawing, SenderConfig } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
+import DrawingThreePreview from "./DrawingThreePreview";
 import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
+import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
@@ -248,6 +250,8 @@ function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
   }));
   return {
     id: `draw_local_${Date.now()}`, title, description: `Projeto preliminar criado a partir de: ${input}`,
+    isDraft: true, status: "PRELIMINARY_CONTINGENCY", draftStatus: "preliminary",
+    draftLabel: "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN",
     category, unit, overallDimensions: { width, height, depth }, pieces,
     dimensionLines: [
       { id: "d1", label: `${width} ${unit}`, value: width, unit, orientation: "horizontal", start: { x: 80, y: 50 }, end: { x: 520, y: 50 } },
@@ -317,21 +321,81 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     return () => unsub();
   }, [authReady]);
 
+  const loadApprovedDrawingSnapshot = async (snapshotId: string) => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error("Faça login novamente para consultar o desenho aprovado.");
+    const response = await fetch("/api/approved-snapshot?snapshotId=" + encodeURIComponent(snapshotId), {
+      headers: { Authorization: "Bearer " + token },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error || "Não foi possível recuperar o snapshot do desenho.");
+    if (data?.type !== "drawing" || !data?.document) throw new Error("Snapshot de desenho inválido.");
+    return data;
+  };
+
+  const handleApproveDrawing = async () => {
+    if (!drawing?.id || !drawing.pieces?.length) return;
+    if (drawing.id === "draw-sample-01") {
+      showToast("Gere ou abra um projeto real antes de aprová-lo para fabricação.", "warning");
+      return;
+    }
+    if (drawing.approvedSnapshotId) {
+      showToast("Este desenho já está aprovado e bloqueado para fabricação.", "warning");
+      return;
+    }
+    if (drawing.id === "draw-sample-01") {
+      showToast("O desenho de demonstração não pode ser aprovado para fabricação. Gere ou abra um projeto real.", "warning");
+      return;
+    }
+    if ((drawing as any).isDraft === true && !window.confirm("CONFIRMAÇÃO DE RESPONSABILIDADE TÉCNICA\n\nRevisei as dimensões, materiais, componentes, folgas, ferragens e plano de corte. Confirmo que este desenho preliminar foi verificado por profissional autorizado e pode ser liberado para fabricação.\n\nDeseja congelar esta versão como aprovada?")) return;
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre novamente para aprovar o desenho.");
+      const saved = await handleSaveDrawing(drawing, true);
+      if (!saved) throw new Error("Salve o desenho antes de aprová-lo.");
+      const token = await user.getIdToken();
+      const response = await fetch("/api/approved-snapshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ type: "drawing", documentId: drawing.id, senderSnapshot: senderConfig }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || "Não foi possível aprovar o desenho.");
+      const approved = { ...result.snapshot.document, approvedSnapshotId: result.snapshotId } as TechnicalDrawing;
+      setDrawing(approved);
+      setSavedDrawings((previous) => previous.map((item) => item.id === approved.id ? approved : item));
+      showToast("Plano aprovado. Snapshot imutável criado e liberado para fabricação.", "success");
+    } catch (error) {
+      console.error("Technical drawing approval failed:", error);
+      showToast((error as Error).message || "Falha ao aprovar o desenho.", "error");
+    }
+  };
+
   const handleOpenDrawingPdf = async (targetDrawing?: TechnicalDrawing) => {
-    // Sempre regenerar a partir dos dados editáveis atuais; nunca reutilizar PDF antigo/desatualizado.
     const source = targetDrawing || drawing;
     try {
-      const pdf = buildTechnicalDrawingPdf(source, senderConfig);
-      const target = { ...source, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb };
+      let pdfSource = source;
+      let pdfSender: SenderConfig | undefined;
+      if (source.approvedSnapshotId) {
+        const snapshot = await loadApprovedDrawingSnapshot(source.approvedSnapshotId);
+        pdfSource = snapshot.document as TechnicalDrawing;
+        pdfSender = snapshot.senderSnapshot as SenderConfig | undefined;
+      }
+      const pdf = buildTechnicalDrawingPdf(pdfSource, pdfSender);
+      const target = { ...pdfSource, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfFileSizeKb: pdf.sizeKb };
       setDrawing(target);
       setIsPdfModalOpen(true);
     } catch (error) {
-      console.error("Could not build drawing preview PDF:", error);
-      showToast("Não foi possível preparar a pré-visualização PDF.", "error");
+      console.error("Could not build drawing PDF from its approved snapshot:", error);
+      showToast((error as Error).message || "Não foi possível preparar a pré-visualização PDF.", "error");
     }
   };
 
   const handleSaveDrawing = async (targetDrawing: TechnicalDrawing = drawing, silent = false): Promise<boolean> => {
+    if (targetDrawing.approvedSnapshotId || targetDrawing.status === "APPROVED_FOR_MANUFACTURING") {
+      if (!silent) showToast("Desenho aprovado: edição bloqueada. Duplique o projeto para criar uma nova revisão.", "warning");
+      return false;
+    }
     const user = auth.currentUser;
     if (!user) {
       if (!silent) showToast("Faça login novamente para salvar o projeto técnico.", "error");
@@ -377,6 +441,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   };
 
   const handleDeleteDrawing = async (item: TechnicalDrawing) => {
+    if (item.approvedSnapshotId || item.status === "APPROVED_FOR_MANUFACTURING") { showToast("Um desenho aprovado não pode ser excluído. Preserve o histórico industrial.", "warning"); return; }
     if (!auth.currentUser) { showToast("Faça login novamente para excluir o desenho.", "error"); return; }
     if (!window.confirm("Deseja excluir definitivamente o desenho “" + item.title + "”? Esta ação não pode ser desfeita.")) return;
     try {
@@ -419,6 +484,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     setIsLoading(true);
     let generated: TechnicalDrawing | null = null;
+    let generationWarning = false;
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -427,12 +493,32 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         return;
       }
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/technical-drawing", {
+      const res = await fetch("/api/ai/technical-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
       });
-      const responseBody = await res.json().catch(() => null);
+      let responseBody = await res.json().catch(() => null);
+      if (res.status === 202 && responseBody?.status === "JOB_PROCESSING" && responseBody?.jobId && responseBody?.pollUrl) {
+        let completed = false;
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const jobResponse = await fetch(responseBody.pollUrl, { headers: { Authorization: `Bearer ${idToken}` } });
+          const job = await jobResponse.json().catch(() => null);
+          if (!jobResponse.ok) throw new Error(job?.error || "Não foi possível consultar o processamento do desenho.");
+          if (job?.status === "COMPLETED" || job?.status === "COMPLETED_WITH_FALLBACK") {
+            responseBody = job.result;
+            completed = true;
+            break;
+          }
+          if (job?.status === "FAILED") throw new Error(job?.error || "O serviço não conseguiu concluir o desenho.");
+        }
+        if (!completed) {
+          showToast(`O desenho continua em processamento. ID da tarefa: ${responseBody.jobId}. Consulte novamente em instantes.`, "warning");
+          setIsLoading(false);
+          return;
+        }
+      }
       if (!res.ok) {
         const serviceError = new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
         if (res.status === 401 || res.status === 403) {
@@ -445,6 +531,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (!responseBody || !Array.isArray(responseBody.pieces) || responseBody.pieces.length === 0) {
         throw new Error("O serviço retornou um desenho sem componentes renderizáveis.");
       }
+      // A resposta de fallback é um rascunho heurístico, não um desenho validado pela IA.
+      generationWarning = Boolean(responseBody._fallback || responseBody.warning);
       const dimensions = responseBody.overallDimensions || {};
       const width = Number(dimensions.width);
       const height = Number(dimensions.height);
@@ -461,6 +549,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         overallDimensions: { width, height, depth: depth > 0 ? depth : undefined },
         pieces: responseBody.pieces,
         visualElements: Array.isArray(responseBody.visualElements) ? responseBody.visualElements : [],
+        ...(responseBody.vectorPayload ? { vectorPayload: responseBody.vectorPayload } as any : {}),
         modelDescription: responseBody.modelDescription || "",
         finalAppearance: responseBody.finalAppearance || "",
         measurementPlan: Array.isArray(responseBody.measurementPlan) ? responseBody.measurementPlan : [],
@@ -475,11 +564,23 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         budget: responseBody.budget,
+        isDraft: true,
+        status: "PRELIMINARY_CONTINGENCY",
+        draftStatus: "preliminary",
+        draftLabel: "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN",
       };
+      if (generationWarning || responseBody.draftStatus === "preliminary") {
+        (generated as any).draftStatus = "preliminary";
+        (generated as any).draftLabel = responseBody.draftLabel || "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO";
+        (generated as any).assumptions = [
+          ...(Array.isArray((generated as any).assumptions) ? (generated as any).assumptions : []),
+          "Desenho de contingência ou resposta não validada pelo serviço de IA. Confirmar todas as medidas, materiais, ferragens e cortes antes de fabricar."
+        ];
+      }
     } catch (error) {
       console.error("Falha na geração do desenho técnico:", error);
       generated = buildLocalTechnicalDrawing(inputPrompt);
-      showToast("A IA não respondeu corretamente. Foi criado um rascunho local; confira as dimensões e os componentes antes de fabricar.", "warning");
+      generationWarning = true;
     }
 
     try {
@@ -493,24 +594,50 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (!presetPrompt) setPrompt("");
 
       setDrawing(generated);
-      const saved = await handleSaveDrawing(generated, true);
-      if (saved) {
-        showToast("Desenho gerado e salvo automaticamente no projeto, com PDF e dados editáveis.", "success");
+      if (generationWarning) {
+        showToast("A IA não confirmou um desenho técnico válido. Um rascunho preliminar foi aberto, mas não será salvo automaticamente. Revise a geometria e as medidas antes de salvar ou fabricar.", "warning");
       } else {
-        showToast("Desenho gerado, mas não foi possível salvar automaticamente. Ele permanece aberto; use Salvar projeto para tentar novamente.", "warning");
+        const saved = await handleSaveDrawing(generated, true);
+        if (saved) {
+          showToast("Desenho gerado pela IA e salvo com PDF e dados editáveis.", "success");
+        } else {
+          showToast("Desenho gerado, mas não foi possível salvar automaticamente. Ele permanece aberto; use Salvar projeto para tentar novamente.", "warning");
+        }
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-    const handleExportPdf = () => {
+    const handleExportPdf = async () => {
     try {
-      exportTechnicalDrawingPdf(drawing, senderConfig);
+      let source = drawing;
+      let sender: SenderConfig | undefined = senderConfig;
+      if (drawing.approvedSnapshotId) {
+        const snapshot = await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId);
+        source = snapshot.document as TechnicalDrawing;
+        sender = snapshot.senderSnapshot as SenderConfig | undefined;
+      }
+      exportTechnicalDrawingPdf(source, sender);
       showToast("Desenho técnico e memorial exportados para PDF.", "success");
     } catch (err) {
       console.error(err);
       showToast("Erro ao exportar o PDF.", "error");
+    }
+  };
+
+  const handleExportDxf = async () => {
+    try {
+      let source = drawing;
+      if (drawing.approvedSnapshotId) {
+        const snapshot = await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId);
+        source = snapshot.document as TechnicalDrawing;
+      }
+      downloadTechnicalDrawingDxf(source);
+      showToast("Arquivo DXF exportado para AutoCAD.", "success");
+    } catch (err) {
+      console.error("DXF export failed:", err);
+      showToast((err as Error).message || "Não foi possível exportar o DXF.", "error");
     }
   };
 
@@ -546,7 +673,12 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
               Desenho Técnico e Lista de Componentes Inteligente
-            </h1>
+            </h1>            {(drawing as any).isDraft !== false && drawing.status !== "APPROVED_FOR_MANUFACTURING" && (
+              <div role="alert" className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] font-black tracking-wide text-amber-300">
+                <AlertCircle className="h-4 w-4" />
+                {(drawing as any).draftLabel || "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN"}
+              </div>
+            )}
           </div>
         </div>
 
@@ -558,13 +690,31 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             <Eye className="w-4 h-4 text-amber-400" />
             Pré-visualizar PDF
           </button>
+          {!drawing.approvedSnapshotId && (
+            <button
+              onClick={handleApproveDrawing}
+              disabled={isSaving || !drawing.pieces?.length || drawing.isDraft === false || drawing.id === "draw-sample-01"}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-black rounded-xl transition"
+            >
+              <CheckCircle className="w-4 h-4" /> Aprovar para fabricação
+            </button>
+          )}
+          {drawing.approvedSnapshotId && <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300">APROVADO · SNAPSHOT IMUTÁVEL</span>}
           <button
-            onClick={handleSaveDrawing}
+            onClick={() => handleSaveDrawing()}
             disabled={isSaving}
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Save className="w-4 h-4 text-amber-400" />}
             Salvar desenho
+          </button>
+          <button
+            onClick={handleExportDxf}
+            disabled={!Array.isArray((drawing as any).visualElements) || !(drawing as any).visualElements.length}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
+          >
+            <Download className="w-4 h-4" />
+            Exportar DXF
           </button>
           <button
             onClick={handleExportPdf}
@@ -812,6 +962,9 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 showDimensions={true}
                 showLabels={true}
               />
+            </div>
+            <div className="mt-4">
+              <DrawingThreePreview drawing={drawing} />
             </div>
           </div>
 

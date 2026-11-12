@@ -28,6 +28,9 @@ export interface QuoteItem {
   itemCategory?: string;
   itemDimensions?: string;
   sku?: string;
+  catalogItemId?: string;
+  priceSource?: "catalog" | "pending" | "existing" | "manual";
+  priceValidation?: string;
 }
 
 export interface DeliveryEvidence {
@@ -76,6 +79,11 @@ export interface Quote {
   pdfFileName?: string;
   pdfGeneratedAt?: string;
   pdfFileSizeKb?: number;
+  approvedSnapshotId?: string;
+  approvedAt?: string;
+  approvedBy?: { uid: string; email: string; role: string };
+  snapshotContentHash?: string;
+  senderSnapshot?: SenderConfig;
   // Legacy compatibility fields
   clientNif?: string;
   language?: string;
@@ -177,6 +185,21 @@ export interface TechnicalDrawing {
     depth?: number;
   };
   pieces: TechnicalPiece[];
+  isDraft?: boolean;
+  status?: "PRELIMINARY_CONTINGENCY" | "APPROVED_FOR_MANUFACTURING";
+  draftStatus?: "preliminary" | "approved";
+  draftLabel?: string;
+  vectorPayload?: {
+    format: "svg";
+    svg: string;
+    watermarked: boolean;
+    status: "PRELIMINARY_CONTINGENCY" | "APPROVED_FOR_MANUFACTURING";
+  };
+  approvedSnapshotId?: string;
+  approvedAt?: string;
+  approvedBy?: { uid: string; email: string; role: string };
+  snapshotContentHash?: string;
+  senderSnapshot?: SenderConfig;
   // Geometria vetorial específica gerada a partir do prompt, usada na tela e no PDF.
   visualElements?: Array<Record<string, any>>;
   modelDescription?: string;
@@ -192,7 +215,11 @@ export interface TechnicalDrawing {
   currentStep: number;
   budget?: {
     currency: string;
-    items: Array<{ id?: string; pieceId?: string; description: string; sku?: string; quantity: number; unitPrice: number; subtotal: number; priceSource?: string }>;
+    items: Array<{
+      id?: string; pieceId?: string; description: string; sku?: string; catalogItemId?: string;
+      quantity: number; unitPrice: number; subtotal: number; priceSource?: string;
+      priceValidation?: string; catalogPriceAtApproval?: number;
+    }>;
     subtotal: number;
     labor: number;
     total: number;
@@ -211,6 +238,8 @@ export interface TechnicalDrawing {
   pdfFileSizeKb?: number;
   projectId?: string;
   projectName?: string;
+  ownerUid?: string;
+  schemaVersion?: number;
 }
 
 export interface LedgerEntry {

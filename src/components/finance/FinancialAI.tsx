@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Sparkles, Upload, CheckCircle, Loader2, FileText, Save, AlertTriangle } from "lucide-react";
+import { Sparkles, Upload, CheckCircle, Loader2, FileText, Save, AlertTriangle, MessageCircle, Send } from "lucide-react";
 import { addDoc, collection, getDocs } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, auth, storage } from "../../firebase";
@@ -10,7 +10,7 @@ type InvoiceBoleto = { id: string; number: string; digitableLine: string; amount
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value) || 0);
 
-export default function FinancialAI() {
+export default function FinancialAI({ language = "pt" }: { language?: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -27,6 +27,11 @@ export default function FinancialAI() {
   const [boletos, setBoletos] = useState<InvoiceBoleto[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [assistantQuestion, setAssistantQuestion] = useState("");
+  const [assistantLoading, setAssistantLoading] = useState(false);
+  const [assistantMessages, setAssistantMessages] = useState<Array<{role:"user"|"assistant";text:string;metrics?:Array<{label:string;value:string;explanation:string}>;warnings?:string[]}>>([
+    { role: "assistant", text: language === "es" ? "¡Hola! Soy el Asistente Financiero de Anacleto. Puedo analizar facturación, cobros, costos registrados de aluminio y vidrio, inventario, cuentas por pagar y cobrar y flujo de caja usando los registros actuales del sistema. No invento valores cuando faltan datos." : "Olá! Sou o Assistente Financeiro da Anacleto. Posso analisar faturamento, recebimentos, custos cadastrados de alumínio e vidro, estoque, contas a pagar e receber e fluxo de caixa usando os registros atuais do sistema. Não invento valores quando faltam dados." }
+  ]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const readBase64 = (selected: File) => new Promise<string>((resolve, reject) => {
@@ -35,6 +40,32 @@ export default function FinancialAI() {
     reader.onload = () => { const encoded = String(reader.result || "").split(",")[1]; encoded ? resolve(encoded) : reject(new Error("Arquivo vazio ou inválido.")); };
     reader.readAsDataURL(selected);
   });
+
+  const sendFinancialQuestion = async () => {
+    const question = assistantQuestion.trim();
+    if (question.length < 3 || assistantLoading) return;
+    const user = auth.currentUser;
+    if (!user) { setAssistantMessages(rows => [...rows, { role: "assistant", text: language === "es" ? "Su sesión expiró. Inicie sesión nuevamente para consultar los datos financieros." : "Sua sessão expirou. Entre novamente para consultar os dados financeiros." }]); return; }
+    const history = assistantMessages.slice(-8).map(({role,text}) => ({role,text}));
+    setAssistantMessages(rows => [...rows, { role: "user", text: question }]);
+    setAssistantQuestion("");
+    setAssistantLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/ai/financial-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ message: question, language: language === "es" ? "es" : "pt", history }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Não foi possível consultar os dados financeiros.");
+      setAssistantMessages(rows => [...rows, { role: "assistant", text: String(payload.answer || "Não houve resposta."), metrics: Array.isArray(payload.metrics) ? payload.metrics : [], warnings: Array.isArray(payload.warnings) ? payload.warnings : [] }]);
+    } catch (e) {
+      setAssistantMessages(rows => [...rows, { role: "assistant", text: (e as Error).message || (language === "es" ? "El Asistente Financiero no está disponible temporalmente." : "O Assistente Financeiro está temporariamente indisponível.") }]);
+    } finally {
+      setAssistantLoading(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file) return setError("Selecione uma nota fiscal, boleto, recibo ou documento de compra.");
@@ -127,7 +158,23 @@ export default function FinancialAI() {
   };
 
   return <div className="space-y-6 text-slate-800 dark:text-slate-100">
-    <header><h2 className="flex items-center gap-2 text-2xl font-black"><Sparkles className="h-6 w-6 text-indigo-600"/> IA Financeira</h2><p className="mt-1 text-sm text-slate-500">Leia notas fiscais, boletos, recibos e documentos de compra com IA. Revise os dados e envie ao Financeiro sem lançar pagamentos automaticamente.</p></header>
+    <header><h2 className="flex items-center gap-2 text-2xl font-black"><Sparkles className="h-6 w-6 text-indigo-600"/> {language === "es" ? "Asistente Financiero" : "Assistente Financeiro"}</h2><p className="mt-1 text-sm text-slate-500">{language === "es" ? "Consulte registros reales de presupuestos, facturas, inventario, compras y cuentas por pagar y cobrar. La lectura de documentos sigue disponible abajo." : "Consulte os registros reais de orçamentos, faturas, estoque, compras, contas a pagar e receber. A leitura de documentos continua disponível abaixo."}</p></header>
+    <section className="space-y-4 rounded-2xl border bg-white p-5 dark:bg-slate-900">
+      <div className="flex items-center gap-2"><MessageCircle className="h-5 w-5 text-indigo-600"/><h3 className="font-bold">{language === "es" ? "Pregunte sobre las finanzas de la empresa" : "Pergunte sobre as finanças da empresa"}</h3></div>
+      <div className="max-h-[420px] space-y-3 overflow-y-auto rounded-xl bg-slate-50 p-3 dark:bg-slate-950">
+        {assistantMessages.map((entry,index)=><div key={index} className={entry.role==="user"?"ml-8 rounded-xl bg-indigo-600 p-3 text-sm text-white":"mr-4 rounded-xl border bg-white p-3 text-sm dark:bg-slate-900"}>
+          <p className="whitespace-pre-wrap leading-relaxed">{entry.text}</p>
+          {!!entry.metrics?.length&&<div className="mt-3 grid gap-2 sm:grid-cols-2">{entry.metrics.map((metric,i)=><div key={i} className="rounded-lg border bg-slate-50 p-2 dark:bg-slate-800"><p className="text-[11px] font-bold text-slate-500">{metric.label}</p><p className="font-black">{metric.value}</p>{metric.explanation&&<p className="mt-1 text-[11px] text-slate-500">{metric.explanation}</p>}</div>)}</div>}
+          {!!entry.warnings?.length&&<ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-700 dark:text-amber-300">{entry.warnings.map((warning,i)=><li key={i}>{warning}</li>)}</ul>}
+        </div>)}
+        {assistantLoading&&<p className="text-xs text-slate-500">{language === "es" ? "Consultando datos reales y analizando..." : "Consultando dados reais e analisando..."}</p>}
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input value={assistantQuestion} onChange={e=>setAssistantQuestion(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();void sendFinancialQuestion();}}} placeholder={language === "es" ? "Ej.: ¿Cuánto tenemos por cobrar y pagar este mes?" : "Ex.: Quanto temos a receber e pagar este mês?"} className="min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-sm dark:bg-slate-800"/>
+        <button onClick={()=>void sendFinancialQuestion()} disabled={assistantLoading||assistantQuestion.trim().length<3} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{assistantLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Send className="h-4 w-4"/>}{language === "es" ? "Enviar pregunta" : "Enviar pergunta"}</button>
+      </div>
+      <p className="text-[11px] text-slate-500">{language === "es" ? "La IA no realiza pagos ni modifica registros. Solo estima beneficios cuando los registros de ingresos y costos son suficientes." : "A IA não efetua pagamentos nem altera registros. Lucro só é estimado quando os lançamentos de receita e custo são suficientes."}</p>
+    </section>
     <section className="space-y-4 rounded-2xl border bg-white p-5 dark:bg-slate-900">
       <div onClick={() => fileRef.current?.click()} role="button" tabIndex={0} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }} className="cursor-pointer rounded-xl border-2 border-dashed border-slate-300 p-8 text-center transition hover:border-indigo-500 hover:bg-indigo-50/30">
         <Upload className="mx-auto mb-2 h-10 w-10 text-slate-400"/><p className="font-bold">Enviar nota fiscal, boleto ou recibo (PDF ou imagem)</p><p className="mt-1 text-xs text-slate-500">{file ? file.name : "Nenhum arquivo selecionado"}</p>

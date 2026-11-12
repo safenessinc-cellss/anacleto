@@ -154,6 +154,10 @@ const applyDocumentWatermark = (doc: jsPDF, sender?: SenderConfig) => {
 
 export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF();
+  if (quote.approvedAt) {
+    doc.setCreationDate(new Date(quote.approvedAt));
+    if (quote.snapshotContentHash) doc.setFileId(String(quote.snapshotContentHash).slice(0, 32).toUpperCase());
+  }
   const pageWidth = doc.internal.pageSize.width;
   const currency = quote.currency || "BRL";
 
@@ -384,6 +388,16 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   );
 
   applyDocumentWatermark(doc, sender);
+  if (!quote.snapshotContentHash || quote.status !== "approved") {
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(185, 28, 28);
+      doc.text("BORRADOR COMERCIAL - NO VÁLIDO COMO PRESUPUESTO APROBADO", pageWidth / 2, 34, { align: "center", angle: -18 });
+    }
+  }
   const fileName = `Presupuesto_${quote.number || "PRE"}.pdf`;
   const dataUri = doc.output("datauristring");
   const sizeKb = Math.max(1, Math.round((dataUri.length * 0.75) / 1024));
@@ -566,6 +580,10 @@ export const exportInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDo
 
 export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  if (drawing.approvedAt) {
+    doc.setCreationDate(new Date(drawing.approvedAt));
+    if (drawing.snapshotContentHash) doc.setFileId(String(drawing.snapshotContentHash).slice(0, 32).toUpperCase());
+  }
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const unit = drawing.unit || "cm";
@@ -669,6 +687,7 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
 
   // Página 1: identificação, dimensões e as três vistas do MESMO modelo do editor.
   drawHeader("DESENHO TÉCNICO 2D — " + (drawing.title || "Projeto"), "ANACLETO ESQUADRIAS • Documento gerado a partir dos dados editáveis do projeto");
+  // O selo definitivo de rascunho é aplicado a todas as páginas após a composição do documento.
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(15, 23, 42);
@@ -719,7 +738,7 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
     headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: "bold" },
     styles: { fontSize: 8, cellPadding: 3, overflow: "linebreak" },
     columnStyles: { 0: { cellWidth: 12, halign: "center" }, 1: { cellWidth: 52 }, 2: { cellWidth: 14, halign: "center" }, 3: { cellWidth: 48 }, 4: { cellWidth: "auto" }, 5: { cellWidth: 27 } },
-    didDrawPage: () => { if (doc.internal.getNumberOfPages() > 2) drawHeader("LISTA DE PEÇAS E PLANO DE CORTE", drawing.title || "Projeto técnico"); },
+    didDrawPage: () => { if (doc.getNumberOfPages() > 2) drawHeader("LISTA DE PEÇAS E PLANO DE CORTE", drawing.title || "Projeto técnico"); },
   });
   let nextY = ((doc as any).lastAutoTable?.finalY || 40) + 10;
   if (nextY > pageHeight - 35) { doc.addPage(); drawHeader("MONTAGEM E OBSERVAÇÕES", drawing.title || "Projeto técnico"); nextY = 38; }
@@ -749,6 +768,17 @@ export const buildTechnicalDrawingPdf = (drawing: TechnicalDrawing, sender?: Sen
   });
 
   applyDocumentWatermark(doc, sender);
+  if ((drawing as any).isDraft !== false || (drawing as any).status !== "APPROVED_FOR_MANUFACTURING") {
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(185, 28, 28);
+      doc.text("BORRADOR PRELIMINAR - NO VÁLIDO PARA FABRICACIÓN", pageWidth / 2, 27, { align: "center", angle: -18 });
+      doc.setFontSize(8);
+    }
+  }
   const cleanTitle = (drawing.title || "Projeto").replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = "Desenho_Tecnico_" + cleanTitle + ".pdf";
   const dataUri = doc.output("datauristring");

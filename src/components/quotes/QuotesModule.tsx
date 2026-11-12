@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -223,18 +223,27 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     if (!selectedQuote) return;
     const popup = window.open("about:blank", "_blank");
     try {
-      const pdfSender = await preparePdfSender();
-      const pdf = buildQuotePdf(recalculateQuote(selectedQuote), pdfSender);
+      let pdfSender: SenderConfig | undefined;
+      let pdfQuote = selectedQuote;
+      if (selectedQuote.approvedSnapshotId) {
+        const snapshot = await loadApprovedQuoteSnapshot(selectedQuote.approvedSnapshotId);
+        pdfQuote = snapshot.document as Quote;
+        pdfSender = snapshot.senderSnapshot as SenderConfig | undefined;
+      } else {
+        pdfQuote = recalculateQuote(selectedQuote);
+        pdfSender = await preparePdfSender();
+      }
+      const pdf = buildQuotePdf(pdfQuote, pdfSender);
       pdf.doc.save(pdf.fileName);
-      const message = `Olá, ${selectedQuote.clientName}. Segue o orçamento ${selectedQuote.number} no valor de ${formatCurrency(selectedQuote.total, selectedQuote.currency)}. O PDF foi baixado; anexe o arquivo nesta conversa.`;
+      const message = `Olá, ${pdfQuote.clientName}. Segue o orçamento ${pdfQuote.number} no valor de ${formatCurrency(pdfQuote.total, pdfQuote.currency)}. O PDF foi baixado; anexe o arquivo nesta conversa.`;
       if (channel === "whatsapp") {
         const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
         if (popup) popup.location.href = url;
         else window.location.href = url;
       } else {
-        const subject = encodeURIComponent(`Orçamento ${selectedQuote.number} - Anacleto Esquadrias`);
+        const subject = encodeURIComponent(`Orçamento ${pdfQuote.number} - Anacleto Esquadrias`);
         const body = encodeURIComponent(`${message}\n\nAtenciosamente,\nAnacleto Esquadrias\n\nAnexe o PDF baixado antes de enviar.`);
-        const url = `mailto:${encodeURIComponent(selectedQuote.clientEmail || "")}?subject=${subject}&body=${body}`;
+        const url = `mailto:${encodeURIComponent(pdfQuote.clientEmail || "")}?subject=${subject}&body=${body}`;
         if (popup) popup.location.href = url;
         else window.location.href = url;
       }
@@ -248,28 +257,91 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   const formatCurrency = (value: number, currency = "BRL") => new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format(value || 0);
 
+  const loadApprovedQuoteSnapshot = async (snapshotId: string) => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) throw new Error("Faça login novamente para consultar a aprovação.");
+    const response = await fetch("/api/approved-snapshot?snapshotId=" + encodeURIComponent(snapshotId), {
+      headers: { Authorization: "Bearer " + token },
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error || "Não foi possível recuperar a instantânea aprovada.");
+    if (data?.type !== "quote" || !data?.document) throw new Error("Instantânea de orçamento inválida.");
+    return data;
+  };
+
+  const handleDownloadQuotePdf = async (quote: Quote) => {
+    try {
+      if (quote.approvedSnapshotId) {
+        const snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
+        const pdf = buildQuotePdf(snapshot.document as Quote, snapshot.senderSnapshot as SenderConfig | undefined);
+        pdf.doc.save(pdf.fileName);
+      } else {
+        const sender = await preparePdfSender();
+        exportQuotePdf(quote, sender);
+      }
+    } catch (error) {
+      console.error("Quote PDF download failed:", error);
+      showToast((error as Error).message || "Não foi possível baixar o PDF.", "error");
+    }
+  };
+
+  const handleApproveQuote = async () => {
+    if (!selectedQuote) return;
+    if (selectedQuote.approvedSnapshotId) {
+      showToast("Este orçamento já está aprovado e bloqueado por instantânea.", "warning");
+      return;
+    }
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Faça login novamente para aprovar o orçamento.");
+      const approvalCandidate = recalculateQuote(selectedQuote);
+      await setDoc(doc(db, "quotes", approvalCandidate.id), approvalCandidate);
+      const senderSnapshot = await preparePdfSender();
+      const response = await fetch("/api/approved-snapshot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ type: "quote", documentId: selectedQuote.id, senderSnapshot }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || "Não foi possível congelar o orçamento.");
+      const approved = { ...result.snapshot.document, approvedSnapshotId: result.snapshotId };
+      setSelectedQuote(approved);
+      setQuotes((previous) => previous.map((item) => item.id === approved.id ? approved : item));
+      showToast("Orçamento aprovado. Snapshot imutável criado; PDF e fatura usarão esta versão.", "success");
+    } catch (error) {
+      console.error("Quote approval failed:", error);
+      showToast((error as Error).message || "Falha ao aprovar o orçamento.", "error");
+    }
+  };
+
   // Open and View Stored PDF
   const handleOpenQuotePdf = async (quote: Quote) => {
     let target = quote;
-    if (!target.pdfDataUri) {
-      try {
-        const pdfSender = await preparePdfSender();
-        const pdfRes = buildQuotePdf(target, pdfSender);
-        target = {
-          ...target,
-          itemIds: Array.from(new Set(target.items.map((item) => item.itemId).filter((id): id is string => Boolean(id)))),
-        pdfDataUri: pdfRes.dataUri,
-          pdfFileName: pdfRes.fileName,
-          pdfGeneratedAt: new Date().toISOString(),
-          pdfFileSizeKb: pdfRes.sizeKb,
-        };
-        await setDoc(doc(db, "quotes", target.id), target);
-        if (selectedQuote?.id === target.id) {
-          setSelectedQuote(target);
-        }
-      } catch (err) {
-        console.warn("Could not pre-cache PDF data URI:", err);
+    try {
+      let sender: SenderConfig | undefined;
+      if (quote.approvedSnapshotId) {
+        const snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
+        target = snapshot.document as Quote;
+        sender = (snapshot.senderSnapshot || target.senderSnapshot) as SenderConfig | undefined;
+      } else {
+        sender = await preparePdfSender();
       }
+      const pdfRes = buildQuotePdf(target, sender);
+      target = {
+        ...target,
+        pdfDataUri: pdfRes.dataUri,
+        pdfFileName: pdfRes.fileName,
+        pdfGeneratedAt: new Date().toISOString(),
+        pdfFileSizeKb: pdfRes.sizeKb,
+      };
+      if (!quote.approvedSnapshotId) {
+        await setDoc(doc(db, "quotes", target.id), target);
+        if (selectedQuote?.id === target.id) setSelectedQuote(target);
+      }
+    } catch (err) {
+      console.warn("Could not prepare quote PDF from its source snapshot:", err);
+      showToast((err as Error).message || "Não foi possível preparar o PDF.", "error");
+      return;
     }
     setViewerPdfQuote(target);
     setIsPdfModalOpen(true);
@@ -277,7 +349,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   // Save Quote and its persistent PDF to Firestore
   const handleSaveQuote = async (quoteToSave?: Quote) => {
-    let target = recalculateQuote(quoteToSave || selectedQuote!);
+    const requested = quoteToSave || selectedQuote!;
+    if (requested?.approvedSnapshotId) {
+      showToast("Orçamento aprovado: alterações bloqueadas. Crie uma nova revisão para modificar valores ou itens.", "warning");
+      return;
+    }
+    let target = recalculateQuote(requested);
     try {
       // Build PDF document and serialize as data URI
       const pdfSender = await preparePdfSender();
@@ -303,22 +380,66 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // Convert Approved Quote to Invoice (with persistent PDF attached)
   const handleConvertQuoteToInvoice = async (quote: Quote) => {
     try {
-      const quoteRef = doc(db, "quotes", quote.id);
+      let approvedQuote = quote;
+      let invoiceSender: SenderConfig = senderConfig;
+      let snapshot: any;
+      if (quote.approvedSnapshotId) {
+        snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
+      } else {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error("Faça login novamente para gerar a fatura.");
+        // Freeze the same recalculated totals that will be used by the invoice PDF.
+        approvedQuote = recalculateQuote(quote);
+        await setDoc(doc(db, "quotes", approvedQuote.id), approvedQuote);
+        const senderSnapshot = await preparePdfSender();
+        const approvalResponse = await fetch("/api/approved-snapshot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ type: "quote", documentId: quote.id, senderSnapshot }),
+        });
+        const approvalResult = await approvalResponse.json();
+        if (!approvalResponse.ok) throw new Error(approvalResult?.error || "Não foi possível congelar o orçamento antes de faturar.");
+        snapshot = approvalResult.snapshot;
+        setSelectedQuote({ ...snapshot.document, approvedSnapshotId: approvalResult.snapshotId });
+      }
+      approvedQuote = { ...snapshot.document, id: quote.id, approvedSnapshotId: quote.approvedSnapshotId || snapshot.document.approvedSnapshotId } as Quote;
+      invoiceSender = snapshot.senderSnapshot || senderConfig;
+
+      // Recompute from the approved line items instead of trusting possibly stale
+      // aggregate fields. This prevents a valid priced quote becoming a R$ 0.00 invoice.
+      if (!Array.isArray(approvedQuote.items) || approvedQuote.items.length === 0) {
+        throw new Error("O orçamento aprovado não possui itens. Adicione os materiais e serviços antes de emitir a fatura.");
+      }
+      const calculatedQuote = recalculateQuote(approvedQuote);
+      const invalidLine = calculatedQuote.items.find(item =>
+        !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 ||
+        item.unitPrice === undefined || item.unitPrice === null || String(item.unitPrice).trim() === "" ||
+        !Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) < 0
+      );
+      if (invalidLine) {
+        throw new Error(`O item "${invalidLine.description || "sem descrição"}" está sem preço válido. Atualize o preço pelo catálogo Materiais e Componentes antes de emitir a fatura.`);
+      }
+      if (!Number.isFinite(calculatedQuote.total) || calculatedQuote.total <= 0) {
+        throw new Error("O valor total calculado é zero ou inválido. A fatura não será criada; revise os preços e os impostos do orçamento.");
+      }
+      approvedQuote = calculatedQuote;
+
+      const quoteRef = doc(db, "quotes", approvedQuote.id);
       const invoiceRef = doc(collection(db, "invoices"));
       const invoiceId = invoiceRef.id;
       const invoiceNumber = "FAT-" + new Date().getFullYear() + "-" + invoiceId.slice(-8).toUpperCase();
       const baseInvoice: Invoice = {
-        id: invoiceId, number: invoiceNumber, quoteId: quote.id, companyId: quote.companyId,
-        clientName: quote.clientName, clientEmail: quote.clientEmail, clientTaxId: quote.clientTaxId,
-        clientAddress: quote.clientAddress, date: new Date().toISOString().split("T")[0],
+        id: invoiceId, number: invoiceNumber, quoteId: approvedQuote.id, companyId: approvedQuote.companyId,
+        clientName: approvedQuote.clientName, clientEmail: approvedQuote.clientEmail, clientTaxId: approvedQuote.clientTaxId,
+        clientAddress: approvedQuote.clientAddress, date: new Date().toISOString().split("T")[0],
         dueDate: new Date(Date.now() + 15 * 24 * 3600 * 1000).toISOString().split("T")[0],
-        items: quote.items, subtotal: quote.subtotal, taxRate: quote.taxRate, taxAmount: quote.taxAmount,
-        discountRate: quote.discountRate, discountAmount: quote.discountAmount, total: quote.total,
-        currency: quote.currency, senderSnapshot: senderConfig, status: "pendente", paymentMethod: "Transferência Bancária",
-        notes: `Fatura gerada a partir do orçamento ${quote.number}.`,
+        items: approvedQuote.items, subtotal: approvedQuote.subtotal, taxRate: approvedQuote.taxRate, taxAmount: approvedQuote.taxAmount,
+        discountRate: approvedQuote.discountRate, discountAmount: approvedQuote.discountAmount, total: approvedQuote.total,
+        currency: approvedQuote.currency, senderSnapshot: invoiceSender, status: "pendente", paymentMethod: "Transferência Bancária",
+        notes: `Fatura gerada a partir do orçamento ${approvedQuote.number}.`,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
-      const pdf = buildInvoicePdf(baseInvoice, senderConfig);
+      const pdf = buildInvoicePdf(baseInvoice, invoiceSender);
       const finalInvoice: Invoice = { ...baseInvoice, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdf.sizeKb };
       await runTransaction(db, async tx => {
         const current = await tx.get(quoteRef);
@@ -327,10 +448,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         if (!["accepted", "approved", "aprovado"].includes(String(current.data().status || ""))) throw new Error("Aprove o orçamento antes de gerar a fatura.");
         tx.set(invoiceRef, finalInvoice);
         tx.set(doc(db, "receivables", invoiceId), {
-          clientId: quote.companyId || "", clientName: quote.clientName || "Cliente",
-          description: `Fatura ${invoiceNumber} · Orçamento ${quote.number}`,
-          amount: Number(quote.total || 0), receivedAmount: 0, dueDate: baseInvoice.dueDate,
-          paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: quote.id,
+          clientId: approvedQuote.companyId || "", clientName: approvedQuote.clientName || "Cliente",
+          description: `Fatura ${invoiceNumber} · Orçamento ${approvedQuote.number}`,
+          amount: Number(approvedQuote.total || 0), receivedAmount: 0, dueDate: baseInvoice.dueDate,
+          paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: approvedQuote.id,
           notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
         tx.update(quoteRef, { status: "invoiced", invoiceId, invoicedAt: serverTimestamp(), updatedAt: serverTimestamp() });
@@ -356,6 +477,16 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     try {
       const idToken = await auth.currentUser?.getIdToken();
       if (!idToken) throw new Error("Entre na sua conta para usar o assistente de orçamentos.");
+
+      // Orçamentos recém-criados existem primeiro apenas no estado local.
+      // O agente valida a versão persistida no servidor, portanto grave o rascunho
+      // uma única vez antes da primeira chamada, sem sobrescrever documentos existentes.
+      const quoteRef = doc(db, "quotes", selectedQuote.id);
+      const savedQuote = await getDoc(quoteRef);
+      if (!savedQuote.exists()) {
+        await setDoc(quoteRef, recalculateQuote(selectedQuote));
+      }
+
       const res = await fetch("/api/ai/quote-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
@@ -363,7 +494,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           message: userText,
           currentQuote: {
             id: selectedQuote.id, number: selectedQuote.number, clientName: selectedQuote.clientName,
-            items: selectedQuote.items.map(item => ({ id: item.id, description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
+            items: selectedQuote.items.map(item => ({ id: item.id, itemId: item.itemId || "", catalogItemId: (item as any).catalogItemId || "", catalogSource: (item as any).catalogSource || "", sku: (item as any).sku || "", description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
             subtotal: selectedQuote.subtotal, taxRate: selectedQuote.taxRate, discountRate: selectedQuote.discountRate || 0,
             total: selectedQuote.total, currency: selectedQuote.currency, notes: selectedQuote.notes || "",
           },
@@ -406,11 +537,15 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         // If items are brand new or appended
         updated.items = data.items.map((it: any, idx: number) => ({
           id: it.id || `it_${idx + 1}`,
+          itemId: it.itemId || undefined,
+          catalogItemId: it.catalogItemId || undefined,
+          catalogSource: it.catalogSource || undefined,
+          sku: it.sku || undefined,
           description: it.description,
           quantity: Number(it.quantity || 1),
           unitPrice: Number(it.unitPrice || 0),
           subtotal: Number((Number(it.quantity || 1) * Number(it.unitPrice || 0)).toFixed(2)),
-          notes: it.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : "Preço confirmado no catálogo.",
+          notes: it.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : it.priceSource === "existing" ? "Preço existente preservado; confirme o cadastro no catálogo." : "Preço confirmado no catálogo.",
         }));
       }
 
@@ -677,7 +812,7 @@ const handleAddItem = () => {
                       <Eye className="w-3.5 h-3.5 text-amber-400" /> Visualizar PDF armazenado
                     </button>
                     <button
-                      onClick={async () => { const pdfSender = await preparePdfSender(); exportQuotePdf(selectedQuote, pdfSender); }}
+                      onClick={() => handleDownloadQuotePdf(selectedQuote)}
                       className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
                     >
                       <Download className="w-3.5 h-3.5 text-slate-300" /> Baixar PDF
@@ -700,6 +835,19 @@ const handleAddItem = () => {
                     >
                       <FileCheck className="w-3.5 h-3.5" /> Converter em fatura
                     </button>
+                    {!selectedQuote.approvedSnapshotId && (
+                      <button
+                        onClick={handleApproveQuote}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-xl transition"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Aprovar e congelar versão
+                      </button>
+                    )}
+                    {selectedQuote.approvedSnapshotId && (
+                      <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300">
+                        Aprovado · Snapshot imutável
+                      </span>
+                    )}
                     <button
                       onClick={() => handleSaveQuote()}
                       className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase rounded-xl transition shadow-md shadow-amber-500/20"
