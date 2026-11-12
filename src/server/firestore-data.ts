@@ -84,3 +84,33 @@ export async function loadQuoteFromFirestore(request: any, quoteId: unknown): Pr
   const document = await response.json() as { fields?: Record<string, any> };
   return decodeFields(document.fields || {});
 }
+
+const ALLOWED_FINANCIAL_COLLECTIONS = new Set([
+  "quotes", "invoices", "inventory_items", "inventory_movements",
+  "ledger_entries", "payables", "receivables", "purchase_orders",
+]);
+
+/** Read a bounded, authenticated Firestore collection for server-side financial analysis. */
+export async function loadCollectionFromFirestore(request: any, collectionName: string, maxDocuments = 250): Promise<any[]> {
+  if (!ALLOWED_FINANCIAL_COLLECTIONS.has(collectionName)) throw new Error("Coleção não autorizada para análise financeira.");
+  const token = getToken(request);
+  if (!token) throw new Error("Autenticação necessária para consultar dados financeiros.");
+  const pageSize = Math.min(500, Math.max(1, Math.floor(maxDocuments)));
+  const rows: any[] = [];
+  let pageToken: string | undefined;
+  do {
+    const response = await fetch(collectionUrl(collectionName, pageToken).replace("pageSize=1000", "pageSize=" + pageSize), {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(`Não foi possível consultar ${collectionName} (HTTP ${response.status}).`);
+    const payload = await response.json() as { documents?: any[]; nextPageToken?: string };
+    for (const document of payload.documents || []) {
+      const id = String(document.name || "").split("/").pop() || "";
+      rows.push({ id, ...decodeFields(document.fields || {}) });
+      if (rows.length >= maxDocuments) break;
+    }
+    pageToken = rows.length >= maxDocuments ? undefined : payload.nextPageToken || undefined;
+  } while (pageToken);
+  return rows;
+}
