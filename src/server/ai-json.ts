@@ -1,4 +1,5 @@
 import { generateText } from "ai";
+import { GoogleGenAI } from "@google/genai";
 import { AI_CONFIG, getAIModel } from "./ai-config";
 
 export class AIJsonError extends Error {
@@ -55,6 +56,7 @@ export async function generateValidatedJson<T>(options: {
   validate: (value: any) => T;
   temperature?: number;
   maxOutputTokens?: number;
+  responseSchema?: Record<string, unknown>;
   onGeneration?: (event: { text: string; usage?: { inputTokens?: number; outputTokens?: number; promptTokens?: number; completionTokens?: number }; attempt: number }) => void;
 }): Promise<T> {
   const config = AI_CONFIG[options.capability];
@@ -64,16 +66,37 @@ export async function generateValidatedJson<T>(options: {
     const prompt = attempt === 0
       ? options.prompt
       : `Corrija exclusivamente a estrutura da resposta abaixo para JSON válido conforme as instruções. Preserve todos os dados; não invente nem complete informações ausentes. Retorne somente JSON.\nERRO DE VALIDAÇÃO: ${String((lastError as Error)?.message || lastError)}\nRESPOSTA ORIGINAL:\n${raw}`;
-    const result = await generateText({
-      model: getAIModel(options.capability),
-      system: options.system,
-      prompt,
-      temperature: options.temperature ?? config.temperature,
-      maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
-      abortSignal: AbortSignal.timeout(config.timeoutMs),
-    });
-    raw = result.text || "";
-    options.onGeneration?.({ text: raw, usage: result.usage as any, attempt });
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+    let usage: any;
+    if (apiKey) {
+      const client = new GoogleGenAI({ apiKey });
+      const result = await client.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: {
+          systemInstruction: options.system,
+          responseMimeType: "application/json",
+          ...(options.responseSchema ? { responseSchema: options.responseSchema } : {}),
+          temperature: options.temperature ?? config.temperature,
+          maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
+          abortSignal: AbortSignal.timeout(config.timeoutMs),
+        },
+      });
+      raw = result.text || "";
+      usage = { inputTokens: result.usageMetadata?.promptTokenCount, outputTokens: result.usageMetadata?.candidatesTokenCount };
+    } else {
+      const result = await generateText({
+        model: getAIModel(options.capability),
+        system: options.system,
+        prompt,
+        temperature: options.temperature ?? config.temperature,
+        maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
+        abortSignal: AbortSignal.timeout(config.timeoutMs),
+      });
+      raw = result.text || "";
+      usage = result.usage as any;
+    }
+    options.onGeneration?.({ text: raw, usage, attempt });
     try {
       return parseAIJson(raw, options.validate);
     } catch (error) {
