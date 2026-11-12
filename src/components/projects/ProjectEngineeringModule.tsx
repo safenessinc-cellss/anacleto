@@ -4,6 +4,7 @@ import BusinessWorkspace from "../workspace/BusinessWorkspace";
 import RegistryModule from "../registry/RegistryModule";
 import TechnicalDrawingModule from "../technical-drawing/TechnicalDrawingModule";
 import PriceTableModule from "../registry/PriceTableModule";
+import CutOptimization6m from "./CutOptimization6m";
 import { SenderConfig } from "../../types";
 
 type WorkflowTab = "projects" | "measurement" | "cut_plan" | "profile_optimization" | "tipologias" | "technical_drawing" | "price_table";
@@ -63,7 +64,7 @@ export default function ProjectEngineeringModule({ language, senderConfig }: { l
         </div>
         {active === "projects" && <BusinessWorkspace kind="projects" />}
         {active === "measurement" && <RegistryModule kind="measurement" />}
-        {active === "cut_plan" && <RegistryModule kind="cut_plan" />}
+        {active === "cut_plan" && <CutOptimization6m />}
         {active === "profile_optimization" && <RegistryModule kind="profile_optimization" />}
         {active === "tipologias" && <BusinessWorkspace kind="tipologias" />}
         {active === "technical_drawing" && <TechnicalDrawingModule language={language} senderConfig={senderConfig} />}
