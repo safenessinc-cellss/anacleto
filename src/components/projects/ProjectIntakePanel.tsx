@@ -3,7 +3,7 @@ import { collection, doc, setDoc } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Camera, FileUp, FolderPlus, Globe, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
-import { assertUnder10Kb, withoutHeavyInlineData } from "../../utils/firestorePayloads";
+import { assertUnder10Kb, sanitizeFirestoreData, withoutHeavyInlineData } from "../../utils/firestorePayloads";
 
 type IntakeAsset = {
   id: string; name: string; kind: "image" | "pdf" | "reference" | "document";
@@ -126,7 +126,7 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         assets, ownerUid: user.uid, importSource: sourceUrl.trim() ? "browser" : files.length ? "device" : "ai",
         importedAt: now, createdAt: now, updatedAt: now
       };
-      await setDoc(projectRef, assertUnder10Kb(withoutHeavyInlineData(project), "O projeto"));
+      await setDoc(projectRef, assertUnder10Kb(sanitizeFirestoreData(withoutHeavyInlineData(project)), "O projeto"));
       uploadedPaths.length = 0;
       setFiles([]); setName(""); setClient(""); setDescription(""); setSourceUrl("");
       if (picker.current) picker.current.value = "";

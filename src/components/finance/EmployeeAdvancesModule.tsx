@@ -23,7 +23,7 @@ export default function EmployeeAdvancesModule() {
   const pendingTotal = monthItems.filter((item) => item.status !== "deducted").reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   useEffect(() => {
-    const sources = ["employees", "admins", "pending_users", "user_profiles", "staff", "registry_items"] as const;
+    const sources = ["employees", "funcionarios", "staff", "admins", "user_profiles", "pending_users", "registry_items"] as const;
     const stops = sources.map((source) => onSnapshot(collection(db, source), (snap) => {
       const loaded = snap.docs.map((item) => ({ id: item.id, source, data: item.data() }) as EmployeeDirectoryRecord);
       setEmployeeRecords((current) => [...current.filter((record) => record.source !== source), ...loaded]);

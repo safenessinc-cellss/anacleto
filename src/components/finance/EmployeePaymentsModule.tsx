@@ -50,7 +50,7 @@ export default function EmployeePaymentsModule() {
   const [savingEmployee, setSavingEmployee] = useState(false);
 
   useEffect(() => {
-    const employeeSources = ["employees", "admins", "pending_users", "user_profiles"] as const;
+    const employeeSources = ["employees", "funcionarios", "staff", "admins", "user_profiles", "pending_users"] as const;
     const employeeStops = employeeSources.map((source) => onSnapshot(
       collection(db, source),
       (snap) => {

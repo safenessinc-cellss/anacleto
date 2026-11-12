@@ -22,7 +22,7 @@ import { collection, doc, deleteDoc, onSnapshot, query, orderBy, runTransaction,
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
-import { compactInvoiceForFirestore } from "../../utils/firestorePayloads";
+import { compactInvoiceForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
 
 interface InvoicesModuleProps {
   senderConfig: SenderConfig;
@@ -92,19 +92,19 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
         const receiptDelta = Math.max(0, Number(invoice.total || 0) - previousReceived);
         if (receiptDelta <= 0) throw new Error("Esta fatura já está totalmente recebida.");
         tx.set(invoiceRef, compactInvoiceForFirestore(updated));
-        tx.set(receivableRef, {
+        tx.set(receivableRef, sanitizeFirestoreData({
           clientId: invoice.companyId || "", clientName: invoice.clientName || "Cliente",
           description: `Recebimento da fatura ${invoice.number}`, amount: Number(invoice.total || 0),
           receivedAmount: Number(invoice.total || 0), dueDate: invoice.dueDate || invoice.date,
           paymentMethod: "transferencia", status: "received", invoiceId: invoice.id,
           receivedAt: new Date().toISOString(), updatedAt: serverTimestamp()
-        }, { merge: true });
-        tx.set(ledgerRef, {
+        }), { merge: true });
+        tx.set(ledgerRef, sanitizeFirestoreData({
           direction: "inflow", category: "customer_receipt", sourceType: "invoice", sourceId: invoice.id,
           description: `Recebimento da fatura ${invoice.number}`, amount: receiptDelta,
           date: new Date().toISOString().slice(0, 10), status: "posted", createdAt: serverTimestamp(),
           createdBy: auth.currentUser?.email || ""
-        });
+        }));
       });
       setSelectedInvoice(updated);
       showToast(`Fatura ${invoice.number} recebida e conciliada no Financeiro.`, "success");

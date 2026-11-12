@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, X, XCircle } from "lucide-react";
+import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
 
 interface Supplier { id?: string; name: string; nif?: string; }
 interface Payable {
@@ -16,6 +17,7 @@ interface Payable {
   paidAt?: string;
   notes?: string;
   purchaseId?: string;
+  paymentId?: string;
   expenseCategory?: string;
   purchaseNumber?: string;
   documentNumber?: string;
@@ -24,6 +26,7 @@ interface Payable {
   documentName?: string;
   supplierCnpj?: string;
 }
+type HistoricalPayment = { id: string; payableId?: string; supplierName?: string; supplier?: string; description?: string; payableDescription?: string; amount?: number; total?: number; value?: number; method?: string; paymentMethod?: string; status?: string; paidAt?: string; date?: string; dueDate?: string; direction?: string; type?: string; sourceType?: string };
 
 const emptyForm: Omit<Payable, "id"> = {
   supplierId: "",
@@ -48,6 +51,8 @@ const METHODS = [
 export default function PayablesModule() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [items, setItems] = useState<Payable[]>([]);
+  const [history, setHistory] = useState<HistoricalPayment[]>([]);
+  const [historyError, setHistoryError] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "paid" | "overdue">("all");
   const [editing, setEditing] = useState<Payable | null>(null);
@@ -65,8 +70,35 @@ export default function PayablesModule() {
       list.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
       setItems(list);
     });
-    return () => { u1(); u2(); };
+    const u3 = onSnapshot(collection(db, "payments"), (snap) => setHistory((current) => {
+      const transactions = current.filter((row) => row.sourceType === "transaction");
+      return [...transactions, ...snap.docs.map((d) => ({ id: d.id, ...d.data() } as HistoricalPayment))];
+    }), (reason) => setHistoryError(`Falha ao carregar pagamentos históricos: ${reason.message}`));
+    const u4 = onSnapshot(collection(db, "transactions"), (snap) => setHistory((current) => {
+      const payments = current.filter((row) => row.sourceType !== "transaction");
+      return [...payments, ...snap.docs.map((d) => ({ id: d.id, ...d.data(), sourceType: "transaction" } as HistoricalPayment))];
+    }), (reason) => setHistoryError(`Falha ao carregar transações históricas: ${reason.message}`));
+    return () => { u1(); u2(); u3(); u4(); };
   }, []);
+
+  const historicalItems: Payable[] = history
+    .filter((row) => ["paid", "pago", "completed", "posted", "settled", "liquidado"].includes(String(row.status || "").toLowerCase()))
+    .filter((row) => !["inflow", "income", "in", "entrada", "receipt"].includes(String(row.direction || row.type || "").toLowerCase()))
+    .filter((row, index, rows) => rows.findIndex((other) => (other.payableId || other.id) === (row.payableId || row.id)) === index)
+    .filter((row) => !items.some((item) => item.id === row.payableId || item.paymentId === row.id))
+    .map((row) => ({
+      id: `historical-${row.id}`,
+      supplierId: "",
+      supplierName: row.supplierName || row.supplier || "Fornecedor histórico",
+      description: row.payableDescription || row.description || "Pagamento histórico",
+      amount: Number(row.amount ?? row.total ?? row.value ?? 0),
+      dueDate: row.dueDate || row.paidAt?.slice(0, 10) || row.date?.slice(0, 10) || "",
+      paymentMethod: (row.paymentMethod || row.method || "boleto") as Payable["paymentMethod"],
+      status: "paid" as const,
+      paidAt: row.paidAt || row.date,
+    }))
+    .filter((row) => Number.isFinite(row.amount) && row.amount > 0);
+  const allItems = [...items, ...historicalItems];
 
   const today = new Date().toISOString().split("T")[0];
   const isOverdue = (p: Payable) => p.status === "pending" && p.dueDate < today;
@@ -80,7 +112,7 @@ export default function PayablesModule() {
     pending: items.filter((i) => i.status === "pending").reduce((s, i) => s + i.amount, 0),
     pendingApproval: items.filter((i) => i.status === "pending_approval").reduce((s, i) => s + i.amount, 0),
     overdue: items.filter((i) => isOverdue(i)).reduce((s, i) => s + i.amount, 0),
-    paid: items.filter((i) => i.status === "paid").reduce((s, i) => s + i.amount, 0),
+    paid: allItems.filter((i) => i.status === "paid").reduce((s, i) => s + i.amount, 0),
   };
 
   const handleSave = async () => {
@@ -88,7 +120,7 @@ export default function PayablesModule() {
     if (!form.supplierId) return alert("Selecione um fornecedor");
     if (form.amount <= 0) return alert("Valor deve ser maior que zero");
     const supplier = suppliers.find((s) => s.id === form.supplierId);
-    const payload = { ...form, supplierName: supplier?.name || form.supplierName };
+    const payload = sanitizeFirestoreData({ ...form, supplierName: supplier?.name || form.supplierName });
     if (editing?.id) {
       await updateDoc(doc(db, "payables", editing.id), payload);
     } else {
@@ -110,9 +142,9 @@ export default function PayablesModule() {
         const ledger = await tx.get(ledgerRef);
         if (!current.exists() || current.data().status !== "pending") throw new Error("Esta despesa já foi processada.");
         if (ledger.exists()) throw new Error("Já existe uma conciliação para esta despesa.");
-        tx.set(paymentRef, { payableId: p.id, payableDescription: p.description, supplierName: p.supplierName, amount: Number(p.amount || 0), method: p.paymentMethod, status: "completed", reference: "", paidBy: auth.currentUser?.email || "", paidAt, notes: "Pagamento registrado pela tela de Contas a Pagar." });
-        tx.update(payableRef, { status: "paid", paidAt, paidMethod: p.paymentMethod, paymentId: paymentRef.id });
-        tx.set(ledgerRef, { direction: "outflow", category: p.expenseCategory === "gastos_diarios" ? "daily_expense" : p.expenseCategory === "materiais" ? "materials" : "supplier_payment", sourceType: "payable", sourceId: p.id, description: "Pagamento a fornecedor · " + p.description, amount: Number(p.amount || 0), date: paidAt.slice(0, 10), status: "posted", paymentMethod: p.paymentMethod, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        tx.set(paymentRef, sanitizeFirestoreData({ payableId: p.id, payableDescription: p.description, supplierName: p.supplierName, amount: Number(p.amount || 0), method: p.paymentMethod, status: "completed", reference: "", paidBy: auth.currentUser?.email || "", paidAt, notes: "Pagamento registrado pela tela de Contas a Pagar." }));
+        tx.update(payableRef, sanitizeFirestoreData({ status: "paid", paidAt, paidMethod: p.paymentMethod, paymentId: paymentRef.id }));
+        tx.set(ledgerRef, sanitizeFirestoreData({ direction: "outflow", category: p.expenseCategory === "gastos_diarios" ? "daily_expense" : p.expenseCategory === "materiais" ? "materials" : "supplier_payment", sourceType: "payable", sourceId: p.id, description: "Pagamento a fornecedor · " + p.description, amount: Number(p.amount || 0), date: paidAt.slice(0, 10), status: "posted", paymentMethod: p.paymentMethod, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" }));
       });
     } catch (err) { alert("Não foi possível conciliar o pagamento: " + ((err as Error).message || "erro desconhecido")); }
   };
@@ -125,7 +157,7 @@ export default function PayablesModule() {
     if (confirm("Excluir esta despesa pendente?")) await deleteDoc(doc(db, "payables", id));
   };
 
-  const filtered = items.filter((i) => {
+  const filtered = allItems.filter((i) => {
     if (search) {
       const q = search.toLowerCase().trim();
       const supplier = suppliers.find((s) => s.id === i.supplierId);
@@ -155,6 +187,7 @@ export default function PayablesModule() {
 
   return (
     <div className="space-y-4">
+      {historyError && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{historyError}</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
           <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500"><Clock className="w-3.5 h-3.5" /> Pendente</div>

@@ -174,7 +174,7 @@ export default function PdfViewerModal({
             <span className="font-mono text-slate-300 font-bold">{fileName}</span>
             <span>•</span>
             <span className="text-emerald-400 flex items-center gap-1">
-              <CheckCircle className="w-3 h-3" /> PDF armazenado no Firebase Storage
+              <CheckCircle className="w-3 h-3" /> Pré-visualização / Exportar PDF
             </span>
           </div>
           <span className="font-mono text-slate-500 text-[10px]">Anacleto Pro PDF Vault</span>

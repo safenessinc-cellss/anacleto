@@ -3,6 +3,31 @@ import type { Invoice, Quote, QuoteItem, SenderConfig, TechnicalDrawing, Technic
 const isInlineImage = (value: unknown) =>
   typeof value === "string" && value.startsWith("data:image/");
 
+const isOmittedReferenceValue = (key: string, value: unknown) =>
+  value === null && /^(drawingId|referenceCode|reference|tipologia|medidas|linha|cor|vidro)$/i.test(key);
+
+export function sanitizeFirestoreData<T>(value: T): T {
+  const sanitize = (current: unknown): unknown => {
+    if (typeof current === "function" || (typeof current === "number" && !Number.isFinite(current))) return undefined;
+    if (Array.isArray(current)) {
+      return current.map(sanitize).filter((item) => item !== undefined);
+    }
+    if (!current || typeof current !== "object") return current;
+
+    const prototype = Object.getPrototypeOf(current);
+    if (prototype !== Object.prototype && prototype !== null) return current;
+
+    return Object.fromEntries(
+      Object.entries(current as Record<string, unknown>)
+        .filter(([key, child]) => child !== undefined && !isOmittedReferenceValue(key, child) &&
+          !(typeof child === "string" && child.trim() === "" && /^(drawingId|referenceCode|reference|tipologia|medidas|linha|cor|vidro)$/i.test(key)))
+        .map(([key, child]) => [key, sanitize(child)])
+        .filter(([, child]) => child !== undefined),
+    );
+  };
+  return sanitize(value) as T;
+}
+
 function stripInlineImages<T>(value: T): T {
   if (Array.isArray(value)) return value.map(stripInlineImages) as T;
   if (!value || typeof value !== "object") return value;
@@ -45,14 +70,14 @@ function technicalDrawingReference(drawing?: Quote["technicalDrawing"]): Technic
 
 export function compactQuoteForFirestore(quote: Quote): Quote {
   const { pdfDataUri: _pdf, pdfFileName: _fileName, pdfGeneratedAt: _generatedAt, pdfFileSizeKb: _size, senderSnapshot: _sender, ...light } = quote;
-  const result = stripInlineImages({
+  const result = sanitizeFirestoreData(stripInlineImages({
     ...light,
     technicalDrawing: technicalDrawingReference(quote.technicalDrawing),
     items: quote.items.map((item) => {
       const { itemPhotoUrl: _photo, itemPhotoUrls: _photos, ...line } = item;
       return line;
     }),
-  });
+  }));
   return assertUnder10Kb(result, "O orçamento");
 }
 
@@ -62,14 +87,14 @@ export function compactInvoiceForFirestore(invoice: Invoice): Invoice {
   const compactSender = sender
     ? Object.fromEntries(Object.entries(sender).filter(([key, value]) => !(/logo|watermark/i.test(key) && isInlineImage(value)))) as SenderConfig
     : undefined;
-  return assertUnder10Kb(stripInlineImages({
+  return assertUnder10Kb(sanitizeFirestoreData(stripInlineImages({
     ...light,
     ...(compactSender ? { senderSnapshot: compactSender } : {}),
     items: invoice.items.map((item: QuoteItem) => {
       const { itemPhotoUrl: _photo, itemPhotoUrls: _photos, ...line } = item;
       return line;
     }),
-  }), "A fatura");
+  })), "A fatura");
 }
 
 export function withoutHeavyInlineData<T>(value: T): T {

@@ -52,7 +52,7 @@ service cloud.firestore {
     match /companies/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /companies_crm/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /budgets/{id} {
- allow read: if canOperate();
+ allow read: if canOperate() || canManageFinance();
  allow create: if canManageCommercial() || (request.resource.data.requestOnly == true && request.resource.data.source == 'website' && request.resource.data.status == 'pending' && !('total' in request.resource.data) && !('subtotal' in request.resource.data) && !('taxRate' in request.resource.data) && !('taxAmount' in request.resource.data));
  allow update: if canManageCommercial();
  allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
@@ -76,6 +76,8 @@ service cloud.firestore {
     match /suppliers/{id} { allow read, write: if canManageFinance(); }
     match /payroll_adjustments/{id} { allow read, write: if canManageFinance(); }
     match /employees/{id} { allow read, write: if canManageFinance(); }
+    match /funcionarios/{id} { allow read: if canManageFinance(); }
+    match /transactions/{id} { allow read: if canManageFinance(); }
     match /employee_payments/{id} { allow read, write: if canManageFinance(); }
     match /time_entries/{id} { allow read, write: if canManageFinance(); }
     match /production_orders/{id} {

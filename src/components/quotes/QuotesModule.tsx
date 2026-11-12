@@ -33,7 +33,7 @@ import PdfViewerModal from "../common/PdfViewerModal";
 import ImageLightbox from "../common/ImageLightbox";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
 import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
-import { compactInvoiceForFirestore, compactQuoteForFirestore } from "../../utils/firestorePayloads";
+import { compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
 
 interface QuotesModuleProps {
   senderConfig: SenderConfig;
@@ -505,14 +505,14 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         if (current.data().invoiceId) throw new Error("Este orçamento já possui uma fatura vinculada.");
         if (!["accepted", "approved", "aprovado"].includes(String(current.data().status || ""))) throw new Error("Aprove o orçamento antes de gerar a fatura.");
         tx.set(invoiceRef, compactInvoiceForFirestore(finalInvoice));
-        tx.set(doc(db, "receivables", invoiceId), {
+        tx.set(doc(db, "receivables", invoiceId), sanitizeFirestoreData({
           clientId: approvedQuote.companyId || "", clientName: approvedQuote.clientName || "Cliente",
           description: `Fatura ${invoiceNumber} · Orçamento ${approvedQuote.number}`,
           amount: Number(approvedQuote.total || 0), receivedAmount: 0, dueDate: baseInvoice.dueDate,
           paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: approvedQuote.id,
           notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        });
-        tx.update(quoteRef, { status: "invoiced", invoiceId, invoicedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        }));
+        tx.update(quoteRef, sanitizeFirestoreData({ status: "invoiced", invoiceId, invoicedAt: serverTimestamp(), updatedAt: serverTimestamp() }));
       });
       showToast(`Fatura ${invoiceNumber} gerada e vinculada ao Financeiro.`, "success");
     } catch (err) {

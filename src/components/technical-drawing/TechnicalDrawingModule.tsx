@@ -33,6 +33,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
 import { db, storage } from "../../firebase";
 import { useToast } from "../ToastContext";
+import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
 import PdfViewerModal from "../common/PdfViewerModal";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
@@ -615,7 +616,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         ownerUid: user.uid,
         schemaVersion: 2,
       });
-      await setDoc(doc(db, "technical_drawings", targetDrawing.id), savedDrawing);
+      await setDoc(doc(db, "technical_drawings", targetDrawing.id), sanitizeFirestoreData(savedDrawing));
       setDrawing(savedDrawing);
       if (!silent) showToast("Projeto técnico salvo com os dados editáveis. O PDF será gerado ao exportar.", "success");
       return true;
@@ -846,7 +847,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               {drawing.pdfDataUri && (
                 <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
                   <CheckCircle className="w-3 h-3" />
-                  PDF armazenado
+                  Pré-visualização / Exportar PDF
                 </span>
               )}
             </div>

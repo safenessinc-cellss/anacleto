@@ -1,6 +1,6 @@
 export interface EmployeeDirectoryRecord {
   id: string;
-  source: "employees" | "admins" | "pending_users" | "user_profiles" | "staff" | "registry_items";
+  source: "employees" | "funcionarios" | "admins" | "pending_users" | "user_profiles" | "staff" | "registry_items";
   data: Record<string, unknown>;
 }
 
@@ -32,7 +32,7 @@ function firstString(data: Record<string, unknown>, keys: string[]): string {
 }
 
 function isEmployeeRecord(record: EmployeeDirectoryRecord): boolean {
-  if (record.source === "employees" || record.source === "admins" || record.source === "staff") return true;
+  if (record.source === "employees" || record.source === "funcionarios" || record.source === "admins" || record.source === "staff") return true;
   const { data } = record;
   const description = [
     data.role, data.type, data.userType, data.category, data.kind, data.position, data.cargo,
@@ -45,6 +45,7 @@ function isEmployeeRecord(record: EmployeeDirectoryRecord): boolean {
 
 const sourcePriority: Record<EmployeeDirectoryRecord["source"], number> = {
   employees: 6,
+  funcionarios: 6,
   staff: 5,
   admins: 4,
   user_profiles: 3,
@@ -61,7 +62,7 @@ function toEntry(record: EmployeeDirectoryRecord): EmployeeDirectoryEntry | null
   if (!name && !email) return null;
   const salaryValue = Number(data.salary ?? data.baseSalary ?? data.salaryBase ?? 0);
   return {
-    id: record.source === "employees" || record.source === "staff" ? record.id : uid || email || record.id,
+    id: record.source === "employees" || record.source === "funcionarios" || record.source === "staff" ? record.id : uid || email || record.id,
     uid: uid || undefined,
     name: name || email,
     email: email || undefined,

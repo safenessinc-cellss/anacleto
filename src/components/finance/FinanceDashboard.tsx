@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 
-type Ledger = { id: string; date?: string; direction?: string; type?: string; amount?: number; category?: string; description?: string; status?: string; sourceType?: string; sourceId?: string };
-type OpenRow = { id: string; invoiceId?: string; dueDate?: string; date?: string; paidAt?: string; amount?: number; total?: number; receivedAmount?: number; status?: string; clientName?: string; supplierName?: string; description?: string; purchaseId?: string; expenseCategory?: string };
-type CashRow = { id: string; date?: string; amount?: number; status?: string; category?: string; sourceId?: string; kind?: string };
+type Ledger = { id: string; date?: string; paidAt?: string; direction?: string; type?: string; amount?: number; total?: number; value?: number; category?: string; description?: string; status?: string; sourceType?: string; sourceId?: string; payableId?: string; receivableId?: string; purchaseId?: string; quoteId?: string; projectId?: string; paymentMethod?: string; method?: string; kind?: string; };
+type OpenRow = { id: string; invoiceId?: string; dueDate?: string; date?: string; paidAt?: string; amount?: number; total?: number; receivedAmount?: number; status?: string; clientName?: string; supplierName?: string; description?: string; purchaseId?: string; expenseCategory?: string; paymentMethod?: string; paid?: boolean; isPaid?: boolean; paidAmount?: number };
+type CashRow = { id: string; date?: string; amount?: number; status?: string; category?: string; sourceId?: string; kind?: string; quoteId?: string; projectId?: string; sourceType?: string; };
+type HistoricalQuote = { id: string; projectId?: string; quoteId?: string; status?: string; clientName?: string; clientAdvanceTotal?: number; depositAmount?: number; advancePaid?: number; sinal?: number; entrada?: number };
 const money = (value: number) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const monthId = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 const parseDate = (value?: string) => value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;
@@ -15,6 +16,16 @@ const isCustomerReceipt = (row: Ledger) => isIncoming(row) && (
 );
 const cashOutflowCategories = new Set(["daily_expense", "employee_advance", "payroll", "materials", "supplier_payment"]);
 const isCancelled = (status?: string) => ["cancelled", "cancelado", "void", "estornado", "refunded"].includes(String(status || "").toLowerCase());
+const isPaid = (status?: string) => ["paid", "pago", "completed", "complete", "posted", "settled", "liquidado"].includes(String(status || "").toLowerCase());
+const recordDate = (value: unknown) => {
+  if (typeof value === "string") return value.slice(0, 10);
+  if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate?: unknown }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().toISOString().slice(0, 10);
+  }
+  return "";
+};
+const signalAmount = (row: HistoricalQuote) => Math.max(0, ...[row.clientAdvanceTotal, row.depositAmount, row.advancePaid, row.sinal, row.entrada].map(Number).filter(Number.isFinite));
+const referenceKey = (row: { projectId?: string; quoteId?: string; id: string }) => row.projectId || row.quoteId || row.id;
 const point = (cx: number, cy: number, radius: number, angle: number) => `${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`;
 
 function donutPath(start: number, end: number) {
@@ -32,6 +43,9 @@ export default function FinanceDashboard() {
   const [adjustments, setAdjustments] = useState<CashRow[]>([]);
   const [payroll, setPayroll] = useState<CashRow[]>([]);
   const [dailyExpenses, setDailyExpenses] = useState<CashRow[]>([]);
+  const [transactions, setTransactions] = useState<Ledger[]>([]);
+  const [historicalPayments, setHistoricalPayments] = useState<Ledger[]>([]);
+  const [historicalQuotes, setHistoricalQuotes] = useState<HistoricalQuote[]>([]);
   const [error, setError] = useState("");
   const [activeMonth, setActiveMonth] = useState(monthId(new Date()));
   const [activeExpense, setActiveExpense] = useState("");
@@ -51,24 +65,99 @@ export default function FinanceDashboard() {
       watch<CashRow>("payroll_adjustments", setAdjustments),
       watch<CashRow>("employee_payments", setPayroll),
       watch<CashRow>("daily_expenses", setDailyExpenses),
+      watch<Ledger>("transactions", setTransactions),
+      watch<Ledger>("payments", setHistoricalPayments),
+      watch<HistoricalQuote>("quotes", (rows) => setHistoricalQuotes((current) => [...rows, ...current.filter((row) => row.id.startsWith("budget:"))])),
+      watch<HistoricalQuote>("budgets", (rows) => setHistoricalQuotes((current) => [...current.filter((row) => !row.id.startsWith("budget:")), ...rows.map((row) => ({ ...row, id: `budget:${row.id}` }))])),
     ];
     return () => stops.forEach((stop) => stop());
   }, []);
 
   const posted = ledger.filter((row) => !isCancelled(row.status) && (row.status || "posted") !== "pending");
-  const paidPayableIds = new Set(payables.filter((row) => row.status === "paid").map((row) => row.id));
-  const cashEntries = posted.filter((row) =>
+  const paidPayableIds = new Set(payables.filter((row) => isPaid(row.status)).map((row) => row.id));
+  const ledgerCashEntries = posted.filter((row) =>
     isCustomerReceipt(row) ||
     (cashOutflowCategories.has(String(row.category || "").toLowerCase()) &&
       (row.sourceType === "payable"
         ? paidPayableIds.has(row.sourceId || "")
         : ["daily_expense", "employee_advance", "payroll"].includes(String(row.category || "").toLowerCase()))),
   );
+  const ledgerIdentifiers = new Set(ledger.flatMap((row) => [row.id, row.sourceId].filter((value): value is string => Boolean(value))));
+  const historicalCashEntries = [...historicalPayments, ...transactions]
+    .filter((row) => !isCancelled(row.status))
+    .map((row): Ledger => {
+      const direction = String(row.direction || row.type || "").toLowerCase();
+      const incoming = ["inflow", "income", "in", "entrada", "receipt", "recebimento", "customer_receipt", "customer_advance"].includes(direction);
+      const sourceId = row.payableId || row.receivableId || row.purchaseId || row.sourceId || row.id;
+      return {
+        ...row,
+        amount: Number(row.amount ?? row.total ?? row.value ?? 0),
+        date: recordDate(row.paidAt || row.date) || recordDate(row.date),
+        direction: incoming ? "inflow" : "outflow",
+        category: incoming && !["customer_receipt", "customer_advance"].includes(String(row.category || "").toLowerCase())
+          ? "customer_receipt"
+          : row.category || "supplier_payment",
+        sourceId,
+        sourceType: row.sourceType || (row.payableId ? "payable" : row.receivableId ? "receivable" : row.purchaseId ? "purchase" : ""),
+      };
+    })
+    .filter((row) => (isPaid(row.status) || (["received", "recebido"].includes(String(row.status || "").toLowerCase()) && isCustomerReceipt(row))) &&
+      Number.isFinite(row.amount) && Number(row.amount) > 0 && !ledgerIdentifiers.has(row.id) && !ledgerIdentifiers.has(row.sourceId || ""))
+    .filter((row, index, rows) => rows.findIndex((other) => other.sourceId === row.sourceId && other.direction === row.direction) === index);
+  const purchaseLedgerIds = new Set(ledger.filter((row) => row.sourceType === "purchase").map((row) => row.sourceId));
+  const historicalPurchaseIds = new Set(historicalCashEntries.filter((row) => row.sourceType === "purchase").map((row) => row.sourceId));
+  const legacyPaidPurchaseEntries: Ledger[] = purchases
+    .filter((row) => !isCancelled(row.status) && (
+      isPaid(row.status) || row.paid === true || row.isPaid === true ||
+      (["received", "recebida"].includes(String(row.status || "").toLowerCase()) &&
+        ["cash", "dinheiro", "pix", "à vista", "a vista"].includes(String(row.paymentMethod || "").toLowerCase()) &&
+        Boolean(row.paidAt))
+    ))
+    .filter((row) => !purchaseLedgerIds.has(row.id) && !historicalPurchaseIds.has(row.id) && !paidPayableIds.has(row.id))
+    .map((row) => ({
+      id: `paid-purchase:${row.id}`,
+      amount: Number(row.paidAmount ?? row.amount ?? row.total ?? 0),
+      date: recordDate(row.paidAt || row.date),
+      status: "posted",
+      direction: "outflow",
+      category: row.expenseCategory === "gastos_diarios" ? "daily_expense" : "materials",
+      sourceId: row.id,
+      sourceType: "purchase",
+      description: row.description,
+    }))
+    .filter((row) => Number.isFinite(row.amount) && Number(row.amount) > 0);
+  const cashEntries = [
+    ...ledgerCashEntries,
+    ...historicalCashEntries.filter((row) =>
+      isCustomerReceipt(row) || row.sourceType !== "payable" ||
+      !payables.some((payable) => payable.id === row.sourceId) || paidPayableIds.has(row.sourceId || "")),
+    ...legacyPaidPurchaseEntries,
+  ];
   const inflows = cashEntries.filter(isCustomerReceipt);
   const outflows = cashEntries.filter((row) => !isCustomerReceipt(row));
-  const advanceLedgerIds = new Set(inflows.filter((row) => row.sourceType === "client_advance").map((row) => row.sourceId));
-  const legacyClientAdvances = advances.filter((row) => !isCancelled(row.status) && ["received", "paid", "recebido"].includes(String(row.status || "").toLowerCase()) && !advanceLedgerIds.has(row.id))
-    .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const advanceLedgerIds = new Set(inflows.filter((row) => row.sourceType === "client_advance" || row.category === "customer_advance").map((row) => row.sourceId));
+  const legacyAdvanceRows = advances.filter((row) => !isCancelled(row.status) &&
+    (isPaid(row.status) || ["received", "recebido"].includes(String(row.status || "").toLowerCase())) && !advanceLedgerIds.has(row.id));
+  const advanceTotalsByReference = new Map<string, number>();
+  const ledgerAdvanceTotalsByReference = new Map<string, number>();
+  for (const row of inflows.filter((item) => item.category === "customer_advance")) {
+    const key = referenceKey(row);
+    ledgerAdvanceTotalsByReference.set(key, (ledgerAdvanceTotalsByReference.get(key) || 0) + Number(row.amount || 0));
+  }
+  for (const row of legacyAdvanceRows) {
+    const key = referenceKey(row);
+    advanceTotalsByReference.set(key, (advanceTotalsByReference.get(key) || 0) + Number(row.amount || 0));
+  }
+  const storedAdvanceTotalsByReference = new Map<string, number>();
+  for (const row of historicalQuotes) {
+    const amount = signalAmount(row);
+    if (!amount) continue;
+    const key = referenceKey(row);
+    storedAdvanceTotalsByReference.set(key, Math.max(storedAdvanceTotalsByReference.get(key) || 0, amount));
+  }
+  const legacyClientAdvances = [...advanceTotalsByReference.entries()].reduce((sum, [key, value]) => sum + Math.max(0, value - (ledgerAdvanceTotalsByReference.get(key) || 0)), 0);
+  const legacyQuoteAdvances = [...storedAdvanceTotalsByReference.entries()].reduce((sum, [key, value]) =>
+    sum + Math.max(0, value - (ledgerAdvanceTotalsByReference.get(key) || 0) - (advanceTotalsByReference.get(key) || 0)), 0);
   const receiptLedgerIds = new Set(inflows.map((row) => row.sourceId));
   const legacyReceipts = receivables.filter((row) => !isCancelled(row.status) &&
       !receiptLedgerIds.has(row.invoiceId || row.id))
@@ -80,14 +169,15 @@ export default function FinanceDashboard() {
   const legacyPayrollPaid = payroll.filter((row) => !isCancelled(row.status) && ["paid", "pago"].includes(String(row.status || "").toLowerCase()) && !payrollLedgerIds.has(row.id))
     .reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const paidPayableLedgerIds = new Set(outflows.filter((row) => row.sourceType === "payable").map((row) => row.sourceId));
-  const legacyPaidPayables = payables.filter((row) => row.status === "paid" && !paidPayableLedgerIds.has(row.id));
+  const legacyHistoricalPayableIds = new Set(historicalCashEntries.filter((row) => row.sourceType === "payable").map((row) => row.sourceId));
+  const legacyPaidPayables = payables.filter((row) => isPaid(row.status) && !paidPayableLedgerIds.has(row.id) && !legacyHistoricalPayableIds.has(row.id));
   const legacyPaidPayableTotal = legacyPaidPayables.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const dailyLedgerIds = new Set(outflows.filter((row) => row.sourceType === "daily_expense").map((row) => row.sourceId));
   const legacyDailyExpenses = dailyExpenses.filter((row) => !dailyLedgerIds.has(row.id));
   const legacyPaidDailyPurchases = legacyPaidPayables
     .filter((row) => row.expenseCategory === "gastos_diarios" || purchases.some((purchase) => purchase.id === row.purchaseId && purchase.expenseCategory === "gastos_diarios"))
     .map((row) => ({ id: row.id, date: row.paidAt?.slice(0, 10) || row.date, amount: row.amount, status: row.status }));
-  const incomingTotal = inflows.reduce((sum, row) => sum + Number(row.amount || 0), 0) + legacyClientAdvances + legacyReceipts;
+  const incomingTotal = inflows.reduce((sum, row) => sum + Number(row.amount || 0), 0) + legacyClientAdvances + legacyQuoteAdvances + legacyReceipts;
   const outgoingTotal = outflows.reduce((sum, row) => sum + Number(row.amount || 0), 0) + legacyEmployeeAdvances + legacyPayrollPaid + legacyPaidPayableTotal +
     legacyDailyExpenses.filter((row) => ["paid", "pago"].includes(String(row.status || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const cash = incomingTotal - outgoingTotal;
@@ -169,7 +259,7 @@ export default function FinanceDashboard() {
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Saldo em Caixa (R$)</p><p className={`mt-2 text-2xl font-black ${cash < 0 ? "text-rose-700" : "text-slate-900 dark:text-white"}`}>{cash < 0 ? `-R$ ${Math.abs(cash).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : money(cash)}</p><p className="mt-1 text-[11px] text-slate-600">Entradas: {money(incomingTotal)} | Saídas e Vales: -{money(outgoingTotal)}</p></article>
-      <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Adiantamentos de Clientes (Sinais)</p><p className="mt-2 text-2xl font-black">{money(advances.filter((row) => !isCancelled(row.status) && ["received", "paid", "recebido"].includes(String(row.status || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || 0), 0))}</p><p className="mt-1 text-[11px] text-slate-500">Valores recebidos vinculados às obras</p></article>
+      <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Adiantamentos de Clientes (Sinais)</p><p className="mt-2 text-2xl font-black">{money(inflows.filter((row) => row.category === "customer_advance").reduce((sum, row) => sum + Number(row.amount || 0), 0) + legacyClientAdvances + legacyQuoteAdvances)}</p><p className="mt-1 text-[11px] text-slate-500">Valores recebidos vinculados às obras</p></article>
       <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">A Receber de Obras</p><p className="mt-2 text-2xl font-black">{money(openReceivables)}</p><p className="mt-1 text-[11px] text-slate-500">Saldo aberto das cobranças</p></article>
       <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Contas a Pagar / Boletos Futuros</p><p className="mt-2 text-2xl font-black">{money(openPayables)}</p><p className="mt-1 text-[11px] text-slate-500">Compromissos não pagos; não reduz o caixa</p></article>
       <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Gastos Diários (Hoje / Mês)</p><p className="mt-2 text-lg font-black">{money(dailyToday)}</p><p className="mt-1 text-[11px] text-slate-500">Hoje · {money(dailyMonth)} no mês</p></article>

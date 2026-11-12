@@ -5,6 +5,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage
 import { buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { TechnicalDrawing } from "../../types";
 import DrawingSvgCanvas from "../technical-drawing/DrawingSvgCanvas";
+import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
 import { ClipboardCheck, Ruler, Scissors, Hammer, Box, Sparkles, Loader2, Save, ShieldCheck } from "lucide-react";
 
 type Props = { projectId: string; projectName: string; projectNotes?: string; assets?: Array<{name:string;url:string;kind:string}> };
@@ -79,8 +80,8 @@ export default function ProjectProductionWorkflow({projectId,projectName,project
       const fileRef=storageRef(storage,path);
       await uploadBytes(fileRef,blob,{contentType:"application/pdf",customMetadata:{ownerUid:user.uid,drawingId,projectId}});
       const pdfUrl=await getDownloadURL(fileRef);
-      await setDoc(doc(db,"technical_drawings",drawingId),{id:drawingId,title:drawing.title,description:drawing.description,projectId,projectName,category:drawing.category,unit:drawing.unit,overallDimensions:drawing.overallDimensions,createdAt:drawing.createdAt,updatedAt:new Date().toISOString(),pdfUrl,pdfStoragePath:path,pdfFileName:pdf.fileName,pdfGeneratedAt:new Date().toISOString(),pdfFileSizeKb:pdf.sizeKb,storageFormat:"pdf-only",workflowStatus:approved?"Aprovado tecnicamente":"Aguardando validação",approvedBy:approved?user.uid:"",approvedAt:approved?new Date().toISOString():""});
-      await updateDoc(doc(db,"projects",projectId),{engineering:{drawingId,workflowStatus:approved?"Aprovado tecnicamente":"Aguardando validação",measurement:form,plan,approvalChecklist:checked,approved,updatedAt:new Date().toISOString()},updatedAt:new Date().toISOString()});
+      await setDoc(doc(db,"technical_drawings",drawingId),sanitizeFirestoreData({id:drawingId,title:drawing.title,description:drawing.description,projectId,projectName,category:drawing.category,unit:drawing.unit,overallDimensions:drawing.overallDimensions,createdAt:drawing.createdAt,updatedAt:new Date().toISOString(),pdfUrl,pdfStoragePath:path,pdfFileName:pdf.fileName,pdfGeneratedAt:new Date().toISOString(),pdfFileSizeKb:pdf.sizeKb,storageFormat:"pdf-only",workflowStatus:approved?"Aprovado tecnicamente":"Aguardando validação",approvedBy:approved?user.uid:"",approvedAt:approved?new Date().toISOString():""}));
+      await updateDoc(doc(db,"projects",projectId),sanitizeFirestoreData({engineering:{drawingId,workflowStatus:approved?"Aprovado tecnicamente":"Aguardando validação",measurement:form,plan,approvalChecklist:checked,approved,updatedAt:new Date().toISOString()},updatedAt:new Date().toISOString()}));
       setNotice("Dossiê de fabricação e PDF final salvos no projeto. "+(approved?"Aprovação registrada.":"Permanece pendente de aprovação técnica."));
     }catch(e){setError(e instanceof Error?e.message:"Falha ao salvar o dossiê.");}
     finally{setSaving(false);}

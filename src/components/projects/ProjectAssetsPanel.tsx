@@ -4,6 +4,7 @@ import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage
 import { ExternalLink, FileText, ImagePlus, Link2, Trash2, UploadCloud } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
 import { TechnicalDrawing } from "../../types";
+import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
 
 type ProjectAsset = {
   id: string;
@@ -43,7 +44,7 @@ export default function ProjectAssetsPanel({ projectId, projectName, assets = []
   }, [projectId]);
 
   const persistAsset = async (asset: ProjectAsset) => {
-    await updateDoc(doc(db, "projects", projectId), { assets: arrayUnion(asset), updatedAt: new Date().toISOString() });
+    await updateDoc(doc(db, "projects", projectId), sanitizeFirestoreData({ assets: arrayUnion(sanitizeFirestoreData(asset)), updatedAt: new Date().toISOString() }));
     setItems(current => current.some(item => item.id === asset.id) ? current : [asset, ...current]);
   };
 
@@ -99,7 +100,7 @@ export default function ProjectAssetsPanel({ projectId, projectName, assets = []
     setBusy(true); setError("");
     try {
       if (asset.storagePath) await deleteObject(ref(storage, asset.storagePath));
-      await updateDoc(doc(db, "projects", projectId), { assets: arrayRemove(asset), updatedAt: new Date().toISOString() });
+      await updateDoc(doc(db, "projects", projectId), sanitizeFirestoreData({ assets: arrayRemove(sanitizeFirestoreData(asset)), updatedAt: new Date().toISOString() }));
       setItems(current => current.filter(item => item.id !== asset.id));
     } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível remover o arquivo."); }
     finally { setBusy(false); }

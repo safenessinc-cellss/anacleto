@@ -63,7 +63,7 @@ export default function PayrollModule() {
   const [editHours, setEditHours] = useState("");
   const [savingSalary, setSavingSalary] = useState(false);
   useEffect(() => {
-    const sources = ["employees", "admins", "pending_users", "user_profiles", "staff", "registry_items"] as const;
+    const sources = ["employees", "funcionarios", "staff", "admins", "user_profiles", "pending_users", "registry_items"] as const;
     const employeeStops = sources.map(source => onSnapshot(collection(db, source), snapshot => {
       const loaded = snapshot.docs.map(item => ({ id: item.id, source, data: item.data() }) as EmployeeDirectoryRecord);
       setEmployeeRecords(current => [...current.filter(record => record.source !== source), ...loaded]);
