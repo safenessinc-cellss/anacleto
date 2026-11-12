@@ -400,6 +400,25 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       }
       approvedQuote = { ...snapshot.document, id: quote.id, approvedSnapshotId: quote.approvedSnapshotId || snapshot.document.approvedSnapshotId } as Quote;
       invoiceSender = snapshot.senderSnapshot || senderConfig;
+
+      // Recompute from the approved line items instead of trusting possibly stale
+      // aggregate fields. This prevents a valid priced quote becoming a R$ 0.00 invoice.
+      if (!Array.isArray(approvedQuote.items) || approvedQuote.items.length === 0) {
+        throw new Error("O orçamento aprovado não possui itens. Adicione os materiais e serviços antes de emitir a fatura.");
+      }
+      const calculatedQuote = recalculateQuote(approvedQuote);
+      const invalidLine = calculatedQuote.items.find(item =>
+        !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 ||
+        !Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) <= 0
+      );
+      if (invalidLine) {
+        throw new Error(`O item "${invalidLine.description || "sem descrição"}" está sem preço válido. Atualize o preço pelo catálogo Materiais e Componentes antes de emitir a fatura.`);
+      }
+      if (!Number.isFinite(calculatedQuote.total) || calculatedQuote.total <= 0) {
+        throw new Error("O valor total calculado é zero ou inválido. A fatura não será criada; revise os preços e os impostos do orçamento.");
+      }
+      approvedQuote = calculatedQuote;
+
       const quoteRef = doc(db, "quotes", approvedQuote.id);
       const invoiceRef = doc(collection(db, "invoices"));
       const invoiceId = invoiceRef.id;
