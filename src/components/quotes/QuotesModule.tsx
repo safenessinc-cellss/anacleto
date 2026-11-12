@@ -294,7 +294,8 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("Faça login novamente para aprovar o orçamento.");
-      await setDoc(doc(db, "quotes", selectedQuote.id), selectedQuote);
+      const approvalCandidate = recalculateQuote(selectedQuote);
+      await setDoc(doc(db, "quotes", approvalCandidate.id), approvalCandidate);
       const senderSnapshot = await preparePdfSender();
       const response = await fetch("/api/approved-snapshot", {
         method: "POST",
@@ -387,6 +388,9 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       } else {
         const token = await auth.currentUser?.getIdToken();
         if (!token) throw new Error("Faça login novamente para gerar a fatura.");
+        // Freeze the same recalculated totals that will be used by the invoice PDF.
+        approvedQuote = recalculateQuote(quote);
+        await setDoc(doc(db, "quotes", approvedQuote.id), approvedQuote);
         const senderSnapshot = await preparePdfSender();
         const approvalResponse = await fetch("/api/approved-snapshot", {
           method: "POST",
