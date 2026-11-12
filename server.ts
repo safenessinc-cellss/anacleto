@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "./src/server/ai-config";
 import { generateValidatedJson, parseAIJson } from "./src/server/ai-json";
-import { loadCatalogFromFirestore, loadQuoteFromFirestore } from "./src/server/firestore-data";
+import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore } from "./src/server/firestore-data";
 import technicalDrawingHandler from "./api/technical-drawing";
 import approvedSnapshotHandler from "./api/approved-snapshot";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate";
@@ -84,6 +84,69 @@ const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
 };
 
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
+
+function compactFinancialRows(rows: any[], fields: string[]) {
+  return rows.slice(0, 120).map(row => Object.fromEntries(fields.filter(key => row[key] !== undefined).map(key => [key, row[key]])));
+}
+
+// Assistente Financeiro: answers only from the authenticated user's live business records.
+app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("financial-assistant", 15, 60_000), async (req, res) => {
+  const startedAt = Date.now();
+  const user = res.locals.firebaseUser as { uid?: string; email?: string };
+  const question = String(req.body?.message || "").trim().slice(0, 3000);
+  const language = String(req.body?.language || "pt").toLowerCase().startsWith("es") ? "es" : "pt";
+  if (question.length < 3) return res.status(400).json({ error: "Digite uma pergunta financeira." });
+  try {
+    const names = ["quotes", "invoices", "inventory_items", "inventory_movements", "ledger_entries", "payables", "receivables", "purchase_orders"];
+    const loaded = await Promise.all(names.map(name => loadCollectionFromFirestore(req, name, 250)));
+    const data = Object.fromEntries(names.map((name, index) => [name, loaded[index]]));
+    const ledger = data.ledger_entries as any[];
+    const cashIn = ledger.filter(x => ["inflow","income","entrada","in"].includes(String(x.direction || x.type || "").toLowerCase()) && !["void","cancelled","cancelado","estornado"].includes(String(x.status || "").toLowerCase())).reduce((s,x)=>s+Math.max(0,Number(x.amount||0)),0);
+    const cashOut = ledger.filter(x => ["outflow","expense","saida","saída","out"].includes(String(x.direction || x.type || "").toLowerCase()) && !["void","cancelled","cancelado","estornado"].includes(String(x.status || "").toLowerCase())).reduce((s,x)=>s+Math.max(0,Number(x.amount||0)),0);
+    const stock = (data.inventory_items as any[]).map(x => ({
+      name: String(x.name || x.description || "Item"),
+      sku: String(x.sku || x.code || ""),
+      quantity: Number(x.quantity || 0),
+      reservedQuantity: Number(x.reservedQuantity || 0),
+      available: Math.max(0, Number(x.quantity || 0) - Number(x.reservedQuantity || 0)),
+      minimumStock: Number(x.minimumStock || 0),
+      unitCost: Number(x.unitCost ?? x.costPrice ?? x.averageCost ?? 0),
+      unit: String(x.unit || "un"),
+    }));
+    const stockCostKnown = stock.filter(x => x.unitCost > 0).reduce((s,x)=>s+x.quantity*x.unitCost,0);
+    const context = {
+      currency: "BRL",
+      collectionCounts: Object.fromEntries(names.map(name => [name, (data as any)[name].length])),
+      cashLedger: { receivedRecorded: cashIn, paidRecorded: cashOut, netRecorded: cashIn - cashOut, note: "Calculado exclusivamente dos lançamentos efetivos em ledger_entries; não equivale ao lucro contábil." },
+      quotes: compactFinancialRows(data.quotes, ["number","clientName","date","status","subtotal","taxAmount","discountAmount","total","currency","items"]),
+      invoices: compactFinancialRows(data.invoices, ["number","clientName","date","dueDate","status","subtotal","taxAmount","total","currency","items"]),
+      inventory: stock.slice(0, 150),
+      inventoryMovements: compactFinancialRows(data.inventory_movements, ["itemName","type","quantity","reason","createdAt"]),
+      payables: compactFinancialRows(data.payables, ["description","supplierName","amount","total","dueDate","status","paidAt"]),
+      receivables: compactFinancialRows(data.receivables, ["description","clientName","amount","receivedAmount","dueDate","status","receivedAt"]),
+      purchaseOrders: compactFinancialRows(data.purchase_orders, ["number","supplierName","documentNumber","issueDate","dueDate","status","subtotal","tax","total","items"]),
+      inventoryKnownCostEstimate: stockCostKnown,
+      inventoryCostCoverage: stock.length ? stock.filter(x => x.unitCost > 0).length + "/" + stock.length + " itens com custo unitário informado" : "sem itens",
+    };
+    const history = Array.isArray(req.body?.history) ? req.body.history.slice(-8).map((m:any)=>({role:m?.role==="assistant"?"assistant":"user",text:String(m?.text||"").slice(0,1200)})) : [];
+    const result = await generateValidatedJson({
+      capability: "chat",
+      system: `Você é o Assistente Financeiro da Anacleto Esquadrias. Responda no idioma ${language === "es" ? "espanhol" : "português brasileiro"}. Use EXCLUSIVAMENTE os dados reais fornecidos no contexto. Não invente custos, preços, impostos, margens, lucros, datas ou saldos. Diferencie faturamento emitido, valores efetivamente recebidos, contas em aberto, compras registradas e pagamentos efetivos. Lucro só pode ser afirmado quando houver receita e custos efetivos suficientemente completos no ledger; caso contrário, explique a limitação. Para custo de alumínio/vidro, procure itens identificados no estoque e catálogo; se não houver custo unitário confiável, informe que o dado não está cadastrado. A resposta deve ser objetiva, explicar cálculos e apontar dados faltantes. Retorne somente JSON com answer (string), metrics (array de {label,value,explanation}), warnings (array de strings).`,
+      prompt: `Dados atuais do sistema (BRL): ${JSON.stringify(context)}\nHistórico recente: ${JSON.stringify(history)}\nPergunta: ${question}`,
+      validate: (value:any) => {
+        if (!value || typeof value.answer !== "string" || !value.answer.trim() || !Array.isArray(value.metrics) || !Array.isArray(value.warnings)) throw new Error("Resposta financeira incompleta.");
+        return { answer: value.answer.slice(0,8000), metrics: value.metrics.slice(0,8).map((m:any)=>({label:String(m?.label||"").slice(0,100),value:String(m?.value??"").slice(0,120),explanation:String(m?.explanation||"").slice(0,300)})), warnings: value.warnings.slice(0,8).map((w:any)=>String(w).slice(0,300)) };
+      },
+    });
+    await recordAIAudit({serviceName:"FINANCIAL_ASSISTANT",modelUsed:AI_CONFIG.chat.model,input:{question,collectionCounts:context.collectionCounts},output:result,actorUid:user.uid,requestId:String(req.headers["x-request-id"]||""),startedAt,authorizationToken:String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"")});
+    return res.json(result);
+  } catch (error:any) {
+    try { await recordAIAudit({serviceName:"FINANCIAL_ASSISTANT",modelUsed:AI_CONFIG.chat.model,input:{question},error,actorUid:user.uid,requestId:String(req.headers["x-request-id"]||""),startedAt,authorizationToken:String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"")}); } catch {}
+    console.error("Financial assistant failed:", error?.message || error);
+    return res.status(502).json({error:"O Assistente Financeiro não conseguiu consultar os dados agora. Verifique a conexão e tente novamente.",code:"FINANCIAL_ASSISTANT_UNAVAILABLE"});
+  }
+});
+
 const rateLimitByUser = (bucket: string, limit: number, windowMs: number): express.RequestHandler => (req, res, next) => {
   const user = res.locals.firebaseUser as { uid?: string } | undefined;
   const key = `${bucket}:${user?.uid || req.ip}`;
