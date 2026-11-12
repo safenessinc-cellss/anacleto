@@ -1,4 +1,5 @@
 import type { TechnicalDrawing, TechnicalPiece } from "../types";
+import { estimatedCatalogPrice, readAluminumPricePerKg } from "./catalogPricing";
 
 export type AluminumTipologia =
   | "janela_correr"
@@ -30,7 +31,7 @@ const glassFill = "#38bdf8";
 const glassStroke = "#bae6fd";
 
 export function isAluminumPrompt(prompt: string): boolean {
-  return /janela|ventana|porta|puerta|esquadria|box de banheiro|box para banheiro|maxim.?ar|basculante|pivotante/i.test(prompt);
+  return /janela|ventana|porta|puerta|esquadria|\bbox\b|maxim[\s-]?ar|basculante|pivotante/i.test(prompt);
 }
 
 export function localParametricSpec(prompt: string): ParametricWindowSpec {
@@ -38,32 +39,43 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   const match = prompt.match(/(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
   const toMm = (value: string | undefined, unit: string | undefined, fallback: number) => {
     const number = value ? Number(value.replace(",", ".")) : fallback;
-    return Math.max(0, Math.round(number * (unit?.toLowerCase() === "m" ? 1000 : unit?.toLowerCase() === "cm" || (!unit && number > 0 && number < 100) ? 10 : 1)));
+    const normalizedUnit = unit?.toLowerCase();
+    const factor = normalizedUnit === "m" || (!normalizedUnit && number > 0 && number < 10)
+      ? 1000
+      : normalizedUnit === "cm" || (!normalizedUnit && number >= 10 && number < 100)
+        ? 10
+        : 1;
+    return Math.max(0, Math.round(number * factor));
   };
   const tipologia: AluminumTipologia = /box/.test(text) ? "box_banheiro"
-    : /maxim.?ar/.test(text) ? "maxim_ar"
+    : /maxim[\s-]?ar/.test(text) ? "maxim_ar"
     : /basculante/.test(text) ? "basculante"
     : /pivot/.test(text) ? "porta_pivotante"
     : /porta/.test(text) && /giro|abrir|dobradi[cç]a/.test(text) ? "porta_giro"
     : /porta/.test(text) ? "porta_correr"
     : "janela_correr";
-  const requestedLeaves = Number(text.match(/([234])\s*(?:folhas|folha|pain[eé]is|portas)/)?.[1] || 2);
-  const leaves = tipologia === "porta_correr" ? (requestedLeaves === 4 ? 4 : 2)
-    : tipologia === "janela_correr" ? [2, 3, 4].includes(requestedLeaves) ? requestedLeaves : 2 : 1;
+  const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is|portas?)/)?.[1] || 2);
+  const leaves = tipologia === "porta_correr" || tipologia === "janela_correr"
+    ? Math.min(8, Math.max(1, requestedLeaves))
+    : 1;
   const widthMatch = prompt.match(/largura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
   const heightMatch = prompt.match(/altura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
   const width = toMm(widthMatch?.[1] || match?.[1], widthMatch?.[2] || match?.[2], 0);
   const height = toMm(heightMatch?.[1] || match?.[3], heightMatch?.[2] || match?.[4], 0);
+  const namedLine = prompt.match(/\b(linha\s+\d+|suprema|gold)\b/i)?.[1];
+  const glassType = text.match(/\b(duplo|laminado|temperado|insulado|comum|float)\b/)?.[1];
+  const thickness = text.match(/(?:vidro\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\s+)?(?:de\s*)?|espessura\s*(?:de\s*)?)(\d+(?:[.,]\d+)?)\s*mm/)?.[1]
+    || text.match(/(\d+(?:[.,]\d+)?)\s*mm\s*(?:de\s*)?(?:vidro|espessura)\b/)?.[1];
   return {
     tipologia,
-    linha_aluminio: (prompt.match(/linha\s+([a-z0-9 -]+)/i)?.[1] || "Linha a definir").trim(),
+    linha_aluminio: namedLine ? namedLine.replace(/^linha/i, "Linha").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Linha a definir",
     cor_perfil: /preto/.test(text) ? "#1f2937" : /branco/.test(text) ? "#f8fafc" : "#94a3b8",
     largura_mm: width,
     altura_mm: height,
     folhas: leaves,
     modulo_fixo: /fix[oa]|m[oó]dulo fixo/.test(text),
-    tipo_vidro: /laminado/.test(text) ? "laminado" : /temperado/.test(text) ? "temperado" : "a definir",
-    espessura_mm: Number(text.match(/(\d+(?:[.,]\d+)?)\s*mm\s*(?:de\s*)?(?:vidro|espessura)/)?.[1]?.replace(",", ".")) || 8,
+    tipo_vidro: glassType ? glassType.toLowerCase() : "a definir",
+    espessura_mm: Number(thickness?.replace(",", ".")) || 8,
     abertura: /esquerda/.test(text) ? "esquerda" : /direita/.test(text) ? "direita" : tipologia === "maxim_ar" ? "projetante" : tipologia === "basculante" ? "basculante" : "central",
   };
 }
@@ -185,16 +197,33 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
     cutAngle: "90° · confirmar tabela do fabricante",
     notes: "Dimensão nominal gerada por template paramétrico. Validar folgas e corte conforme a linha de alumínio selecionada.",
   }));
-  const budgetItems = pieces.map((piece) => {
-    const catalogItem = catalog.find((row) => {
-      const sourceName = String(row.name || row.description || "").toLowerCase();
-      return sourceName && (sourceName.includes(piece.name.toLowerCase().split(" · ")[0]) || piece.material.toLowerCase().includes(String(row.code || row.sku || "").toLowerCase()));
-    });
-    const unitPrice = Number(catalogItem?.price || 0);
+  const catalogText = (row: any) => `${row.name || ""} ${row.description || ""} ${row.code || ""} ${row.sku || ""} ${row.category || ""}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const lineKey = spec.linha_aluminio.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/^linha\s+/, "");
+  const profileWords = /perfil|alumin|marco|montante|travessa|folha|trilho|esquadria/;
+  const catalogMatch = (role: "profile" | "glass" | "accessory") => {
+    const keywords = role === "profile" ? ["perfil", "alumin", "marco", "montante", "travessa", "trilho", lineKey]
+      : role === "glass" ? ["vidro", spec.tipo_vidro]
+        : ["ferragem", "acessorio", "roldana", "fecho", "kit", "dobradica"];
+    return [...catalog].map((row) => {
+      const text = catalogText(row);
+      if (role === "profile" && !profileWords.test(text)) return { row, score: 0 };
+      if (role === "glass" && !/vidro|glass/.test(text)) return { row, score: 0 };
+      if (role === "accessory" && !/ferragem|acessor|roldana|fecho|kit|dobradica/.test(text)) return { row, score: 0 };
+      const score = keywords.reduce((sum, keyword) => {
+        const normalized = keyword.replace(/[.*+?^${}()|[\]\\]/g, "");
+        return normalized.length > 2 && text.includes(normalized) ? sum + (normalized === lineKey ? 6 : 1) : sum;
+      }, 0);
+      return { row, score };
+    }).sort((a, b) => b.score - a.score)[0]?.row;
+  };
+  const budgetItems: NonNullable<TechnicalDrawing["budget"]>["items"] = pieces.map((piece) => {
+    const catalogItem = catalogMatch("profile");
+    const unitPrice = catalogItem ? estimatedCatalogPrice(catalogItem, readAluminumPricePerKg(), piece.dimensions.width) || 0 : 0;
     return {
       id: `budget-${piece.id}`,
       pieceId: piece.id,
       catalogItemId: catalogItem?.id || "",
+      catalogSource: catalogItem?.source || "",
       sku: catalogItem?.code || catalogItem?.sku || "",
       description: piece.name,
       quantity: piece.quantity,
@@ -202,9 +231,45 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
       subtotal: Number((piece.quantity * unitPrice).toFixed(2)),
       cutLengthMm: piece.dimensions.width,
       imageUrl: catalogItem?.thumbnailDataUrl || catalogItem?.imageUrl || "",
-      priceSource: catalogItem ? "catalog" : "pending",
+      priceSource: catalogItem && unitPrice > 0 ? (Number(catalogItem.price || 0) > 0 ? "catalog" : "estimated") : "pending",
     };
   });
+  const glassItem = catalogMatch("glass");
+  if (glassItem) {
+    const glassAreaM2 = width * height / 1_000_000;
+    const glassPrice = Number(glassItem.price || 0);
+    const unitPrice = glassPrice > 0 && /m(?:2|²|²)/i.test(String(glassItem.unit || "")) ? Number((glassAreaM2 * glassPrice).toFixed(2)) : glassPrice;
+    budgetItems.push({
+      id: "budget-glass",
+      catalogItemId: String(glassItem.id || ""),
+      catalogSource: String(glassItem.source || ""),
+      sku: String(glassItem.code || glassItem.sku || ""),
+      description: `${spec.tipo_vidro} ${spec.espessura_mm} mm`,
+      quantity: 1,
+      unitPrice,
+      subtotal: unitPrice,
+      cutLengthMm: width,
+      imageUrl: String(glassItem.thumbnailDataUrl || glassItem.imageUrl || ""),
+      priceSource: unitPrice > 0 ? "catalog" : "pending",
+    });
+  }
+  const accessoryItem = catalogMatch("accessory");
+  if (accessoryItem) {
+    const unitPrice = Number(accessoryItem.price || 0);
+    budgetItems.push({
+      id: "budget-accessories",
+      catalogItemId: String(accessoryItem.id || ""),
+      catalogSource: String(accessoryItem.source || ""),
+      sku: String(accessoryItem.code || accessoryItem.sku || ""),
+      description: `Ferragens e acessórios · ${spec.folhas} folha(s)`,
+      quantity: 1,
+      unitPrice,
+      subtotal: unitPrice,
+      cutLengthMm: 0,
+      imageUrl: String(accessoryItem.thumbnailDataUrl || accessoryItem.imageUrl || ""),
+      priceSource: unitPrice > 0 ? "catalog" : "pending",
+    });
+  }
   const subtotal = Number(budgetItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
   const steps = [
     ["Conferência de vão", "Medir o vão acabado no local e confirmar largura/altura em milímetros."],

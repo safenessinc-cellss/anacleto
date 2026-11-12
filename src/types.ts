@@ -29,7 +29,7 @@ export interface QuoteItem {
   itemDimensions?: string;
   sku?: string;
   catalogItemId?: string;
-  priceSource?: "catalog" | "pending" | "existing" | "manual";
+  priceSource?: "catalog" | "pending" | "existing" | "manual" | "estimated";
   priceValidation?: string;
 }
 
@@ -64,6 +64,10 @@ export interface Quote {
   itemIds?: string[];
   technicalDrawing?: TechnicalDrawing;
   subtotal: number;
+  labor?: number;
+  marginRate?: number;
+  margin?: number;
+  freight?: number;
   taxRate: number;
   taxAmount: number;
   discountRate?: number;
@@ -230,7 +234,7 @@ export interface TechnicalDrawing {
   budget?: {
     currency: string;
     items: Array<{
-      id?: string; pieceId?: string; description: string; sku?: string; catalogItemId?: string;
+      id?: string; pieceId?: string; description: string; sku?: string; catalogItemId?: string; catalogSource?: string;
       quantity: number; unitPrice: number; subtotal: number; priceSource?: string;
       priceValidation?: string; catalogPriceAtApproval?: number;
       cutLengthMm?: number; imageUrl?: string;

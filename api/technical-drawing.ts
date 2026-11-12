@@ -547,7 +547,7 @@ export default async function handler(req: any, res: any) {
             return json(res, 422, { error: "Não consegui extrair as dimensões da descrição. Informe largura e altura para continuar.", code: "DIMENSIONS_REQUIRED" });
           }
           const local = buildParametricDrawing(localSpec, prompt, catalog);
-          local.status = "LOCAL_PRELIMINARY_FALLBACK";
+          local.status = "PRELIMINARY_CONTINGENCY";
           local.draftLabel = "RASCUNHO PARAMÉTRICO LOCAL — VALIDAR ANTES DE FABRICAR";
           local.assumptions = ["A extração de IA não ficou disponível; os dados foram identificados localmente por palavras-chave. Confirme tipologia e cotas antes da fabricação."];
           return json(res, 200, withDraftVectorWatermark(local));

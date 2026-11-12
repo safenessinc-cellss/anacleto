@@ -230,7 +230,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   const tableData = quote.items.map((item, idx) => [
     idx + 1,
     "",
-    item.description,
+    item.sku ? `${item.sku} · ${item.description}` : item.description,
     item.quantity,
     formatMoney(item.unitPrice, currency),
     formatMoney(item.subtotal || item.quantity * item.unitPrice, currency),
@@ -272,34 +272,39 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
 
   // Totals Box
   const totalsX = pageWidth - 90;
+  const totalRows = [
+    ["Materiais:", formatMoney(quote.subtotal, currency)],
+    ...(Number(quote.labor || 0) > 0 ? [["Mão de obra:", formatMoney(quote.labor || 0, currency)]] : []),
+    ...(Number(quote.margin || 0) > 0 ? [[`Margem (${quote.marginRate || 0}%):`, formatMoney(quote.margin || 0, currency)]] : []),
+    ...(Number(quote.freight || 0) > 0 ? [["Frete:", formatMoney(quote.freight || 0, currency)]] : []),
+    ...(Number(quote.discountAmount || 0) > 0 ? [[`Desconto (${quote.discountRate || 0}%):`, `-${formatMoney(quote.discountAmount || 0, currency)}`]] : []),
+    [`IVA (${quote.taxRate}%):`, formatMoney(quote.taxAmount, currency)],
+  ];
+  const totalsBoxHeight = (totalRows.length + 1) * 7 + 7;
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(totalsX - 5, finalY - 4, 85, 45, 3, 3, "F");
+  doc.roundedRect(totalsX - 5, finalY - 4, 85, totalsBoxHeight, 3, 3, "F");
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
-  doc.text("Base Imponible:", totalsX, finalY + 4);
-  doc.text(formatMoney(quote.subtotal, currency), pageWidth - 14, finalY + 4, { align: "right" });
-
-  if (quote.discountRate && quote.discountRate > 0) {
-    doc.text(`Descuento (${quote.discountRate}%):`, totalsX, finalY + 11);
-    doc.setTextColor(220, 38, 38);
-    doc.text(`-${formatMoney(quote.discountAmount || 0, currency)}`, pageWidth - 14, finalY + 11, { align: "right" });
+  totalRows.forEach(([label, amount], index) => {
+    const rowY = finalY + 4 + index * 7;
+    doc.text(label, totalsX, rowY);
+    if (label.startsWith("Desconto")) doc.setTextColor(220, 38, 38);
+    doc.text(amount, pageWidth - 14, rowY, { align: "right" });
     doc.setTextColor(71, 85, 105);
-  }
+  });
 
-  doc.text(`IVA (${quote.taxRate}%):`, totalsX, finalY + 18);
-  doc.text(formatMoney(quote.taxAmount, currency), pageWidth - 14, finalY + 18, { align: "right" });
-
+  const dividerY = finalY + 4 + totalRows.length * 7;
   doc.setDrawColor(203, 213, 225);
-  doc.line(totalsX, finalY + 23, pageWidth - 14, finalY + 23);
+  doc.line(totalsX, dividerY, pageWidth - 14, dividerY);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
-  doc.text("TOTAL PRESUPUESTO:", totalsX, finalY + 30);
+  doc.text("TOTAL ORÇAMENTO:", totalsX, dividerY + 7);
   doc.setTextColor(180, 83, 9);
-  doc.text(formatMoney(quote.total, currency), pageWidth - 14, finalY + 30, { align: "right" });
+  doc.text(formatMoney(quote.total, currency), pageWidth - 14, dividerY + 7, { align: "right" });
 
   // Notes and Terms
   if (quote.notes) {

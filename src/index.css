@@ -382,11 +382,11 @@ html:not(.dark) button.bg-emerald-600 *, html:not(.dark) button.bg-rose-600 * { 
 :root {
   --anacleto-accent: #2563eb;
   --anacleto-accent-strong: #1d4ed8;
-  --anacleto-surface: #ffffff;
-  --anacleto-surface-muted: #f7f9fc;
-  --anacleto-border: #dce5f0;
-  --anacleto-text: #172b4d;
-  --anacleto-muted: #64748b;
+  --anacleto-surface: #f8fafc;
+  --anacleto-surface-muted: #eef2f6;
+  --anacleto-border: rgb(203 213 225 / 80%);
+  --anacleto-text: #0f172a;
+  --anacleto-muted: #475569;
   --anacleto-radius: 18px;
 }
 main h1, main h2, main h3 { letter-spacing: -0.025em; }
@@ -433,9 +433,9 @@ html.dark main .rounded-2xl.border, html.dark main .rounded-3xl.border, html.dar
 :root {
   --anacleto-primary: #3978d5;
   --anacleto-primary-soft: #eaf2ff;
-  --anacleto-ink: #24364d;
-  --anacleto-muted: #718096;
-  --anacleto-line: #e3eaf3;
+  --anacleto-ink: #0f172a;
+  --anacleto-muted: #475569;
+  --anacleto-line: rgb(203 213 225 / 80%);
 }
 html:not(.dark) body,
 html:not(.dark) #root { background: #f5f8fd !important; color: var(--anacleto-ink) !important; }
@@ -491,4 +491,54 @@ html:not(.dark) select:focus,
 html:not(.dark) textarea:focus {
   border-color: #8bb4ef !important;
   --tw-ring-color: #8bb4ef !important;
+}
+
+/* Calmer neutral light surfaces with stronger, consistent text contrast. */
+html:not(.dark) body,
+html:not(.dark) #root,
+html:not(.dark) main {
+  background-color: #eef2f6 !important;
+  color: #0f172a !important;
+}
+html:not(.dark) aside,
+html:not(.dark) nav,
+html:not(.dark) header,
+html:not(.dark) [role="dialog"],
+html:not(.dark) .bg-white,
+html:not(.dark) .bg-slate-50,
+html:not(.dark) .bg-gray-50 {
+  background-color: #f8fafc !important;
+}
+html:not(.dark) .bg-slate-100,
+html:not(.dark) .bg-gray-100 {
+  background-color: #eef2f6 !important;
+}
+html:not(.dark) .border-slate-100,
+html:not(.dark) .border-slate-200,
+html:not(.dark) .border-slate-300,
+html:not(.dark) .border-gray-200,
+html:not(.dark) .border-gray-300 {
+  border-color: rgb(203 213 225 / 80%) !important;
+}
+html:not(.dark) .text-slate-950,
+html:not(.dark) .text-slate-900,
+html:not(.dark) .text-slate-800,
+html:not(.dark) .text-gray-900,
+html:not(.dark) .text-gray-800 {
+  color: #0f172a !important;
+}
+html:not(.dark) .text-slate-600,
+html:not(.dark) .text-slate-500,
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-gray-600,
+html:not(.dark) .text-gray-500,
+html:not(.dark) .text-gray-400 {
+  color: #475569 !important;
+}
+html:not(.dark) .shadow,
+html:not(.dark) .shadow-sm,
+html:not(.dark) .shadow-md,
+html:not(.dark) .shadow-lg,
+html:not(.dark) .shadow-xl {
+  --tw-shadow-color: rgb(15 23 42 / 7%) !important;
 }

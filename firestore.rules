@@ -39,12 +39,12 @@ service cloud.firestore {
     }
 
     match /admins/{email} {
-      allow read: if signedIn() && (request.auth.token.email.lower() == email || owner());
+      allow read: if signedIn() && (request.auth.token.email.lower() == email || owner() || canManageFinance());
       allow create, update, delete: if owner();
     }
     match /pending_users/{uid} {
       allow create, update: if signedIn() && request.auth.uid == uid;
-      allow read: if (signedIn() && request.auth.uid == uid) || owner();
+      allow read: if (signedIn() && request.auth.uid == uid) || owner() || canManageFinance();
       allow delete: if owner();
     }
 
@@ -77,7 +77,11 @@ service cloud.firestore {
       allow create, update: if canManageProduction() || canManageFinance();
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
-    match /user_profiles/{uid} { allow read, write: if signedIn() && (request.auth.uid == uid || owner()); }
+    match /user_profiles/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || owner() || canManageFinance());
+      allow write: if signedIn() && (request.auth.uid == uid || owner());
+    }
+    match /staff/{id} { allow read: if canManageFinance(); allow write: if canManageFinance(); }
     match /agenda_slots/{id} { allow read: if true; allow write: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor']); }
     match /chat_sessions/{id} {
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;

@@ -227,9 +227,9 @@ export default function AnacletoProApp({
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 dark:bg-[#101827] dark:text-slate-100 flex flex-col lg:flex-row font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-[#101827] dark:text-slate-100 flex flex-col lg:flex-row font-sans">
       {/* Mobile Header */}
-      <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 sticky top-0 z-40">
+      <div className="lg:hidden flex items-center justify-between p-4 bg-slate-50/90 border-b border-slate-300/80 sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => logoInputRef.current?.click()} className="w-14 h-9 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden p-0.5" title="Alterar logotipo">{customLogo ? <img src={customLogo} alt="Logotipo" className="w-full h-full object-contain" /> : <img src={logoImg} alt="Anacleto Esquadrias" className="w-full h-full object-contain" />}</button>
           <div>
@@ -250,7 +250,7 @@ export default function AnacletoProApp({
 
       {/* SIDEBAR (Desktop & Mobile Drawer) */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarCollapsed ? "lg:w-[76px]" : "lg:w-64"} w-72 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col justify-between transition-all duration-300 ${
+        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarCollapsed ? "lg:w-[76px]" : "lg:w-64"} w-72 bg-slate-50/90 dark:bg-slate-950 border-r border-slate-300/80 dark:border-slate-800 z-50 flex flex-col justify-between transition-all duration-300 shadow-sm ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
@@ -331,7 +331,7 @@ export default function AnacletoProApp({
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-[#f8fafc] dark:bg-[#101827]">
+      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-100 dark:bg-[#101827]">
         <div className="max-w-7xl mx-auto rounded-[28px]">
           {activeSectionTabs.length > 1 && (
             <nav aria-label={`Abas de ${activeSection?.label || "configurações"}`} className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">

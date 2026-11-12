@@ -22,10 +22,10 @@ import {
   Eye,
   Trash2
 } from "lucide-react";
-import { TechnicalDrawing, SenderConfig } from "../../types";
+import { TechnicalDrawing, SenderConfig, Quote } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import DrawingThreePreview from "./DrawingThreePreview";
-import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
+import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf, buildQuotePdf } from "../../utils/pdfExport";
 import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
@@ -35,6 +35,7 @@ import { db, storage } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
+import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
 
 interface TechnicalDrawingModuleProps {
   senderConfig: SenderConfig;
@@ -163,6 +164,49 @@ const initialSampleDrawing: TechnicalDrawing = {
   updatedAt: new Date().toISOString(),
 };
 
+function enrichDrawingBudget(
+  budget: NonNullable<TechnicalDrawing["budget"]>,
+  catalog: any[],
+  aluminumPricePerKg: number,
+): NonNullable<TechnicalDrawing["budget"]> {
+  const normalize = (value: unknown) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const items = budget.items.map((item) => {
+    const itemText = normalize(item.description);
+    const terms = itemText.split(/\s+/).filter((term) => term.length >= 4);
+    const match = catalog.find((row) =>
+      (item.catalogItemId && row.id === item.catalogItemId) ||
+      (item.sku && normalize(row.sku || row.code) === normalize(item.sku))
+    ) || catalog.map((row) => {
+      const rowText = normalize(`${row.name || ""} ${row.description || ""} ${row.code || ""} ${row.sku || ""}`);
+      const score = terms.reduce((sum, term) => sum + (rowText.includes(term) ? 1 : 0), 0);
+      return { row, score };
+    }).filter((candidate) => candidate.score >= Math.min(2, terms.length))
+      .sort((a, b) => b.score - a.score)[0]?.row;
+    const catalogPrice = Number(match?.price || 0);
+    const estimated = match ? estimatedCatalogPrice(match, aluminumPricePerKg, item.cutLengthMm) : undefined;
+    const unitPrice = Number(item.unitPrice) > 0 ? Number(item.unitPrice) : catalogPrice > 0 ? catalogPrice : estimated || 0;
+    const quantity = Math.max(1, Number(item.quantity) || 1);
+    return {
+      ...item,
+      catalogItemId: item.catalogItemId || match?.id || "",
+      sku: item.sku || match?.sku || match?.code || "",
+      imageUrl: item.imageUrl || match?.thumbnailDataUrl || match?.imageUrl || "",
+      unitPrice,
+      quantity,
+      subtotal: Number((quantity * unitPrice).toFixed(2)),
+      priceSource: unitPrice <= 0 ? "pending" : catalogPrice > 0 ? "catalog" : Number(item.unitPrice) > 0 ? item.priceSource || "catalog" : "estimated",
+    };
+  });
+  const subtotal = Number(items.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
+  const labor = Math.max(0, Number(budget.labor || 0));
+  const marginRate = Math.max(0, Number(budget.marginRate || 0));
+  const margin = Number((budget.margin ?? (subtotal + labor) * marginRate / 100).toFixed(2));
+  const freight = Math.max(0, Number(budget.freight || 0));
+  const taxRate = Math.max(0, Number(budget.taxRate || 0));
+  const taxAmount = Number(((subtotal + labor + margin + freight) * taxRate / 100).toFixed(2));
+  return { ...budget, items, subtotal, labor, marginRate, margin, freight, taxRate, taxAmount, total: Number((subtotal + labor + margin + freight + taxAmount).toFixed(2)) };
+}
+
 
 function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
   const normalized = input.toLowerCase();
@@ -281,7 +325,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const [projects, setProjects] = useState<Array<{id:string;name:string}>>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
-  const [supplierCatalog, setSupplierCatalog] = useState<Array<{ id: string; name: string; code?: string; supplier?: string; category?: string; price?: number; thumbnailDataUrl?: string; imageUrl?: string; lengthMm?: number }>>([]);
+  const [supplierCatalog, setSupplierCatalog] = useState<any[]>([]);
+  const [aluminumPricePerKg, setAluminumPricePerKg] = useState(readAluminumPricePerKg);
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
@@ -295,17 +340,31 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   useEffect(() => {
     if (!authReady) return;
     return onSnapshot(collection(db, "catalog"), (snap) => {
-      setCatalogItems(snap.docs.map((item) => ({ id: item.id, ...item.data() })));
+      const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), source: "catalog" }));
+      setCatalogItems(loaded);
+      setSupplierCatalog((current) => [...current.filter((item) => item.source !== "catalog"), ...loaded]);
     }, (err) => console.warn("Firestore catalog load notice:", err));
   }, [authReady]);
 
   useEffect(() => {
     if (!authReady) return;
     return onSnapshot(collection(db, "supplier_catalog"), (snap) => {
-      setSupplierCatalog(snap.docs.map((item) => ({ id: item.id, ...item.data() } as typeof supplierCatalog[number])));
+      const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), source: "supplier_catalog" }));
+      setSupplierCatalog((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...loaded]);
     }, (err) => {
       console.error("Supplier catalog load failed in technical drawing module:", err);
       showToast("Não foi possível carregar o catálogo de fornecedores para o orçamento CAD.", "error");
+    });
+  }, [authReady, showToast]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    return onSnapshot(collection(db, "registry_items"), (snap) => {
+      const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), name: item.data().name || item.data().description || "Item sem nome", source: "registry_items" }));
+      setSupplierCatalog((current) => [...current.filter((item) => item.source !== "registry_items"), ...loaded]);
+    }, (err) => {
+      console.error("Registry catalog load failed in technical drawing module:", err);
+      showToast("Não foi possível carregar os itens cadastrados para o orçamento CAD.", "error");
     });
   }, [authReady, showToast]);
 
@@ -332,27 +391,107 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   };
 
   const addSupplierBudgetItem = (productId: string) => {
-    const product = supplierCatalog.find((item) => item.id === productId);
+    const product = supplierCatalog.find((item) => item.id === productId || `${item.source}:${item.id}` === productId);
     if (!product) return;
     if (drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") {
       showToast("Desenho aprovado: duplique o projeto para alterar o orçamento.", "warning");
       return;
     }
+    const unitPrice = estimatedCatalogPrice(product, aluminumPricePerKg, Number(product.lengthMm || 0)) || 0;
     updateBudget((budget) => ({
       ...budget,
       items: [...budget.items, {
         id: `catalog-${product.id}-${Date.now()}`,
         catalogItemId: product.id,
+        catalogSource: product.source,
         sku: product.code || "",
         description: product.name,
         quantity: 1,
-        unitPrice: Number(product.price || 0),
-        subtotal: Number(product.price || 0),
+        unitPrice,
+        subtotal: unitPrice,
         cutLengthMm: Number(product.lengthMm || 0),
         imageUrl: product.thumbnailDataUrl || product.imageUrl || "",
-        priceSource: "supplier_catalog",
+        priceSource: Number(product.price || 0) > 0 ? "catalog" : unitPrice > 0 ? "estimated" : "pending",
       }],
     }));
+  };
+
+  const handleCreateQuoteFromDrawing = async () => {
+    const budget = drawing.budget;
+    if (!budget?.items.length) {
+      showToast("Adicione componentes ao orçamento do desenho antes de criar a proposta.", "warning");
+      return;
+    }
+    const items = budget.items.map((item, index) => ({
+      id: item.id || `drawing-item-${index + 1}`,
+      description: item.description,
+      sku: item.sku || "",
+      catalogItemId: item.catalogItemId || "",
+      catalogSource: item.catalogSource || supplierCatalog.find((product) => product.id === item.catalogItemId)?.source || "",
+      quantity: Math.max(1, Number(item.quantity) || 1),
+      unitPrice: Math.max(0, Number(item.unitPrice) || 0),
+      subtotal: Number((Math.max(1, Number(item.quantity) || 1) * Math.max(0, Number(item.unitPrice) || 0)).toFixed(2)),
+      itemPhotoUrl: item.imageUrl || "",
+      itemPhotoUrls: item.imageUrl ? [item.imageUrl] : [],
+      priceSource: item.priceSource === "estimated" ? "estimated" as const : item.unitPrice > 0 ? "catalog" as const : "pending" as const,
+      notes: item.priceSource === "estimated" ? "Preço estimado pelo peso do perfil e valor configurado do alumínio por kg." : undefined,
+    }));
+    const subtotal = Number(items.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
+    const labor = Math.max(0, Number(budget.labor || 0));
+    const marginRate = Math.max(0, Number(budget.marginRate || 0));
+    const margin = Number(((subtotal + labor) * marginRate / 100).toFixed(2));
+    const freight = Math.max(0, Number(budget.freight || 0));
+    const taxRate = Math.max(0, Number(budget.taxRate || 0));
+    const taxAmount = Number(((subtotal + labor + margin + freight) * taxRate / 100).toFixed(2));
+    const total = Number((subtotal + labor + margin + freight + taxAmount).toFixed(2));
+    if (total <= 0) {
+      showToast("Não é possível gerar um orçamento total de R$ 0,00. Informe preços no catálogo ou revise o custo do alumínio por kg.", "error");
+      return;
+    }
+    const id = `quote_${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    const quote: Quote = {
+      id,
+      number: `ORC-${new Date().getFullYear()}-${id.slice(-6).toUpperCase()}`,
+      companyId: "",
+      clientName: "",
+      clientTaxId: "",
+      clientEmail: "",
+      clientAddress: "",
+      date: now.slice(0, 10),
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      items,
+      subtotal,
+      labor,
+      marginRate,
+      margin,
+      freight,
+      taxRate,
+      taxAmount,
+      discountRate: 0,
+      discountAmount: 0,
+      total,
+      currency: "BRL",
+      status: "draft",
+      notes: `Orçamento criado a partir do desenho técnico: ${drawing.title}. Preços estimados precisam de validação.`,
+      technicalDrawing: drawing,
+      createdAt: now,
+      updatedAt: now,
+    };
+    try {
+      const pdf = buildQuotePdf(quote, senderConfig);
+      await setDoc(doc(db, "quotes", id), {
+        ...quote,
+        pdfDataUri: pdf.dataUri,
+        pdfFileName: pdf.fileName,
+        pdfGeneratedAt: now,
+        pdfFileSizeKb: pdf.sizeKb,
+      });
+      showToast(`Orçamento ${quote.number} e PDF adicionados ao Cofre de Documentos.`, "success");
+    } catch (error) {
+      console.error("Could not save quote generated from technical drawing:", error);
+      showToast((error as Error).message || "Não foi possível salvar o orçamento do desenho.", "error");
+    }
   };
 
   // Load saved drawings from Firestore
@@ -541,50 +680,47 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     }
 
     setIsLoading(true);
-    let generated: TechnicalDrawing | null = null;
-    let generationWarning = false;
+    let generated: TechnicalDrawing;
+    let generationWarning = true;
+    const aluminumPrompt = isAluminumPrompt(inputPrompt);
+    if (aluminumPrompt) {
+      const spec = localParametricSpec(inputPrompt);
+      if (!spec.largura_mm) spec.largura_mm = 1000;
+      if (!spec.altura_mm) spec.altura_mm = 1000;
+      generated = buildParametricDrawing(spec, inputPrompt, supplierCatalog);
+      if (!/\d+(?:[.,]\d+)?\s*(?:mm|cm|m)?\s*[x×]\s*\d+/i.test(inputPrompt) &&
+          !/largura\s*(?:de|:|=)?\s*\d+[\s\S]*altura\s*(?:de|:|=)?\s*\d+/i.test(inputPrompt)) {
+        generated.assumptions = [...(generated.assumptions || []), "Dimensões ausentes: foi usado um vão preliminar de 1000 × 1000 mm para que o desenho possa ser revisado."];
+      }
+    } else {
+      generated = buildLocalTechnicalDrawing(inputPrompt);
+    }
+
+    const selectedProject = projects.find((project) => project.id === selectedProjectId);
+    generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
+    setDrawing(generated);
+    setCurrentStep(1);
+    if (!presetPrompt) setPrompt("");
+    const localDrawing = generated;
+
     try {
       const user = auth.currentUser;
       if (!user) {
-        showToast("Entre na sua conta para gerar e salvar projetos técnicos.", "error");
-        setIsLoading(false);
-        return;
+        throw new Error("O desenho local está aberto; entre na sua conta para tentar a melhoria por IA.");
       }
       const idToken = await user.getIdToken();
       const res = await fetch("/api/ai/technical-drawing", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: catalogItems }),
+        body: JSON.stringify({ prompt: inputPrompt, currentDrawing: drawing, catalog: [...catalogItems, ...supplierCatalog] }),
+        signal: AbortSignal.timeout(8_000),
       });
       let responseBody = await res.json().catch(() => null);
       if (res.status === 202 && responseBody?.status === "JOB_PROCESSING" && responseBody?.jobId && responseBody?.pollUrl) {
-        let completed = false;
-        for (let attempt = 0; attempt < 30; attempt += 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          const jobResponse = await fetch(responseBody.pollUrl, { headers: { Authorization: `Bearer ${idToken}` } });
-          const job = await jobResponse.json().catch(() => null);
-          if (!jobResponse.ok) throw new Error(job?.error || "Não foi possível consultar o processamento do desenho.");
-          if (job?.status === "COMPLETED" || job?.status === "COMPLETED_WITH_FALLBACK") {
-            responseBody = job.result;
-            completed = true;
-            break;
-          }
-          if (job?.status === "FAILED") throw new Error(job?.error || "O serviço não conseguiu concluir o desenho.");
-        }
-        if (!completed) {
-          showToast(`O desenho continua em processamento. ID da tarefa: ${responseBody.jobId}. Consulte novamente em instantes.`, "warning");
-          setIsLoading(false);
-          return;
-        }
+        throw new Error("A versão de IA segue em processamento; o desenho local permanece disponível.");
       }
       if (!res.ok) {
-        const serviceError = new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
-        if (res.status === 401 || res.status === 403) {
-          showToast("Sua conta não tem autorização para gerar desenhos. Entre com o usuário autorizado.", "error");
-          setIsLoading(false);
-          return;
-        }
-        throw serviceError;
+        throw new Error(responseBody?.error || responseBody?.details || `Falha no serviço de desenho (${res.status})`);
       }
       if (!responseBody || !Array.isArray(responseBody.pieces) || responseBody.pieces.length === 0) {
         throw new Error("O serviço retornou um desenho sem componentes renderizáveis.");
@@ -598,6 +734,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (![width, height].every((n) => Number.isFinite(n) && n > 0)) {
         throw new Error("O serviço retornou dimensões inválidas.");
       }
+      generationWarning = Boolean(responseBody._fallback || responseBody.warning);
       generated = {
         id: "draw_" + Date.now().toString(36),
         title: responseBody.title || "Projeto técnico sob medida",
@@ -606,8 +743,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         unit: responseBody.unit === "mm" ? "mm" : "cm",
         overallDimensions: { width, height, depth: depth > 0 ? depth : undefined },
         pieces: responseBody.pieces,
-        ...(responseBody.parametricSpec ? { parametricSpec: responseBody.parametricSpec } : {}),
-        visualElements: Array.isArray(responseBody.visualElements) ? responseBody.visualElements : [],
+        ...((responseBody.parametricSpec || localDrawing.parametricSpec) ? { parametricSpec: responseBody.parametricSpec || localDrawing.parametricSpec } : {}),
+        visualElements: Array.isArray(responseBody.visualElements) && responseBody.visualElements.some((element: any) => element && element.type !== "text")
+          ? responseBody.visualElements
+          : localDrawing.visualElements || [],
         ...(responseBody.vectorPayload ? { vectorPayload: responseBody.vectorPayload } as any : {}),
         modelDescription: responseBody.modelDescription || "",
         finalAppearance: responseBody.finalAppearance || "",
@@ -622,12 +761,15 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         currentStep: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        budget: responseBody.budget,
+        budget: responseBody.budget
+          ? enrichDrawingBudget(responseBody.budget, [...catalogItems, ...supplierCatalog], aluminumPricePerKg)
+          : localDrawing.budget,
         isDraft: true,
         status: "PRELIMINARY_CONTINGENCY",
         draftStatus: "preliminary",
         draftLabel: "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN",
       };
+      generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
       if (generationWarning || responseBody.draftStatus === "preliminary") {
         (generated as any).draftStatus = "preliminary";
         (generated as any).draftLabel = responseBody.draftLabel || "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO";
@@ -637,34 +779,16 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         ];
       }
     } catch (error) {
-      console.error("Falha na geração do desenho técnico:", error);
-      if (isAluminumPrompt(inputPrompt)) {
-        const spec = localParametricSpec(inputPrompt);
-        if (spec.largura_mm <= 0 || spec.altura_mm <= 0) {
-          showToast((error as Error).message || "Informe largura e altura para gerar o desenho paramétrico.", "error");
-          setIsLoading(false);
-          return;
-        }
-        generated = buildParametricDrawing(spec, inputPrompt, supplierCatalog);
-      } else {
-        generated = buildLocalTechnicalDrawing(inputPrompt);
-      }
+      console.warn("A versão local foi mantida após falha ou demora da IA:", error);
       generationWarning = true;
+      generated = localDrawing;
     }
 
     try {
-      if (!generated) throw new Error("Não foi possível montar o desenho técnico.");
-      // O desenho técnico é salvo independentemente do cadastro de um projeto comercial.
-      // Se houver projeto selecionado, vincula; caso contrário, mantém como desenho avulso.
-      const selectedProject = projects.find((project) => project.id === selectedProjectId);
-      generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
       setDrawing(generated);
       setCurrentStep(1);
-      if (!presetPrompt) setPrompt("");
-
-      setDrawing(generated);
       if (generationWarning) {
-        showToast("A IA não confirmou um desenho técnico válido. Um rascunho preliminar foi aberto, mas não será salvo automaticamente. Revise a geometria e as medidas antes de salvar ou fabricar.", "warning");
+        showToast("O desenho local já está aberto. Revise medidas e componentes antes de salvar ou fabricar.", "warning");
       } else {
         const saved = await handleSaveDrawing(generated, true);
         if (saved) {
@@ -955,10 +1079,13 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 <h3 className="text-xs font-black uppercase tracking-wider text-emerald-300">Orçamento de materiais</h3>
                 <span className="text-sm font-black text-emerald-300">{drawing.budget.currency} {drawing.budget.total.toFixed(2)}</span>
               </div>
+              <label className="block text-[10px] font-semibold text-slate-400">Valor de referência do alumínio (R$/kg)
+                <input type="number" min="0.01" step="0.01" value={aluminumPricePerKg} onChange={(event) => setAluminumPricePerKg(writeAluminumPricePerKg(Number(event.target.value)))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-xs text-white" />
+              </label>
               <label className="block text-[11px] font-semibold text-slate-400">Adicionar item do catálogo de fornecedores
                 <select disabled={Boolean(drawing.approvedSnapshotId)} defaultValue="" onChange={(event) => { addSupplierBudgetItem(event.target.value); event.currentTarget.value = ""; }} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-xs text-white disabled:opacity-50">
                   <option value="">Selecionar produto...</option>
-                  {supplierCatalog.map((product) => <option key={product.id} value={product.id}>{product.code ? `${product.code} · ` : ""}{product.name} · R$ {Number(product.price || 0).toFixed(2)}</option>)}
+                  {supplierCatalog.map((product) => <option key={`${product.source}-${product.id}`} value={`${product.source}:${product.id}`}>{product.code || product.sku ? `${product.code || product.sku} · ` : ""}{product.name || product.description} · R$ {Number(product.price || 0).toFixed(2)}</option>)}
                 </select>
               </label>
               <div className="overflow-x-auto">
@@ -992,6 +1119,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 <p className="flex justify-between border-t border-slate-800 pt-2 text-sm font-black text-emerald-300"><span>Total</span><span>R$ {drawing.budget.total.toFixed(2)}</span></p>
               </div>
               {drawing.budget.notes && <p className="text-[10px] text-slate-500">{drawing.budget.notes}</p>}
+              <button type="button" onClick={handleCreateQuoteFromDrawing} disabled={Boolean(drawing.approvedSnapshotId) || isSaving || drawing.budget.total <= 0} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">Criar orçamento e PDF no Cofre de Documentos</button>
               <button type="button" onClick={async () => { const saved = await handleSaveDrawing(); if (saved) await handleExportPdf(); }} disabled={isSaving || Boolean(drawing.approvedSnapshotId)} className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">{isSaving ? "Salvando..." : "Guardar Projeto e Gerar Orçamento PDF"}</button>
             </div>
           )}

@@ -284,7 +284,7 @@ app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimit
     const currentQuote = { ...storedQuote, id: quoteId };
     const storedQuoteItems = Array.isArray(storedQuote.items) ? storedQuote.items : [];
     if (!message) return res.status(400).json({ error: "Mensagem obrigatória." });
-    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 250);
+    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 1000);
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((entry: any) => ({
       role: entry?.role === "assistant" ? "assistant" : "user",
       text: String(entry?.text || "").slice(0, 2000),

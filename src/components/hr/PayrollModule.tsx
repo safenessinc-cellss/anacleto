@@ -1,15 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Users, Clock3, Wallet, Plus, Calculator, FileSpreadsheet, UserRound, ShieldCheck } from "lucide-react";
+import { mergeEmployeeDirectory, type EmployeeDirectoryRecord, type EmployeeDirectoryEntry } from "../../utils/employeeDirectory";
 
-type Employee = {
-  id: string; name: string; cpf?: string; role: string; salary: number;
-  monthlyHours?: number; weeklyHours?: number; admissionDate?: string;
-  department?: string; email?: string; phone?: string; active: boolean;
-  additions?: { name: string; kind: "fixed" | "percent"; value: number }[];
-};
+type Employee = EmployeeDirectoryEntry & { weeklyHours?: number };
 // Keep each payroll type declaration on its own physical line; do not insert escaped newline text.
 type EmployeePayment = { id: string; employeeId: string; competence: string; amount: number; paymentDate: string; };
 type PayrollAdjustment = { id: string; employeeId: string; competence: string; kind: "advance" | "vale" | "loan"; amount: number; description?: string; date?: string; status?: string; source?: string; };
@@ -36,7 +32,8 @@ function additionsTotal(emp: Employee) {
   return round2((emp.additions || []).reduce((sum, item) => sum + (item.kind === "percent" ? emp.salary * item.value / 100 : item.value), 0));
 }
 export default function PayrollModule() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeRecords, setEmployeeRecords] = useState<EmployeeDirectoryRecord[]>([]);
+  const employees = useMemo(() => mergeEmployeeDirectory(employeeRecords) as Employee[], [employeeRecords]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [payments, setPayments] = useState<EmployeePayment[]>([]);
   const [adjustments, setAdjustments] = useState<PayrollAdjustment[]>([]);
@@ -66,11 +63,15 @@ export default function PayrollModule() {
   const [editHours, setEditHours] = useState("");
   const [savingSalary, setSavingSalary] = useState(false);
   useEffect(() => {
-    const e = onSnapshot(query(collection(db, "employees"), orderBy("name")), s => setEmployees(s.docs.map(d => ({ id:d.id, ...d.data() } as Employee))), err => setError("Não foi possível carregar os funcionários: " + err.message));
+    const sources = ["employees", "admins", "pending_users", "user_profiles", "staff", "registry_items"] as const;
+    const employeeStops = sources.map(source => onSnapshot(collection(db, source), snapshot => {
+      const loaded = snapshot.docs.map(item => ({ id: item.id, source, data: item.data() }) as EmployeeDirectoryRecord);
+      setEmployeeRecords(current => [...current.filter(record => record.source !== source), ...loaded]);
+    }, err => setError(`Não foi possível carregar funcionários de ${source}: ${err.message}`)));
     const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc")), s => setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))), err => setError("Não foi possível carregar os apontamentos: " + err.message));
     const p = onSnapshot(collection(db, "employee_payments"), s => setPayments(s.docs.map(d => ({ id:d.id, ...d.data() } as EmployeePayment))), err => setError("Não foi possível carregar os pagamentos: " + err.message));
     const a = onSnapshot(query(collection(db, "payroll_adjustments"), orderBy("date", "desc")), s => setAdjustments(s.docs.map(d => ({ id:d.id, ...d.data() } as PayrollAdjustment))), err => setError("Não foi possível carregar adiantamentos, vales e empréstimos: " + err.message));
-    return () => { e(); t(); p(); a(); };
+    return () => { employeeStops.forEach(stop => stop()); t(); p(); a(); };
   }, []);
   const summary = useMemo(() => employees.filter(e => e.active !== false).map(emp => {
     const rows = entries.filter(x => x.employeeId === emp.id && monthKey(x.date) === month);
@@ -142,12 +143,15 @@ export default function PayrollModule() {
     if (cpfDigits && employees.some(employee => employee.id !== editingEmployee.id && onlyDigits(employee.cpf || "") === cpfDigits)) return setError("Já existe outro funcionário cadastrado com este CPF.");
     setSavingSalary(true);
     try {
-      await updateDoc(doc(db, "employees", editingEmployee.id), {
+      const employeeRef = doc(db, "employees", editingEmployee.id);
+      const profile = {
         name: editName.trim(), role: editRole.trim(), cpf: cpfDigits, department: editDepartment.trim(),
         email: editEmail.trim(), phone: editPhone.trim(), admissionDate: editAdmissionDate,
         salary: round2(value), monthlyHours: hours,
         profileUpdatedAt: serverTimestamp(), profileUpdatedBy: auth.currentUser?.email || ""
-      });
+      };
+      if (editingEmployee.source === "employees") await updateDoc(employeeRef, profile);
+      else await setDoc(employeeRef, { ...profile, active: true, additions: editingEmployee.additions || [], createdBy: auth.currentUser?.uid || null }, { merge: true });
       setEditingEmployee(null); setEditName(""); setEditRole(""); setEditCpf(""); setEditDepartment("");
       setEditEmail(""); setEditPhone(""); setEditAdmissionDate(""); setEditSalary(""); setEditHours("");
     } catch (e) { setError("Não foi possível atualizar o cadastro: " + (e as Error).message); }

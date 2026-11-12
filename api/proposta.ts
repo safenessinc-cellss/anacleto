@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, type DocumentData } from "firebase-admin/firestore";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type Request = {
@@ -77,7 +77,7 @@ async function authenticatedRole(req: Request) {
   return typeof role === "string" ? { uid: user.localId, role } : null;
 }
 
-function publicProposal(quote: FirebaseFirestore.DocumentData) {
+function publicProposal(quote: DocumentData) {
   const drawing = quote.technicalDrawing && typeof quote.technicalDrawing === "object" ? quote.technicalDrawing : null;
   return {
     clientName: String(quote.clientName || ""),

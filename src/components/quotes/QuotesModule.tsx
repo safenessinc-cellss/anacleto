@@ -32,6 +32,7 @@ import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
 import ImageLightbox from "../common/ImageLightbox";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
+import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
 
 interface QuotesModuleProps {
   senderConfig: SenderConfig;
@@ -60,15 +61,15 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   useEffect(() => {
     const unsubs = [
       onSnapshot(collection(db, "catalog"), (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data(), source: "catalog" }));
+        const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, name: data.name || data.description || "Item sem nome", sku: data.sku || data.code || "", price: Number(data.price || 0), source: "catalog" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "catalog"), ...list]);
       }, (err) => console.warn("Catalog listener (quotes):", err)),
       onSnapshot(collection(db, "supplier_catalog"), (snap) => {
-        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), supplier: data.supplier || "", category: data.category || "", unit: data.unit || "un", source: "supplier_catalog" }; });
+        const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), supplier: data.supplier || "", category: data.category || "", unit: data.unit || "un", source: "supplier_catalog" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...list]);
       }, (err) => console.warn("Supplier catalog listener (quotes):", err)),
       onSnapshot(collection(db, "registry_items"), (snap) => {
-        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, itemId: d.id, name: data.name || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", width: data.width || 0, height: data.height || 0, depth: data.depth || 0, itemPhotoUrls: data.itemPhotoUrls || [], source: "registry_items" }; });
+        const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, itemId: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", width: data.width || 0, height: data.height || 0, depth: data.depth || 0, itemPhotoUrls: data.itemPhotoUrls || [], source: "registry_items" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "registry_items"), ...list]);
       }, (err) => console.warn("Items registry listener (quotes):", err)),
       onSnapshot(collection(db, "price_table"), (snap) => {
@@ -89,6 +90,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [viewerPdfQuote, setViewerPdfQuote] = useState<Quote | null>(null);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [generatingPublicLink, setGeneratingPublicLink] = useState(false);
+  const [aluminumPricePerKg, setAluminumPricePerKg] = useState(readAluminumPricePerKg);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedCatalogSearch(catalogSearch.trim().toLowerCase()), 250);
@@ -142,6 +144,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       validUntil: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10),
       items: [],
       subtotal: 0,
+      labor: 0,
+      marginRate: 0,
+      margin: 0,
+      freight: 0,
       taxRate: 0,
       taxAmount: 0,
       discountRate: 0,
@@ -165,8 +171,13 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     }));
 
     const subtotal = Number(updatedItems.reduce((acc, curr) => acc + curr.subtotal, 0).toFixed(2));
-    const discountAmount = Number(((subtotal * (current.discountRate || 0)) / 100).toFixed(2));
-    const taxableBase = Math.max(0, subtotal - discountAmount);
+    const labor = Math.max(0, Number(current.labor || 0));
+    const marginRate = Math.max(0, Number(current.marginRate || 0));
+    const margin = Number(((subtotal + labor) * marginRate / 100).toFixed(2));
+    const freight = Math.max(0, Number(current.freight || 0));
+    const grossBase = subtotal + labor + margin + freight;
+    const discountAmount = Number(((grossBase * (current.discountRate || 0)) / 100).toFixed(2));
+    const taxableBase = Math.max(0, grossBase - discountAmount);
     const taxAmount = Number(((taxableBase * (current.taxRate || 0)) / 100).toFixed(2));
     const total = Number((taxableBase + taxAmount).toFixed(2));
 
@@ -174,11 +185,34 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       ...current,
       items: updatedItems,
       subtotal,
+      labor,
+      marginRate,
+      margin,
+      freight,
       discountAmount,
       taxAmount,
       total,
       updatedAt: new Date().toISOString(),
     };
+  };
+
+  const findCatalogMatch = (item: Record<string, unknown>) => {
+    const sku = String(item.sku || "").trim().toLowerCase();
+    const catalogId = String(item.catalogItemId || item.itemId || "").trim();
+    const description = String(item.description || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const exact = catalogItems.find((candidate) =>
+      (catalogId && candidate.id === catalogId) ||
+      (sku && String(candidate.sku || candidate.code || "").trim().toLowerCase() === sku) ||
+      (description && String(candidate.name || candidate.description || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === description)
+    );
+    if (exact) return exact;
+    const terms = description.split(/\s+/).filter((term) => term.length >= 4 && !/^(perfil|aluminio|janela|porta|vidro|linha)$/.test(term));
+    if (!terms.length) return undefined;
+    return catalogItems.map((candidate) => {
+      const text = `${candidate.name || ""} ${candidate.description || ""} ${candidate.sku || candidate.code || ""} ${candidate.category || ""}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const score = terms.reduce((sum, term) => sum + (text.includes(term) ? 1 : 0), 0);
+      return { candidate, score };
+    }).filter((result) => result.score >= Math.min(2, terms.length)).sort((a, b) => b.score - a.score)[0]?.candidate;
   };
 
   // Prioriza o logotipo configurado; usa o ativo oficial do projeto como fallback.
@@ -356,6 +390,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       return;
     }
     let target = recalculateQuote(requested);
+    if (target.items.length > 0 && target.total <= 0) {
+      showToast("O orçamento tem componentes sem preço confirmado ou estimado. Revise os valores antes de salvar um total de R$ 0,00.", "error");
+      return;
+    }
     try {
       // Build PDF document and serialize as data URI
       const pdfSender = await preparePdfSender();
@@ -528,11 +566,16 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           currentQuote: {
             id: selectedQuote.id, number: selectedQuote.number, clientName: selectedQuote.clientName,
             items: selectedQuote.items.map(item => ({ id: item.id, itemId: item.itemId || "", catalogItemId: (item as any).catalogItemId || "", catalogSource: (item as any).catalogSource || "", sku: (item as any).sku || "", description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
-            subtotal: selectedQuote.subtotal, taxRate: selectedQuote.taxRate, discountRate: selectedQuote.discountRate || 0,
+            subtotal: selectedQuote.subtotal, labor: selectedQuote.labor || 0, marginRate: selectedQuote.marginRate || 0, freight: selectedQuote.freight || 0,
+            taxRate: selectedQuote.taxRate, discountRate: selectedQuote.discountRate || 0,
             total: selectedQuote.total, currency: selectedQuote.currency, notes: selectedQuote.notes || "",
           },
           history: newHistory.slice(-12),
-          catalog: catalogItems.slice(0, 250),
+          catalog: catalogItems.map((item) => ({
+            id: item.id, name: item.name, description: item.description, sku: item.sku || item.code,
+            code: item.code, price: item.price, category: item.category, unit: item.unit,
+            supplier: item.supplier, source: item.source,
+          })),
         }),
       });
 
@@ -568,18 +611,37 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       }
       if (data.items && Array.isArray(data.items) && data.items.length > 0) {
         // If items are brand new or appended
-        updated.items = data.items.map((it: any, idx: number) => ({
-          id: it.id || `it_${idx + 1}`,
-          itemId: it.itemId || undefined,
-          catalogItemId: it.catalogItemId || undefined,
-          catalogSource: it.catalogSource || undefined,
-          sku: it.sku || undefined,
-          description: it.description,
-          quantity: Number(it.quantity || 1),
-          unitPrice: Number(it.unitPrice || 0),
-          subtotal: Number((Number(it.quantity || 1) * Number(it.unitPrice || 0)).toFixed(2)),
-          notes: it.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : it.priceSource === "existing" ? "Preço existente preservado; confirme o cadastro no catálogo." : "Preço confirmado no catálogo.",
-        }));
+        updated.items = data.items.map((it: any, idx: number) => {
+          const match = findCatalogMatch(it);
+          const listedPrice = Number(match?.price || 0);
+          const estimatedPrice = match ? estimatedCatalogPrice(match, aluminumPricePerKg) : undefined;
+          const suppliedPrice = Number(it.unitPrice);
+          const unitPrice = Number.isFinite(suppliedPrice) && suppliedPrice > 0
+            ? suppliedPrice
+            : listedPrice > 0 ? listedPrice : estimatedPrice || 0;
+          const quantity = Number(it.quantity || 1);
+          const priceSource = suppliedPrice > 0 ? it.priceSource || "catalog" : listedPrice > 0 ? "catalog" : estimatedPrice ? "estimated" : "pending";
+          return {
+            id: it.id || `it_${idx + 1}`,
+            itemId: it.itemId || match?.itemId || (match?.source === "registry_items" ? match.id : undefined),
+            catalogItemId: it.catalogItemId || match?.id || undefined,
+            catalogSource: it.catalogSource || match?.source || undefined,
+            sku: it.sku || match?.sku || match?.code || undefined,
+            description: it.description || match?.name || "Componente do orçamento",
+            quantity,
+            unitPrice,
+            subtotal: Number((quantity * unitPrice).toFixed(2)),
+            itemPhotoUrl: match?.itemPhotoUrls?.[0] || match?.imageUrl || undefined,
+            itemPhotoUrls: match?.itemPhotoUrls || undefined,
+            itemCategory: match?.category || undefined,
+            priceSource,
+            notes: priceSource === "pending"
+              ? "Preço pendente de confirmação no catálogo."
+              : priceSource === "estimated"
+                ? "Preço estimado com base no peso por metro e valor configurado do alumínio por kg."
+                : "Preço confirmado no catálogo.",
+          };
+        });
       }
 
       updated = recalculateQuote(updated);
@@ -625,13 +687,17 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       id: Math.random().toString(36).substring(2),
       description: `${item.name}${item.sku ? ` (${item.sku})` : ""}${item.supplier ? ` — ${item.supplier}` : ""}`,
       quantity: 1,
-      unitPrice: Number(item.price || 0),
+      unitPrice: estimatedCatalogPrice(item, aluminumPricePerKg) || 0,
                           itemId: item.itemId || (item.source === "registry_items" ? item.id : undefined),
                           catalogSource: item.source,
+                          catalogItemId: item.id,
+                          sku: item.sku || item.code || "",
                           itemPhotoUrl: item.itemPhotoUrls?.[0],
                           itemPhotoUrls: item.itemPhotoUrls || [],
                           itemCategory: item.category,
                           itemDimensions: [item.width,item.height,item.depth].filter(Boolean).join(" × "),
+                          priceSource: Number(item.price || 0) > 0 ? "catalog" : estimatedCatalogPrice(item, aluminumPricePerKg) ? "estimated" : "pending",
+                          notes: Number(item.price || 0) > 0 ? undefined : estimatedCatalogPrice(item, aluminumPricePerKg) ? "Preço estimado pelo peso do perfil e valor configurado do alumínio por kg." : "Preço pendente de confirmação no catálogo.",
       unit: item.unit || "UN",
     };
     setQuoteItems([...quoteItems, newItem]);
@@ -664,7 +730,7 @@ const handleAddItem = () => {
     setSelectedQuote(updated);
   };
 
-  const handleUpdateItem = (id: string, field: "description" | "quantity" | "unitPrice", val: any) => {
+  const handleUpdateItem = (id: string, field: "description" | "quantity" | "unitPrice" | "sku", val: any) => {
     if (!selectedQuote) return;
     const updatedItems = selectedQuote.items.map((it) => {
       if (it.id === id) {
@@ -969,6 +1035,9 @@ const handleAddItem = () => {
                     
         {/* Botón para abrir catálogo */}
         <div className="mb-4">
+          <label className="mb-3 block text-[10px] font-semibold text-slate-500">Valor de referência do alumínio (R$/kg)
+            <input type="number" min="0.01" step="0.01" value={aluminumPricePerKg} onChange={(event) => setAluminumPricePerKg(writeAluminumPricePerKg(Number(event.target.value)))} className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900" />
+          </label>
           <button
             type="button"
             onClick={() => setShowCatalog(!showCatalog)}
@@ -998,17 +1067,21 @@ const handleAddItem = () => {
                       type="button"
                       onClick={() => {
                         // Adicionar o produto ao orçamento
-                        const newItem = {
+                        const newItem: QuoteItem = {
                           id: Math.random().toString(36).substring(2),
                           description: item.name + (item.sku ? " (" + item.sku + ")" : "") + (item.width || item.height || item.depth ? " · " + [item.width,item.height,item.depth].filter(Boolean).join(" × ") + " mm" : ""),
                           quantity: 1,
-                          unitPrice: Number(item.price || 0),
+                          unitPrice: estimatedCatalogPrice(item, aluminumPricePerKg) || 0,
                           itemId: item.itemId || (item.source === "registry_items" ? item.id : undefined),
                           catalogSource: item.source,
+                          catalogItemId: item.id,
+                          sku: item.sku || item.code || "",
                           itemPhotoUrl: item.itemPhotoUrls?.[0],
                           itemPhotoUrls: item.itemPhotoUrls || [],
                           itemCategory: item.category,
                           itemDimensions: [item.width,item.height,item.depth].filter(Boolean).join(" × "),
+                          priceSource: Number(item.price || 0) > 0 ? "catalog" : estimatedCatalogPrice(item, aluminumPricePerKg) ? "estimated" : "pending",
+                          notes: Number(item.price || 0) > 0 ? undefined : estimatedCatalogPrice(item, aluminumPricePerKg) ? "Preço estimado pelo peso do perfil e valor configurado do alumínio por kg." : "Preço pendente de confirmação no catálogo.",
                         };
                         if (selectedQuote) {
                           setSelectedQuote(recalculateQuote({ ...selectedQuote, items: [...selectedQuote.items, newItem] }));
@@ -1019,7 +1092,7 @@ const handleAddItem = () => {
                       className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 rounded flex justify-between"
                     >
                       <span className="flex min-w-0 items-center gap-2">{item.itemPhotoUrls?.[0] && <img src={item.itemPhotoUrls[0]} alt="" className="h-10 w-10 rounded object-cover"/>}<span><strong>{item.sku || "Sem código"}</strong> — {item.name}{item.supplier ? " · " + item.supplier : ""}{item.width || item.height || item.depth ? <small className="block text-slate-500">{[item.width,item.height,item.depth].filter(Boolean).join(" × ")} mm</small> : null}</span></span>
-                      <span className="font-bold text-indigo-600">R$ {item.price?.toFixed(2)}</span>
+                      <span className="text-right font-bold text-indigo-600">R$ {(estimatedCatalogPrice(item, aluminumPricePerKg) || 0).toFixed(2)}{Number(item.price || 0) <= 0 && estimatedCatalogPrice(item, aluminumPricePerKg) ? <small className="block text-[9px] font-medium">estimado</small> : null}</span>
                     </button>
                   ))}
                 {catalogItems.filter((i) => i.name?.toLowerCase().includes(debouncedCatalogSearch) || i.sku?.toLowerCase().includes(debouncedCatalogSearch) || i.category?.toLowerCase().includes(debouncedCatalogSearch) || [i.width, i.height, i.depth].join(" ").includes(debouncedCatalogSearch)).length === 0 && (
@@ -1037,6 +1110,13 @@ const handleAddItem = () => {
                     </button>
                   </div>
 
+                  <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-950 p-3 sm:grid-cols-3">
+                    {([
+                      ["Mão de Obra (R$)", "labor"],
+                      ["Margem (%)", "marginRate"],
+                      ["Frete (R$)", "freight"],
+                    ] as const).map(([label, field]) => <label key={field} className="text-[10px] font-semibold text-slate-400">{label}<input type="number" min="0" step="0.01" value={selectedQuote[field] || 0} onChange={(event) => setSelectedQuote(recalculateQuote({ ...selectedQuote, [field]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 p-2 text-xs text-white" /></label>)}
+                  </div>
                   <div className="space-y-2">
                     {selectedQuote.items.map((item) => (
                       <div
@@ -1044,6 +1124,14 @@ const handleAddItem = () => {
                         className="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center gap-3"
                       >
                         {item.itemPhotoUrl && <button type="button" onClick={() => setItemPhotoViewer(item.itemPhotoUrls?.length ? item.itemPhotoUrls : [item.itemPhotoUrl!])} className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-700"><img src={item.itemPhotoUrl} alt={"Foto de " + item.description} className="h-full w-full object-cover"/></button>}
+                        <input
+                          type="text"
+                          aria-label="Código do item"
+                          value={item.sku || ""}
+                          onChange={(e) => handleUpdateItem(item.id, "sku", e.target.value)}
+                          placeholder="Código"
+                          className="w-24 px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white outline-none"
+                        />
                         <input
                           type="text"
                           value={item.description}
@@ -1091,9 +1179,12 @@ const handleAddItem = () => {
                   {/* Totals Summary */}
                   <div className="mt-4 p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-end space-y-1.5 text-xs">
                     <div className="flex justify-between w-64 text-slate-400">
-                      <span>Base de cálculo:</span>
+                      <span>Materiais:</span>
                       <span className="font-mono text-white">{selectedQuote.subtotal?.toFixed(2)} R$</span>
                     </div>
+                    {Number(selectedQuote.labor || 0) > 0 && <div className="flex justify-between w-64 text-slate-400"><span>Mão de obra:</span><span className="font-mono text-white">{Number(selectedQuote.labor).toFixed(2)} R$</span></div>}
+                    {Number(selectedQuote.margin || 0) > 0 && <div className="flex justify-between w-64 text-slate-400"><span>Margem ({selectedQuote.marginRate || 0}%):</span><span className="font-mono text-white">{Number(selectedQuote.margin).toFixed(2)} R$</span></div>}
+                    {Number(selectedQuote.freight || 0) > 0 && <div className="flex justify-between w-64 text-slate-400"><span>Frete:</span><span className="font-mono text-white">{Number(selectedQuote.freight).toFixed(2)} R$</span></div>}
                     {selectedQuote.discountRate ? (
                       <div className="flex justify-between w-64 text-rose-400">
                         <span>Desconto ({selectedQuote.discountRate}%):</span>
