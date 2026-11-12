@@ -58,8 +58,8 @@ export default function DashboardOverview({
     fileName: "",
     type: "generic",
   });
-  const totalInvoiced = invoices.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalPago = invoices.filter((i) => i.status === "pago").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalInvoiced = invoices.filter(i => !["cancelled", "cancelado", "void"].includes(String(i.status || "").toLowerCase())).reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalPago = invoices.filter((i) => i.status === "pago" || i.status === "paid").reduce((acc, curr) => acc + (curr.total || 0), 0);
   const totalOrçamentosValue = quotes.reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   return (
