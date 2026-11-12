@@ -169,7 +169,7 @@ export default function BudgetModal({
       setClientAddress(budget.clientAddress || "");
       setDocumentLanguage(budget.language || "pt");
       setTaxRate(budget.taxRate !== undefined ? budget.taxRate : 0);
-      setItems(budget.items || []);
+      setItems((budget.items || []).map((item) => budget.requestOnly ? { ...item, unitPrice: 0 } : item));
       setNifFoundInfo(budget.clientNif ? { name: budget.clientName || "", email: budget.clientEmail || "", address: budget.clientAddress || "" } : null);
     } else {
       setClientName(prefillClient?.name || "");

@@ -301,7 +301,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
   };
 
   // Dynamic business metrics calculation
-  const totalBudgetsSum = budgets.reduce((acc, b) => acc + (b.total || 0), 0);
+  const totalBudgetsSum = budgets.reduce((acc, b) => acc + (b.requestOnly ? 0 : (b.total || 0)), 0);
   const totalInvoicedSum = invoices.reduce((acc, i) => acc + (i.total || 0), 0);
   const activeVisitsTotal = visits.filter(v => v.status === "pending" || v.status === "confirmed").length;
   const dealClosingRate = budgets.length > 0 ? Math.round((budgets.filter(b => b.status === "accepted" || b.status === "invoiced").length / budgets.length) * 150) : 0; // scale up logically
@@ -590,7 +590,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
                           </td>
                           <td className="p-4 text-slate-500">{b.date}</td>
                           <td className="p-4 text-right font-black text-slate-900 dark:text-white font-mono">
-                            {formatCurrency(b.total, senderConfig.currency)}
+                            {b.requestOnly ? "Sob medição" : formatCurrency(b.total, senderConfig.currency)}
                           </td>
                           <td className="p-4 text-center">
                             <span
@@ -604,7 +604,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
                                   : "text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400"
                               }`}
                             >
-                              {b.status === "invoiced" ? t.statusInvoiced : b.status === "accepted" ? t.statusAccepted : b.status === "rejected" ? t.statusRejected : t.statusPending}
+                              {b.requestOnly ? "Sob medição" : b.status === "invoiced" ? t.statusInvoiced : b.status === "accepted" ? t.statusAccepted : b.status === "rejected" ? t.statusRejected : t.statusPending}
                             </span>
                           </td>
                           <td className="p-4">
@@ -632,7 +632,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
                                 PDF
                               </button>
 
-                              {b.status === "pending" && (
+                              {b.status === "pending" && !b.requestOnly && (
                                 <button
                                   onClick={async () => {
                                     // Accept budget

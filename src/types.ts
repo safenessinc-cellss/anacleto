@@ -306,6 +306,8 @@ export type BudgetLineItem = QuoteItem;
 export type BudgetStatus = QuoteStatus;
 export interface Budget extends Quote {
   clientNif: string;
+  requestOnly?: boolean;
+  source?: string;
 }
 export interface ChatMessage {
   id: string;
