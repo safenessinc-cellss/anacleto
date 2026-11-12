@@ -4,11 +4,6 @@ import {
   Save,
   Building,
   CreditCard,
-  Mail,
-  Phone,
-  Globe,
-  MapPin,
-  CheckCircle,
   ShieldCheck,
   Image as ImageIcon
 } from "lucide-react";
@@ -23,7 +18,7 @@ interface SettingsModuleProps {
   language?: string;
 }
 
-export default function SettingsModule({ senderConfig, setSenderConfig, language = "pt"}: SettingsModuleProps) {
+export default function SettingsModule({ senderConfig, setSenderConfig }: SettingsModuleProps) {
   const { showToast } = useToast();
   const [formData, setFormData] = useState<SenderConfig>(senderConfig);
   const [isSaving, setIsSaving] = useState(false);
@@ -61,7 +56,6 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
 
   return (
     <div className="space-y-6 max-w-4xl">
-      {/* Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 shadow-lg">
@@ -70,7 +64,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                Ajustes del Sistema
+                Configurações do sistema
               </span>
               <span className="text-[10px] font-mono text-slate-400">Anacleto Pro v2.6</span>
             </div>
@@ -81,68 +75,40 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
         </div>
       </div>
 
-      {/* Settings Form */}
       <form onSubmit={handleSave} className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-6">
         <div className="space-y-4">
           <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-2">
-            <Building className="w-4 h-4" /> Datos de Identificación Fiscal (Aparecen en PDFs)
+            <Building className="w-4 h-4" /> Dados de identificação fiscal (exibidos nos PDFs)
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="text-slate-400 block mb-1 font-bold">Razão social da empresa *</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => handleChange("name", e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
-              />
+              <input type="text" required value={formData.name} onChange={(e) => handleChange("name", e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60" />
             </div>
 
             <div>
-              <label className="text-slate-400 block mb-1 font-bold">CNPJ / CIF / CNPJ *</label>
-              <input
-                type="text"
-                required
-                value={formData.nif}
-                onChange={(e) => handleChange("nif", e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono outline-none focus:border-amber-500/60"
-              />
+              <label className="text-slate-400 block mb-1 font-bold">CNPJ / CPF *</label>
+              <input type="text" required value={formData.nif} onChange={(e) => handleChange("nif", e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono outline-none focus:border-amber-500/60" />
             </div>
 
             <div className="sm:col-span-2">
               <label className="text-slate-400 block mb-1">Endereço fiscal</label>
-              <input
-                type="text"
-                value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
-              />
+              <input type="text" value={formData.address} onChange={(e) => handleChange("address", e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60" />
             </div>
 
             <div>
               <label className="text-slate-400 block mb-1">CEP</label>
-              <input
-                type="text"
-                value={formData.postalCode}
-                onChange={(e) => handleChange("postalCode", e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
-              />
+              <input type="text" value={formData.postalCode} onChange={(e) => handleChange("postalCode", e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60" />
             </div>
 
             <div>
               <label className="text-slate-400 block mb-1">Cidade e país</label>
-              <input
-                type="text"
-                value={`${formData.city} - ${formData.country}`}
-                onChange={(e) => {
-                  const parts = e.target.value.split("-");
-                  handleChange("city", parts[0]?.trim() || "");
-                  handleChange("country", parts[1]?.trim() || "");
-                }}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
-              />
+              <input type="text" value={`${formData.city} - ${formData.country}`} onChange={(e) => {
+                const parts = e.target.value.split("-");
+                handleChange("city", parts[0]?.trim() || "");
+                handleChange("country", parts[1]?.trim() || "");
+              }} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60" />
             </div>
           </div>
         </div>
@@ -153,11 +119,11 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
           </h3>
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="w-36 h-24 rounded-xl border border-slate-700 bg-white p-2 flex items-center justify-center overflow-hidden">
-              {formData.logoUrl ? <img src={formData.logoUrl} alt="Logotipo oficial" className="max-w-full max-h-full object-contain" /> : <span className="text-xs text-slate-400">Sem logotipo configurado</span>}
+              {formData.logoUrl ? <img src={formData.logoUrl} alt="Logotipo oficial" className="max-w-full max-h-full object-contain" /> : <span className="text-xs text-slate-400">Nenhum logotipo configurado</span>}
             </div>
             <div className="space-y-2">
               <input type="file" accept="image/*" onChange={(e) => handleLogoFile(e.target.files?.[0])} className="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-500 file:px-3 file:py-2 file:text-xs file:font-bold file:text-slate-950" />
-              <p className="text-[11px] text-slate-400">Salve aqui o logotipo usado no cabeçalho e na marca d’água dos PDFs. Limite: 650 KB.</p>
+              <p className="text-[11px] text-slate-400">Configure o logotipo usado no cabeçalho e na marca d'água dos PDFs. Limite: 650 KB.</p>
               {formData.logoUrl && <button type="button" onClick={() => handleChange("logoUrl", "")} className="text-xs font-bold text-rose-400">Remover logotipo</button>}
             </div>
           </div>
@@ -165,29 +131,18 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
 
         <div className="pt-4 border-t border-slate-800 space-y-4">
           <h3 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-2">
-            <CreditCard className="w-4 h-4" /> Datos Bancarios y Moeda
+            <CreditCard className="w-4 h-4" /> Dados bancários e moeda
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div className="sm:col-span-2">
               <label className="text-slate-400 block mb-1 font-bold">Conta bancária para transferências (PIX / IBAN)</label>
-              <input
-                type="text"
-                value={formData.bankAccount}
-                onChange={(e) => handleChange("bankAccount", e.target.value)}
-                placeholder="Chave PIX ou IBAN"
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono outline-none focus:border-amber-500/60"
-              />
+              <input type="text" value={formData.bankAccount} onChange={(e) => handleChange("bankAccount", e.target.value)} placeholder="Chave PIX ou IBAN" className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono outline-none focus:border-amber-500/60" />
             </div>
 
             <div>
-              <label className="text-slate-400 block mb-1">Moeda Principal</label>
-              <select
-                value={formData.currency}
-                onChange={(e) => handleChange("currency", e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
-              >
-                <option value="BRL">BRL (R$) - Real brasileiro</option>
+              <label className="text-slate-400 block mb-1">Moeda principal</label>
+              <select value={formData.currency} onChange={(e) => handleChange("currency", e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60">
                 <option value="BRL">BRL (R$) - Real brasileiro</option>
                 <option value="USD">USD ($) - Dólar americano</option>
                 <option value="MXN">MXN ($) - Peso mexicano</option>
@@ -196,37 +151,26 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
 
             <div>
               <label className="text-slate-400 block mb-1">E-mail para faturamento</label>
-              <input
-                type="email"
-                value={formData.profileEmail || ""}
-                onChange={(e) => handleChange("profileEmail", e.target.value)}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60"
-              />
+              <input type="email" value={formData.profileEmail || ""} onChange={(e) => handleChange("profileEmail", e.target.value)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white outline-none focus:border-amber-500/60" />
             </div>
           </div>
         </div>
 
         <div className="pt-4 border-t border-slate-800 flex justify-end">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase rounded-xl transition shadow-lg shadow-amber-500/20"
-          >
+          <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase rounded-xl transition shadow-lg shadow-amber-500/20">
             <Save className="w-4 h-4" />
-            {isSaving ? "Salvando..." : "Salvar Configuração"}
+            {isSaving ? "Salvando..." : "Salvar configurações"}
           </button>
         </div>
       </form>
 
       <section className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-5 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100">
-        <h3 className="flex items-center gap-2 font-black"><ShieldCheck className="h-4 w-4"/> {language === "es" ? "Conexión segura de IA" : "Conexão segura da IA"}</h3>
+        <h3 className="flex items-center gap-2 font-black"><ShieldCheck className="h-4 w-4" /> Conexão segura da IA</h3>
         <p className="mt-2 text-xs leading-relaxed">
-          {language === "es"
-            ? "ANACLETO utiliza Gemini 2.5 Flash. Para activar la API oficial con JSON Schema, configure GEMINI_API_KEY como variable sensible del servidor en Vercel (Preview y Production). Por seguridad, la clave nunca se guarda en localStorage, Firestore ni en el navegador. Si no existe, el sistema utiliza AI Gateway cuando está disponible."
-            : "ANACLETO utiliza Gemini 2.5 Flash. Para ativar a API oficial com JSON Schema, configure GEMINI_API_KEY como variável sensível do servidor no Vercel (Preview e Production). Por segurança, a chave nunca é salva em localStorage, Firestore ou no navegador. Se não existir, o sistema utiliza o AI Gateway quando disponível."}
+          O ANACLETO utiliza Gemini 2.5 Flash. Para ativar a API oficial com JSON Schema, configure GEMINI_API_KEY como variável sensível do servidor no Vercel (Preview e Production). Por segurança, a chave nunca é salva em localStorage, Firestore ou no navegador. Se não existir, o sistema utiliza o AI Gateway quando disponível.
         </p>
         <p className="mt-2 text-[11px] opacity-80">
-          {language === "es" ? "La cuota gratuita de Google tiene límites de uso y disponibilidad; no es ilimitada." : "A cota gratuita do Google possui limites de uso e disponibilidade; não é ilimitada."}
+          A cota gratuita do Google possui limites de uso e disponibilidade; não é ilimitada.
         </p>
       </section>
     </div>
