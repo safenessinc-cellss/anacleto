@@ -906,6 +906,7 @@ const handleAddItem = () => {
     const matchesStatus = filterStatus === "all" || q.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+  const latestAiReply = [...aiChatHistory].reverse().find((message) => message.role === "assistant")?.text;
 
   return (
     <div className="space-y-6">
@@ -928,7 +929,6 @@ const handleAddItem = () => {
         </button>
       </div>
 
-  const latestAiReply = [...aiChatHistory].reverse().find((message) => message.role === "assistant")?.text;
       {/* Main Grid: Left = Quotes List (4 cols); Right = Active Quote Detail (8 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: List & Search Filter */}
