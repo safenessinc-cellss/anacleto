@@ -3,7 +3,7 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import firebaseConfig from "../../firebase-applet-config.json" with { type: "json" };
 
-export type AIAuditServiceName = "BUDGET" | "TECHNICAL_DRAWING";
+export type AIAuditServiceName = "BUDGET" | "TECHNICAL_DRAWING" | "FINANCIAL_ASSISTANT";
 export type BudgetLineState = "SUGGESTED_BY_AI" | "REVIEWED_BY_ENGINEER" | "APPROVED_FOR_MANUFACTURING";
 
 export interface AIAuditRecord {
