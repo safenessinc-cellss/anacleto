@@ -409,7 +409,8 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       const calculatedQuote = recalculateQuote(approvedQuote);
       const invalidLine = calculatedQuote.items.find(item =>
         !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0 ||
-        !Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) <= 0
+        item.unitPrice === undefined || item.unitPrice === null || String(item.unitPrice).trim() === "" ||
+        !Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) < 0
       );
       if (invalidLine) {
         throw new Error(`O item "${invalidLine.description || "sem descrição"}" está sem preço válido. Atualize o preço pelo catálogo Materiais e Componentes antes de emitir a fatura.`);
