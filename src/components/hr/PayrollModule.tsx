@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, updateDoc, doc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Users, Clock3, Wallet, Plus, Calculator, FileSpreadsheet, UserRound, ShieldCheck } from "lucide-react";
@@ -12,7 +12,7 @@ type Employee = {
 };
 // Keep each payroll type declaration on its own physical line; do not insert escaped newline text.
 type EmployeePayment = { id: string; employeeId: string; competence: string; amount: number; paymentDate: string; };
-type PayrollAdjustment = { id: string; employeeId: string; competence: string; kind: "advance" | "vale" | "loan"; amount: number; description?: string; date?: string; };
+type PayrollAdjustment = { id: string; employeeId: string; competence: string; kind: "advance" | "vale" | "loan"; amount: number; description?: string; date?: string; status?: string; source?: string; };
 type TimeEntry = {
   id: string; employeeId: string; date: string; normalHours?: number;
   hours?: number; absences?: number; delays?: number;
@@ -103,20 +103,25 @@ export default function PayrollModule() {
     if (!window.confirm(`Registrar pagamento de ${money(outstanding)} para ${employee.name}, competência ${month}?`)) return;
     setError("");
     try {
-      await addDoc(collection(db, "employee_payments"), {
-        employeeId: employee.id,
-        employeeName: employee.name,
-        employeeRole: employee.role || "",
-        competence: month,
-        amount: outstanding,
-        paymentDate: new Date().toISOString().slice(0, 10),
-        method: "pix",
-        reference: `Folha de pagamento ${month}`,
-        notes: "Pagamento registrado diretamente na Folha de Pagamento.",
-        status: "paid",
-        payrollSource: "payroll",
-        createdAt: serverTimestamp(),
-        createdBy: auth.currentUser?.email || "",
+      const paymentRef = doc(collection(db, "employee_payments"));
+      const pendingAdvances = adjustments.filter((item) => item.employeeId === employee.id && item.competence === month && item.source === "finance_employee_advance" && item.status !== "deducted");
+      await runTransaction(db, async (transaction) => {
+        const refs = pendingAdvances.map((item) => doc(db, "payroll_adjustments", item.id));
+        const snapshots = [];
+        for (const ref of refs) snapshots.push(await transaction.get(ref));
+        transaction.set(paymentRef, {
+          employeeId: employee.id, employeeName: employee.name, employeeRole: employee.role || "",
+          competence: month, amount: outstanding, paymentDate: new Date().toISOString().slice(0, 10),
+          method: "pix", reference: `Folha de pagamento ${month}`,
+          notes: "Pagamento registrado diretamente na Folha de Pagamento.",
+          status: "paid", payrollSource: "payroll", deductedAdvanceIds: pendingAdvances.map((item) => item.id),
+          createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "",
+        });
+        snapshots.forEach((snapshot, index) => {
+          if (snapshot.exists() && snapshot.data().status !== "deducted") {
+            transaction.update(refs[index], { status: "deducted", deductedAt: serverTimestamp(), paymentId: paymentRef.id });
+          }
+        });
       });
     } catch (paymentError) {
       setError("Não foi possível registrar o pagamento da folha: " + (paymentError as Error).message);

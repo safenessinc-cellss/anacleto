@@ -62,11 +62,21 @@ service cloud.firestore {
       allow create: if canManageCommercial();
       allow update: if (canManageCommercial() || canManageFinance()) && (
         !('approvedSnapshotId' in resource.data) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt','clientAdvanceTotal','balanceDue','productionStatus'])
       );
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']) && !('approvedSnapshotId' in resource.data);
     }
     match /ledger_entries/{id} { allow read, write: if canManageFinance(); }
+    match /client_advances/{id} { allow read, write: if canManageFinance(); }
+    match /payroll_adjustments/{id} { allow read, write: if canManageFinance(); }
+    match /employees/{id} { allow read, write: if canManageFinance(); }
+    match /employee_payments/{id} { allow read, write: if canManageFinance(); }
+    match /time_entries/{id} { allow read, write: if canManageFinance(); }
+    match /production_orders/{id} {
+      allow read: if canOperate() || canManageProduction() || canManageFinance();
+      allow create, update: if canManageProduction() || canManageFinance();
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
     match /user_profiles/{uid} { allow read, write: if signedIn() && (request.auth.uid == uid || owner()); }
     match /agenda_slots/{id} { allow read: if true; allow write: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor']); }
     match /chat_sessions/{id} {
@@ -76,7 +86,12 @@ service cloud.firestore {
       allow delete: if owner();
     }
     match /tipologias/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /projects/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /projects/{id} {
+      allow read: if canOperate();
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial() || (canManageFinance() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['productionStatus','updatedAt']));
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
     match /user_suggestions/{id} { allow read: if canOperate(); allow create: if canOperate(); allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /invoices/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial() || canManageFinance(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /catalog/{id} { allow read: if canOperate() || canManageFinance() || canManageQuality() || canManageProduction(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }

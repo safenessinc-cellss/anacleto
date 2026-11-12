@@ -5,6 +5,7 @@ import './index.css';
 import { ToastProvider } from './components/ToastContext.tsx';
 import ErrorBoundary from './components/ErrorBoundary';
 import { applyTheme, loadSavedTheme } from './utils/applyTheme';
+import PublicProposalPage from './components/quotes/PublicProposalPage';
 
 const savedTheme = loadSavedTheme();
 if (savedTheme) applyTheme(savedTheme);
@@ -17,12 +18,13 @@ if (savedMode === "dark") {
   document.documentElement.classList.remove("dark");
 }
 
-createRoot(document.getElementById('root')!).render(
+const isPublicProposal = /^\/proposta\/[^/]+$/.test(window.location.pathname);
+createRoot(document.getElementById('root')!).render(isPublicProposal ? <PublicProposalPage /> : (
   <StrictMode>
     <ToastProvider>
       <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </ToastProvider>
-  </StrictMode>,
-);
+  </StrictMode>
+));

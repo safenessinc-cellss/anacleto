@@ -10,6 +10,7 @@ import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFir
 import technicalDrawingHandler from "./api/technical-drawing.js";
 import approvedSnapshotHandler from "./api/approved-snapshot.js";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate.js";
+import publicProposalHandler from "./api/proposta.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -556,6 +557,7 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLi
 // 4. Technical Drawing AI Agent (/api/ai/technical-drawing)
 // ----------------------------------------------------
 app.post("/api/public/quote-estimate", (req, res) => publicQuoteEstimateHandler(req, res));
+app.all("/api/proposta", (req, res) => publicProposalHandler(req, res));
 
 app.post("/api/ai/technical-drawing",(req,res)=>technicalDrawingHandler(req,res));
 app.all("/api/approved-snapshot", (req, res) => approvedSnapshotHandler(req, res));

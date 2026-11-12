@@ -34,6 +34,7 @@ import { auth } from "../../firebase";
 import { db, storage } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
+import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 
 interface TechnicalDrawingModuleProps {
   senderConfig: SenderConfig;
@@ -280,6 +281,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const [projects, setProjects] = useState<Array<{id:string;name:string}>>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
+  const [supplierCatalog, setSupplierCatalog] = useState<Array<{ id: string; name: string; code?: string; supplier?: string; category?: string; price?: number; thumbnailDataUrl?: string; imageUrl?: string; lengthMm?: number }>>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
@@ -296,6 +298,62 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       setCatalogItems(snap.docs.map((item) => ({ id: item.id, ...item.data() })));
     }, (err) => console.warn("Firestore catalog load notice:", err));
   }, [authReady]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    return onSnapshot(collection(db, "supplier_catalog"), (snap) => {
+      setSupplierCatalog(snap.docs.map((item) => ({ id: item.id, ...item.data() } as typeof supplierCatalog[number])));
+    }, (err) => {
+      console.error("Supplier catalog load failed in technical drawing module:", err);
+      showToast("Não foi possível carregar o catálogo de fornecedores para o orçamento CAD.", "error");
+    });
+  }, [authReady, showToast]);
+
+  const updateBudget = (change: (budget: NonNullable<TechnicalDrawing["budget"]>) => NonNullable<TechnicalDrawing["budget"]>) => {
+    setDrawing((current) => {
+      const currentBudget = current.budget || { currency: "BRL", items: [], subtotal: 0, labor: 0, total: 0 };
+      const next = change(currentBudget);
+      const subtotal = Number(next.items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0).toFixed(2));
+      const labor = Math.max(0, Number(next.labor || 0));
+      const marginRate = Math.max(0, Number(next.marginRate || 0));
+      const margin = Number(((subtotal + labor) * marginRate / 100).toFixed(2));
+      const freight = Math.max(0, Number(next.freight || 0));
+      const taxRate = Math.max(0, Number(next.taxRate || 0));
+      const taxAmount = Number(((subtotal + labor + margin + freight) * taxRate / 100).toFixed(2));
+      return { ...current, budget: { ...next, subtotal, labor, marginRate, margin, freight, taxRate, taxAmount, total: Number((subtotal + labor + margin + freight + taxAmount).toFixed(2)) } };
+    });
+  };
+
+  const updateBudgetItem = (itemId: string, field: "description" | "sku" | "quantity" | "unitPrice" | "cutLengthMm", value: string) => {
+    updateBudget((budget) => ({
+      ...budget,
+      items: budget.items.map((item) => item.id === itemId ? { ...item, [field]: ["quantity", "unitPrice", "cutLengthMm"].includes(field) ? Number(value) || 0 : value } : item),
+    }));
+  };
+
+  const addSupplierBudgetItem = (productId: string) => {
+    const product = supplierCatalog.find((item) => item.id === productId);
+    if (!product) return;
+    if (drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") {
+      showToast("Desenho aprovado: duplique o projeto para alterar o orçamento.", "warning");
+      return;
+    }
+    updateBudget((budget) => ({
+      ...budget,
+      items: [...budget.items, {
+        id: `catalog-${product.id}-${Date.now()}`,
+        catalogItemId: product.id,
+        sku: product.code || "",
+        description: product.name,
+        quantity: 1,
+        unitPrice: Number(product.price || 0),
+        subtotal: Number(product.price || 0),
+        cutLengthMm: Number(product.lengthMm || 0),
+        imageUrl: product.thumbnailDataUrl || product.imageUrl || "",
+        priceSource: "supplier_catalog",
+      }],
+    }));
+  };
 
   // Load saved drawings from Firestore
   useEffect(() => {
@@ -548,6 +606,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         unit: responseBody.unit === "mm" ? "mm" : "cm",
         overallDimensions: { width, height, depth: depth > 0 ? depth : undefined },
         pieces: responseBody.pieces,
+        ...(responseBody.parametricSpec ? { parametricSpec: responseBody.parametricSpec } : {}),
         visualElements: Array.isArray(responseBody.visualElements) ? responseBody.visualElements : [],
         ...(responseBody.vectorPayload ? { vectorPayload: responseBody.vectorPayload } as any : {}),
         modelDescription: responseBody.modelDescription || "",
@@ -579,7 +638,17 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       }
     } catch (error) {
       console.error("Falha na geração do desenho técnico:", error);
-      generated = buildLocalTechnicalDrawing(inputPrompt);
+      if (isAluminumPrompt(inputPrompt)) {
+        const spec = localParametricSpec(inputPrompt);
+        if (spec.largura_mm <= 0 || spec.altura_mm <= 0) {
+          showToast((error as Error).message || "Informe largura e altura para gerar o desenho paramétrico.", "error");
+          setIsLoading(false);
+          return;
+        }
+        generated = buildParametricDrawing(spec, inputPrompt, supplierCatalog);
+      } else {
+        generated = buildLocalTechnicalDrawing(inputPrompt);
+      }
       generationWarning = true;
     }
 
@@ -652,29 +721,24 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   return (
     <div className="space-y-6">
-      {/* Module Title Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl backdrop-blur">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-5">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20">
-            <Compass className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+            <Compass className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                Módulo Arquitectónico CAD
-              </span>
-              <span className="text-[10px] font-mono text-slate-400">Gemini 2.5 Industrial Engine</span>
               {drawing.pdfDataUri && (
-                <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3 text-emerald-400" />
-                  PDF armazenado ({drawing.pdfFileSizeKb || 40} KB)
+                <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  PDF armazenado
                 </span>
               )}
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mt-1">
-              Desenho Técnico e Lista de Componentes Inteligente
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-1">
+              Projeto CAD
             </h1>            {(drawing as any).isDraft !== false && drawing.status !== "APPROVED_FOR_MANUFACTURING" && (
-              <div role="alert" className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] font-black tracking-wide text-amber-300">
+              <div role="alert" className="mt-2 inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
                 <AlertCircle className="h-4 w-4" />
                 {(drawing as any).draftLabel || "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN"}
               </div>
@@ -684,52 +748,30 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => handleOpenDrawingPdf()}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 text-xs font-bold rounded-xl transition border border-amber-500/40 shadow-sm"
-          >
-            <Eye className="w-4 h-4 text-amber-400" />
-            Pré-visualizar PDF
-          </button>
-          {!drawing.approvedSnapshotId && (
-            <button
-              onClick={handleApproveDrawing}
-              disabled={isSaving || !drawing.pieces?.length || drawing.isDraft === false || drawing.id === "draw-sample-01"}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-black rounded-xl transition"
-            >
-              <CheckCircle className="w-4 h-4" /> Aprovar para fabricação
-            </button>
-          )}
-          {drawing.approvedSnapshotId && <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase text-emerald-300">APROVADO · SNAPSHOT IMUTÁVEL</span>}
-          <button
             onClick={() => handleSaveDrawing()}
             disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
           >
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Save className="w-4 h-4 text-amber-400" />}
-            Salvar desenho
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Salvar Projeto
           </button>
-          <button
-            onClick={handleExportDxf}
-            disabled={!Array.isArray((drawing as any).visualElements) || !(drawing as any).visualElements.length}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
-          >
-            <Download className="w-4 h-4" />
-            Exportar DXF
-          </button>
-          <button
-            onClick={handleExportPdf}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-lg shadow-amber-500/20"
-          >
-            <Download className="w-4 h-4" />
-            Baixar PDF
-          </button>
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Ações ▾</summary>
+            <div className="absolute right-0 z-30 mt-2 grid min-w-56 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              <button type="button" onClick={() => handleOpenDrawingPdf()} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Eye className="h-4 w-4" />Pré-visualizar PDF</button>
+              {!drawing.approvedSnapshotId && <button type="button" onClick={handleApproveDrawing} disabled={isSaving || !drawing.pieces?.length || drawing.isDraft === false || drawing.id === "draw-sample-01"} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-200 dark:hover:bg-slate-800"><CheckCircle className="h-4 w-4" />Aprovar para fabricação</button>}
+              <button type="button" onClick={handleExportDxf} disabled={!Array.isArray((drawing as any).visualElements) || !(drawing as any).visualElements.length} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40 dark:text-slate-200 dark:hover:bg-slate-800"><Download className="h-4 w-4" />Exportar DXF</button>
+              <button type="button" onClick={handleExportPdf} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Download className="h-4 w-4" />Baixar PDF</button>
+            </div>
+          </details>
+          {drawing.approvedSnapshotId && <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-semibold uppercase text-emerald-700">Aprovado</span>}
         </div>
       </div>
 
       {/* Two-Panel Layout: Left = Chat / Controls; Right = Scalable SVG Canvas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT PANEL: Chat / Instructions / Step by Step (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:order-2 lg:col-span-5 space-y-6">
           {/* Natural Language Prompt Box */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl">
             <div className="flex items-center justify-between mb-3">
@@ -913,24 +955,50 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 <h3 className="text-xs font-black uppercase tracking-wider text-emerald-300">Orçamento de materiais</h3>
                 <span className="text-sm font-black text-emerald-300">{drawing.budget.currency} {drawing.budget.total.toFixed(2)}</span>
               </div>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {drawing.budget.items.map((item, index) => (
-                  <div key={item.id || index} className="flex justify-between gap-3 text-[11px] text-slate-300">
-                    <span className="truncate">{item.description} ({item.quantity} × {item.unitPrice.toFixed(2)})</span>
-                    <span className="font-mono text-emerald-300">{item.subtotal.toFixed(2)}</span>
-                  </div>
-                ))}
+              <label className="block text-[11px] font-semibold text-slate-400">Adicionar item do catálogo de fornecedores
+                <select disabled={Boolean(drawing.approvedSnapshotId)} defaultValue="" onChange={(event) => { addSupplierBudgetItem(event.target.value); event.currentTarget.value = ""; }} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-xs text-white disabled:opacity-50">
+                  <option value="">Selecionar produto...</option>
+                  {supplierCatalog.map((product) => <option key={product.id} value={product.id}>{product.code ? `${product.code} · ` : ""}{product.name} · R$ {Number(product.price || 0).toFixed(2)}</option>)}
+                </select>
+              </label>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-[11px] text-slate-300">
+                  <thead><tr className="border-b border-slate-700 text-[9px] uppercase text-slate-500"><th className="p-2">Item</th><th className="p-2">Código</th><th className="p-2">Corte (mm)</th><th className="p-2">Qtd.</th><th className="p-2">Preço unit.</th><th className="p-2">Subtotal</th></tr></thead>
+                  <tbody>{drawing.budget.items.map((item, index) => (
+                    <tr key={item.id || index} className="border-b border-slate-800">
+                      <td className="p-2"><div className="flex items-center gap-2">{item.imageUrl && <img src={item.imageUrl} alt="" className="h-10 w-10 rounded bg-white object-contain" />}<input disabled={Boolean(drawing.approvedSnapshotId)} value={item.description} onChange={(event) => updateBudgetItem(item.id || `budget-${index}`, "description", event.target.value)} className="w-40 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-white disabled:opacity-60" /></div></td>
+                      <td className="p-2"><input disabled={Boolean(drawing.approvedSnapshotId)} value={item.sku || ""} onChange={(event) => updateBudgetItem(item.id || `budget-${index}`, "sku", event.target.value)} className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-white disabled:opacity-60" /></td>
+                      <td className="p-2"><input disabled={Boolean(drawing.approvedSnapshotId)} type="number" min="0" value={item.cutLengthMm || 0} onChange={(event) => updateBudgetItem(item.id || `budget-${index}`, "cutLengthMm", event.target.value)} className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-white disabled:opacity-60" /></td>
+                      <td className="p-2"><input disabled={Boolean(drawing.approvedSnapshotId)} type="number" min="0" step="1" value={item.quantity} onChange={(event) => updateBudgetItem(item.id || `budget-${index}`, "quantity", event.target.value)} className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-white disabled:opacity-60" /></td>
+                      <td className="p-2"><input disabled={Boolean(drawing.approvedSnapshotId)} type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateBudgetItem(item.id || `budget-${index}`, "unitPrice", event.target.value)} className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-white disabled:opacity-60" /></td>
+                      <td className="p-2 font-mono text-emerald-300">R$ {(Number(item.quantity || 0) * Number(item.unitPrice || 0)).toFixed(2)}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
               </div>
-              <div className="border-t border-slate-800 pt-2 flex justify-between text-[11px] font-bold text-slate-300">
-                <span>Materiais + mão de obra</span><span>{drawing.budget.total.toFixed(2)} {drawing.budget.currency}</span>
+              <div className="grid gap-2 border-t border-slate-800 pt-3 sm:grid-cols-2">
+                {([
+                  ["Mão de Obra (R$)", "labor"],
+                  ["Margem (%)", "marginRate"],
+                  ["Impostos / IVA (%)", "taxRate"],
+                  ["Frete (R$)", "freight"],
+                ] as const).map(([label, field]) => <label key={field} className="text-[10px] font-semibold text-slate-400">{label}<input disabled={Boolean(drawing.approvedSnapshotId)} type="number" min="0" step="0.01" value={drawing.budget?.[field] || 0} onChange={(event) => updateBudget((budget) => ({ ...budget, [field]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-xs text-white disabled:opacity-60" /></label>)}
+              </div>
+              <div className="space-y-1 border-t border-slate-800 pt-2 text-[11px] text-slate-300">
+                <p className="flex justify-between"><span>Materiais + mão de obra</span><span>R$ {(drawing.budget.subtotal + drawing.budget.labor).toFixed(2)}</span></p>
+                <p className="flex justify-between"><span>Margem calculada</span><span>R$ {Number(drawing.budget.margin || 0).toFixed(2)}</span></p>
+                <p className="flex justify-between"><span>Impostos</span><span>R$ {Number(drawing.budget.taxAmount || 0).toFixed(2)}</span></p>
+                <p className="flex justify-between"><span>Frete</span><span>R$ {Number(drawing.budget.freight || 0).toFixed(2)}</span></p>
+                <p className="flex justify-between border-t border-slate-800 pt-2 text-sm font-black text-emerald-300"><span>Total</span><span>R$ {drawing.budget.total.toFixed(2)}</span></p>
               </div>
               {drawing.budget.notes && <p className="text-[10px] text-slate-500">{drawing.budget.notes}</p>}
+              <button type="button" onClick={async () => { const saved = await handleSaveDrawing(); if (saved) await handleExportPdf(); }} disabled={isSaving || Boolean(drawing.approvedSnapshotId)} className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">{isSaving ? "Salvando..." : "Guardar Projeto e Gerar Orçamento PDF"}</button>
             </div>
           )}
         </div>
 
         {/* RIGHT PANEL: Scalable SVG Canvas (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:order-1 lg:col-span-7 space-y-4">
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-2xl flex flex-col h-[680px]">
             {/* Header info bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-2 mb-2 border-b border-slate-800/80">

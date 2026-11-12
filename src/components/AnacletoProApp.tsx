@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Building, Calendar, ChevronRight, Compass, ExternalLink, Factory, FileCheck, FileText, Globe, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Shield, ShieldCheck, Sparkles, Sun, Wallet, X, Palette, Headset, Truck } from "lucide-react";
+import { Compass, ExternalLink, Factory, FileText, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Sun, Wallet, X } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
@@ -162,168 +162,127 @@ export default function AnacletoProApp({
     return () => unsub();
   }, [authReady]);
 
-  // Navegação organizada como no fluxo de trabalho de esquadrias.
-  const [cadastrosOpen, setCadastrosOpen] = useState(true);
-  const [gestaoOpen, setGestaoOpen] = useState(true);
-  const homeItems = [
-    { id: "dashboard" as NavigationTab, label: "Início", icon: LayoutDashboard, badge: null },
+  const navigationSections: Array<{
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    tabs: Array<{ id: NavigationTab; label: string }>;
+  }> = [
+    { id: "home", label: "Início", icon: LayoutDashboard, tabs: [{ id: "dashboard", label: "Painel" }] },
+    { id: "commercial", label: "Comercial", icon: FileText, tabs: [
+      { id: "quotes", label: "Orçamentos & Propostas" },
+      { id: "crm", label: "Clientes (CRM)" },
+      { id: "contracts", label: "Contratos" },
+    ] },
+    { id: "projects", label: "Projetos & Oficina CAD", icon: Compass, tabs: [
+      { id: "projects", label: "Projetos" },
+      { id: "technical_drawing", label: "Oficina CAD" },
+    ] },
+    { id: "production", label: "Produção & Obras", icon: Factory, tabs: [
+      { id: "production", label: "Ordens de Produção & Corte" },
+      { id: "deliveries", label: "Entregas e Instalações" },
+      { id: "agenda", label: "Agenda de Medição" },
+      { id: "post_sale", label: "Qualidade & Pós-venda" },
+      { id: "materials", label: "Materiais de Produção" },
+    ] },
+    { id: "catalog", label: "Catálogo & Estoque", icon: Package, tabs: [
+      { id: "cadastro_items", label: "Catálogo de Fornecedores" },
+      { id: "catalog", label: "Catálogo" },
+      { id: "products", label: "Produtos & Tipologias" },
+      { id: "tipologias", label: "Modelos de Esquadrias" },
+      { id: "services", label: "Serviços" },
+      { id: "inventory", label: "Estoque" },
+      { id: "payment_methods", label: "Meios de Pagamento" },
+    ] },
+    { id: "finance", label: "Financeiro & Relatórios", icon: Wallet, tabs: [
+      { id: "finance", label: "Financeiro" },
+      { id: "reports", label: "Relatórios" },
+      { id: "invoices", label: "Notas Fiscais" },
+      { id: "financial_ai", label: "Assistente Financeiro" },
+    ] },
   ];
-  const cadastroItems = [
-    { id: "crm" as NavigationTab, label: "Clientes", icon: Building, badge: companies.length },
-    { id: "cadastro_items" as NavigationTab, label: "Materiais e Componentes", icon: Package, badge: null },
-    { id: "products" as NavigationTab, label: "Produtos", icon: Package, badge: null },
-
-    { id: "services" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
+  const settingTabOptions: Array<{ id: NavigationTab; label: string }> = [
+    { id: "settings", label: "Configurações" },
+    { id: "admin", label: "Equipe & Roles" },
+    { id: "theme", label: "Aparência" },
+    { id: "profile", label: "Meu Perfil" },
+    { id: "suggestions", label: "Sugestões" },
   ];
-  const gestaoItems = [
-    { id: "quotes" as NavigationTab, label: "Orçamentos", icon: FileText, badge: quotes.length },
-    { id: "contracts" as NavigationTab, label: "Contratos", icon: FileCheck, badge: null },
-    { id: "materials" as NavigationTab, label: "Materiais de Produção", icon: Package, badge: null },
-    { id: "production" as NavigationTab, label: "Ordens de Produção", icon: Factory, badge: null },
-    { id: "deliveries" as NavigationTab, label: "Entregas e Instalações", icon: Truck, badge: null },
-    { id: "post_sale" as NavigationTab, label: "Qualidade e Pós-venda", icon: Headset, badge: null },
-  ];
-
-  const visibleGestaoItems = gestaoItems.filter((item) => isFullMenuRole || hasAccessToTab(effectiveRole, item.id as RoleNavTab));
-  const utilityItems = [
-    { id: "reports" as NavigationTab, label: "Relatórios de Vendas e Custos", icon: Wallet, badge: "BI" },
-    { id: "projects" as NavigationTab, label: "Projetos", icon: Compass, badge: null },
-    { id: "inventory" as NavigationTab, label: "Estoque e Almoxarifado", icon: Package, badge: null },
-    { id: "agenda" as NavigationTab, label: "Agenda", icon: Calendar, badge: null },
-    { id: "finance" as NavigationTab, label: "Financeiro", icon: Wallet, badge: null },
-    { id: "financial_ai" as NavigationTab, label: "Assistente Financeiro", icon: Sparkles, badge: "NOVO" },
-    { id: "admin" as NavigationTab, label: "Administração", icon: Shield, badge: roleConfig.canManageUsers ? "ROLES" : null },
-    { id: "suggestions" as NavigationTab, label: "Sugestões", icon: Sparkles, badge: null },
-    { id: "theme" as NavigationTab, label: "Aparência", icon: Palette, badge: null },
-    { id: "profile" as NavigationTab, label: "Meu Perfil", icon: Building, badge: null },
-    { id: "settings" as NavigationTab, label: "Configurações", icon: Settings, badge: null },
-  ].filter((item) => item.id === "admin" ? roleConfig.canManageUsers : hasAccessToTab(effectiveRole, item.id as RoleNavTab));
+  const settingsTabs = settingTabOptions.filter((tab) => tab.id !== "admin" || roleConfig.canManageUsers)
+    .filter((tab) => canSeeNavigation(tab.id));
+  const sectionForTab = (tab: NavigationTab) => {
+    if (["settings", "admin", "theme", "profile", "suggestions"].includes(tab)) return "settings";
+    return navigationSections.find((section) => section.tabs.some((item) => item.id === tab))?.id || "home";
+  };
+  const activeSectionId = sectionForTab(activeTab);
+  const activeSection = navigationSections.find((section) => section.id === activeSectionId);
+  const activeSectionTabs = activeSection?.tabs.filter((tab) => canSeeNavigation(tab.id)) || settingsTabs;
+  const selectNavigationTab = (tab: NavigationTab) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+  };
 
   const handleSelectCompanyForQuote = (comp: Company) => {
     setActiveTab("quotes");
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 dark:bg-[#101827] dark:text-slate-100 flex flex-col lg:flex-row font-sans">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 dark:bg-[#101827] dark:text-slate-100 flex flex-col lg:flex-row font-sans">
       {/* Mobile Header */}
-      <div className="lg:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
+      <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => logoInputRef.current?.click()} className="w-14 h-9 rounded-lg bg-slate-950 border border-amber-500/30 flex items-center justify-center overflow-hidden p-0.5" title="Alterar logotipo">{customLogo ? <img src={customLogo} alt="Logotipo" className="w-full h-full object-contain" /> : <img src={logoImg} alt="Anacleto Esquadrias" className="w-full h-full object-contain" />}</button>
+          <button type="button" onClick={() => logoInputRef.current?.click()} className="w-14 h-9 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden p-0.5" title="Alterar logotipo">{customLogo ? <img src={customLogo} alt="Logotipo" className="w-full h-full object-contain" /> : <img src={logoImg} alt="Anacleto Esquadrias" className="w-full h-full object-contain" />}</button>
           <div>
-            <h1 className="text-sm font-black text-white tracking-widest uppercase">ANACLETO ESQUADRIAS</h1>
-            <p className="text-[9px] text-amber-400 font-mono">Vidraçaria e esquadrias de alumínio</p>
+            <h1 className="text-sm font-bold text-slate-900 tracking-wide uppercase">ANACLETO ESQUADRIAS</h1>
           </div>
         </div>
 
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 text-slate-300 hover:text-white rounded-lg bg-slate-800"
+          aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+          className="p-2 text-slate-600 hover:text-slate-900 rounded-lg border border-slate-200"
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
+      {mobileMenuOpen && <button aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-30 bg-slate-950/30 lg:hidden" />}
+
       {/* SIDEBAR (Desktop & Mobile Drawer) */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarCollapsed ? "lg:w-[88px]" : "lg:w-72"} w-72 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col justify-between transition-all duration-300 ${
+        className={`fixed lg:sticky top-0 left-0 h-screen ${sidebarCollapsed ? "lg:w-[76px]" : "lg:w-64"} w-72 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 z-50 flex flex-col justify-between transition-all duration-300 ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
         <div className="p-4 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
-          <div className={`hidden lg:flex ${sidebarCollapsed ? "justify-center" : "justify-end"}`}><button onClick={() => setSidebarCollapsed(v => !v)} className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-blue-50 hover:text-blue-700 transition" title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}><Menu className="h-4 w-4"/></button></div>
-          {/* Brand Logo & Title */}
-          <div className={`flex items-center gap-3.5 pb-6 border-b border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
-            <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="group relative w-24 h-16 shrink-0 rounded-xl overflow-hidden bg-slate-950 border border-amber-500/30 p-1 shadow-lg shadow-amber-500/10 flex items-center justify-center">
-              <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[14px] flex items-center justify-center overflow-hidden">
-                {customLogo ? <img src={customLogo} alt="Logotipo personalizado" className="h-full w-full object-contain" /> : <img src={logoImg} alt="Anacleto" className="h-full w-full object-contain" />}
-              </div><span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/60 text-[9px] font-bold text-white">ALTERAR</span>
+          <div className={`flex items-center gap-3 pb-5 border-b border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
+            <button type="button" onClick={() => logoInputRef.current?.click()} title="Alterar logotipo" className="w-11 h-11 shrink-0 rounded-xl overflow-hidden border border-slate-200 p-1 flex items-center justify-center">
+              {customLogo ? <img src={customLogo} alt="Logotipo personalizado" className="h-full w-full object-contain" /> : <img src={logoImg} alt="Anacleto" className="h-full w-full object-contain" />}
             </button>
             <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" aria-label="Enviar logotipo" />
-            {!sidebarCollapsed && <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-base font-black tracking-[0.12em] text-slate-900 dark:text-white uppercase">ANACLETO ESQUADRIAS</h1>
-                <span className="px-1.5 py-0.2 bg-amber-500 text-slate-950 font-black text-[9px] rounded-md tracking-wider">
-                  PRO
-                </span>
-              </div>
-              <p className="text-[9px] text-slate-400 tracking-wider font-mono uppercase mt-0.5">
-                Orçamentos • Desenhos • Faturas
-              </p>
-            </div>}
+            {!sidebarCollapsed && <span className="text-xs font-bold tracking-wide text-slate-800 dark:text-white">ANACLETO ESQUADRIAS</span>}
           </div>
 
-          {/* Navigation grouped by the user's reference screenshots */}
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              {!sidebarCollapsed && <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 px-3 block mb-2">Principal</span>}
-              {homeItems.filter((item) => canSeeNavigation(item.id)).map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-3 rounded-2xl text-xs font-bold transition ${isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-600 dark:text-slate-300 hover:text-blue-700 dark:hover:text-white hover:bg-blue-50 dark:hover:bg-slate-900"}`}>
-                  <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}><Icon className={`w-5 h-5 shrink-0 ${isActive ? "text-white" : "text-blue-500"}`} />{!sidebarCollapsed && <span>{item.label}</span>}</span>
-                </button>;
-              })}
-            </div>
-            <div className="space-y-1">
-              {!sidebarCollapsed && <button onClick={() => setCadastrosOpen(!cadastrosOpen)} aria-expanded={cadastrosOpen}
-                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-blue-700">
-                <span>Cadastros</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${cadastrosOpen ? "rotate-90" : ""}`} />
-              </button>}
-              {(sidebarCollapsed || cadastrosOpen) && cadastroItems.filter((item) => canSeeNavigation(item.id)).map((item, index) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-600/10 dark:text-blue-300 dark:border-blue-500/20" : "text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900"}`}>
-                  <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}><Icon className="w-5 h-5 shrink-0 text-blue-500" />{!sidebarCollapsed && <span>{item.label}</span>}</span>
-                  {!sidebarCollapsed && item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{item.badge}</span>}
-                </button>;
-              })}
-            </div>
-            <div className="space-y-1">
-              {!sidebarCollapsed && <button onClick={() => setGestaoOpen(!gestaoOpen)} aria-expanded={gestaoOpen}
-                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-blue-700">
-                <span>Gestão</span><ChevronRight className={`w-3.5 h-3.5 transition-transform ${gestaoOpen ? "rotate-90" : ""}`} />
-              </button>}
-              {(sidebarCollapsed || gestaoOpen) && visibleGestaoItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-600/10 dark:text-blue-300 dark:border-blue-500/20" : "text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900"}`}>
-                  <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}><Icon className="w-5 h-5 shrink-0 text-blue-500" />{!sidebarCollapsed && <span>{item.label}</span>}</span>
-                  {!sidebarCollapsed && item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{item.badge}</span>}
-                </button>;
-              })}
-            </div>
-            <div className={`space-y-1 pt-2 border-t border-slate-200 dark:border-slate-800 ${sidebarCollapsed ? "mt-2" : ""}`}>
-              {utilityItems.filter((item) => canSeeNavigation(item.id)).map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return <button key={item.label} onClick={() => { setActiveTab(item.id); setMobileMenuOpen(false); }}
-                  title={item.label} aria-label={item.label} className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "justify-between px-3.5"} py-2.5 rounded-xl text-xs font-semibold transition ${isActive ? "bg-blue-100 text-blue-800 dark:bg-blue-600/10 dark:text-blue-300" : "text-slate-500 hover:text-blue-700 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-900"}`}>
-                  <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}><Icon className="w-5 h-5 shrink-0 text-blue-500" />{!sidebarCollapsed && <span>{item.label}</span>}</span>
-                  {!sidebarCollapsed && item.badge !== null && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{item.badge}</span>}
-                </button>;
-              })}
-            </div>
-          </div>
-
-          {/* Quick AI CAD Promotion Pill */}
-          {!sidebarCollapsed && <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-yellow-50 border border-blue-100 dark:from-blue-950 dark:via-slate-900 dark:to-slate-900 dark:border-blue-900 space-y-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-[10px] font-black uppercase text-blue-600 dark:text-amber-400 tracking-wider">
-                Motor Gemini 3.8 Flash
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-tight">
-              Genera dibujos 2D y despiece tipo puzzle con cotas en milisegundos.
-            </p>
-          </div>}
+          <nav aria-label="Navegação principal" className="space-y-1">
+            {navigationSections.filter((section) => section.tabs.some((tab) => canSeeNavigation(tab.id))).map((section) => {
+              const Icon = section.icon;
+              const selected = activeSectionId === section.id;
+              const firstTab = section.tabs.find((tab) => canSeeNavigation(tab.id));
+              if (!firstTab) return null;
+              return <button key={section.id} type="button" onClick={() => selectNavigationTab(firstTab.id)} title={section.label} aria-label={section.label} aria-current={selected ? "page" : undefined}
+                className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl text-sm font-medium transition ${selected ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900"}`}>
+                <Icon className="h-5 w-5 shrink-0" />{!sidebarCollapsed && <span className="truncate">{section.label}</span>}
+              </button>;
+            })}
+          </nav>
         </div>
 
         {/* Sidebar Footer */}
         <div className={`p-3 border-t border-slate-200 dark:border-slate-800 space-y-2 ${sidebarCollapsed ? "flex flex-col items-center" : ""}`}>
+          {settingsTabs.length > 0 && <button type="button" onClick={() => selectNavigationTab(settingsTabs[0].id)} title="Configurações, equipe e perfil" aria-label="Configurações, equipe e perfil"
+            className={`flex items-center justify-center rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 ${sidebarCollapsed ? "w-11" : "w-11"} ${activeSectionId === "settings" ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : ""}`}>
+            <Settings className="h-5 w-5 shrink-0" />
+          </button>}
           {onSwitchToPublicLanding && (
             <button
               onClick={onSwitchToPublicLanding}
@@ -333,7 +292,6 @@ export default function AnacletoProApp({
             </button>
           )}
 
-          {/* Selector de idioma */}
           <button
             onClick={toggleThemeQuick}
             className="p-2.5 rounded-xl bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 hover:bg-blue-100 dark:hover:bg-slate-700 transition"
@@ -357,6 +315,10 @@ export default function AnacletoProApp({
             </div>
           )}
 
+          <button type="button" onClick={() => setSidebarCollapsed((value) => !value)} className="hidden lg:flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 p-2 text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900" title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}>
+            <Menu className="h-4 w-4" />{!sidebarCollapsed && "Recolher menu"}
+          </button>
+
           {onLogout && (
             <button
               onClick={onLogout}
@@ -369,8 +331,18 @@ export default function AnacletoProApp({
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-50 dark:bg-[#101827]">
+      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-[#f8fafc] dark:bg-[#101827]">
         <div className="max-w-7xl mx-auto rounded-[28px]">
+          {activeSectionTabs.length > 1 && (
+            <nav aria-label={`Abas de ${activeSection?.label || "configurações"}`} className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
+              {activeSectionTabs.map((tab) => (
+                <button key={tab.id} type="button" onClick={() => selectNavigationTab(tab.id)} aria-current={activeTab === tab.id ? "page" : undefined}
+                  className={`shrink-0 border-b-2 px-3 py-3 text-sm font-medium transition ${activeTab === tab.id ? "border-blue-600 text-blue-700 dark:text-blue-300" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          )}
           {activeTab === "reports" && <BusinessWorkspace kind="reports" quotes={quotes} invoices={invoices} />}
           {activeTab === "tipologias" && <BusinessWorkspace kind="tipologias" />}
           {activeTab === "projects" && <ProjectEngineeringModule language={language} senderConfig={senderConfig} />}
@@ -380,9 +352,13 @@ export default function AnacletoProApp({
             <DashboardOverview
               quotes={quotes}
               invoices={invoices}
-              companies={companies}
               drawings={drawings}
               senderConfig={senderConfig}
+              canViewFinance={canSeeNavigation("finance")}
+              canViewProduction={canSeeNavigation("production")}
+              canViewInvoices={canSeeNavigation("invoices")}
+              canViewQuotes={canSeeNavigation("quotes")}
+              canViewDrawings={canSeeNavigation("technical_drawing")}
               onNavigateTab={(tab) => setActiveTab(tab)}
             />
           )}
@@ -425,7 +401,7 @@ export default function AnacletoProApp({
         {activeTab === "deliveries" && <DeliveryModule />}
         {activeTab === "post_sale" && <PostSaleModule />}
 
-         {activeTab === "finance" && (<FinanceModule language={language} />)}
+         {activeTab === "finance" && (<FinanceModule language={language} senderConfig={senderConfig} canManageFinance={["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(effectiveRole)} />)}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={effectiveRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI language={language} />)}

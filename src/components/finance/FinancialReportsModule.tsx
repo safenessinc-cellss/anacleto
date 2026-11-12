@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { Download, Printer, TrendingDown, TrendingUp, Wallet, Clock, FileText } from "lucide-react";
+import { jsPDF } from "jspdf";
 
 type ModuleName = "Caixa" | "Vendas" | "Compras" | "Folha" | "Contas a receber" | "Contas a pagar";
 type Row = {
@@ -86,6 +87,30 @@ export default function FinancialReportsModule(){
     const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"}));
     const a=document.createElement("a");a.href=url;a.download="relatorio-financeiro-"+from+"-a-"+to+".csv";a.click();URL.revokeObjectURL(url);
   };
+  const exportPdf=()=>{
+    const pdf=new jsPDF({orientation:"landscape"});
+    pdf.setFontSize(18);pdf.text("Relatório Financeiro · Anacleto",14,18);
+    pdf.setFontSize(10);pdf.text(`Período: ${from} a ${to} · Registros: ${filtered.length}`,14,26);
+    pdf.text(`Entradas em caixa: ${money(incoming)} · Saídas: ${money(outgoing)} · Saldo: ${money(incoming-outgoing)}`,14,33);
+    let y=45;
+    const header=["Data","Módulo","Natureza","Descrição / parte","Cliente / fornecedor","Valor","Status"];
+    const widths=[22,28,30,73,45,28,30];
+    const drawRow=(values:string[],bold=false)=>{
+      let x=14;let maxHeight=5;
+      const wrapped=values.map((value,index)=>pdf.splitTextToSize(value,widths[index]-2));
+      maxHeight=Math.max(5,...wrapped.map(lines=>lines.length*4.5));
+      if(y+maxHeight>195){pdf.addPage();y=18;}
+      pdf.setFont("helvetica",bold?"bold":"normal");
+      wrapped.forEach((lines,index)=>{pdf.text(lines,x+1,y+4);x+=widths[index];});
+      pdf.setDrawColor(220);pdf.line(14,y+maxHeight,270,y+maxHeight);y+=maxHeight;
+    };
+    drawRow(header,true);
+    filtered.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(row=>drawRow([
+      row.date,row.module,row.kind==="cash"?"Caixa":row.kind==="receivable"?"A receber":row.kind==="payable"?"A pagar":"Nota fiscal",
+      row.description,row.party,money(row.amount),row.status,
+    ]));
+    pdf.save(`relatorio-financeiro-${from}-a-${to}.pdf`);
+  };
   return <div className="space-y-5">
     <header><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Análise financeira · Brasil (R$)</p><h2 className="text-2xl font-black">Relatório financeiro por módulos</h2><p className="text-sm text-slate-500">Entradas e saídas efetivas aparecem no Caixa. Notas fiscais de compras ficam no módulo Compras como custo registrado; boletos ficam em Contas a Pagar. Assim, a nota fiscal não é somada novamente como se fosse um pagamento.</p></header>
     {error&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{error}</div>}
@@ -94,7 +119,7 @@ export default function FinancialReportsModule(){
       <label className="text-xs font-semibold text-slate-500">Data final<input type="date" value={to} onChange={e=>setTo(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
       <label className="text-xs font-semibold text-slate-500">Módulo<select value={module} onChange={e=>setModule(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"><option value="all">Todos os módulos</option>{["Caixa","Vendas","Compras","Folha","Contas a receber","Contas a pagar"].map(v=><option key={v} value={v}>{v}</option>)}</select></label>
       <label className="text-xs font-semibold text-slate-500">Movimentação<select value={direction} onChange={e=>setDirection(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"><option value="all">Entradas e saídas</option><option value="in">Entradas</option><option value="out">Saídas</option></select></label>
-      <div className="flex items-end gap-2"><button onClick={()=>window.print()} className="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-bold"><Printer className="h-4 w-4"/> PDF</button><button onClick={download} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white"><Download className="h-4 w-4"/> CSV</button></div>
+      <div className="flex items-end gap-2"><button onClick={exportPdf} className="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-bold"><Printer className="h-4 w-4"/> PDF profissional</button><button onClick={download} className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold text-white"><Download className="h-4 w-4"/> CSV / Excel</button></div>
     </div>
     <div className="grid gap-3 sm:grid-cols-3">
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><TrendingUp className="mb-2 text-emerald-600"/><p className="text-xs text-slate-500">Entradas efetivas (caixa)</p><strong className="text-xl">{money(incoming)}</strong></div>

@@ -201,7 +201,7 @@ export default function DrawingSvgCanvas({
           const opacity = Math.max(0, Math.min(1, Number(element.opacity ?? 1)));
           const label = String(element.label || "");
           if (type === "line") return <g key={element.id || index} opacity={opacity}>
-            <line x1={x + Number(element.x1 || 0) * w / 1000} y1={y + Number(element.y1 || 0) * h / 1000} x2={x + Number(element.x2 || 0) * w / 1000} y2={y + Number(element.y2 || 0) * h / 1000} stroke={stroke} strokeWidth={sw} />
+            <line x1={x + Number(element.x1 || 0) * w / 1000} y1={y + Number(element.y1 || 0) * h / 1000} x2={x + Number(element.x2 || 0) * w / 1000} y2={y + Number(element.y2 || 0) * h / 1000} stroke={stroke} strokeWidth={sw} strokeDasharray={element.strokeDasharray || undefined} />
             {label && <text x={x + Number(element.x1 || 0) * w / 1000} y={y + Number(element.y1 || 0) * h / 1000 - 5} fill="#f8fafc" fontSize="10">{label}</text>}
           </g>;
           if (type === "circle") return <circle key={element.id || index} cx={x + Number(element.cx || 0) * w / 1000} cy={y + Number(element.cy || 0) * h / 1000} r={Math.max(1, Number(element.r) || 8) * Math.min(w, h) / 1000} fill={fill} stroke={stroke} strokeWidth={sw} opacity={opacity} />;
@@ -284,7 +284,7 @@ export default function DrawingSvgCanvas({
           </defs>
           <rect width="1000" height={canvasHeight} fill="url(#drawing-grid-large)"/>
           <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-            {currentStep === 1 && renderOverview()}
+            {currentStep === 1 && (drawing.parametricSpec ? renderFinal() : renderOverview())}
             {currentStep === 2 && renderParts()}
             {currentStep === 3 && renderCuts()}
             {currentStep === 4 && renderAssembly()}

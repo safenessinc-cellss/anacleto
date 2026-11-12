@@ -5,6 +5,7 @@ import { parseAIJson } from "../src/server/ai-json.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { recordAIAudit } from "../src/server/ai-audit.js";
 import { withDraftVectorWatermark } from "../src/server/drawing-vector.js";
+import { buildParametricDrawing, isAluminumPrompt, localParametricSpec, type AluminumTipologia, type ParametricWindowSpec } from "../src/utils/parametricCad.js";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
@@ -45,7 +46,23 @@ const drawingResponseSchema = {
   },
   required:["title","description","category","unit","overallDimensions","pieces","dimensionLines","assemblyInstructions","steps","measurementPlan","cuttingPlan","manufacturingSteps","modelDescription","finalAppearance","visualElements","qualityChecklist","assumptions"]
 };
-async function generateDrawingJson(options: { system: string; prompt: string; images?: URL[]; temperature: number; maxOutputTokens: number }) {
+const parametricResponseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    tipologia: { type: Type.STRING, enum: ["janela_correr", "porta_correr", "porta_giro", "porta_pivotante", "maxim_ar", "basculante", "box_banheiro"] },
+    linha_aluminio: { type: Type.STRING },
+    cor_perfil: { type: Type.STRING },
+    largura_mm: { type: Type.NUMBER },
+    altura_mm: { type: Type.NUMBER },
+    folhas: { type: Type.NUMBER },
+    modulo_fixo: { type: Type.BOOLEAN },
+    tipo_vidro: { type: Type.STRING },
+    espessura_mm: { type: Type.NUMBER },
+    abertura: { type: Type.STRING },
+  },
+  required: ["tipologia", "linha_aluminio", "cor_perfil", "largura_mm", "altura_mm", "folhas", "modulo_fixo", "tipo_vidro", "espessura_mm", "abertura"],
+};
+async function generateDrawingJson(options: { system: string; prompt: string; images?: URL[]; temperature: number; maxOutputTokens: number; responseSchema?: any }) {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
   if (apiKey) {
     const parts: any[] = [{ text: options.prompt }];
@@ -57,12 +74,13 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
       parts.push({ inlineData: { mimeType: response.headers.get("content-type") || "image/jpeg", data: Buffer.from(bytes).toString("base64") } });
     }
     const client = new GoogleGenAI({ apiKey });
+    const model = options.responseSchema === parametricResponseSchema ? "gemini-2.5-flash-lite" : "gemini-2.5-flash";
     const response = await client.models.generateContent({
-      model: "gemini-2.5-flash",
+      model,
       contents: [{ role: "user", parts }],
-      config: { systemInstruction: options.system, responseMimeType: "application/json", responseSchema: drawingResponseSchema, temperature: options.temperature, maxOutputTokens: options.maxOutputTokens }
+      config: { systemInstruction: options.system, responseMimeType: "application/json", responseSchema: options.responseSchema || drawingResponseSchema, temperature: options.temperature, maxOutputTokens: options.maxOutputTokens }
     });
-    return { text: response.text || "", usage: { inputTokens: response.usageMetadata?.promptTokenCount, outputTokens: response.usageMetadata?.candidatesTokenCount }, model: "gemini-2.5-flash" };
+    return { text: response.text || "", usage: { inputTokens: response.usageMetadata?.promptTokenCount, outputTokens: response.usageMetadata?.candidatesTokenCount }, model };
   }
   // Backward-compatible provider path. Runtime validation remains mandatory.
   const result = await generateText({
@@ -355,6 +373,57 @@ export default async function handler(req: any, res: any) {
     if (!allowRequest(user.uid)) {
       return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
     }
+    if (isAluminumPrompt(prompt)) {
+      stage = "parametric_spec_extraction";
+      const aiStartedAt = Date.now();
+      const system = `Extraia somente dados técnicos explícitos de uma esquadria de alumínio. Não calcule nem devolva coordenadas, linhas, geometrias, lista de peças ou orçamento. Devolva JSON estrito com exatamente as chaves tipologia, linha_aluminio, cor_perfil, largura_mm, altura_mm, folhas, modulo_fixo, tipo_vidro, espessura_mm, abertura. Tipologias permitidas: janela_correr, porta_correr, porta_giro, porta_pivotante, maxim_ar, basculante, box_banheiro. Converta dimensões explicitamente fornecidas para milímetros. Use valores vazios ou zero quando não forem informados; não invente linha, cor, tipo de vidro ou espessura. folhas deve ser 2/3/4 para correr e 1 para os demais. modulo_fixo é booleano.`;
+      const extracted = await generateDrawingJson({
+        system,
+        prompt: `${prompt}${drawingContext ? `\nContexto técnico existente: ${drawingContext}` : ""}`,
+        images: allowedImageUrls,
+        temperature: 0,
+        maxOutputTokens: 512,
+        responseSchema: parametricResponseSchema,
+      });
+      await recordAIAudit({
+        serviceName: "TECHNICAL_DRAWING",
+        modelUsed: extracted.model,
+        input: { prompt, mode: "parametric_spec_extraction", imageCount: allowedImageUrls.length },
+        output: extracted.text,
+        usage: extracted.usage as any,
+        actorUid,
+        requestId,
+        startedAt: aiStartedAt,
+        authorizationToken: String(req.headers?.authorization || "").replace(/^Bearer\s+/i, ""),
+      });
+      auditRecorded = true;
+      const spec = parseAIJson(extracted.text, (value: any): ParametricWindowSpec => {
+        const validTypes: AluminumTipologia[] = ["janela_correr", "porta_correr", "porta_giro", "porta_pivotante", "maxim_ar", "basculante", "box_banheiro"];
+        if (!value || Object.keys(value).some((key) => !parametricResponseSchema.required.includes(key)) ||
+            parametricResponseSchema.required.some((key) => !(key in value)) ||
+            !validTypes.includes(value.tipologia) || typeof value.linha_aluminio !== "string" ||
+            typeof value.cor_perfil !== "string" || !Number.isFinite(value.largura_mm) || value.largura_mm < 0 ||
+            !Number.isFinite(value.altura_mm) || value.altura_mm < 0 || !Number.isInteger(value.folhas) ||
+            typeof value.modulo_fixo !== "boolean" || typeof value.tipo_vidro !== "string" ||
+            !Number.isFinite(value.espessura_mm) || value.espessura_mm < 0 || typeof value.abertura !== "string") {
+          throw new Error("A extração não retornou o schema paramétrico de esquadrias válido.");
+        }
+        if ((value.tipologia === "janela_correr" && ![2, 3, 4].includes(value.folhas)) ||
+            (value.tipologia === "porta_correr" && ![2, 4].includes(value.folhas)) ||
+            (!["janela_correr", "porta_correr"].includes(value.tipologia) && value.folhas !== 1)) {
+          throw new Error("Quantidade de folhas incompatível com a tipologia.");
+        }
+        if (value.largura_mm > 20_000 || value.altura_mm > 20_000 || value.espessura_mm > 100) {
+          throw new Error("Dimensão extraída acima do limite seguro.");
+        }
+        return value;
+      });
+      if (spec.largura_mm <= 0 || spec.altura_mm <= 0) {
+        return json(res, 422, { error: "Informe largura e altura explícitas em milímetros para gerar o desenho paramétrico.", code: "DIMENSIONS_REQUIRED" });
+      }
+      const responseDrawing = withDraftVectorWatermark(buildParametricDrawing(spec, prompt, catalog));
+      return json(res, 200, responseDrawing);
+    }
     stage = "ai_generation";
     const system = `Você é o engenheiro de produto, projetista e especialista em fabricação da Anacleto Pro. Interprete a solicitação inteira, não apenas palavras-chave. Identifique produto, material, tipo de abertura/encaixe, quantidade de folhas/portas, divisões, posição dos componentes e todas as dimensões explicitamente informadas. Diferencie largura, altura e profundidade conforme o produto; para móveis, não confunda profundidade com altura. Preserve a unidade original e converta somente quando o usuário pedir. Se o usuário solicitar alteração de um desenho existente, modifique somente os pontos pedidos e preserve os demais dados e componentes existentes; não reinicie o projeto. Se for um novo projeto, não reutilize o desenho anterior. Nunca invente dimensões, perfis, ferragens, folgas, descontos, espessuras, tolerâncias, fórmulas ou ângulos. Se faltar informação necessária, mantenha o campo vazio/zero e registre pergunta/pendência em assumptions; não apresente suposições como medidas confirmadas. A lista de corte é preliminar até validar sistema, ferragens e tabelas oficiais do fabricante. Gere somente JSON válido, sem markdown, com: title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array), steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions), measurementPlan (array de {point,method,tool,checks}), cuttingPlan (array de {pieceNumber,name,material,quantity,length,width,thickness,unit,cutAngle,notes}), manufacturingSteps (array de {step,title,instructions,qualityGate}), modelDescription (string), finalAppearance (string), visualElements (array de elementos SVG estruturados para desenhar exatamente o produto solicitado, coordenadas normalizadas de 0 a 1000: retângulos {type:"rect",x,y,width,height,fill,stroke,strokeWidth,label}, linhas {type:"line",x1,y1,x2,y2,stroke,strokeWidth,label}, círculos {type:"circle",cx,cy,r,fill,stroke}, polígonos {type:"polygon",points:[{x,y}],fill,stroke}, textos {type:"text",x,y,text,fill,fontSize}). A geometria deve representar fielmente a configuração pedida: número e posição exatos de folhas, portas, gavetas, divisórias, prateleiras, puxadores, trilhos, montantes, travessas, pés, recortes e demais detalhes descritos. Cada elemento visual deve corresponder a um componente real descrito na solicitação ou na lista de peças; use coordenadas normalizadas de 0 a 1000, mantenha proporções coerentes e distribua os elementos dentro do contorno do produto. A vista frontal deve mostrar exatamente a quantidade de folhas/portas/divisões solicitadas, suas posições, puxadores e ferragens explicitamente mencionados. Não use uma ilustração genérica da categoria; não acrescente elementos que o usuário não pediu. Se não for possível determinar a geometria com segurança, registre a lacuna em assumptions em vez de inventar uma imagem. Use o catálogo quando aplicável: ${JSON.stringify(catalog)}.`;
 
@@ -472,6 +541,17 @@ export default async function handler(req: any, res: any) {
       }
       // Rascunho local temporário: nunca liberado para fabricação sem validação técnica.
       try {
+        if (isAluminumPrompt(prompt)) {
+          const localSpec = localParametricSpec(prompt);
+          if (localSpec.largura_mm <= 0 || localSpec.altura_mm <= 0) {
+            return json(res, 422, { error: "Não consegui extrair as dimensões da descrição. Informe largura e altura para continuar.", code: "DIMENSIONS_REQUIRED" });
+          }
+          const local = buildParametricDrawing(localSpec, prompt, catalog);
+          local.status = "LOCAL_PRELIMINARY_FALLBACK";
+          local.draftLabel = "RASCUNHO PARAMÉTRICO LOCAL — VALIDAR ANTES DE FABRICAR";
+          local.assumptions = ["A extração de IA não ficou disponível; os dados foram identificados localmente por palavras-chave. Confirme tipologia e cotas antes da fabricação."];
+          return json(res, 200, withDraftVectorWatermark(local));
+        }
         const fallback: any = localFallback(prompt);
         fallback.isDraft = true;
         fallback.status = "LOCAL_PRELIMINARY_FALLBACK";

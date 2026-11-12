@@ -92,6 +92,8 @@ export interface Quote {
   deliveryStatus?: string;
   deliveredAt?: string;
   deliveryEvidence?: DeliveryEvidence;
+  publicProposalToken?: string;
+  publicProposalEnabled?: boolean;
 }
 
 export type InvoiceStatus = "pending" | "paid" | "cancelled" | "pendente" | "pago";
@@ -185,6 +187,18 @@ export interface TechnicalDrawing {
     depth?: number;
   };
   pieces: TechnicalPiece[];
+  parametricSpec?: {
+    tipologia: "janela_correr" | "porta_correr" | "porta_giro" | "porta_pivotante" | "maxim_ar" | "basculante" | "box_banheiro";
+    linha_aluminio: string;
+    cor_perfil: string;
+    largura_mm: number;
+    altura_mm: number;
+    folhas: number;
+    modulo_fixo: boolean;
+    tipo_vidro: string;
+    espessura_mm: number;
+    abertura: string;
+  };
   isDraft?: boolean;
   status?: "PRELIMINARY_CONTINGENCY" | "APPROVED_FOR_MANUFACTURING";
   draftStatus?: "preliminary" | "approved";
@@ -219,9 +233,15 @@ export interface TechnicalDrawing {
       id?: string; pieceId?: string; description: string; sku?: string; catalogItemId?: string;
       quantity: number; unitPrice: number; subtotal: number; priceSource?: string;
       priceValidation?: string; catalogPriceAtApproval?: number;
+      cutLengthMm?: number; imageUrl?: string;
     }>;
     subtotal: number;
     labor: number;
+    marginRate?: number;
+    margin?: number;
+    taxRate?: number;
+    taxAmount?: number;
+    freight?: number;
     total: number;
     notes?: string;
   };
