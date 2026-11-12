@@ -29,26 +29,42 @@ function collectionUrl(collection: string, pageToken?: string) {
   return pageToken ? base + "&pageToken=" + encodeURIComponent(pageToken) : base;
 }
 
+/** Load authoritative rows from every collection exposed in the quote/catalog UI. */
 export async function loadCatalogFromFirestore(request: any): Promise<any[]> {
   const token = getToken(request);
   if (!token) throw new Error("Autenticação necessária para consultar o catálogo oficial.");
-  const rows: any[] = [];
-  let pageToken: string | undefined;
-  do {
-    const response = await fetch(collectionUrl("catalog", pageToken), {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!response.ok) throw new Error(`Não foi possível consultar o catálogo oficial (HTTP ${response.status}).`);
-    const payload = await response.json() as { documents?: any[]; nextPageToken?: string };
-    for (const document of payload.documents || []) {
-      const id = String(document.name || "").split("/").pop() || "";
-      rows.push({ id, ...decodeFields(document.fields || {}) });
-    }
-    pageToken = payload.nextPageToken || undefined;
-    if (rows.length > 5000) throw new Error("Catálogo excede o limite seguro de leitura.");
-  } while (pageToken);
-  return rows;
+  const collectionNames = ["catalog", "supplier_catalog", "registry_items", "price_table"];
+  const collections = await Promise.all(collectionNames.map(async (collectionName) => {
+    const rows: any[] = [];
+    let pageToken: string | undefined;
+    do {
+      const response = await fetch(collectionUrl(collectionName, pageToken), {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) {
+        throw new Error(`Não foi possível consultar o catálogo ${collectionName} (HTTP ${response.status}).`);
+      }
+      const payload = await response.json() as { documents?: any[]; nextPageToken?: string };
+      for (const document of payload.documents || []) {
+        const id = String(document.name || "").split("/").pop() || "";
+        const data = decodeFields(document.fields || {});
+        const name = String(data.name || data.description || "").trim();
+        if (!name) continue;
+        rows.push({
+          ...data,
+          id,
+          name,
+          sku: String(data.sku || data.code || "").trim(),
+          source: collectionName,
+        });
+      }
+      pageToken = payload.nextPageToken || undefined;
+      if (rows.length > 5000) throw new Error(`O catálogo ${collectionName} excede o limite seguro de leitura.`);
+    } while (pageToken);
+    return rows;
+  }));
+  return collections.flat();
 }
 
 export async function loadQuoteFromFirestore(request: any, quoteId: unknown): Promise<any | null> {

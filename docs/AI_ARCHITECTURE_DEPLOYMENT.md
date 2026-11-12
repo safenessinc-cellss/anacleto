@@ -4,6 +4,8 @@
 
 Configure no ambiente de execução (Preview e Production separadamente). Nunca coloque estes valores no frontend, no Git ou em logs.
 
+`ANACLETO_REQUIRE_AI_AUDIT` é opcional e, por padrão, deve permanecer `false`: a IA continua funcionando se a gravação de auditoria estiver temporariamente indisponível. Defina como `true` somente depois de publicar e validar as regras append-only do Firestore para `ai_audit_logs` e `budget_line_audit`.
+
 | Variável | Finalidade |
 |---|---|
 | `ANACLETO_SERVICE_API_KEY` | Segredo HMAC compartilhado entre o servidor principal e o serviço independente de desenhos. Mínimo de 32 caracteres aleatórios. Deve ser idêntico nos dois serviços. |

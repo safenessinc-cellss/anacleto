@@ -110,8 +110,11 @@ export async function recordAIAudit(context: AIAuditContext): Promise<AIAuditRec
   };
   try { await appendFirestore("ai_audit_logs", record as unknown as Record<string, unknown>, context.authorizationToken); }
   catch (error) {
+    // A temporary Firestore rules/deployment issue must not turn a successful
+    // AI generation into a failed quote. Set ANACLETO_REQUIRE_AI_AUDIT=true
+    // only after the append-only rules and audit persistence are verified.
     console.error("[AI_AUDIT_PERSISTENCE_ERROR]", error);
-    if (process.env.NODE_ENV === "production") throw error;
+    if (process.env.ANACLETO_REQUIRE_AI_AUDIT === "true") throw error;
   }
   return record;
 }

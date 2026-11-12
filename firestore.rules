@@ -74,6 +74,7 @@ service cloud.firestore {
     match /user_suggestions/{id} { allow read: if canOperate(); allow create: if canOperate(); allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /invoices/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial() || canManageFinance(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /catalog/{id} { allow read: if canOperate() || canManageFinance() || canManageQuality() || canManageProduction(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /price_table/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /supplier_catalog/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /registry_items/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /registry_products/{id} { allow read: if canOperate() || canManageFinance(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }

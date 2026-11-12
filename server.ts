@@ -169,8 +169,10 @@ function normalizeCatalogName(value: unknown) {
 function findExactCatalogItem(item: any, catalog: any[]) {
   const sku = String(item?.sku || item?.code || "").trim().toLowerCase();
   const catalogId = String(item?.catalogItemId || item?.itemId || "").trim();
+  const source = String(item?.catalogSource || item?.source || "").trim();
   const description = normalizeCatalogName(item?.description);
   return catalog.find((row: any) => {
+    if (source && row?.source && String(row.source) !== source) return false;
     const rowSku = String(row?.sku || row?.code || "").trim().toLowerCase();
     const idMatches = !!catalogId && String(row?.id || "") === catalogId;
     const skuMatches = !!sku && !!rowSku && sku === rowSku;
@@ -210,13 +212,13 @@ app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimit
     })) : [];
     const systemPrompt = `
 Você é o agente técnico de orçamentos da Anacleto Esquadrias.
-Responda exclusivamente JSON válido: {"reply":"...","action":"update_quote|generate_invoice|none","items":[{"id":"...","description":"nome EXATO do catálogo quando houver correspondência","sku":"","catalogItemId":"","quantity":1,"unitPrice":0,"subtotal":0,"priceSource":"catalog|pending"}],"taxRate":0,"discountRate":0,"notes":""}.
+Responda exclusivamente JSON válido: {"reply":"...","action":"update_quote|generate_invoice|none","items":[{"id":"...","description":"nome EXATO do catálogo quando houver correspondência","sku":"","catalogItemId":"","catalogSource":"","quantity":1,"unitPrice":0,"subtotal":0,"priceSource":"catalog|pending"}],"taxRate":0,"discountRate":0,"notes":""}.
 Orçamento atual: ${JSON.stringify(currentQuote)}
 Catálogo real: ${JSON.stringify(catalog)}
 Regras obrigatórias:
 - Preserve TODAS as linhas atuais, seus IDs, quantidades e preços quando o usuário não pedir alteração.
 - Ao adicionar itens, devolva também todas as linhas que já existiam sem alterações.
-- Use somente itens do catálogo com correspondência exata por SKU/código, ID ou nome completo. Informe sku e catalogItemId quando existirem.
+- Use somente itens do catálogo com correspondência exata por SKU/código, ID ou nome completo. Informe sku, catalogItemId e catalogSource quando existirem.
 - O servidor validará os preços contra o catálogo. Se não houver correspondência exata, unitPrice=0 e priceSource="pending".
 - Nunca estime/invente preços, impostos, medidas ou custos. Medidas ausentes devem aparecer em notes como pendências.
 - Só altere imposto ou desconto quando o usuário solicitar explicitamente.
@@ -279,11 +281,22 @@ Regras obrigatórias:
         subtotal: Number((quantity * unitPrice).toFixed(2)),
         sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || (sameExistingIdentity ? existingItem?.sku : "") || ""),
         catalogItemId: confirmed ? String(match.id || "") : String(item.catalogItemId || (sameExistingIdentity ? existingItem?.catalogItemId : "") || ""),
+        catalogSource: confirmed ? String(match.source || "") : String(item.catalogSource || (sameExistingIdentity ? existingItem?.catalogSource : "") || ""),
         priceSource: confirmed ? "catalog" : preservedExistingPrice ? "existing" : "pending",
       };
     });
-    const taxRate = parsed.taxRate === undefined ? Number(currentQuote.taxRate || 0) : Number(parsed.taxRate);
-    const discountRate = parsed.discountRate === undefined ? Number(currentQuote.discountRate || 0) : Number(parsed.discountRate);
+    // Não permita que valores padrão do JSON da IA zerem taxas existentes.
+    // Só aceite uma alteração quando a solicitação mencionar o campo e indicar uma mudança explícita.
+    const normalizedRequest = normalizeCatalogName(message);
+    const changeVerb = /(mude|alter|ajust|defin|coloque|apliqu|remov|retir|zer|reduz|aument|troqu)/.test(normalizedRequest);
+    const taxMentioned = /(imposto|tributo|taxa|icms|ipi|iss)/.test(normalizedRequest);
+    const discountMentioned = /(desconto|abatimento)/.test(normalizedRequest);
+    const taxChangeRequested = taxMentioned && (changeVerb || /\d/.test(message));
+    const discountChangeRequested = discountMentioned && (changeVerb || /\d/.test(message));
+    const taxRate = taxChangeRequested && parsed.taxRate !== undefined && parsed.taxRate !== null
+      ? Number(parsed.taxRate) : Number(currentQuote.taxRate || 0);
+    const discountRate = discountChangeRequested && parsed.discountRate !== undefined && parsed.discountRate !== null
+      ? Number(parsed.discountRate) : Number(currentQuote.discountRate || 0);
     if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 100 || !Number.isFinite(discountRate) || discountRate < 0 || discountRate > 100) {
       throw new Error("Percentual de imposto ou desconto inválido.");
     }

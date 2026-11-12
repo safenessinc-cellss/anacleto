@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -453,6 +453,16 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     try {
       const idToken = await auth.currentUser?.getIdToken();
       if (!idToken) throw new Error("Entre na sua conta para usar o assistente de orçamentos.");
+
+      // Orçamentos recém-criados existem primeiro apenas no estado local.
+      // O agente valida a versão persistida no servidor, portanto grave o rascunho
+      // uma única vez antes da primeira chamada, sem sobrescrever documentos existentes.
+      const quoteRef = doc(db, "quotes", selectedQuote.id);
+      const savedQuote = await getDoc(quoteRef);
+      if (!savedQuote.exists()) {
+        await setDoc(quoteRef, recalculateQuote(selectedQuote));
+      }
+
       const res = await fetch("/api/ai/quote-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
@@ -460,7 +470,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           message: userText,
           currentQuote: {
             id: selectedQuote.id, number: selectedQuote.number, clientName: selectedQuote.clientName,
-            items: selectedQuote.items.map(item => ({ id: item.id, itemId: item.itemId || "", catalogItemId: (item as any).catalogItemId || "", sku: (item as any).sku || "", description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
+            items: selectedQuote.items.map(item => ({ id: item.id, itemId: item.itemId || "", catalogItemId: (item as any).catalogItemId || "", catalogSource: (item as any).catalogSource || "", sku: (item as any).sku || "", description: item.description, quantity: item.quantity, unitPrice: item.unitPrice })),
             subtotal: selectedQuote.subtotal, taxRate: selectedQuote.taxRate, discountRate: selectedQuote.discountRate || 0,
             total: selectedQuote.total, currency: selectedQuote.currency, notes: selectedQuote.notes || "",
           },
@@ -505,6 +515,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           id: it.id || `it_${idx + 1}`,
           itemId: it.itemId || undefined,
           catalogItemId: it.catalogItemId || undefined,
+          catalogSource: it.catalogSource || undefined,
           sku: it.sku || undefined,
           description: it.description,
           quantity: Number(it.quantity || 1),
