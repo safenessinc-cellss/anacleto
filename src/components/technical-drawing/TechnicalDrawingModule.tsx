@@ -25,6 +25,7 @@ import {
 import { TechnicalDrawing, SenderConfig } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
+import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
@@ -624,6 +625,21 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     }
   };
 
+  const handleExportDxf = async () => {
+    try {
+      let source = drawing;
+      if (drawing.approvedSnapshotId) {
+        const snapshot = await loadApprovedDrawingSnapshot(drawing.approvedSnapshotId);
+        source = snapshot.document as TechnicalDrawing;
+      }
+      downloadTechnicalDrawingDxf(source);
+      showToast("Arquivo DXF exportado para AutoCAD.", "success");
+    } catch (err) {
+      console.error("DXF export failed:", err);
+      showToast((err as Error).message || "Não foi possível exportar o DXF.", "error");
+    }
+  };
+
   const currentStepData = drawing.steps?.[currentStep - 1];
 
   const presets = [
@@ -690,6 +706,14 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : <Save className="w-4 h-4 text-amber-400" />}
             Salvar desenho
+          </button>
+          <button
+            onClick={handleExportDxf}
+            disabled={!Array.isArray((drawing as any).visualElements) || !(drawing as any).visualElements.length}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-bold rounded-xl transition border border-slate-700"
+          >
+            <Download className="w-4 h-4" />
+            Exportar DXF
           </button>
           <button
             onClick={handleExportPdf}
