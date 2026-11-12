@@ -57,8 +57,8 @@ export function buildTechnicalDrawingDxf(drawing: TechnicalDrawing): string {
   }
 
   // Export the dimension annotations as real DXF line/text entities too.
-  const dimensions = Array.isArray((model as any).dimensionLines) ? (model as any).dimensionLines.slice(0, 100) : [];
-  for (const dimension of dimensions) {
+  const dimensionAnnotations = Array.isArray((model as any).dimensionLines) ? (model as any).dimensionLines.slice(0, 100) : [];
+  for (const dimension of dimensionAnnotations) {
     const start = dimension?.start || {};
     const end = dimension?.end || {};
     const x1 = x(start.x), y1 = y(start.y), x2 = x(end.x), y2 = y(end.y);
