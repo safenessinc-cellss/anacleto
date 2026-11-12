@@ -238,14 +238,9 @@ export default function App() {
         id: line.id,
         description: line.description,
         quantity: line.qty,
-        unitPrice: line.price,
       }));
 
-      const subtotal = formattedLines.reduce((acc, current) => acc + (current.quantity * current.unitPrice), 0);
-      const taxRate = 0;
-      const taxAmount = Number(((subtotal * taxRate) / 100).toFixed(2));
-      const total = Number((subtotal + taxAmount).toFixed(2));
-
+      // Solicitação pública sem valores estimados; a equipe define o preço após medição.
       const budgetDoc = {
         id: budgetId,
         number: budgetNo,
@@ -255,10 +250,8 @@ export default function App() {
         clientAddress: visAddress,
         date: new Date().toISOString().split("T")[0],
         items: formattedLines,
-        subtotal,
-        taxRate,
-        taxAmount,
-        total,
+        requestOnly: true,
+        source: "website",
         status: "pending",
         language: language,
         createdAt: new Date().toISOString(),
