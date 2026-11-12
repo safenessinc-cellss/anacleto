@@ -56,6 +56,19 @@ export function buildTechnicalDrawingDxf(drawing: TechnicalDrawing): string {
     }
   }
 
+  // Export the dimension annotations as real DXF line/text entities too.
+  const dimensions = Array.isArray((model as any).dimensionLines) ? (model as any).dimensionLines.slice(0, 100) : [];
+  for (const dimension of dimensions) {
+    const start = dimension?.start || {};
+    const end = dimension?.end || {};
+    const x1 = x(start.x), y1 = y(start.y), x2 = x(end.x), y2 = y(end.y);
+    line(x1, y1, x2, y2, "DIMENSIONS");
+    const label = cleanText(dimension.label || (Number.isFinite(Number(dimension.value)) ? String(dimension.value) + " " + String(dimension.unit || "mm") : ""));
+    if (label) {
+      lines.push(pair(0, "TEXT"), pair(8, "DIMENSIONS"), pair(10, (x1 + x2) / 2), pair(20, (y1 + y2) / 2 + 8), pair(30, 0), pair(40, Math.max(2, Math.min(12, Math.min(widthMm, heightMm) * 0.012))), pair(1, label));
+    }
+  }
+
   if (!lines.length) throw new Error("Este desenho ainda não possui geometria vetorial para exportar em DXF.");
   const draft = model.isDraft !== false || model.status !== "APPROVED_FOR_MANUFACTURING";
   const header =
@@ -66,9 +79,10 @@ export function buildTechnicalDrawingDxf(drawing: TechnicalDrawing): string {
     pair(999, draft ? "RASCUNHO PRELIMINAR - NAO FABRICAR SEM VALIDACAO" : "DESENHO APROVADO - CONFERIR SNAPSHOT") +
     pair(0, "ENDSEC");
   const tables = pair(0, "SECTION") + pair(2, "TABLES") +
-    pair(0, "TABLE") + pair(2, "LAYER") + pair(70, "2") +
+    pair(0, "TABLE") + pair(2, "LAYER") + pair(70, "3") +
     pair(0, "LAYER") + pair(2, "GEOMETRY") + pair(70, "0") + pair(62, "7") + pair(6, "CONTINUOUS") +
     pair(0, "LAYER") + pair(2, "ANNOTATION") + pair(70, "0") + pair(62, "2") + pair(6, "CONTINUOUS") +
+    pair(0, "LAYER") + pair(2, "DIMENSIONS") + pair(70, "0") + pair(62, "4") + pair(6, "CONTINUOUS") +
     pair(0, "ENDTAB") + pair(0, "ENDSEC");
   return header + tables + pair(0, "SECTION") + pair(2, "ENTITIES") + lines.join("") + pair(0, "ENDSEC") + pair(0, "EOF");
 }
