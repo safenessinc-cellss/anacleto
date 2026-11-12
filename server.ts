@@ -98,8 +98,20 @@ app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole,
   if (question.length < 3) return res.status(400).json({ error: "Digite uma pergunta financeira." });
   try {
     const names = ["quotes", "invoices", "inventory_items", "inventory_movements", "ledger_entries", "payables", "receivables", "purchase_orders"];
-    const loaded = await Promise.all(names.map(name => loadCollectionFromFirestore(req, name, 250)));
+    const [loaded, catalogRows] = await Promise.all([
+      Promise.all(names.map(name => loadCollectionFromFirestore(req, name, 250))),
+      loadCatalogFromFirestore(req),
+    ]);
     const data = Object.fromEntries(names.map((name, index) => [name, loaded[index]]));
+    const catalog = catalogRows.slice(0, 250).map(row => ({
+      name: String(row.name || row.description || "Item"),
+      sku: String(row.sku || row.code || ""),
+      category: String(row.category || ""),
+      unit: String(row.unit || "un"),
+      price: Number(row.price || 0),
+      supplier: String(row.supplier || ""),
+      source: String(row.source || ""),
+    }));
     const ledger = data.ledger_entries as any[];
     const cashIn = ledger.filter(x => ["inflow","income","entrada","in"].includes(String(x.direction || x.type || "").toLowerCase()) && !["void","cancelled","cancelado","estornado"].includes(String(x.status || "").toLowerCase())).reduce((s,x)=>s+Math.max(0,Number(x.amount||0)),0);
     const cashOut = ledger.filter(x => ["outflow","expense","saida","saída","out"].includes(String(x.direction || x.type || "").toLowerCase()) && !["void","cancelled","cancelado","estornado"].includes(String(x.status || "").toLowerCase())).reduce((s,x)=>s+Math.max(0,Number(x.amount||0)),0);
@@ -121,6 +133,7 @@ app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole,
       quotes: compactFinancialRows(data.quotes, ["number","clientName","date","status","subtotal","taxAmount","discountAmount","total","currency","items"]),
       invoices: compactFinancialRows(data.invoices, ["number","clientName","date","dueDate","status","subtotal","taxAmount","total","currency","items"]),
       inventory: stock.slice(0, 150),
+      catalog,
       inventoryMovements: compactFinancialRows(data.inventory_movements, ["itemName","type","quantity","reason","createdAt"]),
       payables: compactFinancialRows(data.payables, ["description","supplierName","amount","total","dueDate","status","paidAt"]),
       receivables: compactFinancialRows(data.receivables, ["description","clientName","amount","receivedAmount","dueDate","status","receivedAt"]),
