@@ -4,7 +4,7 @@ import { Quote, Invoice, TechnicalDrawing, SenderConfig } from "../types";
 
 // Format helper
 const formatMoney = (amount: number, currency: string = "BRL") => {
-  return new Intl.NumberFormat("es-ES", {
+  return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: currency,
     minimumFractionDigits: 2,
@@ -152,6 +152,60 @@ const applyDocumentWatermark = (doc: jsPDF, sender?: SenderConfig) => {
   doc.setPage(pageCount);
 };
 
+const applyQuoteWatermark = (doc: jsPDF, quote: Quote, sender?: SenderConfig) => {
+  const pageCount = doc.getNumberOfPages();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const logo = sender?.logoUrl?.startsWith("data:image/")
+    ? sender.logoUrl
+    : sender?.watermarkLogoUrl?.startsWith("data:image/") ? sender.watermarkLogoUrl : null;
+  const watermarkText = quote.status === "approved" ? "APROVADO" : "ORÇAMENTO";
+
+  for (let page = 1; page <= pageCount; page += 1) {
+    doc.setPage(page);
+    try {
+      (doc as any).setGState(new (doc as any).GState({ opacity: 0.08 }));
+    } catch (error) {
+      console.warn("Não foi possível aplicar transparência à marca d'água do orçamento:", error);
+    }
+
+    let logoDrawn = false;
+    if (logo) {
+      try {
+        const mime = logo.slice(5, logo.indexOf(";")).toLowerCase();
+        const format = mime.includes("jpeg") ? "JPEG" : mime.includes("webp") ? "WEBP" : "PNG";
+        doc.addImage(logo, format, pageWidth / 2 - 42, pageHeight / 2 - 21, 84, 42, undefined, "FAST", 45);
+        logoDrawn = true;
+      } catch (error) {
+        console.warn("Não foi possível inserir o logotipo na marca d'água do orçamento:", error);
+      }
+    }
+    if (!logoDrawn) {
+      doc.setDrawColor(190, 195, 202);
+      doc.setLineWidth(1);
+      doc.rect(pageWidth / 2 - 12, pageHeight / 2 - 31, 24, 24, "S");
+      doc.line(pageWidth / 2, pageHeight / 2 - 29, pageWidth / 2, pageHeight / 2 - 9);
+      doc.line(pageWidth / 2 - 10, pageHeight / 2 - 19, pageWidth / 2 + 10, pageHeight / 2 - 19);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(190, 195, 202);
+      doc.text("ANACLETO ESQUADRIAS", pageWidth / 2, pageHeight / 2 + 1, { align: "center", angle: 45 });
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(190, 195, 202);
+    doc.text(watermarkText, pageWidth / 2, pageHeight / 2 + 24, { align: "center", angle: 45 });
+
+    try {
+      (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
+    } catch (error) {
+      console.warn("Não foi possível restaurar a transparência após a marca d'água do orçamento:", error);
+    }
+  }
+  doc.setPage(pageCount);
+};
+
 export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
   const doc = new jsPDF();
   if (quote.approvedAt) {
@@ -171,9 +225,6 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
 
   // Logotipo do CRM presente em todos os documentos comerciais.
   drawDocumentLogo(doc, sender, 14, 7, 25, 25);
-  if (sender?.watermarkLogoUrl?.startsWith("data:image/")) {
-    doc.addImage(sender.watermarkLogoUrl, "PNG", pageWidth / 2 - 65, 72, 130, 130);
-  }
 
   // Brand Title
   doc.setFont("helvetica", "bold");
@@ -184,19 +235,19 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(197, 168, 80);
-  doc.text("ESQUADRIAS DE ALUMÍNIO & SOLUÇÕES TÉCNICAS", sender?.logoUrl?.startsWith("data:image/") ? 44 : 14, 27);
+  doc.text("ESQUADRIAS DE ALUMÍNIO & SOLUÇÕES TÉCNICAS", 44, 27);
 
   // Document Type & Number
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(255, 255, 255);
-  doc.text("PRESUPUESTO", pageWidth - 14, 20, { align: "right" });
+  doc.text("ORÇAMENTO", pageWidth - 14, 20, { align: "right" });
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(203, 213, 225);
   doc.text(`Nº: ${quote.number}`, pageWidth - 14, 27, { align: "right" });
-  doc.text(`Fecha: ${quote.date}`, pageWidth - 14, 34, { align: "right" });
+  doc.text(`Data: ${quote.date}`, pageWidth - 14, 34, { align: "right" });
 
   // Company and Client Details (Two Columns)
   doc.setTextColor(30, 41, 59);
@@ -205,32 +256,35 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   // Column 1: Issuer
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("EMISOR:", 14, yPos);
+  doc.text("EMPRESA:", 14, yPos);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.text(sender?.name || "Anacleto Esquadrias", 14, yPos + 6);
-  doc.text(`NIF / CIF: ${sender?.nif || "B-50204533"}`, 14, yPos + 11);
-  doc.text(`Dirección: ${sender?.address || "Av. Industrial 1069"}`, 14, yPos + 16);
-  doc.text(`${sender?.postalCode || "08001"} ${sender?.city || "Barcelona"} - ${sender?.country || "España"}`, 14, yPos + 21);
-  if (sender?.profileEmail) doc.text(`Email: ${sender.profileEmail}`, 14, yPos + 26);
+  if (sender?.nif) doc.text(`CNPJ: ${sender.nif}`, 14, yPos + 11);
+  else doc.text("CNPJ: Não configurado", 14, yPos + 11);
+  doc.text(`Endereço: ${sender?.address || "Av. Caxias do Sul, 1069 - Rio dos Sinos"}`, 14, yPos + 16);
+  doc.text(`${sender?.postalCode || "93110-000"} ${sender?.city || "São Leopoldo - RS"}${sender?.country ? ` - ${sender.country}` : " - Brasil"}`, 14, yPos + 21);
+  doc.text("WhatsApp: +55 51 99819-3931", 14, yPos + 26);
 
   // Column 2: Client
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text("CLIENTE:", pageWidth / 2 + 10, yPos);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(quote.clientName || "Cliente General", pageWidth / 2 + 10, yPos + 6);
-  doc.text(`NIF / DNI: ${quote.clientTaxId || "No especificado"}`, pageWidth / 2 + 10, yPos + 11);
-  doc.text(`Email: ${quote.clientEmail || "contacto@cliente.com"}`, pageWidth / 2 + 10, yPos + 16);
-  doc.text(`Dirección: ${quote.clientAddress || "Dirección de obra"}`, pageWidth / 2 + 10, yPos + 21);
-  if (quote.validUntil) doc.text(`Válido hasta: ${quote.validUntil}`, pageWidth / 2 + 10, yPos + 26);
+  doc.setFontSize(8);
+  doc.text(quote.clientName || "Cliente não informado", pageWidth / 2 + 10, yPos + 6);
+  doc.text(`CPF / CNPJ: ${quote.clientTaxId || "Não informado"}`, pageWidth / 2 + 10, yPos + 11);
+  doc.text(`E-mail: ${quote.clientEmail || "Não informado"}`, pageWidth / 2 + 10, yPos + 16);
+  doc.text(`Endereço: ${quote.clientAddress || "Não informado"}`, pageWidth / 2 + 10, yPos + 21);
+  if (quote.validUntil) doc.text(`Válido até: ${quote.validUntil}`, pageWidth / 2 + 10, yPos + 26);
 
   // Table of Items
   const tableData = quote.items.map((item, idx) => [
     idx + 1,
     "",
-    item.sku ? `${item.sku} · ${item.description}` : item.description,
+    item.sku
+      ? `${item.sku} · ${item.description}${Number(item.cutLengthMm) > 0 ? ` (${item.cutLengthMm} mm)` : ""}`
+      : item.description,
     item.quantity,
     formatMoney(item.unitPrice, currency),
     formatMoney(item.subtotal || item.quantity * item.unitPrice, currency),
@@ -238,7 +292,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
 
   autoTable(doc, {
     startY: yPos + 35,
-    head: [["#", "Vista 3D", "Descripción del Ítem / Servicio", "Cant.", "Precio Unit.", "Subtotal"]],
+    head: [["#", "Vista 3D", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
     body: tableData,
     theme: "striped",
     didDrawCell: (data: any) => {
@@ -278,7 +332,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     ...(Number(quote.margin || 0) > 0 ? [[`Margem (${quote.marginRate || 0}%):`, formatMoney(quote.margin || 0, currency)]] : []),
     ...(Number(quote.freight || 0) > 0 ? [["Frete:", formatMoney(quote.freight || 0, currency)]] : []),
     ...(Number(quote.discountAmount || 0) > 0 ? [[`Desconto (${quote.discountRate || 0}%):`, `-${formatMoney(quote.discountAmount || 0, currency)}`]] : []),
-    [`IVA (${quote.taxRate}%):`, formatMoney(quote.taxAmount, currency)],
+    [`Imposto (${quote.taxRate}%):`, formatMoney(quote.taxAmount, currency)],
   ];
   const totalsBoxHeight = (totalRows.length + 1) * 7 + 7;
   doc.setFillColor(248, 250, 252);
@@ -311,7 +365,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text("OBSERVACIONES Y CONDICIONES:", 14, finalY + 10);
+    doc.text("OBSERVAÇÕES E CONDIÇÕES:", 14, finalY + 10);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     const splitNotes = doc.splitTextToSize(quote.notes, totalsX - 25);
@@ -323,9 +377,6 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   const technicalDrawing = quote.technicalDrawing;
   if (technicalDrawing || windowItem) {
     doc.addPage();
-    if (sender?.watermarkLogoUrl?.startsWith("data:image/")) {
-      doc.addImage(sender.watermarkLogoUrl, "PNG", pageWidth / 2 - 65, 72, 130, 130);
-    }
     drawDocumentLogo(doc, sender, 14, 7, 25, 25);
     const desc = technicalDrawing?.title || windowItem?.description || "Esquadria";
     const dimensions = desc.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
@@ -386,24 +437,14 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    `Anacleto Esquadrias © ${new Date().getFullYear()} • Documento comercial oficial generado electrónicamente`,
+    `Anacleto Esquadrias © ${new Date().getFullYear()} • Orçamento comercial`,
     pageWidth / 2,
     footerY,
     { align: "center" }
   );
 
-  applyDocumentWatermark(doc, sender);
-  if (!quote.snapshotContentHash || quote.status !== "approved") {
-    const pageCount = doc.getNumberOfPages();
-    for (let page = 1; page <= pageCount; page += 1) {
-      doc.setPage(page);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(185, 28, 28);
-      doc.text("BORRADOR COMERCIAL - NO VÁLIDO COMO PRESUPUESTO APROBADO", pageWidth / 2, 34, { align: "center", angle: -18 });
-    }
-  }
-  const fileName = `Presupuesto_${quote.number || "PRE"}.pdf`;
+  applyQuoteWatermark(doc, quote, sender);
+  const fileName = `Orcamento_${quote.number || "PRE"}.pdf`;
   const dataUri = doc.output("datauristring");
   const sizeKb = Math.max(1, Math.round((dataUri.length * 0.75) / 1024));
 

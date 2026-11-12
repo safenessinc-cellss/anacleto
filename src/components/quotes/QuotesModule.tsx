@@ -103,12 +103,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // AI Chat Agent States
   const [aiMessage, setAiMessage] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiChatHistory, setAiChatHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([
-    {
-      role: "assistant",
-      text: "Olá! Sou seu Agente Técnico de Orçamentos da Anacleto Pro. Você pode me pedir coisas como: 'Adicione 3 janelas de alumínio de 120x100', 'mude o imposto para 21%', 'adicione um desconto de 10%' ou 'gere a fatura deste orçamento'.",
-    },
-  ]);
+  const [aiChatHistory, setAiChatHistory] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
 
   // Load Quotes from Firestore in real-time
   useEffect(() => {
@@ -933,7 +928,8 @@ const handleAddItem = () => {
         </button>
       </div>
 
-      {/* Main Grid: Left = Quotes List (4 cols); Right = Active Quote Detail & AI Chat (8 cols) */}
+  const latestAiReply = [...aiChatHistory].reverse().find((message) => message.role === "assistant")?.text;
+      {/* Main Grid: Left = Quotes List (4 cols); Right = Active Quote Detail (8 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: List & Search Filter */}
         <div className="lg:col-span-4 space-y-4">
@@ -1027,7 +1023,7 @@ const handleAddItem = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Active Quote Form & Gemini AI Assistant */}
+        {/* RIGHT COLUMN: Active Quote Form */}
         <div className="lg:col-span-8 space-y-6">
           {selectedQuote ? (
             <div className="space-y-6">
@@ -1088,8 +1084,31 @@ const handleAddItem = () => {
                   </div>
                 </div>
 
-                {/* Client & Tax Settings */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-2.5">
+                  <form onSubmit={handleSendAiMessage} className="flex items-center gap-2">
+                    <Sparkles className="ml-1 h-4 w-4 shrink-0 text-amber-400" />
+                    <input
+                      type="text"
+                      value={aiMessage}
+                      onChange={(event) => setAiMessage(event.target.value)}
+                      placeholder="Peça à IA: ex. 'adicione 2 janelas 150x120' ou 'mude imposto para 10%'"
+                      aria-label="Instrução para o agente de IA"
+                      className="min-w-0 flex-1 bg-transparent px-2 py-2 text-xs text-white placeholder-slate-500 outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isAiLoading || !aiMessage.trim()}
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-40"
+                    >
+                      {isAiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                      {isAiLoading ? "Processando" : "Enviar"}
+                    </button>
+                  </form>
+                  {latestAiReply && <p aria-live="polite" className="truncate px-8 pt-1 text-[10px] text-slate-400" title={latestAiReply}>{latestAiReply}</p>}
+                </div>
+
+                {/* Client */}
+                <div className="grid grid-cols-1 gap-4 pt-4">
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
                       Selecionar cliente (CRM):
@@ -1105,42 +1124,6 @@ const handleAddItem = () => {
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
-                      Imposto (%):
-                    </label>
-                    <input
-                      type="number"
-                      value={selectedQuote.taxRate}
-                      onChange={(e) => {
-                        const updated = recalculateQuote({
-                          ...selectedQuote,
-                          taxRate: Number(e.target.value) || 0,
-                        });
-                        setSelectedQuote(updated);
-                      }}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-amber-500/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 block">
-                      Desconto (%):
-                    </label>
-                    <input
-                      type="number"
-                      value={selectedQuote.discountRate || 0}
-                      onChange={(e) => {
-                        const updated = recalculateQuote({
-                          ...selectedQuote,
-                          discountRate: Number(e.target.value) || 0,
-                        });
-                        setSelectedQuote(updated);
-                      }}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-amber-500/50"
-                    />
                   </div>
                 </div>
 
@@ -1259,13 +1242,6 @@ const handleAddItem = () => {
                     </button>
                   </div>
 
-                  <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-950 p-3 sm:grid-cols-3">
-                    {([
-                      ["Mão de Obra (R$)", "labor"],
-                      ["Margem (%)", "marginRate"],
-                      ["Frete (R$)", "freight"],
-                    ] as const).map(([label, field]) => <label key={field} className="text-[10px] font-semibold text-slate-400">{label}<input type="number" min="0" step="0.01" value={selectedQuote[field] || 0} onChange={(event) => setSelectedQuote(recalculateQuote({ ...selectedQuote, [field]: Number(event.target.value) || 0 }))} className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 p-2 text-xs text-white" /></label>)}
-                  </div>
                   <div className="space-y-2">
                     {selectedQuote.items.map((item) => (
                       <div
@@ -1281,13 +1257,20 @@ const handleAddItem = () => {
                           placeholder="Código"
                           className="w-24 px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white outline-none"
                         />
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => handleUpdateItem(item.id, "description", e.target.value)}
-                          placeholder="Descrição do item..."
-                          className="flex-1 w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white outline-none focus:border-amber-500/50"
-                        />
+                        <div className="min-w-0 flex-1 w-full">
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) => handleUpdateItem(item.id, "description", e.target.value)}
+                            placeholder="Descrição do item..."
+                            className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white outline-none focus:border-amber-500/50"
+                          />
+                          {Number(item.cutLengthMm) > 0 && item.sku && (
+                            <span className="mt-1 block truncate px-1 text-[10px] text-slate-400" title={`${item.sku} · ${item.description.split(" · ")[0]} (${item.cutLengthMm} mm)`}>
+                              {item.sku} · {item.description.split(" · ")[0]} ({item.cutLengthMm} mm)
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 w-full sm:w-auto">
                           <div className="flex items-center gap-1">
                             <span className="text-[10px] text-slate-500">Qtd.:</span>
@@ -1300,14 +1283,19 @@ const handleAddItem = () => {
                             />
                           </div>
 
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] text-slate-500">Preço:</span>
-                            <input
-                              type="number"
-                              value={item.unitPrice}
-                              onChange={(e) => handleUpdateItem(item.id, "unitPrice", Number(e.target.value) || 0)}
-                              className="w-24 px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white font-mono text-right outline-none"
-                            />
+                          <div className="flex flex-col items-start">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-slate-500">Preço:</span>
+                              <input
+                                type="number"
+                                value={item.unitPrice}
+                                onChange={(e) => handleUpdateItem(item.id, "unitPrice", Number(e.target.value) || 0)}
+                                className={`w-24 rounded-lg border bg-slate-900 px-2 py-1.5 text-right font-mono text-xs text-white outline-none ${Number(item.unitPrice) <= 0 && (item.catalogItemId || item.catalogSource) ? "border-amber-400/70 focus:border-amber-300" : "border-slate-800"}`}
+                              />
+                            </div>
+                            {Number(item.unitPrice) <= 0 && (item.catalogItemId || item.catalogSource) && (
+                              <span className="ml-8 mt-1 text-[9px] font-medium text-amber-300">Informar preço</span>
+                            )}
                           </div>
 
                           <span className="w-24 text-right font-mono font-bold text-xs text-amber-400">
@@ -1325,111 +1313,50 @@ const handleAddItem = () => {
                     ))}
                   </div>
 
-                  {/* Totals Summary */}
-                  <div className="mt-4 p-4 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-end space-y-1.5 text-xs">
+                  {/* Totals and compact financial controls */}
+                  <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-3 text-xs">
                     <div className="flex justify-between w-64 text-slate-400">
                       <span>Materiais:</span>
                       <span className="font-mono text-white">{selectedQuote.subtotal?.toFixed(2)} R$</span>
                     </div>
-                    {Number(selectedQuote.labor || 0) > 0 && <div className="flex justify-between w-64 text-slate-400"><span>Mão de obra:</span><span className="font-mono text-white">{Number(selectedQuote.labor).toFixed(2)} R$</span></div>}
-                    {Number(selectedQuote.margin || 0) > 0 && <div className="flex justify-between w-64 text-slate-400"><span>Margem ({selectedQuote.marginRate || 0}%):</span><span className="font-mono text-white">{Number(selectedQuote.margin).toFixed(2)} R$</span></div>}
-                    {Number(selectedQuote.freight || 0) > 0 && <div className="flex justify-between w-64 text-slate-400"><span>Frete:</span><span className="font-mono text-white">{Number(selectedQuote.freight).toFixed(2)} R$</span></div>}
-                    {selectedQuote.discountRate ? (
-                      <div className="flex justify-between w-64 text-rose-400">
-                        <span>Desconto ({selectedQuote.discountRate}%):</span>
-                        <span className="font-mono">-{selectedQuote.discountAmount?.toFixed(2)} R$</span>
-                      </div>
-                    ) : null}
-                    <div className="flex justify-between w-64 text-slate-400">
-                      <span>Imposto ({selectedQuote.taxRate}%):</span>
-                      <span className="font-mono text-white">{selectedQuote.taxAmount?.toFixed(2)} R$</span>
+                    <div className="my-3 grid grid-cols-2 gap-2 border-y border-slate-800 py-3 sm:grid-cols-5">
+                      {([
+                        ["Mão de Obra (R$)", "labor"],
+                        ["Margem (%)", "marginRate"],
+                        ["Imposto (%)", "taxRate"],
+                        ["Frete (R$)", "freight"],
+                        ["Desconto (%)", "discountRate"],
+                      ] as const).map(([label, field]) => (
+                        <label key={field} className="text-[10px] font-semibold text-slate-400">
+                          {label}
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={selectedQuote[field] || 0}
+                            onChange={(event) => setSelectedQuote(recalculateQuote({ ...selectedQuote, [field]: Number(event.target.value) || 0 }))}
+                            className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 p-2 text-xs text-white outline-none focus:border-amber-500/50"
+                          />
+                        </label>
+                      ))}
                     </div>
                     <div className="flex justify-between w-64 pt-2 border-t border-slate-800 text-sm font-black text-amber-400">
                       <span>TOTAL:</span>
                       <span className="font-mono text-base">{selectedQuote.total?.toFixed(2)} R$</span>
                     </div>
                   </div>
-                  <ManufacturingRoute title={`Orçamento ${selectedQuote.number}`} items={selectedQuote.items} />
+                  <details className="group rounded-2xl border border-indigo-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                    <summary className="cursor-pointer list-none rounded-2xl px-5 py-4 text-sm font-bold text-slate-800 dark:text-slate-100">
+                      Ver Roteiro de Produção / Taller ▾
+                    </summary>
+                    <div className="p-3 pt-0">
+                      <ManufacturingRoute title={`Orçamento ${selectedQuote.number}`} items={selectedQuote.items} />
+                    </div>
+                  </details>
                 </div>
               </div>
 
               {itemPhotoViewer && <ImageLightbox images={itemPhotoViewer} onClose={() => setItemPhotoViewer(null)} />}
-              {/* AI Real-Time Quote Copilot Chat */}
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
-                      Agente de IA para Orçamentos e Faturas (Gemini)
-                    </h3>
-                  </div>
-                  <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ativo
-                  </span>
-                </div>
-
-                {/* Chat History Box */}
-                <div className="max-h-52 overflow-y-auto space-y-2.5 p-3 bg-slate-950 rounded-2xl border border-slate-800/80 custom-scrollbar">
-                  {aiChatHistory.map((msg, i) => (
-                    <div
-                      key={i}
-                      className={`p-3 rounded-2xl text-xs leading-relaxed max-w-[85%] ${
-                        msg.role === "user"
-                          ? "ml-auto bg-amber-500 text-slate-950 font-medium"
-                          : "bg-slate-900 border border-slate-800 text-slate-200"
-                      }`}
-                    >
-                      {msg.text}
-                    </div>
-                  ))}
-                  {isAiLoading && (
-                    <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl text-xs text-amber-400 flex items-center gap-2">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>O assistente está analisando e recalculando o orçamento...</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Prompt Suggestions */}
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    "mude o imposto para 21%",
-                    "adicione um desconto de 10%",
-                    "gere a fatura deste orçamento",
-                    "adicione 2 janelas de correr de 150x120",
-                  ].map((sug, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setAiMessage(sug);
-                      }}
-                      className="text-[10px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition"
-                    >
-                      💬 "{sug}"
-                    </button>
-                  ))}
-                </div>
-
-                {/* Input Form */}
-                <form onSubmit={handleSendAiMessage} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={aiMessage}
-                    onChange={(e) => setAiMessage(e.target.value)}
-                    placeholder="Digite uma instrução para o assistente (ex.: 'altere o imposto para 0%')..."
-                    className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-amber-500/50"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isAiLoading || !aiMessage.trim()}
-                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 text-xs font-black uppercase rounded-xl transition shadow-md"
-                  >
-                    Enviar
-                  </button>
-                </form>
-              </div>
             </div>
           ) : (
             <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-3xl">
