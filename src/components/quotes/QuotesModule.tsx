@@ -72,7 +72,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         setCatalogItems((current) => [...current.filter((item) => item.source !== "registry_items"), ...list]);
       }, (err) => console.warn("Items registry listener (quotes):", err)),
       onSnapshot(collection(db, "price_table"), (snap) => {
-        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", supplier: data.priceSupplier || data.supplier || "", source: "price_table" }; });
+        const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", supplier: data.priceSupplier || data.supplier || "", brand: data.brand || data.manufacturer || "", dimensions: data.dimensions || data.specification || "", validUntil: data.validUntil || "", source: "price_table" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "price_table"), ...list]);
       }, (err) => console.warn("Price table listener (quotes):", err)),
     ];

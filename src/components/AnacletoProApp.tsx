@@ -27,8 +27,9 @@ import DeliveryModule from "./deliveries/DeliveryModule";
 import ProductionModule from "./production/ProductionModule";
 import InventoryModule from "./inventory/InventoryModule";
 import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
+import PriceTableModule from "./price-table/PriceTableModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory" | "price_table";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -171,6 +172,7 @@ export default function AnacletoProApp({
   const cadastroItems = [
     { id: "crm" as NavigationTab, label: "Clientes", icon: Building, badge: companies.length },
     { id: "cadastro_items" as NavigationTab, label: "Materiais e Componentes", icon: Package, badge: null },
+    { id: "price_table" as NavigationTab, label: "Tabela Antecipada de Preços", icon: FileText, badge: null },
     { id: "products" as NavigationTab, label: "Produtos", icon: Package, badge: null },
 
     { id: "services" as NavigationTab, label: "Serviços", icon: Settings, badge: null },
@@ -414,6 +416,7 @@ export default function AnacletoProApp({
 
           {activeTab === "catalog" && (<CatalogModule />)}
           {activeTab === "cadastro_items" && <div className="space-y-8"><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}
+          {activeTab === "price_table" && <PriceTableModule onNavigateQuotes={() => setActiveTab("quotes")} />}
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
           {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
