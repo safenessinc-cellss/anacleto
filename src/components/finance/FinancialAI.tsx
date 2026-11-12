@@ -30,7 +30,7 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
   const [assistantQuestion, setAssistantQuestion] = useState("");
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [assistantMessages, setAssistantMessages] = useState<Array<{role:"user"|"assistant";text:string;metrics?:Array<{label:string;value:string;explanation:string}>;warnings?:string[]}>>([
-    { role: "assistant", text: "Olá! Sou o Assistente Financeiro da Anacleto. Posso analisar faturamento, recebimentos, custos cadastrados de alumínio e vidro, estoque, contas a pagar e fluxo de caixa usando os registros atuais do sistema. Não invento valores quando faltam dados." }
+    { role: "assistant", text: language === "es" ? "¡Hola! Soy el Asistente Financiero de Anacleto. Puedo analizar facturación, cobros, costos registrados de aluminio y vidrio, inventario, cuentas por pagar y cobrar y flujo de caja usando los registros actuales del sistema. No invento valores cuando faltan datos." : "Olá! Sou o Assistente Financeiro da Anacleto. Posso analisar faturamento, recebimentos, custos cadastrados de alumínio e vidro, estoque, contas a pagar e receber e fluxo de caixa usando os registros atuais do sistema. Não invento valores quando faltam dados." }
   ]);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -45,7 +45,7 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
     const question = assistantQuestion.trim();
     if (question.length < 3 || assistantLoading) return;
     const user = auth.currentUser;
-    if (!user) { setAssistantMessages(rows => [...rows, { role: "assistant", text: "Sua sessão expirou. Entre novamente para consultar os dados financeiros." }]); return; }
+    if (!user) { setAssistantMessages(rows => [...rows, { role: "assistant", text: language === "es" ? "Su sesión expiró. Inicie sesión nuevamente para consultar los datos financieros." : "Sua sessão expirou. Entre novamente para consultar os dados financeiros." }]); return; }
     const history = assistantMessages.slice(-8).map(({role,text}) => ({role,text}));
     setAssistantMessages(rows => [...rows, { role: "user", text: question }]);
     setAssistantQuestion("");
@@ -61,7 +61,7 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
       if (!response.ok) throw new Error(payload.error || "Não foi possível consultar os dados financeiros.");
       setAssistantMessages(rows => [...rows, { role: "assistant", text: String(payload.answer || "Não houve resposta."), metrics: Array.isArray(payload.metrics) ? payload.metrics : [], warnings: Array.isArray(payload.warnings) ? payload.warnings : [] }]);
     } catch (e) {
-      setAssistantMessages(rows => [...rows, { role: "assistant", text: (e as Error).message || "O Assistente Financeiro está temporariamente indisponível." }]);
+      setAssistantMessages(rows => [...rows, { role: "assistant", text: (e as Error).message || (language === "es" ? "El Asistente Financiero no está disponible temporalmente." : "O Assistente Financeiro está temporariamente indisponível.") }]);
     } finally {
       setAssistantLoading(false);
     }
