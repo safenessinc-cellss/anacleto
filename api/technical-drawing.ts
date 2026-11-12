@@ -472,7 +472,7 @@ export default async function handler(req: any, res: any) {
       }
       // Rascunho local temporário: nunca liberado para fabricação sem validação técnica.
       try {
-        const fallback = localFallback(prompt);
+        const fallback: any = localFallback(prompt);
         fallback.isDraft = true;
         fallback.status = "LOCAL_PRELIMINARY_FALLBACK";
         fallback.draftStatus = "preliminary";
