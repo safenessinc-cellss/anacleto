@@ -217,6 +217,18 @@ export default function SettingsModule({ senderConfig, setSenderConfig, language
           </button>
         </div>
       </form>
+
+      <section className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-5 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100">
+        <h3 className="flex items-center gap-2 font-black"><ShieldCheck className="h-4 w-4"/> {language === "es" ? "Conexión segura de IA" : "Conexão segura da IA"}</h3>
+        <p className="mt-2 text-xs leading-relaxed">
+          {language === "es"
+            ? "ANACLETO utiliza Gemini 2.5 Flash. Para activar la API oficial con JSON Schema, configure GEMINI_API_KEY como variable sensible del servidor en Vercel (Preview y Production). Por seguridad, la clave nunca se guarda en localStorage, Firestore ni en el navegador. Si no existe, el sistema utiliza AI Gateway cuando está disponible."
+            : "ANACLETO utiliza Gemini 2.5 Flash. Para ativar a API oficial com JSON Schema, configure GEMINI_API_KEY como variável sensível do servidor no Vercel (Preview e Production). Por segurança, a chave nunca é salva em localStorage, Firestore ou no navegador. Se não existir, o sistema utiliza o AI Gateway quando disponível."}
+        </p>
+        <p className="mt-2 text-[11px] opacity-80">
+          {language === "es" ? "La cuota gratuita de Google tiene límites de uso y disponibilidad; no es ilimitada." : "A cota gratuita do Google possui limites de uso e disponibilidade; não é ilimitada."}
+        </p>
+      </section>
     </div>
   );
 }
