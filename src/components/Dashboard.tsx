@@ -42,6 +42,7 @@ import CrmTab from "./CrmTab";
 import LedgerTab from "./LedgerTab";
 import AdvisorTab from "./AdvisorTab";
 import { useToast } from "./ToastContext";
+import { compactInvoiceForFirestore, compactQuoteForFirestore } from "../utils/firestorePayloads";
 
 interface DashboardProps {
   t: Translation;
@@ -171,6 +172,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
       const docRef = doc(db, "budgets", budgetId);
       
       const completeBudget = {
+        ...(selectedBudget || {}),
         ...budgetData,
         id: budgetId,
         number: selectedBudget ? selectedBudget.number : "PRES-" + new Date().getFullYear() + "-" + (budgets.length + 101),
@@ -178,7 +180,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         updatedAt: new Date().toISOString()
       };
 
-      await setDoc(docRef, completeBudget, { merge: true });
+      await setDoc(docRef, compactQuoteForFirestore(completeBudget as Budget));
       showToast(t.toastBudgetCreated, "success");
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, "budgets");
@@ -198,7 +200,8 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         id: invoiceId, number: invoiceNo, budgetId: budget.id,
         clientName: budget.clientName, clientEmail: budget.clientEmail, clientNif: budget.clientNif,
         clientAddress: budget.clientAddress, date: new Date().toISOString().split("T")[0], dueDate,
-        items: budget.items, subtotal: budget.subtotal, taxRate: budget.taxRate, taxAmount: budget.taxAmount,
+        items: budget.items, subtotal: budget.subtotal, labor: budget.labor, marginRate: budget.marginRate,
+        margin: budget.margin, freight: budget.freight, taxRate: budget.taxRate, taxAmount: budget.taxAmount,
         total: budget.total, language: budget.language, senderSnapshot: senderConfig,
         status: "pending", createdAt: new Date().toISOString()
       };
@@ -206,7 +209,7 @@ export default function Dashboard({ t, onLogout, currentLanguage, senderConfig, 
         const current = await tx.get(budgetRef);
         if (!current.exists()) throw new Error("Orçamento não encontrado.");
         if (current.data().invoiceId || current.data().status === "invoiced") throw new Error("Este orçamento já possui uma fatura vinculada.");
-        tx.set(invoiceRef, invoiceData);
+        tx.set(invoiceRef, compactInvoiceForFirestore(invoiceData));
         tx.set(doc(db, "receivables", invoiceId), {
           clientId: (budget as any).companyId || (budget as any).clientId || "",
           clientName: budget.clientName || "Cliente", description: `Fatura ${invoiceNo} · Orçamento ${budget.id}`,

@@ -105,17 +105,25 @@ export default function PayrollModule() {
     setError("");
     try {
       const paymentRef = doc(collection(db, "employee_payments"));
+      const ledgerRef = doc(db, "ledger_entries", `employee-payment-${paymentRef.id}`);
       const pendingAdvances = adjustments.filter((item) => item.employeeId === employee.id && item.competence === month && item.source === "finance_employee_advance" && item.status !== "deducted");
+      const paymentDate = new Date().toISOString().slice(0, 10);
       await runTransaction(db, async (transaction) => {
         const refs = pendingAdvances.map((item) => doc(db, "payroll_adjustments", item.id));
         const snapshots = [];
         for (const ref of refs) snapshots.push(await transaction.get(ref));
         transaction.set(paymentRef, {
           employeeId: employee.id, employeeName: employee.name, employeeRole: employee.role || "",
-          competence: month, amount: outstanding, paymentDate: new Date().toISOString().slice(0, 10),
+          competence: month, amount: outstanding, paymentDate,
           method: "pix", reference: `Folha de pagamento ${month}`,
           notes: "Pagamento registrado diretamente na Folha de Pagamento.",
           status: "paid", payrollSource: "payroll", deductedAdvanceIds: pendingAdvances.map((item) => item.id),
+          createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "",
+        });
+        transaction.set(ledgerRef, {
+          direction: "outflow", category: "payroll", sourceType: "employee_payment", sourceId: paymentRef.id,
+          employeeId: employee.id, employeeName: employee.name, description: `Folha de pagamento · ${employee.name} · ${month}`,
+          amount: outstanding, date: paymentDate, status: "posted", paymentMethod: "pix",
           createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "",
         });
         snapshots.forEach((snapshot, index) => {
@@ -131,7 +139,15 @@ export default function PayrollModule() {
   const addAdjustment = async (ev: React.FormEvent) => {
     ev.preventDefault(); setError(""); const amount = Number(adjustmentAmount);
     if (!adjustmentEmployee || !Number.isFinite(amount) || amount <= 0 || !adjustmentDate) return setError("Informe funcionário, data e valor válido para o lançamento.");
-    try { await addDoc(collection(db, "payroll_adjustments"), { employeeId: adjustmentEmployee, competence: monthKey(adjustmentDate), kind: adjustmentKind, amount: round2(amount), description: adjustmentDescription.trim(), date: adjustmentDate, createdAt: serverTimestamp(), createdBy: auth.currentUser?.uid || null }); setAdjustmentAmount(""); setAdjustmentDescription(""); }
+    try {
+      const adjustmentRef = doc(collection(db, "payroll_adjustments"));
+      const ledgerRef = doc(db, "ledger_entries", `employee-advance-${adjustmentRef.id}`);
+      await runTransaction(db, async transaction => {
+        transaction.set(adjustmentRef, { employeeId: adjustmentEmployee, competence: monthKey(adjustmentDate), kind: adjustmentKind, amount: round2(amount), description: adjustmentDescription.trim(), date: adjustmentDate, status: "pending_deduction", source: "payroll_adjustment", createdAt: serverTimestamp(), createdBy: auth.currentUser?.uid || null });
+        if (adjustmentKind !== "loan") transaction.set(ledgerRef, { direction: "outflow", category: "employee_advance", sourceType: "payroll_adjustment", sourceId: adjustmentRef.id, employeeId: adjustmentEmployee, description: `${adjustmentKind === "vale" ? "Vale" : "Adiantamento"} · ${adjustmentDescription.trim()}`, amount: round2(amount), date: adjustmentDate, status: "posted", createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+      });
+      setAdjustmentAmount(""); setAdjustmentDescription("");
+    }
     catch(e) { setError("Falha ao lançar adiantamento/vale/empréstimo: " + (e as Error).message); }
   };
   const saveSalary = async (ev: React.FormEvent) => {

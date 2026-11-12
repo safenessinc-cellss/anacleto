@@ -67,7 +67,13 @@ service cloud.firestore {
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']) && !('approvedSnapshotId' in resource.data);
     }
     match /ledger_entries/{id} { allow read, write: if canManageFinance(); }
+    match /daily_expenses/{id} { allow read, write: if canManageFinance(); }
     match /client_advances/{id} { allow read, write: if canManageFinance(); }
+    match /purchase_orders/{id} { allow read, write: if canManageFinance(); }
+    match /payables/{id} { allow read, write: if canManageFinance(); }
+    match /payments/{id} { allow read, write: if canManageFinance(); }
+    match /receivables/{id} { allow read, write: if canManageFinance(); }
+    match /suppliers/{id} { allow read, write: if canManageFinance(); }
     match /payroll_adjustments/{id} { allow read, write: if canManageFinance(); }
     match /employees/{id} { allow read, write: if canManageFinance(); }
     match /employee_payments/{id} { allow read, write: if canManageFinance(); }
@@ -146,6 +152,7 @@ service cloud.firestore {
     match /sender_config/{id} { allow read: if canOperate(); allow create, update: if hasRole(['super_admin','super_usuario','ceo','admin']); allow delete: if owner(); }
 
     // Negação por padrão: nenhuma coleção não declarada fica acessível por estar autenticado.
-    match /{document=**} { allow read, write: if false; }
+    // Os perfis de administração têm acesso integral a todas as coleções do sistema.
+    match /{document=**} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']); }
   }
 }

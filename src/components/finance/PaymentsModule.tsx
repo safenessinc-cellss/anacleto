@@ -19,6 +19,7 @@ interface Payable {
   status: "pending" | "paid" | "cancelled";
   paidAt?: string;
   digitableLine?: string;
+  expenseCategory?: string;
 }
 
 interface Payment {
@@ -166,7 +167,7 @@ export default function PaymentsModule() {
         });
         tx.update(payableRef, { status: "paid", paidAt, paidMethod: method, paymentId: paymentRef.id });
         tx.set(ledgerRef, {
-          direction: "outflow", category: "supplier_payment", sourceType: "payable", sourceId: selected.id,
+          direction: "outflow", category: selected.expenseCategory === "gastos_diarios" ? "daily_expense" : selected.expenseCategory === "materiais" ? "materials" : "supplier_payment", sourceType: "payable", sourceId: selected.id,
           description: `Pagamento a fornecedor · ${selected.description}`, amount: Number(selected.amount || 0),
           date: paidAt.slice(0, 10), status: "posted", paymentMethod: method,
           createdAt: paidAt, createdBy: auth.currentUser?.email || ""

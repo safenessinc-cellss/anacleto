@@ -29,6 +29,7 @@ import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
 import AnacletoProApp from "./components/AnacletoProApp";
 import PendingApproval from "./components/PendingApproval";
 import { Role, SUPER_ADMIN_EMAIL } from "./utils/roles";
+import { assertUnder10Kb, withoutHeavyInlineData } from "./utils/firestorePayloads";
 
 // Premium Brand Assets
 import logoImg from "./assets/images/anacleto-logo-premium.svg";
@@ -258,7 +259,7 @@ export default function App() {
         updatedAt: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, "budgets", budgetId), budgetDoc);
+      await setDoc(doc(db, "budgets", budgetId), assertUnder10Kb(withoutHeavyInlineData(budgetDoc), "A solicitação de orçamento"));
       
       setVisSubmittedSuccess(true);
       showToast("Solicitação de orçamento enviada com sucesso!", "success");

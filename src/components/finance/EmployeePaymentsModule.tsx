@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { CheckCircle2, Clock3, CreditCard, Users } from "lucide-react";
+import { mergeEmployeeDirectory, type EmployeeDirectoryEntry, type EmployeeDirectoryRecord } from "../../utils/employeeDirectory";
 
-type Employee = { id: string; name: string; role?: string; salary?: number; cpf?: string; email?: string; phone?: string; department?: string; admissionDate?: string; monthlyHours?: number; active?: boolean };
+type Employee = EmployeeDirectoryEntry;
 type EmployeePayment = {
   id: string; employeeId: string; employeeName: string; competence: string;
   amount: number; paymentDate: string; method: string; reference?: string; notes?: string;
@@ -24,7 +25,8 @@ const validCPF = (value: string) => {
 };
 
 export default function EmployeePaymentsModule() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeRecords, setEmployeeRecords] = useState<EmployeeDirectoryRecord[]>([]);
+  const employees = useMemo(() => mergeEmployeeDirectory(employeeRecords), [employeeRecords]);
   const [payments, setPayments] = useState<EmployeePayment[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [competence, setCompetence] = useState(today.slice(0, 7));
@@ -48,15 +50,20 @@ export default function EmployeePaymentsModule() {
   const [savingEmployee, setSavingEmployee] = useState(false);
 
   useEffect(() => {
-    const stopEmployees = onSnapshot(collection(db, "employees"), snap =>
-      setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)).filter(e => e.active !== false)),
-      err => setError("Não foi possível carregar funcionários: " + err.message)
-    );
+    const employeeSources = ["employees", "admins", "pending_users", "user_profiles"] as const;
+    const employeeStops = employeeSources.map((source) => onSnapshot(
+      collection(db, source),
+      (snap) => {
+        const loaded = snap.docs.map((item) => ({ id: item.id, source, data: item.data() }) as EmployeeDirectoryRecord);
+        setEmployeeRecords((current) => [...current.filter((record) => record.source !== source), ...loaded]);
+      },
+      (err) => setError(`Não foi possível carregar funcionários de ${source}: ${err.message}`),
+    ));
     const stopPayments = onSnapshot(query(collection(db, "employee_payments"), orderBy("paymentDate", "desc")), snap =>
       setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() } as EmployeePayment))),
       err => setError("Não foi possível carregar pagamentos: " + err.message)
     );
-    return () => { stopEmployees(); stopPayments(); };
+    return () => { employeeStops.forEach((stop) => stop()); stopPayments(); };
   }, []);
 
   const selected = employees.find(e => e.id === employeeId);
@@ -79,6 +86,7 @@ export default function EmployeePaymentsModule() {
     if (cpfDigits && employees.some(e => e.id !== editing.id && (e.cpf || "").replace(/\\D/g, "") === cpfDigits)) { setError("Já existe outro funcionário com este CPF."); return; }
     setSavingEmployee(true); setError("");
     try {
+      if (editing.source !== "employees") throw new Error("Edite este funcionário no cadastro de origem para preservar a vinculação.");
       await updateDoc(doc(db, "employees", editing.id), { name: editName.trim(), role: editRole.trim(), cpf: cpfDigits, salary: Math.round(Number(editSalary) * 100) / 100, email: editEmail.trim(), phone: editPhone.trim(), department: editDepartment.trim(), admissionDate: editAdmissionDate, monthlyHours: Number(editMonthlyHours), profileUpdatedAt: serverTimestamp(), profileUpdatedBy: auth.currentUser?.email || "" });
       setEditing(null);
     } catch (e) { setError("Não foi possível atualizar o funcionário: " + (e as Error).message); }
@@ -93,11 +101,21 @@ export default function EmployeePaymentsModule() {
     if (!competence || !paymentDate || !Number.isFinite(value) || value <= 0) return setError("Informe competência, data e valor válido.");
     setSaving(true);
     try {
-      await addDoc(collection(db, "employee_payments"), {
-        employeeId: selected.id, employeeName: selected.name, employeeRole: selected.role || "",
-        competence, amount: Math.round(value * 100) / 100, paymentDate, method,
-        reference: reference.trim(), notes: notes.trim(), status: "paid",
-        payrollSource: "employees", createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || ""
+      const paymentRef = doc(collection(db, "employee_payments"));
+      const ledgerRef = doc(db, "ledger_entries", `employee-payment-${paymentRef.id}`);
+      await runTransaction(db, async (transaction) => {
+        transaction.set(paymentRef, {
+          employeeId: selected.id, employeeName: selected.name, employeeRole: selected.role || "",
+          competence, amount: Math.round(value * 100) / 100, paymentDate, method,
+          reference: reference.trim(), notes: notes.trim(), status: "paid",
+          payrollSource: "employees", createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || ""
+        });
+        transaction.set(ledgerRef, {
+          direction: "outflow", category: "payroll", sourceType: "employee_payment", sourceId: paymentRef.id,
+          employeeId: selected.id, employeeName: selected.name, description: `Folha de pagamento · ${selected.name} · ${competence}`,
+          amount: Math.round(value * 100) / 100, date: paymentDate, status: "posted", paymentMethod: method,
+          createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "",
+        });
       });
       setAmount(""); setReference(""); setNotes("");
     } catch (e) {
@@ -115,7 +133,7 @@ export default function EmployeePaymentsModule() {
     </div>
     <section className="overflow-hidden rounded-2xl border bg-white dark:bg-slate-900">
       <div className="border-b p-4 dark:border-slate-700"><h3 className="font-bold">Salários base vinculados à Folha de Pagamento</h3><p className="text-xs text-slate-500">Valor atual do cadastro funcional; alterações são feitas na Folha de Pagamento e refletidas aqui.</p></div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th className="p-3">Funcionário</th><th className="p-3">Função</th><th className="p-3 text-right">Salário base atual</th><th className="p-3 text-right">Pago na competência</th><th className="p-3 text-right">Diferença</th><th className="p-3">Cadastro</th></tr></thead><tbody>{employees.map(e=>{const paid=monthPayments.filter(p=>p.employeeId===e.id).reduce((s,p)=>s+Number(p.amount||0),0);const base=Number(e.salary||0);return <tr key={e.id} className="border-t dark:border-slate-700"><td className="p-3 font-semibold">{e.name}<div className="text-xs text-slate-500">CPF: {e.cpf || "não informado"}</div></td><td className="p-3 text-slate-500">{e.role||"—"}</td><td className="p-3 text-right font-semibold">{money(base)}</td><td className="p-3 text-right">{money(paid)}</td><td className="p-3 text-right">{money(base-paid)}</td><td className="p-3"><button type="button" onClick={()=>beginEdit(e)} className="rounded-lg border px-3 py-1.5 text-xs font-bold text-blue-700">Editar funcionário</button></td></tr>;})}{!employees.length&&<tr><td colSpan={6} className="p-6 text-center text-slate-500">Nenhum funcionário cadastrado na Folha.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th className="p-3">Funcionário</th><th className="p-3">Função</th><th className="p-3 text-right">Salário base atual</th><th className="p-3 text-right">Pago na competência</th><th className="p-3 text-right">Diferença</th><th className="p-3">Cadastro</th></tr></thead><tbody>{employees.map(e=>{const paid=monthPayments.filter(p=>p.employeeId===e.id).reduce((s,p)=>s+Number(p.amount||0),0);const base=Number(e.salary||0);return <tr key={e.id} className="border-t dark:border-slate-700"><td className="p-3 font-semibold">{e.name}<div className="text-xs text-slate-500">CPF: {e.cpf || "não informado"}</div></td><td className="p-3 text-slate-500">{e.role||"—"}</td><td className="p-3 text-right font-semibold">{money(base)}</td><td className="p-3 text-right">{money(paid)}</td><td className="p-3 text-right">{money(base-paid)}</td><td className="p-3">{e.source === "employees" && <button type="button" onClick={()=>beginEdit(e)} className="rounded-lg border px-3 py-1.5 text-xs font-bold text-blue-700">Editar funcionário</button>}</td></tr>;})}{!employees.length&&<tr><td colSpan={6} className="p-6 text-center text-slate-500">Nenhum funcionário cadastrado na Folha.</td></tr>}</tbody></table></div>
     </section>
     <form onSubmit={save} className="grid gap-3 rounded-2xl border bg-white p-5 dark:bg-slate-900 sm:grid-cols-2">
       <h3 className="sm:col-span-2 font-bold">Registrar pagamento realizado</h3>

@@ -519,34 +519,35 @@ export const buildInvoicePdf = (invoice: Invoice, sender?: SenderConfig): PdfDoc
 
   // Totals Box
   const totalsX = pageWidth - 90;
+  const invoiceRows = [
+    ["Materiais:", formatMoney(invoice.subtotal, currency)],
+    ...(Number(invoice.labor || 0) > 0 ? [["Mão de obra:", formatMoney(invoice.labor || 0, currency)]] : []),
+    ...(Number(invoice.margin || 0) > 0 ? [[`Margem (${invoice.marginRate || 0}%):`, formatMoney(invoice.margin || 0, currency)]] : []),
+    ...(Number(invoice.freight || 0) > 0 ? [["Frete:", formatMoney(invoice.freight || 0, currency)]] : []),
+    ...(Number(invoice.discountAmount || 0) > 0 ? [[`Desconto (${invoice.discountRate || 0}%):`, `-${formatMoney(invoice.discountAmount || 0, currency)}`]] : []),
+    [`IVA (${invoice.taxRate}%):`, formatMoney(invoice.taxAmount, currency)],
+  ];
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(totalsX - 5, finalY - 4, 85, 45, 3, 3, "F");
-
+  doc.roundedRect(totalsX - 5, finalY - 4, 85, (invoiceRows.length + 1) * 7 + 7, 3, 3, "F");
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
-  doc.text("Base Imponible:", totalsX, finalY + 4);
-  doc.text(formatMoney(invoice.subtotal, currency), pageWidth - 14, finalY + 4, { align: "right" });
-
-  if (invoice.discountRate && invoice.discountRate > 0) {
-    doc.text(`Descuento (${invoice.discountRate}%):`, totalsX, finalY + 11);
-    doc.setTextColor(220, 38, 38);
-    doc.text(`-${formatMoney(invoice.discountAmount || 0, currency)}`, pageWidth - 14, finalY + 11, { align: "right" });
+  invoiceRows.forEach(([label, amount], index) => {
+    const rowY = finalY + 4 + index * 7;
+    doc.text(label, totalsX, rowY);
+    if (label.startsWith("Desconto")) doc.setTextColor(220, 38, 38);
+    doc.text(amount, pageWidth - 14, rowY, { align: "right" });
     doc.setTextColor(71, 85, 105);
-  }
-
-  doc.text(`IVA (${invoice.taxRate}%):`, totalsX, finalY + 18);
-  doc.text(formatMoney(invoice.taxAmount, currency), pageWidth - 14, finalY + 18, { align: "right" });
-
+  });
+  const totalLineY = finalY + 4 + invoiceRows.length * 7;
   doc.setDrawColor(203, 213, 225);
-  doc.line(totalsX, finalY + 23, pageWidth - 14, finalY + 23);
-
+  doc.line(totalsX, totalLineY, pageWidth - 14, totalLineY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
-  doc.text("TOTAL FACTURA:", totalsX, finalY + 30);
-  doc.setTextColor(16, 185, 129); // Emerald
-  doc.text(formatMoney(invoice.total, currency), pageWidth - 14, finalY + 30, { align: "right" });
+  doc.text("TOTAL FACTURA:", totalsX, totalLineY + 7);
+  doc.setTextColor(16, 185, 129);
+  doc.text(formatMoney(invoice.total, currency), pageWidth - 14, totalLineY + 7, { align: "right" });
 
   // Bank Info & Notes
   doc.setFont("helvetica", "bold");

@@ -18,10 +18,11 @@ import {
 } from "lucide-react";
 import { Invoice, InvoiceStatus, SenderConfig } from "../../types";
 import { exportInvoicePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
+import { compactInvoiceForFirestore } from "../../utils/firestorePayloads";
 
 interface InvoicesModuleProps {
   senderConfig: SenderConfig;
@@ -59,27 +60,14 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
   }, []);
 
   const handleOpenInvoicePdf = async (inv: Invoice) => {
-    let target = inv;
-    if (!target.pdfDataUri) {
-      try {
-        const res = buildInvoicePdf(target, senderConfig);
-        target = {
-          ...target,
-          pdfDataUri: res.dataUri,
-          pdfFileName: res.fileName,
-          pdfGeneratedAt: new Date().toISOString(),
-          pdfFileSizeKb: res.sizeKb,
-        };
-        await setDoc(doc(db, "invoices", target.id), target);
-        if (selectedInvoice?.id === target.id) {
-          setSelectedInvoice(target);
-        }
-      } catch (err) {
-        console.warn("Could not pre-build invoice PDF:", err);
-      }
+    try {
+      const res = buildInvoicePdf(inv, senderConfig);
+      setViewerPdfInvoice({ ...inv, pdfDataUri: res.dataUri, pdfFileName: res.fileName, pdfFileSizeKb: res.sizeKb });
+      setIsPdfModalOpen(true);
+    } catch (err) {
+      console.error("Could not build invoice PDF:", err);
+      showToast((err as Error).message || "Não foi possível gerar o PDF da fatura.", "error");
     }
-    setViewerPdfInvoice(target);
-    setIsPdfModalOpen(true);
   };
 
   const handleToggleStatus = async (invoice: Invoice) => {
@@ -90,8 +78,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
     try {
       const nextStatus: InvoiceStatus = "paid";
       const baseUpdated: Invoice = { ...invoice, status: nextStatus, updatedAt: new Date().toISOString() };
-      const pdfRes = buildInvoicePdf(baseUpdated, senderConfig);
-      const updated: Invoice = { ...baseUpdated, pdfDataUri: pdfRes.dataUri, pdfFileName: pdfRes.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdfRes.sizeKb };
+      const updated: Invoice = baseUpdated;
       const invoiceRef = doc(db, "invoices", invoice.id);
       const receivableRef = doc(db, "receivables", invoice.id);
       const ledgerRef = doc(db, "ledger_entries", `invoice-paid-${invoice.id}`);
@@ -104,7 +91,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
         const previousReceived = Number(receivableSnap.exists() ? receivableSnap.data().receivedAmount || 0 : 0);
         const receiptDelta = Math.max(0, Number(invoice.total || 0) - previousReceived);
         if (receiptDelta <= 0) throw new Error("Esta fatura já está totalmente recebida.");
-        tx.set(invoiceRef, updated);
+        tx.set(invoiceRef, compactInvoiceForFirestore(updated));
         tx.set(receivableRef, {
           clientId: invoice.companyId || "", clientName: invoice.clientName || "Cliente",
           description: `Recebimento da fatura ${invoice.number}`, amount: Number(invoice.total || 0),
@@ -271,11 +258,6 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
                   <div className="flex items-center justify-between mt-3 text-[11px]">
                     <div className="flex items-center gap-1.5">
                       <span className="text-slate-500">{inv.items?.length || 0} itens</span>
-                      {inv.pdfDataUri && (
-                        <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
-                          PDF
-                        </span>
-                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-black text-white">
@@ -286,7 +268,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
                           e.stopPropagation();
                           handleOpenInvoicePdf(inv);
                         }}
-                        title="Ver PDF armazenado na plataforma"
+                        title="Gerar e visualizar PDF"
                         className="p-1 hover:bg-slate-700 text-slate-400 hover:text-emerald-400 rounded-lg transition"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -310,12 +292,6 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
                     <span className="text-xs font-mono font-bold text-emerald-400">{selectedInvoice.number}</span>
                     <span className="text-slate-500">•</span>
                     <span className="text-xs text-slate-400">Data: {selectedInvoice.date}</span>
-                    {selectedInvoice.pdfDataUri && (
-                      <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3 text-emerald-400" />
-                        PDF armazenado ({selectedInvoice.pdfFileSizeKb || 35} KB)
-                      </span>
-                    )}
                   </div>
                   <h2 className="text-lg font-black text-white mt-1">Fatura para: {selectedInvoice.clientName}</h2>
                   {selectedInvoice.deliveryEvidence && <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200"><p className="font-bold">Entrega concluída · {selectedInvoice.deliveryStatus} · Recebido por {selectedInvoice.deliveryEvidence.signedBy}</p><div className="mt-2 flex flex-wrap gap-2">{selectedInvoice.deliveryEvidence.photos.map(photo=><a key={photo.path} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt="Foto da entrega" className="h-14 w-20 rounded object-cover"/></a>)}<a href={selectedInvoice.deliveryEvidence.signatureUrl} target="_blank" rel="noreferrer" className="rounded border border-emerald-300 px-3 py-2 font-bold">Assinatura</a><a href={`https://maps.google.com/?q=${selectedInvoice.deliveryEvidence.latitude},${selectedInvoice.deliveryEvidence.longitude}`} target="_blank" rel="noreferrer" className="rounded border border-emerald-300 px-3 py-2 font-bold">GPS</a></div></div>}
@@ -326,7 +302,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
                     onClick={() => handleOpenInvoicePdf(selectedInvoice)}
                     className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 text-xs font-bold rounded-xl transition border border-emerald-500/40 shadow-sm"
                   >
-                    <Eye className="w-3.5 h-3.5 text-emerald-400" /> Ver PDF armazenado
+                    <Eye className="w-3.5 h-3.5 text-emerald-400" /> Gerar e visualizar PDF
                   </button>
 
                   {canManageFinance && <button

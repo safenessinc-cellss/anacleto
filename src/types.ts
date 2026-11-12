@@ -62,7 +62,7 @@ export interface Quote {
   validUntil?: string;
   items: QuoteItem[];
   itemIds?: string[];
-  technicalDrawing?: TechnicalDrawing;
+  technicalDrawing?: TechnicalDrawing | TechnicalDrawingReference;
   subtotal: number;
   labor?: number;
   marginRate?: number;
@@ -117,6 +117,10 @@ export interface Invoice {
   dueDate?: string;
   items: QuoteItem[];
   subtotal: number;
+  labor?: number;
+  marginRate?: number;
+  margin?: number;
+  freight?: number;
   taxRate: number;
   taxAmount: number;
   discountRate?: number;
@@ -182,6 +186,12 @@ export interface TechnicalDrawingStep {
 export interface TechnicalDrawing {
   id: string;
   title: string;
+  referenceCode?: string;
+  tipologia?: string;
+  medidas?: string;
+  linha?: string;
+  cor?: string;
+  vidro?: string;
   description: string;
   category: "furniture" | "architectural" | "aluminum_window" | "glass_door" | "custom";
   unit: "cm" | "mm";
@@ -239,6 +249,7 @@ export interface TechnicalDrawing {
       priceValidation?: string; catalogPriceAtApproval?: number;
       cutLengthMm?: number; imageUrl?: string;
     }>;
+
     subtotal: number;
     labor: number;
     marginRate?: number;
@@ -264,6 +275,28 @@ export interface TechnicalDrawing {
   projectName?: string;
   ownerUid?: string;
   schemaVersion?: number;
+}
+
+export interface TechnicalDrawingReference {
+  id: string;
+  title: string;
+  referenceCode?: string;
+  tipologia?: string;
+  medidas?: string;
+  linha?: string;
+  cor?: string;
+  vidro?: string;
+  category?: TechnicalDrawing["category"];
+  unit?: TechnicalDrawing["unit"];
+  overallDimensions?: TechnicalDrawing["overallDimensions"];
+  items?: Array<{
+    description: string;
+    sku?: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal?: number;
+    cutLengthMm?: number;
+  }>;
 }
 
 export interface LedgerEntry {

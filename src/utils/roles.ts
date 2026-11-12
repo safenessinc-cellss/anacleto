@@ -77,7 +77,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     color: "bg-purple-100 text-purple-800 border-purple-300",
     description: "Dirección ejecutiva. Acceso operativo y estratégico; la administración de cuentas queda reservada al propietario.",
     tabs: ALL_TABS,
-    canManageUsers: false,
+    canManageUsers: true,
     canManageRolesBelow: ["super_usuario", "admin", "supervisor", "colaborador", "usuario"],
   },
   super_usuario: {
@@ -88,7 +88,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     color: "bg-orange-100 text-orange-800 border-orange-300",
     description: "Gestión avanzada de la operación; la administración de cuentas queda reservada al propietario.",
     tabs: ALL_TABS,
-    canManageUsers: false,
+    canManageUsers: true,
     canManageRolesBelow: ["admin", "supervisor", "colaborador", "usuario"],
   },
   admin: {
@@ -97,9 +97,9 @@ export const ROLES: Record<Role, RoleConfig> = {
     labelPT: "Administrador",
     level: 60,
     color: "bg-indigo-100 text-indigo-800 border-indigo-300",
-    description: "Gestión completa del negocio, sin privilegios para administrar la cuenta propietaria ni altas de usuarios.",
+    description: "Acceso completo a las secciones y gestiones del sistema.",
     tabs: ALL_TABS,
-    canManageUsers: false,
+    canManageUsers: true,
     canManageRolesBelow: ["supervisor", "colaborador", "usuario"],
   },
   supervisor: {

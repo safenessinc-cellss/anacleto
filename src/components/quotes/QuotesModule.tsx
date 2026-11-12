@@ -33,6 +33,7 @@ import PdfViewerModal from "../common/PdfViewerModal";
 import ImageLightbox from "../common/ImageLightbox";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
 import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
+import { compactInvoiceForFirestore, compactQuoteForFirestore } from "../../utils/firestorePayloads";
 
 interface QuotesModuleProps {
   senderConfig: SenderConfig;
@@ -330,7 +331,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("Faça login novamente para aprovar o orçamento.");
       const approvalCandidate = recalculateQuote(selectedQuote);
-      await setDoc(doc(db, "quotes", approvalCandidate.id), approvalCandidate);
+      await setDoc(doc(db, "quotes", approvalCandidate.id), compactQuoteForFirestore(approvalCandidate));
       const senderSnapshot = await preparePdfSender();
       const response = await fetch("/api/approved-snapshot", {
         method: "POST",
@@ -349,7 +350,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     }
   };
 
-  // Open and View Stored PDF
+  // Build the PDF on demand; generated files remain in memory only.
   const handleOpenQuotePdf = async (quote: Quote) => {
     let target = quote;
     try {
@@ -369,10 +370,6 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         pdfGeneratedAt: new Date().toISOString(),
         pdfFileSizeKb: pdfRes.sizeKb,
       };
-      if (!quote.approvedSnapshotId) {
-        await setDoc(doc(db, "quotes", target.id), target);
-        if (selectedQuote?.id === target.id) setSelectedQuote(target);
-      }
     } catch (err) {
       console.warn("Could not prepare quote PDF from its source snapshot:", err);
       showToast((err as Error).message || "Não foi possível preparar o PDF.", "error");
@@ -382,7 +379,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     setIsPdfModalOpen(true);
   };
 
-  // Save Quote and its persistent PDF to Firestore
+  // Save only the light quote data; generate its PDF when requested.
   const handleSaveQuote = async (quoteToSave?: Quote) => {
     const requested = quoteToSave || selectedQuote!;
     if (requested?.approvedSnapshotId) {
@@ -395,21 +392,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       return;
     }
     try {
-      // Build PDF document and serialize as data URI
-      const pdfSender = await preparePdfSender();
-      const pdfRes = buildQuotePdf(target, pdfSender);
-      target = {
-        ...target,
-        pdfDataUri: pdfRes.dataUri,
-        pdfFileName: pdfRes.fileName,
-        pdfGeneratedAt: new Date().toISOString(),
-        pdfFileSizeKb: pdfRes.sizeKb,
-      };
-
-      await setDoc(doc(db, "quotes", target.id), target);
+      await setDoc(doc(db, "quotes", target.id), compactQuoteForFirestore(target));
       setSelectedQuote(target);
       setIsEditing(false);
-      showToast(`Orçamento ${target.number} e PDF salvos na plataforma.`, "success");
+      showToast(`Orçamento ${target.number} salvo. O PDF será gerado ao visualizar ou exportar.`, "success");
     } catch (err) {
       console.error(err);
       showToast("Erro ao salvar orçamento no Firestore.", "error");
@@ -448,7 +434,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     }
   };
 
-  // Convert Approved Quote to Invoice (with persistent PDF attached)
+  // Convert the approved quote to an invoice; the PDF is generated on demand.
   const handleConvertQuoteToInvoice = async (quote: Quote) => {
     try {
       let approvedQuote = quote;
@@ -461,7 +447,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         if (!token) throw new Error("Faça login novamente para gerar a fatura.");
         // Freeze the same recalculated totals that will be used by the invoice PDF.
         approvedQuote = recalculateQuote(quote);
-        await setDoc(doc(db, "quotes", approvedQuote.id), approvedQuote);
+        await setDoc(doc(db, "quotes", approvedQuote.id), compactQuoteForFirestore(approvedQuote));
         const senderSnapshot = await preparePdfSender();
         const approvalResponse = await fetch("/api/approved-snapshot", {
           method: "POST",
@@ -504,20 +490,21 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         clientName: approvedQuote.clientName, clientEmail: approvedQuote.clientEmail, clientTaxId: approvedQuote.clientTaxId,
         clientAddress: approvedQuote.clientAddress, date: new Date().toISOString().split("T")[0],
         dueDate: new Date(Date.now() + 15 * 24 * 3600 * 1000).toISOString().split("T")[0],
-        items: approvedQuote.items, subtotal: approvedQuote.subtotal, taxRate: approvedQuote.taxRate, taxAmount: approvedQuote.taxAmount,
+        items: approvedQuote.items, subtotal: approvedQuote.subtotal, labor: approvedQuote.labor,
+        marginRate: approvedQuote.marginRate, margin: approvedQuote.margin, freight: approvedQuote.freight,
+        taxRate: approvedQuote.taxRate, taxAmount: approvedQuote.taxAmount,
         discountRate: approvedQuote.discountRate, discountAmount: approvedQuote.discountAmount, total: approvedQuote.total,
         currency: approvedQuote.currency, senderSnapshot: invoiceSender, status: "pendente", paymentMethod: "Transferência Bancária",
         notes: `Fatura gerada a partir do orçamento ${approvedQuote.number}.`,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
-      const pdf = buildInvoicePdf(baseInvoice, invoiceSender);
-      const finalInvoice: Invoice = { ...baseInvoice, pdfDataUri: pdf.dataUri, pdfFileName: pdf.fileName, pdfGeneratedAt: new Date().toISOString(), pdfFileSizeKb: pdf.sizeKb };
+      const finalInvoice: Invoice = baseInvoice;
       await runTransaction(db, async tx => {
         const current = await tx.get(quoteRef);
         if (!current.exists()) throw new Error("Orçamento não encontrado.");
         if (current.data().invoiceId) throw new Error("Este orçamento já possui uma fatura vinculada.");
         if (!["accepted", "approved", "aprovado"].includes(String(current.data().status || ""))) throw new Error("Aprove o orçamento antes de gerar a fatura.");
-        tx.set(invoiceRef, finalInvoice);
+        tx.set(invoiceRef, compactInvoiceForFirestore(finalInvoice));
         tx.set(doc(db, "receivables", invoiceId), {
           clientId: approvedQuote.companyId || "", clientName: approvedQuote.clientName || "Cliente",
           description: `Fatura ${invoiceNumber} · Orçamento ${approvedQuote.number}`,
@@ -555,7 +542,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       const quoteRef = doc(db, "quotes", selectedQuote.id);
       const savedQuote = await getDoc(quoteRef);
       if (!savedQuote.exists()) {
-        await setDoc(quoteRef, recalculateQuote(selectedQuote));
+        await setDoc(quoteRef, compactQuoteForFirestore(recalculateQuote(selectedQuote)));
       }
 
       const res = await fetch("/api/ai/quote-agent", {
@@ -844,11 +831,6 @@ const handleAddItem = () => {
                   <div className="flex items-center justify-between mt-3 text-[11px]">
                     <div className="flex items-center gap-1.5">
                       <span className="text-slate-400">{q.items.length} itens</span>
-                      {q.pdfDataUri ? (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">
-                          PDF
-                        </span>
-                      ) : null}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-black text-white">
@@ -859,7 +841,7 @@ const handleAddItem = () => {
                           e.stopPropagation();
                           handleOpenQuotePdf(q);
                         }}
-                        title="Ver PDF salvo na plataforma"
+                        title="Gerar e visualizar PDF"
                         className="p-1 hover:bg-slate-700 text-slate-400 hover:text-amber-400 rounded-lg transition"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -884,12 +866,6 @@ const handleAddItem = () => {
                       <span className="text-xs font-mono font-bold text-amber-400">{selectedQuote.number}</span>
                       <span className="text-slate-500">•</span>
                       <span className="text-xs text-slate-400">Data: {selectedQuote.date}</span>
-                      {selectedQuote.pdfDataUri && (
-                        <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3 text-emerald-400" />
-                          PDF armazenado ({selectedQuote.pdfFileSizeKb || 35} KB)
-                        </span>
-                      )}
                     </div>
                     <h2 className="text-lg font-black text-white mt-1">Orçamento para: {selectedQuote.clientName}</h2>
                     {selectedQuote.deliveryEvidence && <div className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200"><p className="font-bold">Entrega concluída · {selectedQuote.deliveryStatus} · Recebido por {selectedQuote.deliveryEvidence.signedBy}</p><div className="mt-2 flex flex-wrap gap-2">{selectedQuote.deliveryEvidence.photos.map(photo=><a key={photo.path} href={photo.url} target="_blank" rel="noreferrer"><img src={photo.url} alt="Foto da entrega" className="h-14 w-20 rounded object-cover"/></a>)}<a href={selectedQuote.deliveryEvidence.signatureUrl} target="_blank" rel="noreferrer" className="rounded border border-emerald-300 px-3 py-2 font-bold">Assinatura</a><a href={`https://maps.google.com/?q=${selectedQuote.deliveryEvidence.latitude},${selectedQuote.deliveryEvidence.longitude}`} target="_blank" rel="noreferrer" className="rounded border border-emerald-300 px-3 py-2 font-bold">GPS</a></div></div>}
@@ -909,7 +885,7 @@ const handleAddItem = () => {
                         Ações ▾
                       </summary>
                       <div className="absolute right-0 z-30 mt-2 grid min-w-52 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                        <button type="button" onClick={() => handleOpenQuotePdf(selectedQuote)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Eye className="h-4 w-4" />Visualizar PDF armazenado</button>
+                        <button type="button" onClick={() => handleOpenQuotePdf(selectedQuote)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Eye className="h-4 w-4" />Gerar e visualizar PDF</button>
                         <button type="button" onClick={() => handleDownloadQuotePdf(selectedQuote)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Download className="h-4 w-4" />Baixar PDF</button>
                         <button type="button" onClick={() => handleSendQuote("whatsapp")} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><MessageCircle className="h-4 w-4" />Enviar por WhatsApp</button>
                         <button type="button" onClick={() => handleSendQuote("email")} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Mail className="h-4 w-4" />Enviar por e-mail</button>
@@ -934,7 +910,7 @@ const handleAddItem = () => {
                       onClick={() => handleSaveQuote()}
                       className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
                     >
-                      Salvar orçamento e armazenar PDF
+                      Salvar orçamento
                     </button>
                   </div>
                 </div>

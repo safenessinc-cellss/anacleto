@@ -16,7 +16,10 @@ interface Payable {
   paidAt?: string;
   notes?: string;
   purchaseId?: string;
+  expenseCategory?: string;
   purchaseNumber?: string;
+  documentNumber?: string;
+  boletoNumber?: string;
   documentUrl?: string;
   documentName?: string;
   supplierCnpj?: string;
@@ -109,7 +112,7 @@ export default function PayablesModule() {
         if (ledger.exists()) throw new Error("Já existe uma conciliação para esta despesa.");
         tx.set(paymentRef, { payableId: p.id, payableDescription: p.description, supplierName: p.supplierName, amount: Number(p.amount || 0), method: p.paymentMethod, status: "completed", reference: "", paidBy: auth.currentUser?.email || "", paidAt, notes: "Pagamento registrado pela tela de Contas a Pagar." });
         tx.update(payableRef, { status: "paid", paidAt, paidMethod: p.paymentMethod, paymentId: paymentRef.id });
-        tx.set(ledgerRef, { direction: "outflow", category: "supplier_payment", sourceType: "payable", sourceId: p.id, description: "Pagamento a fornecedor · " + p.description, amount: Number(p.amount || 0), date: paidAt.slice(0, 10), status: "posted", paymentMethod: p.paymentMethod, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        tx.set(ledgerRef, { direction: "outflow", category: p.expenseCategory === "gastos_diarios" ? "daily_expense" : p.expenseCategory === "materiais" ? "materials" : "supplier_payment", sourceType: "payable", sourceId: p.id, description: "Pagamento a fornecedor · " + p.description, amount: Number(p.amount || 0), date: paidAt.slice(0, 10), status: "posted", paymentMethod: p.paymentMethod, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
       });
     } catch (err) { alert("Não foi possível conciliar o pagamento: " + ((err as Error).message || "erro desconhecido")); }
   };
@@ -218,13 +221,13 @@ export default function PayablesModule() {
             {filtered.map((p) => (
               <tr key={p.id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td className="p-3 font-bold text-slate-900 dark:text-white">{p.supplierName}</td>
-                <td className="p-3 text-slate-600 dark:text-slate-300">{p.description}{p.purchaseNumber && <span className="mt-1 block text-[10px] font-bold text-blue-600">Compra vinculada: {p.purchaseNumber}</span>}{p.documentUrl && <a href={p.documentUrl} target="_blank" rel="noreferrer" className="mt-1 block text-[10px] font-bold text-indigo-600">Abrir documento fiscal</a>}</td>
+                <td className="p-3 text-slate-600 dark:text-slate-300">{p.description}{p.purchaseNumber && <span className="mt-1 block text-[10px] font-bold text-blue-600">Compra vinculada: {p.purchaseNumber}</span>}{p.documentNumber && <span className="mt-1 block text-[10px] font-bold text-slate-500">NF-e: {p.documentNumber}</span>}{p.boletoNumber && <span className="mt-1 block text-[10px] font-bold text-slate-500">Boleto: {p.boletoNumber}</span>}{p.documentUrl && <a href={p.documentUrl} target="_blank" rel="noreferrer" className="mt-1 block text-[10px] font-bold text-indigo-600">Abrir documento fiscal</a>}</td>
                 <td className="p-3 font-bold">R$ {p.amount.toFixed(2)}</td>
                 <td className="p-3 font-mono text-xs">{p.dueDate}</td>
                 <td className="p-3 text-xs uppercase">{METHODS.find((m) => m.v === p.paymentMethod)?.l || p.paymentMethod}</td>
                 <td className="p-3">{statusBadge(p)}</td>
                 <td className="p-3">
-                  {p.status === "pending" && <button onClick={() => markPaid(p)} title="Registrar e conciliar pagamento" className="p-1 text-emerald-600 hover:text-emerald-700"><CheckCircle className="w-4 h-4" /></button>}
+                  {p.status === "pending" && <button onClick={() => markPaid(p)} title="Baixar boleto e registrar o pagamento" className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><CheckCircle className="w-3.5 h-3.5" />{p.paymentMethod === "boleto" ? "Pagar Boleto" : "Registrar Pagamento"}</button>}
                   {p.status === "pending" && !p.purchaseId && <button onClick={() => { setEditing(p); setForm(p); }} title="Editar despesa pendente" className="p-1 text-blue-600 hover:text-blue-700"><Edit className="w-4 h-4" /></button>}
                   {p.status === "pending" && !p.purchaseId && <button onClick={() => handleDelete(p.id!)} title="Excluir despesa pendente" className="p-1 text-rose-600 hover:text-rose-700"><Trash2 className="w-4 h-4" /></button>}
                   {p.status === "paid" && <span className="text-[10px] font-semibold text-emerald-700">Conciliado</span>}

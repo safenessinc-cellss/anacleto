@@ -75,7 +75,7 @@ export default function AnacletoProApp({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
-  const isFullMenuRole = effectiveRole === "super_admin" || effectiveRole === "super_usuario" || effectiveRole === "ceo";
+  const isFullMenuRole = ["super_admin", "super_usuario", "ceo", "admin"].includes(effectiveRole);
   const canSeeNavigation = (id: string) => isFullMenuRole || (userPermissions ? userPermissions.includes(id) : hasAccessToTab(effectiveRole, id as RoleNavTab));
   // A autenticação precisa ser inicializada antes de qualquer efeito que a consulte.
   const [authReady, setAuthReady] = useState(false);
@@ -227,7 +227,7 @@ export default function AnacletoProApp({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-[#101827] dark:text-slate-100 flex flex-col lg:flex-row font-sans">
+    <div className="min-h-screen bg-[#EEF2F6] text-slate-900 dark:bg-[#101827] dark:text-slate-100 flex flex-col lg:flex-row font-sans">
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-slate-50/90 border-b border-slate-300/80 sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-3">
@@ -331,7 +331,7 @@ export default function AnacletoProApp({
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-slate-100 dark:bg-[#101827]">
+      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-[#EEF2F6] dark:bg-[#101827]">
         <div className="max-w-7xl mx-auto rounded-[28px]">
           {activeSectionTabs.length > 1 && (
             <nav aria-label={`Abas de ${activeSection?.label || "configurações"}`} className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">

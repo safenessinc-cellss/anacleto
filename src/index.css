@@ -102,7 +102,7 @@ html.dark { color-scheme: dark; }
 
 html:not(.dark) body,
 html:not(.dark) #root {
-  background-color: #f8fafc !important;
+  background-color: #EEF2F6 !important;
   color: #0f172a !important;
 }
 
@@ -187,20 +187,21 @@ html:not(.dark) button.bg-rose-600 * {
 /* ANACLETO: tema claro azul e modo escuro opcional */
 html:not(.dark) body,
 html:not(.dark) #root {
-  background: #f3f7fc;
-  color: #172b4d;
+  background: #EEF2F6;
+  color: #0F172A;
 }
 html:not(.dark) main {
-  color: #172b4d;
+  color: #0F172A;
 }
-html:not(.dark) .bg-slate-50 { background-color: #f3f7fc !important; }
-html:not(.dark) .bg-slate-100 { background-color: #eaf1fb !important; }
+html:not(.dark) .bg-slate-50 { background-color: #F8FAFC !important; }
+html:not(.dark) .bg-slate-100 { background-color: #EEF2F6 !important; }
+html:not(.dark) .bg-white { background-color: #F8FAFC !important; }
 html:not(.dark) .border-slate-200,
-html:not(.dark) .border-slate-300 { border-color: #d8e4f2 !important; }
-html:not(.dark) .text-slate-900 { color: #172b4d !important; }
-html:not(.dark) .text-slate-800 { color: #233d62 !important; }
-html:not(.dark) .text-slate-600 { color: #526985 !important; }
-html:not(.dark) .text-slate-500 { color: #647b96 !important; }
+html:not(.dark) .border-slate-300 { border-color: rgb(203 213 225 / 80%) !important; }
+html:not(.dark) .text-slate-900 { color: #0F172A !important; }
+html:not(.dark) .text-slate-800 { color: #0F172A !important; }
+html:not(.dark) .text-slate-600 { color: #334155 !important; }
+html:not(.dark) .text-slate-500 { color: #64748B !important; }
 html:not(.dark) .shadow,
 html:not(.dark) .shadow-sm,
 html:not(.dark) .shadow-md,

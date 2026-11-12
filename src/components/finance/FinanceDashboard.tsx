@@ -2,11 +2,19 @@ import React, { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 
-type Ledger = { id: string; date?: string; direction?: string; type?: string; amount?: number; category?: string; description?: string; status?: string };
-type OpenRow = { id: string; dueDate?: string; date?: string; amount?: number; total?: number; receivedAmount?: number; status?: string; clientName?: string; supplierName?: string; description?: string };
+type Ledger = { id: string; date?: string; direction?: string; type?: string; amount?: number; category?: string; description?: string; status?: string; sourceType?: string; sourceId?: string };
+type OpenRow = { id: string; invoiceId?: string; dueDate?: string; date?: string; paidAt?: string; amount?: number; total?: number; receivedAmount?: number; status?: string; clientName?: string; supplierName?: string; description?: string; purchaseId?: string; expenseCategory?: string };
+type CashRow = { id: string; date?: string; amount?: number; status?: string; category?: string; sourceId?: string; kind?: string };
 const money = (value: number) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const monthId = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 const parseDate = (value?: string) => value ? new Date(`${value.slice(0, 10)}T00:00:00`) : null;
+const isIncoming = (row: Ledger) => ["inflow", "income", "in", "entrada"].includes(String(row.direction || row.type || "").toLowerCase());
+const isCustomerReceipt = (row: Ledger) => isIncoming(row) && (
+  ["customer_advance", "customer_receipt"].includes(String(row.category || "").toLowerCase()) ||
+  ["client_advance", "invoice", "receivable"].includes(String(row.sourceType || "").toLowerCase())
+);
+const cashOutflowCategories = new Set(["daily_expense", "employee_advance", "payroll", "materials", "supplier_payment"]);
+const isCancelled = (status?: string) => ["cancelled", "cancelado", "void", "estornado", "refunded"].includes(String(status || "").toLowerCase());
 const point = (cx: number, cy: number, radius: number, angle: number) => `${cx + radius * Math.cos(angle)},${cy + radius * Math.sin(angle)}`;
 
 function donutPath(start: number, end: number) {
@@ -19,61 +27,127 @@ export default function FinanceDashboard() {
   const [ledger, setLedger] = useState<Ledger[]>([]);
   const [receivables, setReceivables] = useState<OpenRow[]>([]);
   const [payables, setPayables] = useState<OpenRow[]>([]);
-  const [advances, setAdvances] = useState<Array<{ amount?: number; status?: string }>>([]);
-  const [adjustments, setAdjustments] = useState<Array<{ amount?: number; status?: string; competence?: string }>>([]);
+  const [purchases, setPurchases] = useState<OpenRow[]>([]);
+  const [advances, setAdvances] = useState<CashRow[]>([]);
+  const [adjustments, setAdjustments] = useState<CashRow[]>([]);
+  const [payroll, setPayroll] = useState<CashRow[]>([]);
+  const [dailyExpenses, setDailyExpenses] = useState<CashRow[]>([]);
   const [error, setError] = useState("");
   const [activeMonth, setActiveMonth] = useState(monthId(new Date()));
   const [activeExpense, setActiveExpense] = useState("");
 
   useEffect(() => {
-    const watchers = [
-      onSnapshot(collection(db, "ledger_entries"), (snap) => setLedger(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Ledger))), (reason) => setError(`Falha ao carregar o caixa: ${reason.message}`)),
-      onSnapshot(collection(db, "receivables"), (snap) => setReceivables(snap.docs.map((item) => ({ id: item.id, ...item.data() } as OpenRow))), (reason) => setError(`Falha ao carregar recebíveis: ${reason.message}`)),
-      onSnapshot(collection(db, "payables"), (snap) => setPayables(snap.docs.map((item) => ({ id: item.id, ...item.data() } as OpenRow))), (reason) => setError(`Falha ao carregar contas a pagar: ${reason.message}`)),
-      onSnapshot(collection(db, "client_advances"), (snap) => setAdvances(snap.docs.map((item) => item.data() as { amount?: number; status?: string })), (reason) => setError(`Falha ao carregar sinais: ${reason.message}`)),
-      onSnapshot(collection(db, "payroll_adjustments"), (snap) => setAdjustments(snap.docs.map((item) => item.data() as { amount?: number; status?: string; competence?: string })), (reason) => setError(`Falha ao carregar vales: ${reason.message}`)),
+    const watch = <T,>(name: string, receive: (rows: T[]) => void) => onSnapshot(
+      collection(db, name),
+      (snap) => receive(snap.docs.map((item) => ({ id: item.id, ...item.data() } as T))),
+      (reason) => setError(`Falha ao carregar ${name}: ${reason.message}`),
+    );
+    const stops = [
+      watch<Ledger>("ledger_entries", setLedger),
+      watch<OpenRow>("receivables", setReceivables),
+      watch<OpenRow>("payables", setPayables),
+      watch<OpenRow>("purchase_orders", setPurchases),
+      watch<CashRow>("client_advances", setAdvances),
+      watch<CashRow>("payroll_adjustments", setAdjustments),
+      watch<CashRow>("employee_payments", setPayroll),
+      watch<CashRow>("daily_expenses", setDailyExpenses),
     ];
-    return () => watchers.forEach((stop) => stop());
+    return () => stops.forEach((stop) => stop());
   }, []);
 
-  const posted = ledger.filter((row) => !["cancelled", "cancelado", "void", "estornado"].includes(String(row.status || "").toLowerCase()));
-  const cash = posted.reduce((sum, row) => sum + (["inflow", "income", "in", "entrada"].includes(String(row.direction || row.type || "").toLowerCase()) ? 1 : -1) * Number(row.amount || 0), 0);
-  const customerAdvances = advances.filter((row) => !["cancelled", "cancelado", "refunded"].includes(String(row.status || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const openReceivables = receivables.filter((row) => !["received", "paid", "pago", "cancelled", "cancelado"].includes(String(row.status || "").toLowerCase())).reduce((sum, row) => sum + Math.max(0, Number(row.amount ?? row.total ?? 0) - Number(row.receivedAmount || 0)), 0);
-  const openPayables = payables.filter((row) => ["pending", "pendente", "overdue", "vencido", "pending_approval"].includes(String(row.status || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || row.total || 0), 0);
-  const pendingAdvances = adjustments.filter((row) => row.competence === monthId(new Date()) && row.status !== "deducted").reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const posted = ledger.filter((row) => !isCancelled(row.status) && (row.status || "posted") !== "pending");
+  const paidPayableIds = new Set(payables.filter((row) => row.status === "paid").map((row) => row.id));
+  const cashEntries = posted.filter((row) =>
+    isCustomerReceipt(row) ||
+    (cashOutflowCategories.has(String(row.category || "").toLowerCase()) &&
+      (row.sourceType === "payable"
+        ? paidPayableIds.has(row.sourceId || "")
+        : ["daily_expense", "employee_advance", "payroll"].includes(String(row.category || "").toLowerCase()))),
+  );
+  const inflows = cashEntries.filter(isCustomerReceipt);
+  const outflows = cashEntries.filter((row) => !isCustomerReceipt(row));
+  const advanceLedgerIds = new Set(inflows.filter((row) => row.sourceType === "client_advance").map((row) => row.sourceId));
+  const legacyClientAdvances = advances.filter((row) => !isCancelled(row.status) && ["received", "paid", "recebido"].includes(String(row.status || "").toLowerCase()) && !advanceLedgerIds.has(row.id))
+    .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const receiptLedgerIds = new Set(inflows.map((row) => row.sourceId));
+  const legacyReceipts = receivables.filter((row) => !isCancelled(row.status) &&
+      !receiptLedgerIds.has(row.invoiceId || row.id))
+    .reduce((sum, row) => sum + Number(row.receivedAmount || (["received", "paid", "pago"].includes(String(row.status || "").toLowerCase()) ? row.amount || row.total : 0) || 0), 0);
+  const adjustmentLedgerIds = new Set(outflows.filter((row) => row.sourceType === "payroll_adjustment").map((row) => row.sourceId));
+  const legacyEmployeeAdvances = adjustments.filter((row) => !isCancelled(row.status) && row.kind !== "loan" && !adjustmentLedgerIds.has(row.id))
+    .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const payrollLedgerIds = new Set(outflows.filter((row) => row.sourceType === "employee_payment").map((row) => row.sourceId));
+  const legacyPayrollPaid = payroll.filter((row) => !isCancelled(row.status) && ["paid", "pago"].includes(String(row.status || "").toLowerCase()) && !payrollLedgerIds.has(row.id))
+    .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const paidPayableLedgerIds = new Set(outflows.filter((row) => row.sourceType === "payable").map((row) => row.sourceId));
+  const legacyPaidPayables = payables.filter((row) => row.status === "paid" && !paidPayableLedgerIds.has(row.id));
+  const legacyPaidPayableTotal = legacyPaidPayables.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const dailyLedgerIds = new Set(outflows.filter((row) => row.sourceType === "daily_expense").map((row) => row.sourceId));
+  const legacyDailyExpenses = dailyExpenses.filter((row) => !dailyLedgerIds.has(row.id));
+  const legacyPaidDailyPurchases = legacyPaidPayables
+    .filter((row) => row.expenseCategory === "gastos_diarios" || purchases.some((purchase) => purchase.id === row.purchaseId && purchase.expenseCategory === "gastos_diarios"))
+    .map((row) => ({ id: row.id, date: row.paidAt?.slice(0, 10) || row.date, amount: row.amount, status: row.status }));
+  const incomingTotal = inflows.reduce((sum, row) => sum + Number(row.amount || 0), 0) + legacyClientAdvances + legacyReceipts;
+  const outgoingTotal = outflows.reduce((sum, row) => sum + Number(row.amount || 0), 0) + legacyEmployeeAdvances + legacyPayrollPaid + legacyPaidPayableTotal +
+    legacyDailyExpenses.filter((row) => ["paid", "pago"].includes(String(row.status || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const cash = incomingTotal - outgoingTotal;
+  const openReceivables = receivables.filter((row) => !["received", "paid", "pago", "cancelled", "cancelado"].includes(String(row.status || "").toLowerCase()))
+    .reduce((sum, row) => sum + Math.max(0, Number(row.amount ?? row.total ?? 0) - Number(row.receivedAmount || 0)), 0);
+  const openPayables = payables.filter((row) => ["pending", "pendente", "overdue", "vencido", "pending_approval"].includes(String(row.status || "").toLowerCase()))
+    .reduce((sum, row) => sum + Number(row.amount || row.total || 0), 0);
+  const currentMonth = monthId(new Date());
+  const expenseForPeriod = (row: CashRow, month: string, day?: string) =>
+    !isCancelled(row.status) && String(row.date || "").slice(0, 7) === month && (!day || String(row.date || "").slice(0, 10) === day);
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const postedDaily = outflows.filter((row) => row.category === "daily_expense").map((row) => ({ id: row.id, date: row.date, amount: row.amount, status: row.status, sourceId: row.sourceId }));
+  const completeDaily = [
+    ...postedDaily,
+    ...legacyDailyExpenses.filter((row) => !postedDaily.some((item) => item.sourceId === row.id) && ["paid", "pago"].includes(String(row.status || "").toLowerCase())),
+    ...legacyPaidDailyPurchases,
+  ];
+  const dailyToday = completeDaily.filter((row) => expenseForPeriod(row, currentMonth, todayKey)).reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const dailyMonth = completeDaily.filter((row) => expenseForPeriod(row, currentMonth)).reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
   const monthly = useMemo(() => Array.from({ length: 6 }, (_, index) => {
     const date = new Date();
     date.setMonth(date.getMonth() - (5 - index), 1);
     const key = monthId(date);
-    const rows = posted.filter((row) => String(row.date || "").slice(0, 7) === key);
+    const rows = cashEntries.filter((row) => String(row.date || "").slice(0, 7) === key);
     return {
       key, label: date.toLocaleDateString("pt-BR", { month: "short" }),
-      incoming: rows.filter((row) => ["inflow", "income", "in", "entrada"].includes(String(row.direction || row.type || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || 0), 0),
-      outgoing: rows.filter((row) => !["inflow", "income", "in", "entrada"].includes(String(row.direction || row.type || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || 0), 0),
+      incoming: rows.filter(isIncoming).reduce((sum, row) => sum + Number(row.amount || 0), 0),
+      outgoing: rows.filter((row) => !isIncoming(row)).reduce((sum, row) => sum + Number(row.amount || 0), 0),
     };
-  }), [posted]);
+  }), [cashEntries]);
   const monthMaximum = Math.max(1, ...monthly.flatMap((item) => [item.incoming, item.outgoing]));
   const selectedMonth = monthly.find((item) => item.key === activeMonth) || monthly[monthly.length - 1];
+
   const expenses = useMemo(() => {
-    const categories = [
-      { key: "materiais", label: "Materiais / alumínio", color: "#2563eb", match: /material|alumin|perfil|compra/ },
-      { key: "vidros", label: "Vidros", color: "#06b6d4", match: /vidro/ },
-      { key: "vales", label: "Adiant. funcionários", color: "#f59e0b", match: /employee|funcion|vale|folha/ },
-      { key: "frete", label: "Frete", color: "#8b5cf6", match: /frete|fret/ },
-      { key: "fixos", label: "Fixos / outros", color: "#64748b", match: /.*/ },
+    const purchaseCategoryById = new Map(purchases.map((purchase) => [purchase.id, purchase.expenseCategory || ""]));
+    const payableById = new Map(payables.map((payable) => [payable.id, payable]));
+    const materials = outflows.filter((row) => {
+      if (String(row.date || "").slice(0, 7) !== currentMonth) return false;
+      if (row.category === "materials") return true;
+      const payable = row.sourceType === "payable" ? payableById.get(row.sourceId || "") : undefined;
+      const category = payable?.expenseCategory || purchaseCategoryById.get(payable?.purchaseId || "") || "";
+      return category === "materiais";
+    }).reduce((sum, row) => sum + Number(row.amount || 0), 0) + legacyPaidPayables
+      .filter((row) => String(row.paidAt || row.date || "").slice(0, 7) === currentMonth &&
+        (row.expenseCategory === "materiais" || purchases.some((purchase) => purchase.id === row.purchaseId && purchase.expenseCategory === "materiais")))
+      .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const daily = completeDaily.filter((row) => expenseForPeriod(row, currentMonth))
+      .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    const vales = outflows.filter((row) => row.category === "employee_advance" || row.sourceType === "payroll_adjustment")
+      .filter((row) => String(row.date || "").slice(0, 7) === currentMonth)
+      .reduce((sum, row) => sum + Number(row.amount || 0), 0) + adjustments
+      .filter((row) => !isCancelled(row.status) && row.kind !== "loan" && !adjustmentLedgerIds.has(row.id) && String(row.date || "").slice(0, 7) === currentMonth)
+      .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    return [
+      { key: "materiais", label: "Materiais de Obra", color: "#2563eb", value: materials },
+      { key: "diarios", label: "Gastos Diários", color: "#8b5cf6", value: daily },
+      { key: "vales", label: "Vales de Funcionários", color: "#f59e0b", value: vales },
     ];
-    const sums = categories.map((category) => ({
-      ...category,
-      value: posted.filter((row) => !["inflow", "income", "in", "entrada"].includes(String(row.direction || row.type || "").toLowerCase()) &&
-        (category.key === "fixos" || category.match.test(`${row.category || ""} ${row.description || ""}`)))
-        .reduce((sum, row) => sum + Number(row.amount || 0), 0),
-    }));
-    const classified = sums.slice(0, -1).reduce((sum, category) => sum + category.value, 0);
-    sums[sums.length - 1].value = Math.max(0, posted.filter((row) => !["inflow", "income", "in", "entrada"].includes(String(row.direction || row.type || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || 0), 0) - classified);
-    return sums;
-  }, [posted]);
+  }, [outflows, purchases, payables, completeDaily, currentMonth, adjustments, adjustmentLedgerIds, legacyPaidPayables]);
   const expenseTotal = expenses.reduce((sum, category) => sum + category.value, 0);
   const expenseSectors = expenses.reduce<Array<{ key: string; label: string; color: string; value: number; start: number; end: number }>>((result, category) => {
     const start = result.at(-1)?.end ?? -Math.PI / 2;
@@ -91,10 +165,14 @@ export default function FinanceDashboard() {
   }).slice(0, 6);
 
   return <section className="space-y-6">
-    <header><p className="text-xs font-bold uppercase tracking-widest text-indigo-600">Visão executiva · fluxo de caixa</p><h2 className="text-2xl font-black">Visão Geral & Gráficos</h2><p className="mt-1 text-sm text-slate-500">Indicadores calculados em tempo real a partir dos lançamentos, sinais, recebíveis e contas a pagar.</p></header>
+    <header><p className="text-xs font-bold uppercase tracking-widest text-indigo-600">Visão executiva · fluxo de caixa</p><h2 className="text-2xl font-black">Visão Geral & Gráficos</h2><p className="mt-1 text-sm text-slate-500">Caixa calculado com recebimentos e pagamentos efetivamente registrados.</p></header>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {[["Saldo em Caixa (R$)", cash, "Lançamentos conciliados"], ["Adiantamentos de Clientes (Sinais)", customerAdvances, "Valores recebidos vinculados às obras"], ["A Receber de Obras", openReceivables, "Saldo aberto das cobranças"], ["Contas a Pagar / Vales", openPayables + pendingAdvances, "Fornecedores e vales pendentes na folha"]].map(([label, amount, caption]) => <article key={String(label)} className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">{label}</p><p className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{money(Number(amount))}</p><p className="mt-1 text-[11px] text-slate-500">{caption}</p></article>)}
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Saldo em Caixa (R$)</p><p className={`mt-2 text-2xl font-black ${cash < 0 ? "text-rose-700" : "text-slate-900 dark:text-white"}`}>{cash < 0 ? `-R$ ${Math.abs(cash).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : money(cash)}</p><p className="mt-1 text-[11px] text-slate-600">Entradas: {money(incomingTotal)} | Saídas e Vales: -{money(outgoingTotal)}</p></article>
+      <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Adiantamentos de Clientes (Sinais)</p><p className="mt-2 text-2xl font-black">{money(advances.filter((row) => !isCancelled(row.status) && ["received", "paid", "recebido"].includes(String(row.status || "").toLowerCase())).reduce((sum, row) => sum + Number(row.amount || 0), 0))}</p><p className="mt-1 text-[11px] text-slate-500">Valores recebidos vinculados às obras</p></article>
+      <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">A Receber de Obras</p><p className="mt-2 text-2xl font-black">{money(openReceivables)}</p><p className="mt-1 text-[11px] text-slate-500">Saldo aberto das cobranças</p></article>
+      <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Contas a Pagar / Boletos Futuros</p><p className="mt-2 text-2xl font-black">{money(openPayables)}</p><p className="mt-1 text-[11px] text-slate-500">Compromissos não pagos; não reduz o caixa</p></article>
+      <article className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">Gastos Diários (Hoje / Mês)</p><p className="mt-2 text-lg font-black">{money(dailyToday)}</p><p className="mt-1 text-[11px] text-slate-500">Hoje · {money(dailyMonth)} no mês</p></article>
     </div>
     <div className="grid gap-4 xl:grid-cols-2">
       <section className="rounded-2xl border bg-white p-5 dark:bg-slate-900">
@@ -106,7 +184,7 @@ export default function FinanceDashboard() {
         </svg>
       </section>
       <section className="rounded-2xl border bg-white p-5 dark:bg-slate-900">
-        <h3 className="font-bold">Distribuição de Gastos</h3><p className="text-xs text-slate-500">Saídas de caixa por categoria</p>
+        <h3 className="font-bold">Distribuição de Gastos</h3><p className="text-xs text-slate-500">Materiais, gastos diários e vales pagos no mês</p>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-6">
           <svg viewBox="0 0 200 200" role="img" aria-label="Gráfico circular de despesas" className="h-52 w-52">
             {expenseSectors.filter((sector) => sector.value > 0).map((sector) => <path key={sector.key} d={donutPath(sector.start,sector.end)} fill={sector.color} stroke="white" strokeWidth="2" onClick={()=>setActiveExpense(sector.key)} className="cursor-pointer"><title>{sector.label}: {money(sector.value)}</title></path>)}

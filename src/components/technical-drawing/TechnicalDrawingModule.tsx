@@ -25,10 +25,10 @@ import {
 import { TechnicalDrawing, SenderConfig, Quote } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import DrawingThreePreview from "./DrawingThreePreview";
-import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf, buildQuotePdf } from "../../utils/pdfExport";
+import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref as storageRef, deleteObject } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
 import { db, storage } from "../../firebase";
@@ -36,6 +36,7 @@ import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
+import { compactQuoteForFirestore, withoutHeavyInlineData } from "../../utils/firestorePayloads";
 
 interface TechnicalDrawingModuleProps {
   senderConfig: SenderConfig;
@@ -479,15 +480,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       updatedAt: now,
     };
     try {
-      const pdf = buildQuotePdf(quote, senderConfig);
-      await setDoc(doc(db, "quotes", id), {
-        ...quote,
-        pdfDataUri: pdf.dataUri,
-        pdfFileName: pdf.fileName,
-        pdfGeneratedAt: now,
-        pdfFileSizeKb: pdf.sizeKb,
-      });
-      showToast(`Orçamento ${quote.number} e PDF adicionados ao Cofre de Documentos.`, "success");
+      await setDoc(doc(db, "quotes", id), compactQuoteForFirestore(quote));
+      showToast(`Orçamento ${quote.number} salvo. O PDF será gerado ao visualizar ou exportar.`, "success");
     } catch (error) {
       console.error("Could not save quote generated from technical drawing:", error);
       showToast((error as Error).message || "Não foi possível salvar o orçamento do desenho.", "error");
@@ -605,28 +599,25 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     setIsSaving(true);
     try {
       const now = new Date().toISOString();
-      const pdfRes = buildTechnicalDrawingPdf(targetDrawing, senderConfig);
-      const blob = await (await fetch(pdfRes.dataUri)).blob();
-      const storagePath = "technical-drawings/" + user.uid + "/" + targetDrawing.id + ".pdf";
-      const fileRef = storageRef(storage, storagePath);
-      await uploadBytes(fileRef, blob, { contentType: "application/pdf", customMetadata: { ownerUid: user.uid, drawingId: targetDrawing.id } });
-      const pdfUrl = await getDownloadURL(fileRef);
-      const { pdfDataUri: _temporaryPdfDataUri, ...editableDrawing } = targetDrawing;
-      const savedDrawing: TechnicalDrawing = {
-        ...editableDrawing,
+      const {
+        pdfDataUri: _pdf,
+        pdfUrl: _pdfUrl,
+        pdfStoragePath: _storagePath,
+        pdfFileName: _fileName,
+        pdfGeneratedAt: _generatedAt,
+        pdfFileSizeKb: _size,
+        ...drawingData
+      } = targetDrawing;
+      const savedDrawing: TechnicalDrawing = withoutHeavyInlineData({
+        ...drawingData,
         createdAt: targetDrawing.createdAt || now,
         updatedAt: now,
-        pdfUrl,
-        pdfStoragePath: storagePath,
         ownerUid: user.uid,
         schemaVersion: 2,
-        pdfFileName: pdfRes.fileName,
-        pdfGeneratedAt: now,
-        pdfFileSizeKb: pdfRes.sizeKb,
-      };
+      });
       await setDoc(doc(db, "technical_drawings", targetDrawing.id), savedDrawing);
       setDrawing(savedDrawing);
-      if (!silent) showToast("Projeto técnico salvo com desenho editável e PDF.", "success");
+      if (!silent) showToast("Projeto técnico salvo com os dados editáveis. O PDF será gerado ao exportar.", "success");
       return true;
     } catch (err) {
       console.error("Technical drawing save failed:", err);

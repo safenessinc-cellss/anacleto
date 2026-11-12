@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BarChart3, BriefcaseBusiness, FileText, HandCoins, Users } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, FileText, HandCoins, Receipt, Users } from "lucide-react";
 import type { SenderConfig } from "../../types";
 import ClientAdvancesModule from "./ClientAdvancesModule";
 import EmployeeAdvancesModule from "./EmployeeAdvancesModule";
@@ -14,14 +14,16 @@ import InventoryModule from "../inventory/InventoryModule";
 import EmployeePaymentsModule from "./EmployeePaymentsModule";
 import PayrollModule from "../hr/PayrollModule";
 import InvoicesModule from "../invoices/InvoicesModule";
+import DailyExpensesModule from "./DailyExpensesModule";
 
-type FinanceTab = "overview" | "client_advances" | "employee_advances" | "payables" | "reports";
+type FinanceTab = "overview" | "client_advances" | "employee_advances" | "daily_expenses" | "payables" | "reports";
 type Subsection = "purchases" | "payables" | "suppliers" | "inventory" | "reports" | "fiscal" | "boletos" | "invoices" | "payroll" | "payments";
 
 const primaryTabs: Array<{ id: FinanceTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "overview", label: "Visão Geral & Gráficos", icon: BarChart3 },
   { id: "client_advances", label: "Adiantamentos de Clientes (Sinal)", icon: HandCoins },
   { id: "employee_advances", label: "Adiantamentos de Funcionários (Vales)", icon: Users },
+  { id: "daily_expenses", label: "Gastos Diários", icon: Receipt },
   { id: "payables", label: "Contas a Pagar & Fornecedores", icon: BriefcaseBusiness },
   { id: "reports", label: "Relatórios & Notas Fiscais", icon: FileText },
 ];
@@ -51,6 +53,7 @@ export default function FinanceModule({ language = "pt", senderConfig, canManage
       {tab === "overview" && <FinanceDashboard />}
       {tab === "client_advances" && <ClientAdvancesModule />}
       {tab === "employee_advances" && <EmployeeAdvancesModule />}
+      {tab === "daily_expenses" && <DailyExpensesModule />}
       {(tab === "payables" || tab === "reports") && <>
         <nav aria-label="Subseções financeiras" className="flex flex-wrap gap-2 border-b pb-3">{activeSubsections.map((item) => <button key={item.id} type="button" onClick={() => setSubsection(item.id)} aria-current={subsection === item.id ? "page" : undefined} className={`rounded-lg px-3 py-2 text-xs font-bold ${subsection === item.id ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "border bg-white dark:bg-slate-900"}`}>{item.label}</button>)}</nav>
         {subsection === "purchases" && tab === "payables" && <PurchasesModule />}

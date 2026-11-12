@@ -120,7 +120,6 @@ export default function DashboardOverview({ quotes, invoices, drawings, senderCo
   });
 
   const getPdf = (item: VaultItem) => {
-    if (item.pdfDataUri) return { dataUri: item.pdfDataUri, fileName: item.pdfFileName };
     if (item.type === "quote") return buildQuotePdf(item.raw as Quote, senderConfig);
     if (item.type === "invoice") return buildInvoicePdf(item.raw as Invoice, senderConfig);
     return buildTechnicalDrawingPdf(item.raw as TechnicalDrawing, senderConfig);
