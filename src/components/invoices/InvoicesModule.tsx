@@ -155,13 +155,13 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
     const matchesSearch =
       inv.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       inv.clientName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === "all" || inv.status === filterStatus;
+    const matchesStatus = filterStatus === "all" || (filterStatus === "pago" ? ["pago", "paid"].includes(String(inv.status)) : filterStatus === "pendente" ? ["pendente", "pending"].includes(String(inv.status)) : inv.status === filterStatus);
     return matchesSearch && matchesStatus;
   });
 
-  const totalInvoiced = invoices.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalInvoiced = invoices.filter(i => !["cancelled", "cancelado", "void"].includes(String(i.status || "").toLowerCase())).reduce((acc, curr) => acc + (curr.total || 0), 0);
   const totalPaid = invoices.filter((i) => (i.status === "pago" || i.status === "paid")).reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalPending = invoices.filter((i) => i.status === "pendente").reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalPending = invoices.filter((i) => ["pendente", "pending"].includes(String(i.status))).reduce((acc, curr) => acc + (curr.total || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -264,7 +264,7 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
                           : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                       }`}
                     >
-                      {inv.status === "pago" ? "Paga" : "Pendente"}
+                      {(inv.status === "pago" || inv.status === "paid") ? "Paga" : inv.status === "cancelled" ? "Cancelada" : "Pendente"}
                     </span>
                   </div>
 
