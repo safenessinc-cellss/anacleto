@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { TechnicalDrawing, SenderConfig } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
+import DrawingThreePreview from "./DrawingThreePreview";
 import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
@@ -961,6 +962,9 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 showDimensions={true}
                 showLabels={true}
               />
+            </div>
+            <div className="mt-4">
+              <DrawingThreePreview drawing={drawing} />
             </div>
           </div>
 
