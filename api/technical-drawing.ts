@@ -483,8 +483,8 @@ export default async function handler(req: any, res: any) {
     });
 
     if (authenticated && prompt.length >= 3) {
-      try {
-        if (!auditRecorded && (stage === "ai_generation" || stage === "validate_ai_response")) {
+      if (!auditRecorded && (stage === "ai_generation" || stage === "validate_ai_response")) {
+        try {
           await recordAIAudit({
             serviceName: "TECHNICAL_DRAWING",
             modelUsed: AI_CONFIG.technicalDrawing.model,
@@ -492,36 +492,27 @@ export default async function handler(req: any, res: any) {
             error,
             actorUid,
             requestId,
-            authorizationToken: String(req.headers?.authorization || "").replace(/^Bearer\s+/i, ""),
+            authorizationToken: String(req.headers?.authorization || "").replace(/^Bearer\\s+/i, ""),
           });
+        } catch (auditError) {
+          console.error("Technical drawing failure audit could not be persisted", auditError);
         }
-        const fallback = localFallback(prompt);
-        const fallbackDrawing = withDraftVectorWatermark({
-          ...fallback,
-          budget: buildTechnicalBudget(fallback.pieces, catalog),
-          isDraft: true,
-          status: "PRELIMINARY_CONTINGENCY",
-          draftStatus: "preliminary",
-          draftLabel: "BORRADOR TÉCNICO - NO VÁLIDO PARA FABRICACIÓN",
-          warning: "A IA está temporariamente indisponível. Foi criado um desenho preliminar local; confira todas as medidas antes de fabricar.",
-          fallbackReason: stage,
-        });
-        if (jobPersisted && drawingJobId) await updateDrawingJob(req, drawingJobId, { status: "COMPLETED_WITH_FALLBACK", result: fallbackDrawing, completedAt: new Date().toISOString() });
-        return json(res, 200, fallbackDrawing);
-      } catch (fallbackError) {
-        console.error("Technical drawing local fallback failed", {
-          requestId,
-          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-        });
-        if (jobPersisted && drawingJobId) {
-          try { await updateDrawingJob(req, drawingJobId, { status: "FAILED", error: "DRAWING_GENERATION_FAILED", completedAt: new Date().toISOString() }); } catch (jobError) { console.error("Could not persist failed drawing job", jobError); }
-        }
-        return json(res, 500, {
-          error: "Não foi possível gerar o desenho técnico. Tente novamente ou revise a descrição.",
-          code: "DRAWING_GENERATION_FAILED",
-          requestId,
-        });
       }
+      if (jobPersisted && drawingJobId) {
+        try {
+          await updateDrawingJob(req, drawingJobId, { status: "FAILED", error: "AI_PROVIDER_OR_SCHEMA_FAILURE", completedAt: new Date().toISOString() });
+        } catch (jobError) {
+          console.error("Could not persist failed drawing job", jobError);
+        }
+      }
+      // Never fabricate a generic CAD geometry when the model is unavailable or
+      // returns invalid data. A false technical drawing could be mistaken for a
+      // manufacturing plan; leave the editor unchanged and ask for a retry.
+      return json(res, 503, {
+        error: "A IA não conseguiu gerar um desenho específico e validado. Nenhum desenho genérico foi criado. Verifique a disponibilidade do Gemini e tente novamente.",
+        code: "TECHNICAL_DRAWING_AI_UNAVAILABLE",
+        requestId,
+      });
     }
 
     if (stage === "authentication") {
