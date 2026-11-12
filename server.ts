@@ -133,6 +133,7 @@ app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole,
       capability: "chat",
       system: `Você é o Assistente Financeiro da Anacleto Esquadrias. Responda no idioma ${language === "es" ? "espanhol" : "português brasileiro"}. Use EXCLUSIVAMENTE os dados reais fornecidos no contexto. Não invente custos, preços, impostos, margens, lucros, datas ou saldos. Diferencie faturamento emitido, valores efetivamente recebidos, contas em aberto, compras registradas e pagamentos efetivos. Lucro só pode ser afirmado quando houver receita e custos efetivos suficientemente completos no ledger; caso contrário, explique a limitação. Para custo de alumínio/vidro, procure itens identificados no estoque e catálogo; se não houver custo unitário confiável, informe que o dado não está cadastrado. A resposta deve ser objetiva, explicar cálculos e apontar dados faltantes. Retorne somente JSON com answer (string), metrics (array de {label,value,explanation}), warnings (array de strings).`,
       prompt: `Dados atuais do sistema (BRL): ${JSON.stringify(context)}\nHistórico recente: ${JSON.stringify(history)}\nPergunta: ${question}`,
+      responseSchema: FINANCIAL_ASSISTANT_SCHEMA,
       validate: (value:any) => {
         if (!value || typeof value.answer !== "string" || !value.answer.trim() || !Array.isArray(value.metrics) || !Array.isArray(value.warnings)) throw new Error("Resposta financeira incompleta.");
         return { answer: value.answer.slice(0,8000), metrics: value.metrics.slice(0,8).map((m:any)=>({label:String(m?.label||"").slice(0,100),value:String(m?.value??"").slice(0,120),explanation:String(m?.explanation||"").slice(0,300)})), warnings: value.warnings.slice(0,8).map((w:any)=>String(w).slice(0,300)) };
@@ -226,6 +227,32 @@ app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
 
+
+const QUOTE_AGENT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    reply: {type:"STRING"}, action: {type:"STRING",enum:["update_quote","generate_invoice","none"]},
+    items: {type:"ARRAY",items:{type:"OBJECT",properties:{
+      id:{type:"STRING"},description:{type:"STRING"},sku:{type:"STRING"},catalogItemId:{type:"STRING"},catalogSource:{type:"STRING"},
+      quantity:{type:"NUMBER"},unitPrice:{type:"NUMBER"},subtotal:{type:"NUMBER"},priceSource:{type:"STRING",enum:["catalog","pending","existing","manual"]}
+    },required:["description","quantity","unitPrice"]}},
+    taxRate:{type:"NUMBER"},discountRate:{type:"NUMBER"},notes:{type:"STRING"}
+  }, required:["reply","action","items","taxRate","discountRate","notes"]
+};
+const BUDGET_ITEMS_SCHEMA = {
+  type:"OBJECT",
+  properties:{items:{type:"ARRAY",items:{type:"OBJECT",properties:{description:{type:"STRING"},qty:{type:"NUMBER"},price:{type:"NUMBER"},sku:{type:"STRING"},catalogItemId:{type:"STRING"},priceSource:{type:"STRING",enum:["catalog","pending"]}},required:["description","qty","price"]}},notes:{type:"STRING"}},
+  required:["items","notes"]
+};
+const FINANCIAL_ASSISTANT_SCHEMA = {
+  type:"OBJECT",
+  properties:{
+    answer:{type:"STRING"},
+    metrics:{type:"ARRAY",items:{type:"OBJECT",properties:{label:{type:"STRING"},value:{type:"STRING"},explanation:{type:"STRING"}},required:["label","value","explanation"]}},
+    warnings:{type:"ARRAY",items:{type:"STRING"}}
+  }, required:["answer","metrics","warnings"]
+};
+
 function normalizeCatalogName(value: unknown) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -293,6 +320,7 @@ Regras obrigatórias:
       capability: "quote",
       system: systemPrompt,
       prompt: `Histórico recente:\\n${transcript}\\n\\nSolicitação atual: ${message}`,
+      responseSchema: QUOTE_AGENT_SCHEMA,
       onGeneration: ({ usage }) => {
         aiUsage.inputTokens += Number(usage?.inputTokens ?? usage?.promptTokens ?? 0);
         aiUsage.outputTokens += Number(usage?.outputTokens ?? usage?.completionTokens ?? 0);
@@ -408,6 +436,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
       capability: "budget",
       system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Só associe item do catálogo por SKU/código, ID ou nome completo EXATO. Informe sku/catalogItemId para validação. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
       prompt,
+      responseSchema: BUDGET_ITEMS_SCHEMA,
       onGeneration: ({ usage }) => {
         aiUsage.inputTokens += Number(usage?.inputTokens ?? usage?.promptTokens ?? 0);
         aiUsage.outputTokens += Number(usage?.outputTokens ?? usage?.completionTokens ?? 0);
