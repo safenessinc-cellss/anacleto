@@ -1,4 +1,5 @@
 import { generateText } from "ai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { AI_CONFIG, getAIModel } from "../src/server/ai-config";
 import { parseAIJson } from "../src/server/ai-json";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data";
@@ -11,6 +12,69 @@ type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[];
 type WindowEntry = { startedAt: number; count: number };
 const windows = new Map<string, WindowEntry>();
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
+
+const drawingResponseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING }, description: { type: Type.STRING },
+    category: { type: Type.STRING, enum: ["furniture","architectural","aluminum_window","glass_door","custom"] },
+    unit: { type: Type.STRING, enum: ["mm","cm"] },
+    overallDimensions: { type: Type.OBJECT, properties: { width: {type:Type.NUMBER}, height: {type:Type.NUMBER}, depth: {type:Type.NUMBER} }, required: ["width","height"] },
+    pieces: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
+      id:{type:Type.STRING},pieceNumber:{type:Type.NUMBER},name:{type:Type.STRING},quantity:{type:Type.NUMBER},
+      dimensions:{type:Type.OBJECT,properties:{width:{type:Type.NUMBER},height:{type:Type.NUMBER},depth:{type:Type.NUMBER},thickness:{type:Type.NUMBER},unit:{type:Type.STRING}},required:["width","height","unit"]},
+      material:{type:Type.STRING},color:{type:Type.STRING},cutAngle:{type:Type.STRING}
+    }, required:["id","pieceNumber","name","quantity","dimensions","material","cutAngle"] } },
+    dimensionLines: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
+      id:{type:Type.STRING},label:{type:Type.STRING},value:{type:Type.NUMBER},unit:{type:Type.STRING},orientation:{type:Type.STRING},
+      start:{type:Type.OBJECT,properties:{x:{type:Type.NUMBER},y:{type:Type.NUMBER}},required:["x","y"]},
+      end:{type:Type.OBJECT,properties:{x:{type:Type.NUMBER},y:{type:Type.NUMBER}},required:["x","y"]}
+    }, required:["label","value","unit","orientation","start","end"] } },
+    assemblyInstructions:{type:Type.ARRAY,items:{type:Type.STRING}},
+    steps:{type:Type.ARRAY,items:{type:Type.OBJECT,properties:{stepNumber:{type:Type.NUMBER},title:{type:Type.STRING},description:{type:Type.STRING},phaseName:{type:Type.STRING},instructions:{type:Type.ARRAY,items:{type:Type.STRING}}},required:["stepNumber","title","description","phaseName","instructions"]}},
+    measurementPlan:{type:Type.ARRAY,items:{type:Type.OBJECT,properties:{point:{type:Type.STRING},method:{type:Type.STRING},tool:{type:Type.STRING},checks:{type:Type.ARRAY,items:{type:Type.STRING}}},required:["point","method","tool","checks"]}},
+    cuttingPlan:{type:Type.ARRAY,items:{type:Type.OBJECT,properties:{pieceNumber:{type:Type.NUMBER},name:{type:Type.STRING},material:{type:Type.STRING},quantity:{type:Type.NUMBER},length:{type:Type.NUMBER},width:{type:Type.NUMBER},thickness:{type:Type.NUMBER},unit:{type:Type.STRING},cutAngle:{type:Type.STRING},notes:{type:Type.STRING}},required:["pieceNumber","name","material","quantity","unit","cutAngle","notes"]}},
+    manufacturingSteps:{type:Type.ARRAY,items:{type:Type.OBJECT,properties:{step:{type:Type.NUMBER},title:{type:Type.STRING},instructions:{type:Type.ARRAY,items:{type:Type.STRING}},qualityGate:{type:Type.STRING}},required:["step","title","instructions","qualityGate"]}},
+    modelDescription:{type:Type.STRING},finalAppearance:{type:Type.STRING},
+    visualElements:{type:Type.ARRAY,items:{type:Type.OBJECT,properties:{
+      type:{type:Type.STRING,enum:["rect","line","circle","polygon","text"]},x:{type:Type.NUMBER},y:{type:Type.NUMBER},width:{type:Type.NUMBER},height:{type:Type.NUMBER},
+      x1:{type:Type.NUMBER},y1:{type:Type.NUMBER},x2:{type:Type.NUMBER},y2:{type:Type.NUMBER},cx:{type:Type.NUMBER},cy:{type:Type.NUMBER},r:{type:Type.NUMBER},
+      points:{type:Type.ARRAY,items:{type:Type.OBJECT,properties:{x:{type:Type.NUMBER},y:{type:Type.NUMBER}},required:["x","y"]}},
+      fill:{type:Type.STRING},stroke:{type:Type.STRING},strokeWidth:{type:Type.NUMBER},label:{type:Type.STRING},text:{type:Type.STRING},fontSize:{type:Type.NUMBER}
+    },required:["type"]}},
+    qualityChecklist:{type:Type.ARRAY,items:{type:Type.STRING}},assumptions:{type:Type.ARRAY,items:{type:Type.STRING}}
+  },
+  required:["title","description","category","unit","overallDimensions","pieces","dimensionLines","assemblyInstructions","steps","measurementPlan","cuttingPlan","manufacturingSteps","modelDescription","finalAppearance","visualElements","qualityChecklist","assumptions"]
+};
+async function generateDrawingJson(options: { system: string; prompt: string; images?: URL[]; temperature: number; maxOutputTokens: number }) {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+  if (apiKey) {
+    const parts: any[] = [{ text: options.prompt }];
+    for (const imageUrl of options.images || []) {
+      const response = await fetch(imageUrl, { signal: AbortSignal.timeout(8_000) });
+      if (!response.ok) throw new Error("Não foi possível carregar uma imagem de referência autorizada.");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength > 8 * 1024 * 1024) throw new Error("A imagem de referência excede o limite de 8 MB.");
+      parts.push({ inlineData: { mimeType: response.headers.get("content-type") || "image/jpeg", data: Buffer.from(bytes).toString("base64") } });
+    }
+    const client = new GoogleGenAI({ apiKey });
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts }],
+      config: { systemInstruction: options.system, responseMimeType: "application/json", responseSchema: drawingResponseSchema, temperature: options.temperature, maxOutputTokens: options.maxOutputTokens }
+    });
+    return { text: response.text || "", usage: { inputTokens: response.usageMetadata?.promptTokenCount, outputTokens: response.usageMetadata?.candidatesTokenCount }, model: "gemini-2.5-flash" };
+  }
+  // Backward-compatible provider path. Runtime validation remains mandatory.
+  const result = await generateText({
+    model: getAIModel("technicalDrawing"), system: options.system,
+    messages: [{ role: "user", content: [{ type: "text", text: options.prompt }, ...(options.images || []).map(image => ({ type: "image" as const, image }))] }],
+    temperature: options.temperature, maxOutputTokens: options.maxOutputTokens,
+    abortSignal: AbortSignal.timeout(AI_CONFIG.technicalDrawing.timeoutMs),
+  });
+  return { text: result.text || "", usage: result.usage as any, model: AI_CONFIG.technicalDrawing.model };
+}
+
 
 function json(res: any, status: number, body: unknown) {
   // Vercel Node responses and Express responses do not share identical chaining semantics.
@@ -330,24 +394,16 @@ export default async function handler(req: any, res: any) {
     const system = `Você é o engenheiro de produto, projetista e especialista em fabricação da Anacleto Pro. Interprete a solicitação inteira, não apenas palavras-chave. Identifique produto, material, tipo de abertura/encaixe, quantidade de folhas/portas, divisões, posição dos componentes e todas as dimensões explicitamente informadas. Diferencie largura, altura e profundidade conforme o produto; para móveis, não confunda profundidade com altura. Preserve a unidade original e converta somente quando o usuário pedir. Se o usuário solicitar alteração de um desenho existente, modifique somente os pontos pedidos e preserve os demais dados e componentes existentes; não reinicie o projeto. Se for um novo projeto, não reutilize o desenho anterior. Nunca invente dimensões, perfis, ferragens, folgas, descontos, espessuras, tolerâncias, fórmulas ou ângulos. Se faltar informação necessária, mantenha o campo vazio/zero e registre pergunta/pendência em assumptions; não apresente suposições como medidas confirmadas. A lista de corte é preliminar até validar sistema, ferragens e tabelas oficiais do fabricante. Gere somente JSON válido, sem markdown, com: title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array), steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions), measurementPlan (array de {point,method,tool,checks}), cuttingPlan (array de {pieceNumber,name,material,quantity,length,width,thickness,unit,cutAngle,notes}), manufacturingSteps (array de {step,title,instructions,qualityGate}), modelDescription (string), finalAppearance (string), visualElements (array de elementos SVG estruturados para desenhar exatamente o produto solicitado, coordenadas normalizadas de 0 a 1000: retângulos {type:"rect",x,y,width,height,fill,stroke,strokeWidth,label}, linhas {type:"line",x1,y1,x2,y2,stroke,strokeWidth,label}, círculos {type:"circle",cx,cy,r,fill,stroke}, polígonos {type:"polygon",points:[{x,y}],fill,stroke}, textos {type:"text",x,y,text,fill,fontSize}). A geometria deve representar fielmente a configuração pedida: número e posição exatos de folhas, portas, gavetas, divisórias, prateleiras, puxadores, trilhos, montantes, travessas, pés, recortes e demais detalhes descritos. Cada elemento visual deve corresponder a um componente real descrito na solicitação ou na lista de peças; use coordenadas normalizadas de 0 a 1000, mantenha proporções coerentes e distribua os elementos dentro do contorno do produto. A vista frontal deve mostrar exatamente a quantidade de folhas/portas/divisões solicitadas, suas posições, puxadores e ferragens explicitamente mencionados. Não use uma ilustração genérica da categoria; não acrescente elementos que o usuário não pediu. Se não for possível determinar a geometria com segurança, registre a lacuna em assumptions em vez de inventar uma imagem. Use o catálogo quando aplicável: ${JSON.stringify(catalog)}.`;
 
     const aiStartedAt = Date.now();
-    const result = await generateText({
-      model: getAIModel("technicalDrawing"),
-      system,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: `Analise as imagens anexadas como referência visual e extraia somente cotas legíveis. Se houver conflito entre texto e imagem, registre a divergência em assumptions. ${drawingContext ? `DESENHO ATUAL PARA ALTERAÇÃO (preserve tudo que não foi solicitado para mudar): ${drawingContext}. ` : "Trate como um novo projeto. "}Solicitação do usuário: ${prompt}` },
-          ...allowedImageUrls.map((image) => ({ type: "image" as const, image })),
-        ],
-      }],
+    const drawingPrompt = `Analise as imagens anexadas como referência visual e extraia somente cotas legíveis. Se houver conflito entre texto e imagem, registre a divergência em assumptions. ${drawingContext ? `DESENHO ATUAL PARA ALTERAÇÃO (preserve tudo que não foi solicitado para mudar): ${drawingContext}. ` : "Trate como um novo projeto. "}Solicitação do usuário: ${prompt}`;
+    const result = await generateDrawingJson({
+      system, prompt: drawingPrompt, images: allowedImageUrls,
       temperature: AI_CONFIG.technicalDrawing.temperature,
       maxOutputTokens: AI_CONFIG.technicalDrawing.maxOutputTokens,
-      abortSignal: AbortSignal.timeout(AI_CONFIG.technicalDrawing.timeoutMs),
     });
 
     await recordAIAudit({
       serviceName: "TECHNICAL_DRAWING",
-      modelUsed: AI_CONFIG.technicalDrawing.model,
+      modelUsed: result.model,
       input: { prompt, drawingContext, imageCount: allowedImageUrls.length },
       output: result.text,
       usage: result.usage as any,
@@ -368,17 +424,14 @@ export default async function handler(req: any, res: any) {
       });
     } catch (firstError) {
       const repairStartedAt = Date.now();
-      const repaired = await generateText({
-        model: getAIModel("technicalDrawing"),
+      const repaired = await generateDrawingJson({
         system: system + "\nRetorne somente JSON válido. Corrija exclusivamente a estrutura; preserve os dados, não invente medidas, materiais, ferragens ou componentes.",
         prompt: "A resposta anterior não passou na validação JSON. Erro: " + String((firstError as Error)?.message || firstError) + ". Corrija esta resposta sem acrescentar fatos: " + String(result.text || "").slice(0, 30000),
-        temperature: 0,
-        maxOutputTokens: AI_CONFIG.technicalDrawing.maxOutputTokens,
-        abortSignal: AbortSignal.timeout(AI_CONFIG.technicalDrawing.timeoutMs),
+        temperature: 0, maxOutputTokens: AI_CONFIG.technicalDrawing.maxOutputTokens,
       });
       await recordAIAudit({
         serviceName: "TECHNICAL_DRAWING",
-        modelUsed: AI_CONFIG.technicalDrawing.model,
+        modelUsed: repaired.model,
         input: { prompt, repair: true, previousOutputHash: String(result.text || "").length },
         output: repaired.text,
         usage: repaired.usage as any,
