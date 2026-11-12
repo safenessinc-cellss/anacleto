@@ -22,7 +22,7 @@ function pair(code: number, value: string | number): string {
 export function buildTechnicalDrawingDxf(drawing: TechnicalDrawing): string {
   const model = drawing as TechnicalDrawing & { visualElements?: Element[]; isDraft?: boolean; status?: string };
   const dimensions = model.overallDimensions || { width: 0, height: 0 };
-  const unitFactor = model.unit === "cm" ? 10 : model.unit === "m" ? 1000 : 1;
+  const unitFactor = model.unit === "cm" ? 10 : 1;
   const widthMm = Math.max(1, safe(dimensions.width) * unitFactor);
   const heightMm = Math.max(1, safe(dimensions.height) * unitFactor);
   const sx = widthMm / 1000;
