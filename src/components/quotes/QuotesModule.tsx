@@ -34,6 +34,8 @@ import ImageLightbox from "../common/ImageLightbox";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
 import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
 import { compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
+import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
+import ManufacturingRoute from "../production/ManufacturingRoute";
 
 interface QuotesModuleProps {
   senderConfig: SenderConfig;
@@ -216,6 +218,141 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     }).filter((result) => result.score >= Math.min(2, terms.length)).sort((a, b) => b.score - a.score)[0]?.candidate;
   };
 
+  const buildLocalQuoteUpdate = (text: string, quote: Quote): Quote => {
+    const updated = { ...quote, items: [...quote.items] };
+    const taxMatch = text.match(/(?:imposto|iva|taxa)\D{0,12}(\d+(?:[.,]\d+)?)\s*%?/i);
+    const marginMatch = text.match(/margem\D{0,12}(\d+(?:[.,]\d+)?)\s*%?/i);
+    const freightMatch = text.match(/frete\D{0,12}(?:r\$)?\s*(\d+(?:[.,]\d+)?)/i);
+    const discountMatch = text.match(/desconto\D{0,12}(\d+(?:[.,]\d+)?)\s*%?/i);
+    if (taxMatch) updated.taxRate = Number(taxMatch[1].replace(",", "."));
+    if (marginMatch) updated.marginRate = Number(marginMatch[1].replace(",", "."));
+    if (freightMatch) updated.freight = Number(freightMatch[1].replace(",", "."));
+    if (discountMatch) updated.discountRate = Number(discountMatch[1].replace(",", "."));
+    if (/imposto|iva|taxa|margem|frete|desconto/i.test(text) && !isAluminumPrompt(text) && !/\b(?:adicion|inclu|orcamento|orçamento|comprar)\b/i.test(text)) {
+      return recalculateQuote(updated);
+    }
+
+    const spec = isAluminumPrompt(text) ? localParametricSpec(text) : undefined;
+    const countMatch = text.match(/\b(?:qtd|qtde|quantidade|unidades?)\s*(?:de|:|=)?\s*(\d+)\b/i)
+      || text.match(/\b(\d+)\s*(?:x\s*)?(?:un(?:idades?)?\s*(?:de\s*)?)?(?=(?:janelas?|ventanas?|portas?|puertas?|boxes?|box|peças?|pecas?))/i)
+      || text.match(/\b(?:janelas?|ventanas?|portas?|puertas?|boxes?|box|peças?|pecas?)\s*(?:x|:)?\s*(\d+)\s*(?:un(?:idades?)?)?\b/i);
+    const quantity = Math.max(1, Number(countMatch?.[1] || 1));
+    const dimensionMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
+    const dimensionToMm = (value: string, unit = "") => {
+      const number = Number(value.replace(",", "."));
+      const factor = unit.toLowerCase() === "m" ? 1000 : unit.toLowerCase() === "cm" ? 10 : unit.toLowerCase() === "mm" ? 1 : number < 10 ? 1000 : number < 100 ? 10 : 1;
+      return Math.round(number * factor);
+    };
+    const widthMm = spec?.largura_mm || (dimensionMatch ? dimensionToMm(dimensionMatch[1], dimensionMatch[2]) : 0);
+    const heightMm = spec?.altura_mm || (dimensionMatch ? dimensionToMm(dimensionMatch[3], dimensionMatch[4]) : 0);
+    if (spec && widthMm > 0 && heightMm > 0) {
+      const glassColor = text.match(/\b(incolor|bronze|verde|fum[eê]|cinza)\b/i)?.[1]?.toLowerCase();
+      const drawing = buildParametricDrawing(
+        { ...spec, largura_mm: widthMm, altura_mm: heightMm },
+        text,
+        catalogItems.filter((item) => item.source === "supplier_catalog"),
+      );
+      const requestedQuantity = Math.max(1, Number(countMatch?.[1] || 1));
+      const glassWidthMm = Math.max(1, Math.round(widthMm / Math.max(1, spec.folhas) - 50));
+      const glassHeightMm = Math.max(1, Math.round(heightMm - 80));
+      const size = `${widthMm} × ${heightMm} mm`;
+      const budgetItems = drawing.budget?.items || [];
+      const profileItems = budgetItems.filter((item) => {
+        const piece = drawing.pieces.find((candidate) => candidate.id === item.pieceId);
+        return Boolean(piece && !/vidro|glass/i.test(`${piece.name} ${piece.material}`));
+      });
+      const glassItems = budgetItems.filter((item) => !item.pieceId &&
+        (item.id === "budget-glass" || /vidro|glass/i.test(item.description)));
+      const accessoryItems = budgetItems.filter((item) => !item.pieceId && /ferragem|acess[oó]rio/i.test(item.description));
+      const rows = [...profileItems, ...glassItems, ...accessoryItems];
+      if (glassItems.length === 0) {
+        rows.push({
+          id: "local-glass",
+          description: `Vidro ${spec.tipo_vidro} ${spec.espessura_mm} mm${glassColor ? ` ${glassColor}` : ""}`,
+          quantity: 1,
+          unitPrice: 0,
+          subtotal: 0,
+          cutLengthMm: 0,
+          priceSource: "pending",
+        });
+      }
+      const additions: QuoteItem[] = rows.map((budgetItem) => {
+        const piece = drawing.pieces.find((candidate) => candidate.id === budgetItem.pieceId);
+        const matchedCatalogItem = catalogItems.find((candidate) => candidate.id === budgetItem.catalogItemId);
+        const isGlass = budgetItem.id === "budget-glass" || budgetItem.id === "local-glass" ||
+          /vidro|glass/i.test(`${budgetItem.description} ${piece?.material || ""}`);
+        const glassPieces = isGlass ? Math.max(1, spec.folhas) : 1;
+        const quantity = Math.max(1, Number(budgetItem.quantity || 1)) * glassPieces * requestedQuantity;
+        const unitPrice = Number(budgetItem.unitPrice || 0) / glassPieces;
+        const priceSource: QuoteItem["priceSource"] = budgetItem.priceSource === "catalog" || budgetItem.priceSource === "estimated"
+          ? budgetItem.priceSource
+          : unitPrice > 0 ? "estimated" : "pending";
+        return {
+          id: `local_${crypto.randomUUID()}`,
+          description: `${isGlass ? "Vidro " : ""}${budgetItem.description} · ${spec.linha_aluminio} · ${size}${isGlass ? ` · ${spec.tipo_vidro} ${spec.espessura_mm} mm${glassColor ? ` ${glassColor}` : ""}` : ""}`,
+          quantity,
+          unitPrice,
+          subtotal: Number((quantity * unitPrice).toFixed(2)),
+          ...(budgetItem.catalogItemId ? { catalogItemId: budgetItem.catalogItemId } : {}),
+          ...(budgetItem.catalogSource ? { catalogSource: budgetItem.catalogSource } : {}),
+          ...(budgetItem.sku ? { sku: budgetItem.sku } : {}),
+          ...(matchedCatalogItem?.category ? { itemCategory: matchedCatalogItem.category } : {}),
+          priceSource,
+          notes: isGlass
+            ? "Estimativa paramétrica: abatimentos de 50 mm na largura e 80 mm na altura; validar folgas da linha e encaixe da goma EPDM antes do corte."
+            : piece?.notes || "Corte paramétrico preliminar; validar a tabela oficial de descontos da linha antes da fabricação.",
+          ...(isGlass
+            ? { itemDimensions: `${glassWidthMm} × ${glassHeightMm} mm` }
+            : { cutLengthMm: Number(budgetItem.cutLengthMm || 0), cutAngle: piece?.cutAngle || "90°" }),
+        };
+      });
+      return recalculateQuote({ ...updated, items: [...updated.items, ...additions] });
+    }
+
+    const lineMatch = text.match(/\b(suprema|gold|linha\s*(?:25|\d+))\b/i);
+    const glassMatch = text.match(/\b(temperado|templado|laminado|insulado|duplo|comum|float)\b/i);
+    const glassColorMatch = text.match(/\b(incolor|bronze|verde|fum[eê]|cinza)\b/i);
+    const normalizeText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const terms = [...new Set(normalizeText(`${text} ${spec?.tipologia || ""}`).split(/[^a-z0-9]+/)
+      .filter((term) => term.length >= 3 && !/^(quero|faca|fazer|crie|criar|adicione|adicionar|orcamento|orçamento|com|para|uma|por|de|da|do|mm|cm)$/.test(term)))];
+    const supplierMatch = catalogItems.filter((item) => item.source === "supplier_catalog").map((item) => {
+      const catalogText = normalizeText(`${item.name || ""} ${item.description || ""} ${item.sku || ""} ${item.code || ""} ${item.category || ""}`);
+      let score = terms.reduce((sum, term) => sum + (catalogText.includes(term) ? 1 : 0), 0);
+      if (lineMatch && catalogText.includes(normalizeText(lineMatch[1]).replace(/^linha\s*/, ""))) score += 4;
+      if (glassMatch && catalogText.includes(normalizeText(glassMatch[1]))) score += 2;
+      return { item, score };
+    }).sort((a, b) => b.score - a.score)[0];
+    const match = supplierMatch && supplierMatch.score > 0 ? supplierMatch.item : undefined;
+    const typology = spec?.tipologia.replaceAll("_", " ") || (isAluminumPrompt(text) ? "esquadria de alumínio" : "");
+    const size = widthMm && heightMm ? `${widthMm} × ${heightMm} mm` : "";
+    const line = lineMatch ? lineMatch[1].replace(/^linha\s*/i, "Linha ") : spec && spec.linha_aluminio !== "Linha a definir" ? spec.linha_aluminio : "";
+    const glass = glassMatch ? `vidro ${glassMatch[1].toLowerCase()}${glassColorMatch ? ` ${glassColorMatch[1].toLowerCase()}` : ""}${spec ? ` ${spec.espessura_mm} mm` : ""}` : "";
+    const freeDescription = [typology, size, line, glass].filter(Boolean).join(" · ") || text.trim();
+    const estimated = match ? estimatedCatalogPrice(match, aluminumPricePerKg, Math.max(widthMm, heightMm) || undefined) : undefined;
+    const unitPrice = Number(match?.price || 0) > 0 ? Number(match.price) : estimated || 0;
+    const item: QuoteItem = {
+      id: `local_${crypto.randomUUID()}`,
+      description: match ? `${match.name || match.description} · ${freeDescription}` : freeDescription,
+      quantity,
+      unitPrice,
+      subtotal: Number((quantity * unitPrice).toFixed(2)),
+      ...(match ? {
+        catalogSource: "supplier_catalog",
+        catalogItemId: match.id,
+        sku: match.sku || match.code || undefined,
+        itemCategory: match.category || undefined,
+      } : {}),
+      priceSource: unitPrice > 0 ? (Number(match?.price || 0) > 0 ? "catalog" : "estimated") : "pending",
+      notes: unitPrice > 0
+        ? estimated && Number(match?.price || 0) <= 0
+          ? `Estimativa a partir do peso kg/m e R$ ${aluminumPricePerKg.toFixed(2)}/kg; validar a composição antes de aprovar.`
+          : "Item associado ao catálogo de fornecedores pelo assistente local."
+        : "Referência local sem preço confirmado; informar o preço antes de aprovar.",
+      ...(size ? { itemDimensions: size } : {}),
+    };
+    return recalculateQuote({ ...updated, items: [...updated.items, item] });
+  };
+
   // Prioriza o logotipo configurado; usa o ativo oficial do projeto como fallback.
   const preparePdfSender = async () => {
     const configuredLogo = senderConfig.logoUrl || senderConfig.websiteLogoUrl || "";
@@ -327,6 +464,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       showToast("Este orçamento já está aprovado e bloqueado por instantânea.", "warning");
       return;
     }
+    if (selectedQuote.items.some((item) => item.priceSource === "pending")) {
+      showToast("Confirme os preços pendentes do orçamento antes de aprová-lo.", "warning");
+      return;
+    }
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("Faça login novamente para aprovar o orçamento.");
@@ -380,25 +521,27 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   };
 
   // Save only the light quote data; generate its PDF when requested.
-  const handleSaveQuote = async (quoteToSave?: Quote) => {
+  const handleSaveQuote = async (quoteToSave?: Quote, allowUnpricedDraft = false): Promise<boolean> => {
     const requested = quoteToSave || selectedQuote!;
     if (requested?.approvedSnapshotId) {
       showToast("Orçamento aprovado: alterações bloqueadas. Crie uma nova revisão para modificar valores ou itens.", "warning");
-      return;
+      return false;
     }
     let target = recalculateQuote(requested);
-    if (target.items.length > 0 && target.total <= 0) {
+    if (!allowUnpricedDraft && target.items.length > 0 && target.total <= 0) {
       showToast("O orçamento tem componentes sem preço confirmado ou estimado. Revise os valores antes de salvar um total de R$ 0,00.", "error");
-      return;
+      return false;
     }
     try {
       await setDoc(doc(db, "quotes", target.id), compactQuoteForFirestore(target));
       setSelectedQuote(target);
       setIsEditing(false);
       showToast(`Orçamento ${target.number} salvo. O PDF será gerado ao visualizar ou exportar.`, "success");
+      return true;
     } catch (err) {
       console.error(err);
       showToast("Erro ao salvar orçamento no Firestore.", "error");
+      return false;
     }
   };
 
@@ -548,6 +691,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       const res = await fetch("/api/ai/quote-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        signal: AbortSignal.timeout(4_000),
         body: JSON.stringify({
           message: userText,
           currentQuote: {
@@ -633,7 +777,8 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
       updated = recalculateQuote(updated);
       setSelectedQuote(updated);
-      await handleSaveQuote(updated);
+      const saved = await handleSaveQuote(updated);
+      if (!saved) throw new Error("A resposta da IA foi recebida, mas o orçamento não pôde ser salvo.");
 
       setAiChatHistory((prev) => [
         ...prev,
@@ -644,11 +789,39 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       ]);
     } catch (err: any) {
       console.error("Quote assistant request failed:", err);
-      setAiChatHistory((prev) => [...prev, {
-        role: "assistant",
-        text: err instanceof Error ? err.message : "Não foi possível gerar o orçamento. Nenhuma linha ou preço foi inventado. Tente novamente.",
-      }]);
-      showToast("Falha no assistente de orçamento. O orçamento não foi alterado.", "error");
+      try {
+        const hasLocalIntent = isAluminumPrompt(userText)
+          || /(?:imposto|iva|taxa|margem|frete|desconto)\D{0,12}\d/i.test(userText)
+          || /\b(?:vidro|glass)\b/i.test(userText) && /\b(?:temperado|templado|laminado|insulado|duplo|comum|float|mm|cm|m)\b/i.test(userText);
+        if (!hasLocalIntent) {
+          setAiChatHistory((prev) => [...prev, {
+            role: "assistant",
+            text: "A API de IA está indisponível e este pedido não é compatível com o motor local. Nenhuma alteração foi aplicada ao orçamento.",
+          }]);
+          return;
+        }
+        const localQuote = buildLocalQuoteUpdate(userText, selectedQuote);
+        const saved = await handleSaveQuote(localQuote, true);
+        if (!saved) throw new Error("Não foi possível salvar o orçamento localmente. Confira a conexão e as permissões da conta.");
+        const addedItems = localQuote.items.slice(selectedQuote.items.length);
+        const hasUnpricedItems = addedItems.some((item) => item.priceSource === "pending");
+        const failureReason = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")
+          ? "A API de IA excedeu o limite de 4 segundos."
+          : "A API de IA falhou ou está indisponível.";
+        const localReply = addedItems.length === 0
+          ? `${failureReason} Apliquei e salvei o ajuste localmente.`
+          : hasUnpricedItems
+            ? `${failureReason} Salvei o orçamento gerado localmente com referências sem preço confirmado; informe os preços antes de aprovar.`
+            : `${failureReason} Interpretei o pedido localmente, associei itens do catálogo e salvei o orçamento.`;
+        setAiChatHistory((prev) => [...prev, { role: "assistant", text: localReply }]);
+      } catch (fallbackError) {
+        console.error("Local quote fallback failed:", fallbackError);
+        setAiChatHistory((prev) => [...prev, {
+          role: "assistant",
+          text: fallbackError instanceof Error ? fallbackError.message : "A API falhou e não foi possível salvar o orçamento localmente.",
+        }]);
+        showToast("Não foi possível salvar o orçamento localmente.", "error");
+      }
     } finally {
       setIsAiLoading(false);
     }
@@ -1176,6 +1349,7 @@ const handleAddItem = () => {
                       <span className="font-mono text-base">{selectedQuote.total?.toFixed(2)} R$</span>
                     </div>
                   </div>
+                  <ManufacturingRoute title={`Orçamento ${selectedQuote.number}`} items={selectedQuote.items} />
                 </div>
               </div>
 

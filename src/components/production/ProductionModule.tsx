@@ -3,14 +3,16 @@ import { collection, doc, onSnapshot, runTransaction, serverTimestamp } from "fi
 import { auth, db } from "../../firebase";
 import { CheckCircle2, Factory, Loader2, PackageCheck, Play, Plus, XCircle } from "lucide-react";
 import CuttingPlanTab from "./CuttingPlanTab";
+import type { TechnicalDrawing } from "../../types";
 
-type QuoteRecord = { id: string; number?: string; clientName?: string; status?: string; items?: any[]; total?: number };
+type QuoteRecord = { id: string; number?: string; clientName?: string; status?: string; items?: any[]; total?: number; drawingId?: string; technicalDrawing?: { id?: string } };
 type Material = { id: string; name: string; sku?: string; unit?: string; quantity: number; reservedQuantity?: number };
 type ReservedMaterial = { itemId: string; name: string; sku?: string; unit: string; quantity: number };
-type WorkOrder = { id: string; number: string; quoteId: string; quoteNumber: string; clientName: string; description: string; targetDate: string; assignedTo: string; status: "planned" | "in_progress" | "completed" | "cancelled"; materials: ReservedMaterial[]; createdAt?: any };
+type WorkOrder = { id: string; number: string; quoteId: string; quoteNumber: string; clientName: string; description: string; targetDate: string; assignedTo: string; status: "planned" | "in_progress" | "completed" | "cancelled"; materials: ReservedMaterial[]; drawingId?: string; quoteItems?: QuoteRecord["items"]; createdAt?: any };
 
 export default function ProductionModule() {
   const [quotes, setQuotes] = useState<QuoteRecord[]>([]);
+  const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [stock, setStock] = useState<Material[]>([]);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [quoteId, setQuoteId] = useState("");
@@ -32,7 +34,8 @@ export default function ProductionModule() {
       rows.sort((x,y) => String(y.createdAt?.toDate?.() || y.createdAt || "").localeCompare(String(x.createdAt?.toDate?.() || x.createdAt || "")));
       setOrders(rows);
     }, e => console.error("Production orders:", e));
-    return () => { a(); b(); c(); };
+    const d = onSnapshot(collection(db, "technical_drawings"), snap => setDrawings(snap.docs.map(row => ({ id: row.id, ...row.data() } as TechnicalDrawing))), e => console.error("Production drawings:", e));
+    return () => { a(); b(); c(); d(); };
   }, []);
 
   const approvedQuotes = useMemo(() => quotes.filter(q => q.status === "approved" || q.status === "aprovado"), [quotes]);
@@ -69,7 +72,7 @@ export default function ProductionModule() {
           tx.update(materialRefs[i], { reservedQuantity: Number(data.reservedQuantity || 0) + requested, updatedAt: serverTimestamp() });
         }
         const number = `OP-${new Date().getFullYear()}-${orderRef.id.slice(0, 6).toUpperCase()}`;
-        tx.set(orderRef, { number, quoteId: quote.id, quoteNumber: quote.number || "", clientName: quote.clientName || "Cliente", description: description.trim() || `Produção do orçamento ${quote.number || ""}`, targetDate, assignedTo: assignedTo.trim(), status: "planned", materials, quoteItems: quote.items || [], quoteTotal: Number(quote.total || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        tx.set(orderRef, { number, quoteId: quote.id, quoteNumber: quote.number || "", clientName: quote.clientName || "Cliente", description: description.trim() || `Produção do orçamento ${quote.number || ""}`, targetDate, assignedTo: assignedTo.trim(), status: "planned", materials, quoteItems: quote.items || [], ...(quote.technicalDrawing?.id || quote.drawingId ? { drawingId: quote.technicalDrawing?.id || quote.drawingId } : {}), quoteTotal: Number(quote.total || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
       });
       setQuoteId(""); setDescription(""); setTargetDate(""); setAssignedTo(""); setMaterials([]); setMessage("Ordem criada. Os materiais foram reservados e vinculados ao orçamento.");
     } catch (err) { setMessage((err as Error).message || "Não foi possível criar a ordem."); }
@@ -120,7 +123,7 @@ export default function ProductionModule() {
       <button type="button" onClick={() => setActiveTab("orders")} aria-current={activeTab === "orders" ? "page" : undefined} className={`rounded-lg px-4 py-2 text-sm font-bold ${activeTab === "orders" ? "bg-indigo-600 text-white" : "border"}`}>Ordens de Produção</button>
       <button type="button" onClick={() => setActiveTab("cutting")} aria-current={activeTab === "cutting" ? "page" : undefined} className={`rounded-lg px-4 py-2 text-sm font-bold ${activeTab === "cutting" ? "bg-indigo-600 text-white" : "border"}`}>Plano de Corte 6M</button>
     </nav>
-    {activeTab === "cutting" ? <CuttingPlanTab orders={orders} /> : <>
+    {activeTab === "cutting" ? <CuttingPlanTab orders={orders} drawings={drawings} /> : <>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Ordens abertas</p><p className="text-2xl font-bold">{orders.filter(o => ["planned","in_progress"].includes(o.status)).length}</p></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Em produção</p><p className="text-2xl font-bold">{orders.filter(o => o.status === "in_progress").length}</p></div>

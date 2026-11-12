@@ -14,6 +14,7 @@ export interface ParametricWindowSpec {
   tipologia: AluminumTipologia;
   linha_aluminio: string;
   cor_perfil: string;
+  cor_vidro?: string;
   largura_mm: number;
   altura_mm: number;
   folhas: number;
@@ -54,7 +55,7 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
     : /porta/.test(text) && /giro|abrir|dobradi[cç]a/.test(text) ? "porta_giro"
     : /porta/.test(text) ? "porta_correr"
     : "janela_correr";
-  const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is|portas?)/)?.[1] || 2);
+  const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is)/)?.[1] || 2);
   const leaves = tipologia === "porta_correr" || tipologia === "janela_correr"
     ? Math.min(8, Math.max(1, requestedLeaves))
     : 1;
@@ -70,6 +71,7 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
     tipologia,
     linha_aluminio: namedLine ? namedLine.replace(/^linha/i, "Linha").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Linha a definir",
     cor_perfil: /preto/.test(text) ? "#1f2937" : /branco/.test(text) ? "#f8fafc" : "#94a3b8",
+    cor_vidro: text.match(/\b(incolor|bronze|verde|fum[eê]|cinza)\b/i)?.[1]?.toLowerCase() || "a definir",
     largura_mm: width,
     altura_mm: height,
     folhas: leaves,
@@ -164,7 +166,7 @@ function buildElevation(spec: ParametricWindowSpec): CadElement[] {
   line(elements, x, y - 15, x + w, y - 15, `${width} mm`, false, "#fbbf24", 2);
   line(elements, x - 25, y, x - 25, y + h, `${height} mm`, false, "#fbbf24", 2);
   text(elements, x + 5, y - 62, `${tipologia.replaceAll("_", " ").toUpperCase()} · ${spec.linha_aluminio}`, "#93c5fd", 15);
-  text(elements, x + 5, y + h + 116, `${spec.tipo_vidro} · ${spec.espessura_mm} mm · perfil ${spec.cor_perfil}`, "#cbd5e1", 13);
+  text(elements, x + 5, y + h + 116, `${spec.tipo_vidro} ${spec.cor_vidro} · ${spec.espessura_mm} mm · perfil ${spec.cor_perfil}`, "#cbd5e1", 13);
   return elements;
 }
 
@@ -244,7 +246,7 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
       catalogItemId: String(glassItem.id || ""),
       catalogSource: String(glassItem.source || ""),
       sku: String(glassItem.code || glassItem.sku || ""),
-      description: `${spec.tipo_vidro} ${spec.espessura_mm} mm`,
+      description: `${spec.tipo_vidro} ${spec.espessura_mm} mm ${spec.cor_vidro || ""}`.trim(),
       quantity: 1,
       unitPrice,
       subtotal: unitPrice,
@@ -291,6 +293,7 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
     draftStatus: "preliminary",
     draftLabel: "DESENHO PARAMÉTRICO PRELIMINAR — VALIDAR FÓRMULAS DO FABRICANTE",
     parametricSpec: spec,
+    vidro: spec.cor_vidro,
     visualElements: buildElevation(spec),
     dimensionLines: [
       { id: "width", label: `LARGURA TOTAL: ${width} mm`, value: width, unit: "mm", orientation: "horizontal", start: { x: 120, y: 100 }, end: { x: 880, y: 100 } },

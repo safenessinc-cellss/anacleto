@@ -31,6 +31,8 @@ export interface QuoteItem {
   catalogItemId?: string;
   priceSource?: "catalog" | "pending" | "existing" | "manual" | "estimated";
   priceValidation?: string;
+  cutLengthMm?: number;
+  cutAngle?: string;
 }
 
 export interface DeliveryEvidence {
@@ -205,6 +207,7 @@ export interface TechnicalDrawing {
     tipologia: "janela_correr" | "porta_correr" | "porta_giro" | "porta_pivotante" | "maxim_ar" | "basculante" | "box_banheiro";
     linha_aluminio: string;
     cor_perfil: string;
+    cor_vidro?: string;
     largura_mm: number;
     altura_mm: number;
     folhas: number;

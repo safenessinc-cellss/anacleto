@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { TechnicalDrawing } from "../../types";
+import { fitDrawingToViewport } from "../../utils/drawingViewport";
 
 type Props = { drawing: TechnicalDrawing };
 type VisualElement = Record<string, any>;
@@ -33,7 +34,6 @@ export default function DrawingThreePreview({ drawing }: Props) {
       const width = widthMm / 1000, height = heightMm / 1000, depth = Math.min(0.35, Math.max(0.012, depthMm / 1000));
       const center = new THREE.Vector3(width / 2, height / 2, 0);
       const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 100);
-      camera.position.set(width * 1.25, height * 1.05, Math.max(width, height) * 2.2);
       camera.lookAt(center);
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -115,9 +115,20 @@ export default function DrawingThreePreview({ drawing }: Props) {
         if (!host || !renderer) return;
         const w = Math.max(1, host.clientWidth), h = Math.max(1, host.clientHeight);
         camera.aspect = w / h;
+        const fit = fitDrawingToViewport(widthMm, heightMm, w, h, 48);
+        const viewHeight = h / fit.scale / 1000;
+        const viewWidth = w / fit.scale / 1000;
+        const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+        const distance = Math.max(
+          viewHeight / (2 * Math.tan(halfFov)),
+          viewWidth / (2 * Math.tan(halfFov) * camera.aspect),
+        ) * 1.2;
+        camera.position.set(center.x + distance * 0.18, center.y + distance * 0.14, distance);
+        camera.lookAt(center);
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
       };
+      resize();
       const observer = new ResizeObserver(resize);
       observer.observe(host);
       let frame = 0;

@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { TechnicalDrawing, TechnicalPiece } from "../../types";
 import { ZoomIn, ZoomOut, RotateCcw, Eye, Layers } from "lucide-react";
+import { fitDrawingToViewport } from "../../utils/drawingViewport";
 
 interface DrawingSvgCanvasProps {
   drawing: TechnicalDrawing;
@@ -168,12 +169,10 @@ export default function DrawingSvgCanvas({
     const visualElements = Array.isArray((drawing as any).visualElements) ? (drawing as any).visualElements : [];
     // Preserve the real width/height ratio instead of stretching every product
     // into the same rectangle. This keeps the generated elevation faithful.
-    const maxW = 500, maxH = 340;
-    const aspect = Math.max(0.05, W / Math.max(1, H));
-    const w = Math.min(maxW, maxH * aspect);
-    const h = Math.min(maxH, maxW / aspect);
-    const x = (1000 - w) / 2;
-    const y = 145 + (maxH - h) / 2;
+    const fit = fitDrawingToViewport(W, H, 500, 340, 48);
+    const w = fit.width, h = fit.height;
+    const x = 250 + fit.x;
+    const y = 120 + fit.y;
     const side = Math.max(28, Math.min(95, D / Math.max(W, H, D) * 170));
     const frame = "#cbd5e1";
     const isWindow = category === "aluminum_window";

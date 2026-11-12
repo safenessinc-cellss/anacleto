@@ -1,11 +1,14 @@
 import React, { useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
 import { Plus, Scissors } from "lucide-react";
+import type { QuoteItem } from "../../types";
+import type { TechnicalDrawing } from "../../types";
+import ManufacturingRoute from "./ManufacturingRoute";
 
 type CutInput = { id: string; label: string; lengthMm: string; quantity: string };
 type CutPiece = { id: string; label: string; lengthMm: number; kerfMm: number };
 type BarPlan = { pieces: CutPiece[]; remainingMm: number };
-type ProductionOrder = { id: string; number: string; clientName: string; quoteItems?: Array<{ description?: string }> };
+type ProductionOrder = { id: string; number: string; clientName: string; drawingId?: string; quoteItems?: QuoteItem[] };
 
 const BAR_LENGTH_MM = 6000;
 const KERF_MM = 4;
@@ -33,7 +36,7 @@ export function packCutsFirstFitDecreasing(cuts: Array<{ label: string; lengthMm
   return bars;
 }
 
-export default function CuttingPlanTab({ orders }: { orders: ProductionOrder[] }) {
+export default function CuttingPlanTab({ orders, drawings = [] }: { orders: ProductionOrder[]; drawings?: TechnicalDrawing[] }) {
   const [orderId, setOrderId] = useState("");
   const [cuts, setCuts] = useState<CutInput[]>([blankCut()]);
   const [error, setError] = useState("");
@@ -94,6 +97,7 @@ export default function CuttingPlanTab({ orders }: { orders: ProductionOrder[] }
       </label>
 
       {selectedOrder?.quoteItems?.length ? <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800">Orçamento vinculado: {selectedOrder.quoteItems.map((item) => item.description).filter(Boolean).join(" · ")}</p> : null}
+      {selectedOrder && <ManufacturingRoute drawing={drawings.find((drawing) => drawing.id === selectedOrder.drawingId)} title={`OP ${selectedOrder.number} · ${selectedOrder.clientName}`} items={selectedOrder.quoteItems || []} />}
 
       <div className="space-y-2">
         {cuts.map((cut, index) => (

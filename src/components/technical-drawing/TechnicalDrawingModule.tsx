@@ -25,6 +25,7 @@ import {
 import { TechnicalDrawing, SenderConfig, Quote } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import DrawingThreePreview from "./DrawingThreePreview";
+import ManufacturingRoute from "../production/ManufacturingRoute";
 import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
@@ -1155,6 +1156,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               <DrawingThreePreview drawing={drawing} />
             </div>
           </div>
+          <ManufacturingRoute drawing={drawing} title={drawing.title || "Projeto técnico"} />
 
           {/* Projetos técnicos salvos: lista completa, mais recente primeiro */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-3xl shadow-sm">
