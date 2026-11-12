@@ -428,7 +428,7 @@ export default function AnacletoProApp({
          {activeTab === "finance" && (<FinanceModule language={language} />)}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={effectiveRole} />)}
-        {activeTab === "financial_ai" && (<FinancialAI />)}
+        {activeTab === "financial_ai" && (<FinancialAI language={language} />)}
         {activeTab === "theme" && (<ThemeModule />)}
 
         {activeTab === "settings" && (
