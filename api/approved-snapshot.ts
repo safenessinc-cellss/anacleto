@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
-import { AI_CONFIG } from "../src/server/ai-config";
-import { loadCatalogFromFirestore } from "../src/server/firestore-data";
-import { createBudgetSnapshot } from "../src/server/snapshot-ledger";
-import { buildDrawingVectorPayload } from "../src/server/drawing-vector";
+import { AI_CONFIG } from "../src/server/ai-config.js";
+import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
+import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
+import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 
 type AuthUser = { uid: string; email: string; role: string };
 const OWNER_EMAIL = "safeness.c.a@gmail.com";

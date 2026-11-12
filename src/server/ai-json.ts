@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 import { GoogleGenAI } from "@google/genai";
-import { AI_CONFIG, getAIModel } from "./ai-config";
+import { AI_CONFIG, getAIModel } from "./ai-config.js";
 
 export class AIJsonError extends Error {
   readonly code = "AI_INVALID_STRUCTURED_RESPONSE";

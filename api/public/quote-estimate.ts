@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { generateText } from "ai";
-import { AI_CONFIG, getAIModel } from "../../src/server/ai-config";
-import { parseAIJson } from "../../src/server/ai-json";
-import { recordAIAudit } from "../../src/server/ai-audit";
+import { AI_CONFIG, getAIModel } from "../../src/server/ai-config.js";
+import { parseAIJson } from "../../src/server/ai-json.js";
+import { recordAIAudit } from "../../src/server/ai-audit.js";
 
 type RateState = { count: number; resetAt: number };
 const localWindows = new Map<string, RateState>();

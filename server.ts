@@ -4,13 +4,13 @@ import path from "path";
 import dotenv from "dotenv";
 // import estático de vite eliminado - se usa import dinámico en desarrollo
 import { generateText } from "ai";
-import { AI_CONFIG, getAIModel } from "./src/server/ai-config";
-import { generateValidatedJson, parseAIJson } from "./src/server/ai-json";
-import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore } from "./src/server/firestore-data";
-import technicalDrawingHandler from "./api/technical-drawing";
-import approvedSnapshotHandler from "./api/approved-snapshot";
-import publicQuoteEstimateHandler from "./api/public/quote-estimate";
-import { recordAIAudit } from "./src/server/ai-audit";
+import { AI_CONFIG, getAIModel } from "./src/server/ai-config.js";
+import { generateValidatedJson, parseAIJson } from "./src/server/ai-json.js";
+import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore } from "./src/server/firestore-data.js";
+import technicalDrawingHandler from "./api/technical-drawing.js";
+import approvedSnapshotHandler from "./api/approved-snapshot.js";
+import publicQuoteEstimateHandler from "./api/public/quote-estimate.js";
+import { recordAIAudit } from "./src/server/ai-audit.js";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 

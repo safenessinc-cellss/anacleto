@@ -1,10 +1,10 @@
 import { generateText } from "ai";
 import { GoogleGenAI, Type } from "@google/genai";
-import { AI_CONFIG, getAIModel } from "../src/server/ai-config";
-import { parseAIJson } from "../src/server/ai-json";
-import { loadCatalogFromFirestore } from "../src/server/firestore-data";
-import { recordAIAudit } from "../src/server/ai-audit";
-import { withDraftVectorWatermark } from "../src/server/drawing-vector";
+import { AI_CONFIG, getAIModel } from "../src/server/ai-config.js";
+import { parseAIJson } from "../src/server/ai-json.js";
+import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
+import { recordAIAudit } from "../src/server/ai-audit.js";
+import { withDraftVectorWatermark } from "../src/server/drawing-vector.js";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
