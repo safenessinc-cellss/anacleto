@@ -2,12 +2,15 @@
 
 ## Segredos e variáveis obrigatórias
 
+`GEMINI_API_KEY` (ou `GOOGLE_API_KEY`) habilita a chamada direta ao Gemini 2.5 Flash pelo SDK oficial `@google/genai`, com `responseMimeType: application/json` e `responseSchema` nos agentes estruturados. Sem essa chave, o sistema mantém o fallback existente pelo Vercel AI Gateway; o fallback não oferece a mesma garantia nativa de schema do endpoint Gemini. A chave deve existir somente como variável sensível no servidor (Vercel Preview/Production), nunca em `localStorage`, no bundle do navegador ou no Git. A camada gratuita do Google tem limites e disponibilidade sujeitos à política atual do provedor; não é possível prometer uso ilimitado ou 100% de disponibilidade.
+
 Configure no ambiente de execução (Preview e Production separadamente). Nunca coloque estes valores no frontend, no Git ou em logs.
 
 `ANACLETO_REQUIRE_AI_AUDIT` é opcional e, por padrão, deve permanecer `false`: a IA continua funcionando se a gravação de auditoria estiver temporariamente indisponível. Defina como `true` somente depois de publicar e validar as regras append-only do Firestore para `ai_audit_logs` e `budget_line_audit`.
 
 | Variável | Finalidade |
 |---|---|
+| `GEMINI_API_KEY` (ou `GOOGLE_API_KEY`) | Chave do Google AI Studio para Gemini 2.5 Flash direto com JSON Schema. Configurar como variável sensível em Preview e Production. |
 | `ANACLETO_SERVICE_API_KEY` | Segredo HMAC compartilhado entre o servidor principal e o serviço independente de desenhos. Mínimo de 32 caracteres aleatórios. Deve ser idêntico nos dois serviços. |
 | `ANACLETO_DRAWING_SERVICE_URL` | URL HTTPS base do serviço independente. O contrato usa `POST /api/technical-drawing` e `GET /api/technical-drawing?jobId={uuid}`. |
 | `UPSTASH_REDIS_REST_URL` | Endpoint REST do Redis para rate limit distribuído do endpoint público. Obrigatório em produção. |
