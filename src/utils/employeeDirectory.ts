@@ -1,11 +1,12 @@
 export interface EmployeeDirectoryRecord {
   id: string;
-  source: "employees" | "funcionarios" | "admins" | "pending_users" | "user_profiles" | "staff" | "registry_items";
+  source: "employees" | "funcionarios" | "admins" | "pending_users" | "user_profiles" | "staff";
   data: Record<string, unknown>;
 }
 
 export interface EmployeeDirectoryEntry {
   id: string;
+  aliases: string[];
   uid?: string;
   name: string;
   email?: string;
@@ -15,13 +16,12 @@ export interface EmployeeDirectoryEntry {
   cpf?: string;
   department?: string;
   phone?: string;
+  pixKey?: string;
   admissionDate?: string;
   monthlyHours?: number;
   additions?: { name: string; kind: "fixed" | "percent"; value: number }[];
   source: EmployeeDirectoryRecord["source"];
 }
-
-const employeeRolePattern = /employee|funcion[aá]ri[oa]|colaborador|staff|oper[aá]ri[oa]|instalador|montador|administrador|admin/i;
 
 function firstString(data: Record<string, unknown>, keys: string[]): string {
   for (const key of keys) {
@@ -31,18 +31,6 @@ function firstString(data: Record<string, unknown>, keys: string[]): string {
   return "";
 }
 
-function isEmployeeRecord(record: EmployeeDirectoryRecord): boolean {
-  if (record.source === "employees" || record.source === "funcionarios" || record.source === "admins" || record.source === "staff") return true;
-  const { data } = record;
-  const description = [
-    data.role, data.type, data.userType, data.category, data.kind, data.position, data.cargo,
-    data.department, data.accountType,
-  ].map((value) => String(value || "")).join(" ");
-  if (employeeRolePattern.test(description)) return true;
-  if (/client|cliente|supplier|fornecedor/i.test(description)) return false;
-  return record.source === "pending_users" && Boolean(data.salary || data.cpf || data.department);
-}
-
 const sourcePriority: Record<EmployeeDirectoryRecord["source"], number> = {
   employees: 6,
   funcionarios: 6,
@@ -50,21 +38,19 @@ const sourcePriority: Record<EmployeeDirectoryRecord["source"], number> = {
   admins: 4,
   user_profiles: 3,
   pending_users: 2,
-  registry_items: 1,
 };
 
 function toEntry(record: EmployeeDirectoryRecord): EmployeeDirectoryEntry | null {
-  if (!isEmployeeRecord(record)) return null;
   const { data } = record;
   const name = firstString(data, ["name", "displayName", "fullName", "requestedName", "nome"]);
   const email = firstString(data, ["email", "workEmail", "userEmail"]).toLowerCase();
   const uid = firstString(data, ["uid", "userId", "authUid"]) || (record.source === "user_profiles" ? record.id : "");
-  if (!name && !email) return null;
   const salaryValue = Number(data.salary ?? data.baseSalary ?? data.salaryBase ?? 0);
   return {
     id: record.source === "employees" || record.source === "funcionarios" || record.source === "staff" ? record.id : uid || email || record.id,
+    aliases: [...new Set([record.id, uid, email].filter(Boolean))],
     uid: uid || undefined,
-    name: name || email,
+    name: name || email.split("@")[0] || record.id,
     email: email || undefined,
     role: firstString(data, ["role", "position", "cargo", "jobTitle", "type"]),
     salary: Number.isFinite(salaryValue) && salaryValue > 0 ? salaryValue : 0,
@@ -72,6 +58,7 @@ function toEntry(record: EmployeeDirectoryRecord): EmployeeDirectoryEntry | null
     cpf: firstString(data, ["cpf", "document"]),
     department: firstString(data, ["department", "sector", "departamento"]),
     phone: firstString(data, ["phone", "telephone", "telefone"]),
+    pixKey: firstString(data, ["pixKey", "chavePix", "pix_key", "pix"]),
     admissionDate: firstString(data, ["admissionDate", "hireDate", "dataAdmissao"]),
     monthlyHours: Number(data.monthlyHours || data.hoursPerMonth || 0) || undefined,
     additions: Array.isArray(data.additions) ? data.additions as EmployeeDirectoryEntry["additions"] : [],
@@ -86,6 +73,7 @@ export function mergeEmployeeDirectory(records: EmployeeDirectoryRecord[]): Empl
     const entry = toEntry(record);
     if (!entry) continue;
     const keys = [
+      `id:${record.id}`,
       entry.email ? `email:${entry.email}` : "",
       entry.uid ? `uid:${entry.uid}` : "",
     ].filter(Boolean);
@@ -106,19 +94,28 @@ export function mergeEmployeeDirectory(records: EmployeeDirectoryRecord[]): Empl
     for (const duplicate of matchingEntries.map(resolve)) {
       if (duplicate === existing) continue;
       if (duplicate.priority > existing.priority) {
-        existing.entry = { ...existing.entry, ...duplicate.entry };
+        existing.entry = {
+          ...existing.entry,
+          ...duplicate.entry,
+          aliases: [...new Set([...existing.entry.aliases, ...duplicate.entry.aliases])],
+        };
         existing.priority = duplicate.priority;
       }
       duplicate.mergedInto = existing;
     }
     const nextPriority = sourcePriority[record.source];
     if (nextPriority > existing.priority) {
-      existing.entry = { ...existing.entry, ...entry };
+      existing.entry = {
+        ...existing.entry,
+        ...entry,
+        aliases: [...new Set([...existing.entry.aliases, ...entry.aliases])],
+      };
       existing.priority = nextPriority;
     } else {
       existing.entry = {
         ...entry,
         ...existing.entry,
+        aliases: [...new Set([...existing.entry.aliases, ...entry.aliases])],
         name: existing.entry.name || entry.name,
         email: existing.entry.email || entry.email,
         uid: existing.entry.uid || entry.uid,
@@ -127,6 +124,7 @@ export function mergeEmployeeDirectory(records: EmployeeDirectoryRecord[]): Empl
         cpf: existing.entry.cpf || entry.cpf,
         department: existing.entry.department || entry.department,
         phone: existing.entry.phone || entry.phone,
+        pixKey: existing.entry.pixKey || entry.pixKey,
         admissionDate: existing.entry.admissionDate || entry.admissionDate,
         monthlyHours: existing.entry.monthlyHours || entry.monthlyHours,
         additions: existing.entry.additions?.length ? existing.entry.additions : entry.additions,
@@ -135,5 +133,5 @@ export function mergeEmployeeDirectory(records: EmployeeDirectoryRecord[]): Empl
     for (const key of keys) aliases.set(key, existing);
   }
   return entries.filter((item) => !item.mergedInto).map(({ entry }) => entry)
-    .filter((entry) => entry.active).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }

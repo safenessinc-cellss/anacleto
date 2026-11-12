@@ -2,17 +2,27 @@ import React, { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, doc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { CheckCircle2, Clock3, CreditCard, Users } from "lucide-react";
-import { mergeEmployeeDirectory, type EmployeeDirectoryEntry, type EmployeeDirectoryRecord } from "../../utils/employeeDirectory";
+import EmployeeDirectoryActions from "./EmployeeDirectoryActions";
+import { useEmployeeDirectory } from "../../hooks/useEmployeeDirectory";
+import { exportEmployeePayrollReceipt, type PayrollReceiptDeduction } from "../../utils/employeePayrollReceipt";
 
-type Employee = EmployeeDirectoryEntry;
+type Employee = ReturnType<typeof useEmployeeDirectory>["employees"][number];
 type EmployeePayment = {
   id: string; employeeId: string; employeeName: string; competence: string;
   amount: number; paymentDate: string; method: string; reference?: string; notes?: string;
+  employeeUid?: string; employeeEmail?: string;
+  employeeRole?: string; salaryBase?: number; bonus?: number; pixKey?: string;
+  deductions?: PayrollReceiptDeduction[];
   createdAt?: any; createdBy?: string;
 };
 const money = (value: number) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const today = new Date().toISOString().slice(0, 10);
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
+const matchesEmployee = (employee: Employee, payment: EmployeePayment) => {
+  const known = new Set([employee.id, ...employee.aliases, employee.uid || "", employee.email || ""].map(value => value.trim().toLowerCase()).filter(Boolean));
+  return [payment.employeeId, payment.employeeUid, payment.employeeEmail]
+    .map(value => String(value || "").trim().toLowerCase()).some(value => known.has(value));
+};
 const formatCPF = (value: string) => onlyDigits(value).slice(0, 11).replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 const validCPF = (value: string) => {
   const cpf = onlyDigits(value);
@@ -25,8 +35,7 @@ const validCPF = (value: string) => {
 };
 
 export default function EmployeePaymentsModule() {
-  const [employeeRecords, setEmployeeRecords] = useState<EmployeeDirectoryRecord[]>([]);
-  const employees = useMemo(() => mergeEmployeeDirectory(employeeRecords), [employeeRecords]);
+  const { employees, error: directoryError, sync, syncing } = useEmployeeDirectory();
   const [payments, setPayments] = useState<EmployeePayment[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [competence, setCompetence] = useState(today.slice(0, 7));
@@ -47,23 +56,15 @@ export default function EmployeePaymentsModule() {
   const [editDepartment, setEditDepartment] = useState("");
   const [editAdmissionDate, setEditAdmissionDate] = useState("");
   const [editMonthlyHours, setEditMonthlyHours] = useState("220");
+  const [editPixKey, setEditPixKey] = useState("");
   const [savingEmployee, setSavingEmployee] = useState(false);
 
   useEffect(() => {
-    const employeeSources = ["employees", "funcionarios", "staff", "admins", "user_profiles", "pending_users"] as const;
-    const employeeStops = employeeSources.map((source) => onSnapshot(
-      collection(db, source),
-      (snap) => {
-        const loaded = snap.docs.map((item) => ({ id: item.id, source, data: item.data() }) as EmployeeDirectoryRecord);
-        setEmployeeRecords((current) => [...current.filter((record) => record.source !== source), ...loaded]);
-      },
-      (err) => setError(`Não foi possível carregar funcionários de ${source}: ${err.message}`),
-    ));
     const stopPayments = onSnapshot(query(collection(db, "employee_payments"), orderBy("paymentDate", "desc")), snap =>
       setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() } as EmployeePayment))),
       err => setError("Não foi possível carregar pagamentos: " + err.message)
     );
-    return () => { employeeStops.forEach((stop) => stop()); stopPayments(); };
+    return () => stopPayments();
   }, []);
 
   const selected = employees.find(e => e.id === employeeId);
@@ -76,6 +77,7 @@ export default function EmployeePaymentsModule() {
     setEditEmail(employee.email || ""); setEditPhone(employee.phone || "");
     setEditDepartment(employee.department || ""); setEditAdmissionDate(employee.admissionDate || "");
     setEditMonthlyHours(String(employee.monthlyHours || 220));
+    setEditPixKey(employee.pixKey || "");
   };
 
   const saveEmployee = async (event: React.FormEvent) => {
@@ -87,7 +89,7 @@ export default function EmployeePaymentsModule() {
     setSavingEmployee(true); setError("");
     try {
       if (editing.source !== "employees") throw new Error("Edite este funcionário no cadastro de origem para preservar a vinculação.");
-      await updateDoc(doc(db, "employees", editing.id), { name: editName.trim(), role: editRole.trim(), cpf: cpfDigits, salary: Math.round(Number(editSalary) * 100) / 100, email: editEmail.trim(), phone: editPhone.trim(), department: editDepartment.trim(), admissionDate: editAdmissionDate, monthlyHours: Number(editMonthlyHours), profileUpdatedAt: serverTimestamp(), profileUpdatedBy: auth.currentUser?.email || "" });
+      await updateDoc(doc(db, "employees", editing.id), { name: editName.trim(), role: editRole.trim(), cpf: cpfDigits, salary: Math.round(Number(editSalary) * 100) / 100, email: editEmail.trim(), phone: editPhone.trim(), pixKey: editPixKey.trim(), department: editDepartment.trim(), admissionDate: editAdmissionDate, monthlyHours: Number(editMonthlyHours), profileUpdatedAt: serverTimestamp(), profileUpdatedBy: auth.currentUser?.email || "" });
       setEditing(null);
     } catch (e) { setError("Não foi possível atualizar o funcionário: " + (e as Error).message); }
     finally { setSavingEmployee(false); }
@@ -103,18 +105,27 @@ export default function EmployeePaymentsModule() {
     try {
       const paymentRef = doc(collection(db, "employee_payments"));
       const ledgerRef = doc(db, "ledger_entries", `employee-payment-${paymentRef.id}`);
+      const historicalPaymentRef = doc(collection(db, "payments"));
+      const paymentAmount = Math.round(value * 100) / 100;
       await runTransaction(db, async (transaction) => {
         transaction.set(paymentRef, {
           employeeId: selected.id, employeeName: selected.name, employeeRole: selected.role || "",
-          competence, amount: Math.round(value * 100) / 100, paymentDate, method,
+          competence, amount: paymentAmount, paymentDate, method, salaryBase: Number(selected.salary || 0),
+          bonus: 0, deductions: [], pixKey: selected.pixKey || "",
           reference: reference.trim(), notes: notes.trim(), status: "paid",
           payrollSource: "employees", createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || ""
         });
         transaction.set(ledgerRef, {
           direction: "outflow", category: "payroll", sourceType: "employee_payment", sourceId: paymentRef.id,
           employeeId: selected.id, employeeName: selected.name, description: `Folha de pagamento · ${selected.name} · ${competence}`,
-          amount: Math.round(value * 100) / 100, date: paymentDate, status: "posted", paymentMethod: method,
+          amount: paymentAmount, date: paymentDate, status: "posted", paymentMethod: method,
           createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "",
+        });
+        transaction.set(historicalPaymentRef, {
+          direction: "outflow", category: "payroll", sourceType: "employee_payment", sourceId: paymentRef.id,
+          employeeId: selected.id, employeeName: selected.name, amount: paymentAmount, date: paymentDate,
+          paidAt: paymentDate, paymentMethod: method, method, status: "paid", createdAt: serverTimestamp(),
+          createdBy: auth.currentUser?.email || "",
         });
       });
       setAmount(""); setReference(""); setNotes("");
@@ -125,15 +136,16 @@ export default function EmployeePaymentsModule() {
 
   return <div className="space-y-5 text-slate-800 dark:text-slate-100">
     <header><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Folha de pagamento vinculada</p><h2 className="text-2xl font-black">Pagamento funcionário</h2><p className="mt-1 text-sm text-slate-500">Registre os valores efetivamente pagos aos funcionários cadastrados na Folha de Pagamento. O registro fica vinculado ao funcionário e à competência.</p></header>
-    {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
+    <EmployeeDirectoryActions onSync={() => { void sync(); }} syncing={syncing}/>
+    {(error || directoryError) && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error || directoryError}</div>}
     <div className="grid gap-3 sm:grid-cols-3">
-      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><Users className="mb-2 text-blue-600"/><p className="text-xs text-slate-500">Funcionários ativos</p><strong className="text-2xl">{employees.length}</strong></div>
+      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><Users className="mb-2 text-blue-600"/><p className="text-xs text-slate-500">Funcionários cadastrados</p><strong className="text-2xl">{employees.length}</strong></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><CheckCircle2 className="mb-2 text-emerald-600"/><p className="text-xs text-slate-500">Pagamentos registrados na competência</p><strong className="text-2xl">{monthPayments.length}</strong></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><CreditCard className="mb-2 text-indigo-600"/><p className="text-xs text-slate-500">Total efetivamente pago</p><strong className="text-2xl">{money(totalPaid)}</strong></div>
     </div>
     <section className="overflow-hidden rounded-2xl border bg-white dark:bg-slate-900">
       <div className="border-b p-4 dark:border-slate-700"><h3 className="font-bold">Salários base vinculados à Folha de Pagamento</h3><p className="text-xs text-slate-500">Valor atual do cadastro funcional; alterações são feitas na Folha de Pagamento e refletidas aqui.</p></div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th className="p-3">Funcionário</th><th className="p-3">Função</th><th className="p-3 text-right">Salário base atual</th><th className="p-3 text-right">Pago na competência</th><th className="p-3 text-right">Diferença</th><th className="p-3">Cadastro</th></tr></thead><tbody>{employees.map(e=>{const paid=monthPayments.filter(p=>p.employeeId===e.id).reduce((s,p)=>s+Number(p.amount||0),0);const base=Number(e.salary||0);return <tr key={e.id} className="border-t dark:border-slate-700"><td className="p-3 font-semibold">{e.name}<div className="text-xs text-slate-500">CPF: {e.cpf || "não informado"}</div></td><td className="p-3 text-slate-500">{e.role||"—"}</td><td className="p-3 text-right font-semibold">{money(base)}</td><td className="p-3 text-right">{money(paid)}</td><td className="p-3 text-right">{money(base-paid)}</td><td className="p-3">{e.source === "employees" && <button type="button" onClick={()=>beginEdit(e)} className="rounded-lg border px-3 py-1.5 text-xs font-bold text-blue-700">Editar funcionário</button>}</td></tr>;})}{!employees.length&&<tr><td colSpan={6} className="p-6 text-center text-slate-500">Nenhum funcionário cadastrado na Folha.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th className="p-3">Funcionário</th><th className="p-3">Função</th><th className="p-3 text-right">Salário base atual</th><th className="p-3 text-right">Pago na competência</th><th className="p-3 text-right">Diferença</th><th className="p-3">Cadastro</th></tr></thead><tbody>{employees.map(e=>{const paid=monthPayments.filter(p=>matchesEmployee(e,p)).reduce((s,p)=>s+Number(p.amount||0),0);const base=Number(e.salary||0);return <tr key={e.id} className="border-t dark:border-slate-700"><td className="p-3 font-semibold">{e.name}<div className="text-xs text-slate-500">CPF: {e.cpf || "não informado"}</div></td><td className="p-3 text-slate-500">{e.role||"—"}</td><td className="p-3 text-right font-semibold">{money(base)}</td><td className="p-3 text-right">{money(paid)}</td><td className="p-3 text-right">{money(base-paid)}</td><td className="p-3">{e.source === "employees" && <button type="button" onClick={()=>beginEdit(e)} className="rounded-lg border px-3 py-1.5 text-xs font-bold text-blue-700">Editar funcionário</button>}</td></tr>;})}{!employees.length&&<tr><td colSpan={6} className="p-6 text-center text-slate-500">Nenhum funcionário cadastrado na Folha.</td></tr>}</tbody></table></div>
     </section>
     <form onSubmit={save} className="grid gap-3 rounded-2xl border bg-white p-5 dark:bg-slate-900 sm:grid-cols-2">
       <h3 className="sm:col-span-2 font-bold">Registrar pagamento realizado</h3>
@@ -149,7 +161,7 @@ export default function EmployeePaymentsModule() {
     </form>
     <section className="overflow-hidden rounded-2xl border bg-white dark:bg-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4 dark:border-slate-700"><h3 className="font-bold">Histórico de pagamentos</h3><label className="text-xs font-semibold">Competência <input type="month" value={competence} onChange={e=>setCompetence(e.target.value)} className="ml-2 rounded-lg border p-2 dark:bg-slate-800"/></label></div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th className="p-3">Funcionário</th><th className="p-3">Data</th><th className="p-3">Forma</th><th className="p-3">Referência</th><th className="p-3 text-right">Valor pago</th><th className="p-3">Status</th></tr></thead><tbody>{monthPayments.map(p=><tr key={p.id} className="border-t dark:border-slate-700"><td className="p-3 font-semibold">{p.employeeName}</td><td className="p-3">{p.paymentDate}</td><td className="p-3">{p.method}</td><td className="p-3">{p.reference || "—"}</td><td className="p-3 text-right font-bold">{money(p.amount)}</td><td className="p-3"><span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5"/> Pago</span></td></tr>)}{!monthPayments.length && <tr><td colSpan={6} className="p-8 text-center text-slate-500"><Clock3 className="mx-auto mb-2"/>Nenhum pagamento registrado nesta competência.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th className="p-3">Funcionário</th><th className="p-3">Data</th><th className="p-3">Forma</th><th className="p-3">Referência</th><th className="p-3 text-right">Valor pago</th><th className="p-3">Status</th><th className="p-3">Recibo</th></tr></thead><tbody>{monthPayments.map(p=><tr key={p.id} className="border-t dark:border-slate-700"><td className="p-3 font-semibold">{p.employeeName}</td><td className="p-3">{p.paymentDate}</td><td className="p-3">{p.method}</td><td className="p-3">{p.reference || "—"}</td><td className="p-3 text-right font-bold">{money(p.amount)}</td><td className="p-3"><span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5"/> Pago</span></td><td className="p-3"><button type="button" onClick={() => exportEmployeePayrollReceipt({ employeeName: p.employeeName, employeeRole: p.employeeRole, competence: p.competence, paymentDate: p.paymentDate, method: p.method, pixKey: p.pixKey, baseSalary: Number(p.salaryBase || 0), bonus: Number(p.bonus || 0), deductions: p.deductions || [], netPaid: Number(p.amount || 0) })} className="rounded-lg border px-3 py-1.5 text-xs font-bold">Comprovante PDF</button></td></tr>)}{!monthPayments.length && <tr><td colSpan={7} className="p-8 text-center text-slate-500"><Clock3 className="mx-auto mb-2"/>Nenhum pagamento registrado nesta competência.</td></tr>}</tbody></table></div>
     </section>
     {editing && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={saveEmployee} className="max-h-[90vh] w-full max-w-2xl space-y-3 overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900">
       <div><h3 className="text-lg font-black">Editar cadastro do funcionário</h3><p className="text-xs text-slate-500">As alterações serão refletidas na Folha de Pagamento e nos próximos pagamentos.</p></div>
@@ -161,6 +173,7 @@ export default function EmployeePaymentsModule() {
         <label className="text-xs font-semibold">E-mail<input type="email" value={editEmail} onChange={e=>setEditEmail(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold">Telefone<input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold">Departamento<input value={editDepartment} onChange={e=>setEditDepartment(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
+        <label className="text-xs font-semibold">Chave PIX<input value={editPixKey} onChange={e=>setEditPixKey(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold">Data de admissão<input type="date" value={editAdmissionDate} onChange={e=>setEditAdmissionDate(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold">Jornada mensal (horas)<input type="number" min="1" max="300" value={editMonthlyHours} onChange={e=>setEditMonthlyHours(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 dark:bg-slate-800"/></label>
       </div>

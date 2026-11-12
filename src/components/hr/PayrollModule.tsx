@@ -2,13 +2,31 @@ import React, { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, doc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import logoImg from "../../assets/images/anacleto-logo-premium.svg";
-import { Users, Clock3, Wallet, Plus, Calculator, FileSpreadsheet, UserRound, ShieldCheck } from "lucide-react";
-import { mergeEmployeeDirectory, type EmployeeDirectoryRecord, type EmployeeDirectoryEntry } from "../../utils/employeeDirectory";
+import { Users, Clock3, Wallet, Calculator, FileSpreadsheet, UserRound, ShieldCheck } from "lucide-react";
+import EmployeeDirectoryActions from "../finance/EmployeeDirectoryActions";
+import { useEmployeeDirectory } from "../../hooks/useEmployeeDirectory";
+import type { EmployeeDirectoryEntry } from "../../utils/employeeDirectory";
+import { exportEmployeePayrollReceipt, type PayrollReceiptDeduction } from "../../utils/employeePayrollReceipt";
+import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
 
 type Employee = EmployeeDirectoryEntry & { weeklyHours?: number };
 // Keep each payroll type declaration on its own physical line; do not insert escaped newline text.
-type EmployeePayment = { id: string; employeeId: string; competence: string; amount: number; paymentDate: string; };
-type PayrollAdjustment = { id: string; employeeId: string; competence: string; kind: "advance" | "vale" | "loan"; amount: number; description?: string; date?: string; status?: string; source?: string; };
+type EmployeePayment = {
+  id: string; employeeId: string; competence: string; amount: number; paymentDate: string;
+  employeeName?: string; employeeRole?: string; method?: string; salaryBase?: number; bonus?: number;
+  pixKey?: string; deductions?: PayrollReceiptDeduction[];
+};
+type PayrollAdjustment = { id: string; employeeId: string; competence: string; kind: "advance" | "vale" | "loan" | "bonus"; amount: number; description?: string; date?: string; status?: string; source?: string; };
+type AdvanceRecord = { id: string; source: "employee_advances" | "advances" | "ledger_entries"; data: Record<string, unknown> };
+type AdvanceReference = { collection: "employee_advances" | "advances" | "payroll_adjustments"; id: string };
+type PayrollDeduction = PayrollReceiptDeduction & {
+  id: string;
+  employeeId: string;
+  kind: "advance" | "vale" | "loan";
+  settled: boolean;
+  references: AdvanceReference[];
+  ledgerEntryIds: string[];
+};
 type TimeEntry = {
   id: string; employeeId: string; date: string; normalHours?: number;
   hours?: number; absences?: number; delays?: number;
@@ -18,6 +36,30 @@ const money = (n: number) => (Number.isFinite(n) ? n : 0).toLocaleString("pt-BR"
 const monthKey = (date: string) => (date || "").slice(0, 7);
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const onlyDigits = (s: string) => s.replace(/\D/g, "");
+const normalizeIdentity = (value: unknown) => String(value || "").trim().toLowerCase();
+const safeDocumentId = (value: string) => encodeURIComponent(value).replaceAll(".", "%2E").slice(0, 900);
+const toDateString = (value: unknown) => {
+  if (typeof value === "string") return value.slice(0, 10);
+  if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate?: unknown }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate().toISOString().slice(0, 10);
+  }
+  return "";
+};
+const employeeMatchesRecord = (employee: Employee, record: Record<string, unknown>) => {
+  const known = new Set([employee.id, ...employee.aliases, employee.uid || "", employee.email || ""].map(normalizeIdentity).filter(Boolean));
+  const references = [
+    record.employeeId, record.employee_id, record.employeeUid, record.uid, record.userId,
+    record.staffId, record.staff_id, record.workerId, record.worker_id, record.funcionarioId, record.funcionario_id,
+    record.employeeEmail, record.email,
+  ].map(normalizeIdentity).filter(Boolean);
+  const nestedEmployee = record.employee;
+  if (typeof nestedEmployee === "string") references.push(normalizeIdentity(nestedEmployee));
+  if (nestedEmployee && typeof nestedEmployee === "object") {
+    const employeeData = nestedEmployee as Record<string, unknown>;
+    references.push(...[employeeData.id, employeeData.uid, employeeData.email].map(normalizeIdentity).filter(Boolean));
+  }
+  return references.some((reference) => known.has(reference));
+};
 const formatCPF = (value: string) => onlyDigits(value).slice(0, 11).replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 function validCPF(value: string) {
   const cpf = onlyDigits(value);
@@ -32,11 +74,15 @@ function additionsTotal(emp: Employee) {
   return round2((emp.additions || []).reduce((sum, item) => sum + (item.kind === "percent" ? emp.salary * item.value / 100 : item.value), 0));
 }
 export default function PayrollModule() {
-  const [employeeRecords, setEmployeeRecords] = useState<EmployeeDirectoryRecord[]>([]);
-  const employees = useMemo(() => mergeEmployeeDirectory(employeeRecords) as Employee[], [employeeRecords]);
+  const { employees: directoryEmployees, error: directoryError, sync, syncing } = useEmployeeDirectory();
+  const employees = directoryEmployees as Employee[];
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [payments, setPayments] = useState<EmployeePayment[]>([]);
   const [adjustments, setAdjustments] = useState<PayrollAdjustment[]>([]);
+  const [advanceRecords, setAdvanceRecords] = useState<AdvanceRecord[]>([]);
+  const [bonusDrafts, setBonusDrafts] = useState<Record<string, string>>({});
+  const [profileDrafts, setProfileDrafts] = useState<Record<string, { name: string; role: string; salary: string }>>({});
+  const [payingEmployeeId, setPayingEmployeeId] = useState("");
   const [adjustmentEmployee, setAdjustmentEmployee] = useState("");
   const [adjustmentKind, setAdjustmentKind] = useState<PayrollAdjustment["kind"]>("advance");
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
@@ -61,20 +107,80 @@ export default function PayrollModule() {
   const [editAdmissionDate, setEditAdmissionDate] = useState("");
   const [editSalary, setEditSalary] = useState("");
   const [editHours, setEditHours] = useState("");
+  const [editPixKey, setEditPixKey] = useState("");
   const [savingSalary, setSavingSalary] = useState(false);
   useEffect(() => {
-    const sources = ["employees", "funcionarios", "staff", "admins", "user_profiles", "pending_users", "registry_items"] as const;
-    const employeeStops = sources.map(source => onSnapshot(collection(db, source), snapshot => {
-      const loaded = snapshot.docs.map(item => ({ id: item.id, source, data: item.data() }) as EmployeeDirectoryRecord);
-      setEmployeeRecords(current => [...current.filter(record => record.source !== source), ...loaded]);
-    }, err => setError(`Não foi possível carregar funcionários de ${source}: ${err.message}`)));
     const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc")), s => setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))), err => setError("Não foi possível carregar os apontamentos: " + err.message));
     const p = onSnapshot(collection(db, "employee_payments"), s => setPayments(s.docs.map(d => ({ id:d.id, ...d.data() } as EmployeePayment))), err => setError("Não foi possível carregar os pagamentos: " + err.message));
     const a = onSnapshot(query(collection(db, "payroll_adjustments"), orderBy("date", "desc")), s => setAdjustments(s.docs.map(d => ({ id:d.id, ...d.data() } as PayrollAdjustment))), err => setError("Não foi possível carregar adiantamentos, vales e empréstimos: " + err.message));
-    return () => { employeeStops.forEach(stop => stop()); t(); p(); a(); };
+    const employeeAdvances = onSnapshot(collection(db, "employee_advances"), s => setAdvanceRecords(current => [...current.filter(row => row.source !== "employee_advances"), ...s.docs.map(d => ({ id:d.id, source:"employee_advances" as const, data:d.data() }))]), err => setError("Não foi possível carregar employee_advances: " + err.message));
+    const advances = onSnapshot(collection(db, "advances"), s => setAdvanceRecords(current => [...current.filter(row => row.source !== "advances"), ...s.docs.map(d => ({ id:d.id, source:"advances" as const, data:d.data() }))]), err => setError("Não foi possível carregar advances: " + err.message));
+    const ledger = onSnapshot(collection(db, "ledger_entries"), s => setAdvanceRecords(current => [...current.filter(row => row.source !== "ledger_entries"), ...s.docs.map(d => ({ id:d.id, source:"ledger_entries" as const, data:d.data() }))]), err => setError("Não foi possível carregar vales do livro-caixa: " + err.message));
+    return () => { t(); p(); a(); employeeAdvances(); advances(); ledger(); };
   }, []);
-  const summary = useMemo(() => employees.filter(e => e.active !== false).map(emp => {
-    const rows = entries.filter(x => x.employeeId === emp.id && monthKey(x.date) === month);
+
+  const deductions = useMemo(() => {
+    const bySource = new Map<string, PayrollDeduction>();
+    const sources: Array<{ id: string; source: "employee_advances" | "advances" | "payroll_adjustments" | "ledger_entries"; data: Record<string, unknown> }> = [
+      ...advanceRecords.filter((row) => row.source !== "ledger_entries"),
+      ...adjustments.filter((item) => item.kind !== "bonus").map((item) => ({
+        id: item.id,
+        source: "payroll_adjustments" as const,
+        data: item as unknown as Record<string, unknown>,
+      })),
+      ...advanceRecords.filter((row) => row.source === "ledger_entries"),
+    ];
+    for (const record of sources) {
+      const { data } = record;
+      const employee = employees.find((candidate) => employeeMatchesRecord(candidate, data));
+      if (!employee) continue;
+      const status = normalizeIdentity(data.status);
+      if (["cancelled", "cancelado", "void", "estornado"].includes(status)) continue;
+      if (record.source === "ledger_entries") {
+        const category = normalizeIdentity(data.category);
+        const sourceType = normalizeIdentity(data.sourceType);
+        const description = String(data.description || "");
+        const isEmployeeAdvance = category === "employee_advance" || sourceType === "payroll_adjustment" ||
+          /vale|adiantamento|empr[eé]stimo/i.test(description);
+        if (!isEmployeeAdvance || ["inflow", "income", "in"].includes(normalizeIdentity(data.direction))) continue;
+      }
+      const amount = Number(data.amount ?? data.value ?? data.total);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      const date = toDateString(data.date || data.advanceDate || data.paymentDate || data.createdAt);
+      const competence = String(data.competence || data.month || monthKey(date)).slice(0, 7);
+      if (competence !== month) continue;
+      const kindText = normalizeIdentity(data.kind || data.type || data.adjustmentType || data.category || data.description);
+      const kind: PayrollDeduction["kind"] = /loan|empr[eé]stimo/.test(kindText)
+        ? "loan"
+        : /vale/.test(kindText) ? "vale" : "advance";
+      const sourceId = String(data.sourceId || data.adjustmentId || record.id);
+      const key = `${employee.id}:${sourceId}`;
+      const reference = record.source === "ledger_entries" ? undefined : { collection: record.source, id: record.id };
+      const isSettled = data.settled === true || data.deducted === true || ["deducted", "settled"].includes(status);
+      const existing = bySource.get(key);
+      if (existing) {
+        if (reference && !existing.references.some((item) => item.collection === reference.collection && item.id === reference.id)) existing.references.push(reference);
+        if (record.source === "ledger_entries" && !existing.ledgerEntryIds.includes(record.id)) existing.ledgerEntryIds.push(record.id);
+        existing.settled ||= isSettled;
+        continue;
+      }
+      bySource.set(key, {
+        id: key,
+        employeeId: employee.id,
+        date: date || `${competence}-01`,
+        kind,
+        amount: round2(amount),
+        description: String(data.description || ""),
+        settled: isSettled,
+        references: reference ? [reference] : [],
+        ledgerEntryIds: record.source === "ledger_entries" ? [record.id] : [],
+      });
+    }
+    return [...bySource.values()];
+  }, [advanceRecords, adjustments, employees, month]);
+
+  const summary = useMemo(() => employees.map(emp => {
+    const rows = entries.filter(x => employeeMatchesRecord(emp, x as unknown as Record<string, unknown>) && monthKey(x.date) === month);
     const divisor = Number(emp.monthlyHours || (emp.weeklyHours ? emp.weeklyHours * 52 / 12 : 220));
     const hourly = divisor > 0 ? Number(emp.salary || 0) / divisor : 0;
     const h50 = rows.reduce((s,x) => s + Number(x.overtime50 || 0), 0);
@@ -85,15 +191,23 @@ export default function PayrollModule() {
     const extra50 = round2(h50 * hourly * 1.5); const extra100 = round2(h100 * hourly * 2);
     const additionsAmount = additionsTotal(emp);
     const deductionsAttendance = round2((absenceHours + delayHours) * hourly);
-    const gross = round2(Number(emp.salary || 0) + additionsAmount + extra50 + extra100);
-    const employeeAdjustments = adjustments.filter(a => a.employeeId === emp.id && a.competence === month);
-    const advances = round2(employeeAdjustments.filter(a => a.kind === "advance").reduce((sum, a) => sum + Number(a.amount || 0), 0));
-    const vales = round2(employeeAdjustments.filter(a => a.kind === "vale").reduce((sum, a) => sum + Number(a.amount || 0), 0));
-    const loans = round2(employeeAdjustments.filter(a => a.kind === "loan").reduce((sum, a) => sum + Number(a.amount || 0), 0));
-    const estimated = round2(Math.max(0, gross - deductionsAttendance - advances - vales - loans));
-    const paidAmount = payments.filter(p => p.employeeId === emp.id && p.competence === month).reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    return { ...emp, hourly, normal, h50, h100, absenceHours, delayHours, extra50, extra100, additionsAmount, advances, vales, loans, deductionsAttendance, gross, estimated, paidAmount };
-  }), [employees, entries, payments, adjustments, month]);
+    const employeeDeductions = deductions.filter((item) => item.employeeId === emp.id);
+    const advances = round2(employeeDeductions.filter((item) => item.kind === "advance").reduce((sum, item) => sum + item.amount, 0));
+    const vales = round2(employeeDeductions.filter((item) => item.kind === "vale").reduce((sum, item) => sum + item.amount, 0));
+    const loans = round2(employeeDeductions.filter((item) => item.kind === "loan").reduce((sum, item) => sum + item.amount, 0));
+    const manualBonus = adjustments.find((item) => item.kind === "bonus" && item.employeeId === emp.id && item.competence === month && item.source === "payroll_bonus");
+    const manualBonusAmount = round2(manualBonus ? Number(manualBonus.amount || 0) : 0);
+    const bonus = round2(additionsAmount + extra50 + extra100 + manualBonusAmount);
+    const gross = round2(Number(emp.salary || 0) + bonus);
+    const otherDeductions = round2(loans + deductionsAttendance);
+    const estimated = round2(Math.max(0, gross - advances - vales - otherDeductions));
+    const paidAmount = payments.filter(p => employeeMatchesRecord(emp, p as unknown as Record<string, unknown>) && p.competence === month).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    return {
+      ...emp, hourly, normal, h50, h100, absenceHours, delayHours, extra50, extra100, additionsAmount,
+      advances, vales, loans, deductionsAttendance, otherDeductions, manualBonusAmount, bonus, gross, estimated, paidAmount,
+      deductions: employeeDeductions,
+    };
+  }), [employees, entries, payments, adjustments, deductions, month]);
   const total = summary.reduce((s,e) => s + e.estimated, 0);
   const totalAdvances = summary.reduce((s,e)=>s+e.advances,0);
   const totalVales = summary.reduce((s,e)=>s+e.vales,0);
@@ -103,37 +217,141 @@ export default function PayrollModule() {
     if (!outstanding) return setError("Esta folha já está quitada para o funcionário selecionado.");
     if (!window.confirm(`Registrar pagamento de ${money(outstanding)} para ${employee.name}, competência ${month}?`)) return;
     setError("");
+    setPayingEmployeeId(employee.id);
     try {
-      const paymentRef = doc(collection(db, "employee_payments"));
+      const paymentRef = doc(db, "employee_payments", `payroll-${safeDocumentId(employee.id)}-${month}`);
       const ledgerRef = doc(db, "ledger_entries", `employee-payment-${paymentRef.id}`);
-      const pendingAdvances = adjustments.filter((item) => item.employeeId === employee.id && item.competence === month && item.source === "finance_employee_advance" && item.status !== "deducted");
+      const historicalPaymentRef = doc(collection(db, "payments"));
+      const deductionRefs = new Map<string, ReturnType<typeof doc>>();
+      for (const deduction of employee.deductions.filter((item) => !item.settled)) {
+        for (const reference of deduction.references) {
+          const key = `${reference.collection}/${reference.id}`;
+          deductionRefs.set(key, doc(db, reference.collection, reference.id));
+        }
+        for (const id of deduction.ledgerEntryIds) {
+          const key = `ledger_entries/${id}`;
+          deductionRefs.set(key, doc(db, "ledger_entries", id));
+        }
+      }
+      const refs = [...deductionRefs.values()];
       const paymentDate = new Date().toISOString().slice(0, 10);
       await runTransaction(db, async (transaction) => {
-        const refs = pendingAdvances.map((item) => doc(db, "payroll_adjustments", item.id));
+        const existingPayment = await transaction.get(paymentRef);
         const snapshots = [];
         for (const ref of refs) snapshots.push(await transaction.get(ref));
-        transaction.set(paymentRef, {
+        if (existingPayment.exists()) {
+          throw new Error("A folha desta competência já foi fechada para este funcionário.");
+        }
+        if (snapshots.some((snapshot) => !snapshot.exists())) {
+          throw new Error("Um vale ou adiantamento foi removido durante o fechamento. Atualize a folha e tente novamente.");
+        }
+        if (snapshots.some((snapshot) => snapshot.data().settled === true ||
+          ["deducted", "settled", "cancelled", "cancelado", "void", "estornado"].includes(normalizeIdentity(snapshot.data().status)))) {
+          throw new Error("Os descontos desta folha foram alterados por outro usuário. Atualize a página antes de pagar.");
+        }
+        const receiptDeductions = employee.deductions.map(({ date: deductionDate, kind, amount, description }) => ({
+          date: deductionDate,
+          kind: kind === "advance" ? "Adiantamento" : kind === "vale" ? "Vale" : "Empréstimo",
+          amount,
+          description,
+        }));
+        const paymentPayload = sanitizeFirestoreData({
           employeeId: employee.id, employeeName: employee.name, employeeRole: employee.role || "",
-          competence: month, amount: outstanding, paymentDate,
+          competence: month, amount: outstanding, paymentDate, salaryBase: Number(employee.salary || 0),
+          bonus: employee.bonus, deductions: receiptDeductions, pixKey: employee.pixKey || "",
           method: "pix", reference: `Folha de pagamento ${month}`,
           notes: "Pagamento registrado diretamente na Folha de Pagamento.",
-          status: "paid", payrollSource: "payroll", deductedAdvanceIds: pendingAdvances.map((item) => item.id),
+          status: "paid", payrollSource: "payroll",
+          deductedAdvanceIds: employee.deductions.map((item) => item.id),
           createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "",
         });
-        transaction.set(ledgerRef, {
+        transaction.set(paymentRef, paymentPayload);
+        transaction.set(ledgerRef, sanitizeFirestoreData({
           direction: "outflow", category: "payroll", sourceType: "employee_payment", sourceId: paymentRef.id,
           employeeId: employee.id, employeeName: employee.name, description: `Folha de pagamento · ${employee.name} · ${month}`,
           amount: outstanding, date: paymentDate, status: "posted", paymentMethod: "pix",
           createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "",
-        });
+        }));
+        transaction.set(historicalPaymentRef, sanitizeFirestoreData({
+          direction: "outflow", category: "payroll", sourceType: "employee_payment", sourceId: paymentRef.id,
+          employeeId: employee.id, employeeName: employee.name, amount: outstanding, date: paymentDate,
+          paidAt: paymentDate, paymentMethod: "pix", method: "pix", status: "paid",
+          createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "",
+        }));
         snapshots.forEach((snapshot, index) => {
-          if (snapshot.exists() && snapshot.data().status !== "deducted") {
-            transaction.update(refs[index], { status: "deducted", deductedAt: serverTimestamp(), paymentId: paymentRef.id });
+          const ref = refs[index];
+          if (ref.path.startsWith("ledger_entries/")) {
+            transaction.update(ref, { settled: true, settledAt: serverTimestamp(), payrollPaymentId: paymentRef.id });
+          } else {
+            transaction.update(ref, {
+              status: "settled", deducted: true, settled: true, deductedAt: serverTimestamp(),
+              settledAt: serverTimestamp(), paymentId: paymentRef.id,
+            });
           }
         });
       });
     } catch (paymentError) {
       setError("Não foi possível registrar o pagamento da folha: " + (paymentError as Error).message);
+    } finally {
+      setPayingEmployeeId("");
+    }
+  };
+  const saveProfileDraft = async (
+    employee: Employee,
+    draft = profileDrafts[employee.id] || { name: employee.name, role: employee.role || "", salary: String(employee.salary || 0) },
+    field?: "name" | "role" | "salary",
+  ) => {
+    const salaryValue = Number(draft.salary);
+    if ((!field || field === "name") && !draft.name.trim()) {
+      setError("Informe o nome do funcionário.");
+      return;
+    }
+    if ((!field || field === "salary") && (!Number.isFinite(salaryValue) || salaryValue < 0)) {
+      setError("Informe um salário base válido.");
+      return;
+    }
+    setError("");
+    setSavingSalary(true);
+    try {
+      const profile = sanitizeFirestoreData({
+        ...(!field || field === "name" ? { name: draft.name.trim() } : {}),
+        ...(!field || field === "role" ? { role: draft.role.trim() } : {}),
+        ...(!field || field === "salary" ? { salary: round2(salaryValue) } : {}),
+        ...(!field ? {
+          monthlyHours: employee.monthlyHours || 220, active: employee.active,
+          additions: employee.additions || [],
+        } : {}),
+        profileUpdatedAt: serverTimestamp(), profileUpdatedBy: auth.currentUser?.email || "",
+      });
+      await setDoc(doc(db, "employees", employee.id), profile, { merge: true });
+      if (!field || field === "salary") {
+        setProfileDrafts((current) => ({ ...current, [employee.id]: { ...draft, salary: String(round2(salaryValue)) } }));
+      }
+    } catch (saveError) {
+      setError("Não foi possível salvar o cadastro do funcionário: " + (saveError as Error).message);
+    } finally {
+      setSavingSalary(false);
+    }
+  };
+  const saveBonus = async (employee: (typeof summary)[number]) => {
+    const bonusKey = `${employee.id}:${month}`;
+    const value = Number(bonusDrafts[bonusKey] ?? employee.manualBonusAmount);
+    if (!Number.isFinite(value) || value < 0) {
+      setError("Informe um valor válido para horas extras e bônus.");
+      return;
+    }
+    setError("");
+    try {
+      const bonusRef = doc(db, "payroll_adjustments", `payroll-bonus-${safeDocumentId(employee.id)}-${month}`);
+      await setDoc(bonusRef, sanitizeFirestoreData({
+        employeeId: employee.id, employeeName: employee.name, competence: month, kind: "bonus",
+        amount: round2(value), description: "Bônus / horas extras da folha",
+        date: `${month}-01`, status: "active", source: "payroll_bonus",
+        updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "",
+      }), { merge: true });
+      setBonusDrafts((current) => ({ ...current, [bonusKey]: String(round2(value)) }));
+    } catch (saveError) {
+      setError("Não foi possível salvar o bônus da folha: " + (saveError as Error).message);
     }
   };
   const addAdjustment = async (ev: React.FormEvent) => {
@@ -194,8 +412,9 @@ export default function PayrollModule() {
   };
   return <div className="space-y-6 text-slate-800 dark:text-slate-100">
     <header className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">Gestão de pessoas</p><h1 className="text-3xl font-black tracking-tight">Folha de pagamento</h1><p className="mt-1 text-sm text-slate-500">Cadastro funcional, jornada, adicionais e apuração mensal estimada.</p></div><label className="text-sm font-semibold">Competência <input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="ml-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:bg-slate-800"/></label></header>
-    {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div>}
-    <div className="grid gap-4 sm:grid-cols-3"><div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><Users className="mb-3 text-blue-600"/><p className="text-xs text-slate-500">Funcionários ativos</p><strong className="text-2xl">{summary.length}</strong></div><div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><Clock3 className="mb-3 text-blue-600"/><p className="text-xs text-slate-500">Horas extras 50% / 100%</p><strong className="text-2xl">{summary.reduce((s,e)=>s+e.h50+e.h100,0).toFixed(2)} h</strong></div><div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><Wallet className="mb-3 text-blue-600"/><p className="text-xs text-slate-500">Total líquido estimado*</p><strong className="text-2xl">{money(total)}</strong></div><div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><Wallet className="mb-3 text-amber-600"/><p className="text-xs text-slate-500">Descontos: adiantamentos + vales + empréstimos</p><strong className="text-2xl">{money(totalAdvances+totalVales+totalLoans)}</strong><p className="mt-1 text-xs text-slate-500">Adiant. {money(totalAdvances)} · Vales {money(totalVales)} · Emprést. {money(totalLoans)}</p></div></div>
+    <EmployeeDirectoryActions onSync={() => { void sync(); }} syncing={syncing}/>
+    {(error || directoryError) && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error || directoryError}</div>}
+    <div className="grid gap-4 sm:grid-cols-3"><div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><Users className="mb-3 text-blue-600"/><p className="text-xs text-slate-500">Funcionários cadastrados</p><strong className="text-2xl">{summary.length}</strong></div><div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><Clock3 className="mb-3 text-blue-600"/><p className="text-xs text-slate-500">Horas extras 50% / 100%</p><strong className="text-2xl">{summary.reduce((s,e)=>s+e.h50+e.h100,0).toFixed(2)} h</strong></div><div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><Wallet className="mb-3 text-blue-600"/><p className="text-xs text-slate-500">Total líquido estimado*</p><strong className="text-2xl">{money(total)}</strong></div><div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><Wallet className="mb-3 text-amber-600"/><p className="text-xs text-slate-500">Descontos: adiantamentos + vales + empréstimos</p><strong className="text-2xl">{money(totalAdvances+totalVales+totalLoans)}</strong><p className="mt-1 text-xs text-slate-500">Adiant. {money(totalAdvances)} · Vales {money(totalVales)} · Emprést. {money(totalLoans)}</p></div></div>
     <div className="grid gap-5 xl:grid-cols-2">
       <form onSubmit={addEmployee} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="flex items-center gap-2 font-bold"><UserRound className="h-4 w-4 text-blue-600"/> Cadastrar funcionário</h2>
@@ -208,14 +427,14 @@ export default function PayrollModule() {
       </form>
       <form onSubmit={addEntry} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
         <h2 className="flex items-center gap-2 font-bold"><Clock3 className="h-4 w-4 text-blue-600"/> Lançar jornada e ocorrências</h2>
-        <select required value={employeeId} onChange={e=>setEmployeeId(e.target.value)} className="w-full rounded-xl border p-3 text-sm dark:bg-slate-800"><option value="">Selecione o funcionário</option>{employees.filter(e=>e.active!==false).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>
+        <select required value={employeeId} onChange={e=>setEmployeeId(e.target.value)} className="w-full rounded-xl border p-3 text-sm dark:bg-slate-800"><option value="">Selecione o funcionário</option>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>
         <div className="grid grid-cols-2 gap-2"><label className="text-xs text-slate-500">Data<input required type="date" value={date} onChange={e=>setDate(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label><label className="text-xs text-slate-500">Horas normais<input type="number" min="0" step=".25" value={normalHours} onChange={e=>setNormalHours(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label><label className="text-xs text-slate-500">Faltas (horas)<input type="number" min="0" step=".25" value={absences} onChange={e=>setAbsences(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label><label className="text-xs text-slate-500">Atrasos (horas)<input type="number" min="0" step=".25" value={delays} onChange={e=>setDelays(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label><label className="text-xs text-slate-500">Horas extras 50%<input type="number" min="0" step=".25" value={overtime50} onChange={e=>setOvertime50(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label><label className="text-xs text-slate-500">Horas extras 100%<input type="number" min="0" step=".25" value={overtime100} onChange={e=>setOvertime100(e.target.value)} className="mt-1 w-full rounded-xl border p-2.5 text-sm dark:bg-slate-800"/></label></div>
         <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Observação (opcional)" className="w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/><button className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white">Registrar apontamento</button>
       </form>
     </div>
-    <form onSubmit={addAdjustment} className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="font-bold">Lançar adiantamento, vale ou empréstimo</h2><p className="text-xs text-slate-500">O lançamento é vinculado ao funcionário e à competência da data; será descontado automaticamente do líquido estimado.</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><select required value={adjustmentEmployee} onChange={e=>setAdjustmentEmployee(e.target.value)} className="rounded-xl border p-3 text-sm dark:bg-slate-800"><option value="">Selecione funcionário</option>{employees.filter(e=>e.active!==false).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select><select value={adjustmentKind} onChange={e=>setAdjustmentKind(e.target.value as PayrollAdjustment["kind"])} className="rounded-xl border p-3 text-sm dark:bg-slate-800"><option value="advance">Adiantamento salarial</option><option value="vale">Vale</option><option value="loan">Empréstimo (parcela)</option></select><input required type="number" min="0.01" step="0.01" value={adjustmentAmount} onChange={e=>setAdjustmentAmount(e.target.value)} placeholder="Valor (R$)" className="rounded-xl border p-3 text-sm dark:bg-slate-800"/><input required type="date" value={adjustmentDate} onChange={e=>setAdjustmentDate(e.target.value)} className="rounded-xl border p-3 text-sm dark:bg-slate-800"/></div><div className="flex flex-wrap gap-2"><input value={adjustmentDescription} onChange={e=>setAdjustmentDescription(e.target.value)} placeholder="Descrição / referência / nº parcela" className="min-w-48 flex-1 rounded-xl border p-3 text-sm dark:bg-slate-800"/><button className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white">Registrar desconto</button></div></form>
+    <form onSubmit={addAdjustment} className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="font-bold">Lançar adiantamento, vale ou empréstimo</h2><p className="text-xs text-slate-500">O lançamento é vinculado ao funcionário e à competência da data; será descontado automaticamente do líquido estimado.</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><select required value={adjustmentEmployee} onChange={e=>setAdjustmentEmployee(e.target.value)} className="rounded-xl border p-3 text-sm dark:bg-slate-800"><option value="">Selecione funcionário</option>{employees.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select><select value={adjustmentKind} onChange={e=>setAdjustmentKind(e.target.value as PayrollAdjustment["kind"])} className="rounded-xl border p-3 text-sm dark:bg-slate-800"><option value="advance">Adiantamento salarial</option><option value="vale">Vale</option><option value="loan">Empréstimo (parcela)</option></select><input required type="number" min="0.01" step="0.01" value={adjustmentAmount} onChange={e=>setAdjustmentAmount(e.target.value)} placeholder="Valor (R$)" className="rounded-xl border p-3 text-sm dark:bg-slate-800"/><input required type="date" value={adjustmentDate} onChange={e=>setAdjustmentDate(e.target.value)} className="rounded-xl border p-3 text-sm dark:bg-slate-800"/></div><div className="flex flex-wrap gap-2"><input value={adjustmentDescription} onChange={e=>setAdjustmentDescription(e.target.value)} placeholder="Descrição / referência / nº parcela" className="min-w-48 flex-1 rounded-xl border p-3 text-sm dark:bg-slate-800"/><button className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white">Registrar desconto</button></div></form>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"><div className="hidden print:flex items-center gap-4 border-b border-slate-300 p-5"><img src={logoImg} alt="Anacleto Esquadrias" className="h-14 w-28 object-contain"/><div><p className="text-[10px] font-bold tracking-widest text-slate-500">ANACLETO ESQUADRIAS</p><h1 className="text-lg font-bold text-slate-900">Folha de Pagamento — {month}</h1></div></div><div className="flex flex-wrap items-center justify-between gap-2 border-b p-5 dark:border-slate-700"><h2 className="flex items-center gap-2 font-bold"><Calculator className="h-4 w-4 text-blue-600"/> Resumo da folha — {month}</h2><button onClick={()=>window.print()} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold"><FileSpreadsheet className="h-4 w-4"/> Imprimir / PDF</button></div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr>{["Funcionário","Horas normais","HE 50%","HE 100%","Salário base","Adicionais","Faltas/atrasos","Adiantamentos","Vales","Empréstimos","Líquido estimado","Pago na competência","Ações"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead><tbody>{summary.map(e=><tr key={e.id} className="border-t dark:border-slate-700"><td className="p-3"><b>{e.name}</b><div className="text-xs text-slate-500">{e.role} · CPF {e.cpf || "não informado"}</div></td><td className="p-3">{e.normal.toFixed(2)} h</td><td className="p-3">{money(e.extra50)}</td><td className="p-3">{money(e.extra100)}</td><td className="p-3">{money(e.salary)}</td><td className="p-3">{money(e.additionsAmount)}</td><td className="p-3">{money(e.deductionsAttendance)}</td><td className="p-3">{money(e.advances)}</td><td className="p-3">{money(e.vales)}</td><td className="p-3">{money(e.loans)}</td><td className="p-3 font-bold">{money(e.estimated)}</td><td className="p-3"><span className={e.paidAmount >= e.estimated ? "font-bold text-emerald-700" : "font-semibold text-amber-700"}>{money(e.paidAmount)}</span><div className="text-xs text-slate-500">{e.paidAmount >= e.estimated ? "Quitado" : `Saldo: ${money(Math.max(0, e.estimated - e.paidAmount))}`}</div></td><td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={()=>registerPayrollPayment(e)} disabled={e.paidAmount >= e.estimated} className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">Registrar pagamento</button><button type="button" onClick={()=>{setEditingEmployee(e);setEditName(e.name || "");setEditRole(e.role || "");setEditCpf(formatCPF(e.cpf || ""));setEditDepartment(e.department || "");setEditEmail(e.email || "");setEditPhone(e.phone || "");setEditAdmissionDate(e.admissionDate || "");setEditSalary(String(e.salary || ""));setEditHours(String(e.monthlyHours || 220));}} className="rounded-lg border px-2.5 py-1.5 text-xs font-bold text-blue-700">Editar cadastro</button></div></td></tr>)}{!summary.length&&<tr><td colSpan={13} className="p-8 text-center text-slate-500">Cadastre funcionários para iniciar a folha.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr>{["Funcionário / função","Salário base (R$)","Horas extras / bônus (+R$)","Adiantamentos / vales (-R$)","Outros descontos","Valor líquido","Pago na competência","Ações"].map(x=><th key={x} className="p-3">{x}</th>)}</tr></thead><tbody>{summary.map(e=>{const draft=profileDrafts[e.id]||{name:e.name,role:e.role||"",salary:String(e.salary||0)};const bonusKey=`${e.id}:${month}`;const employeePayments=payments.filter(payment=>employeeMatchesRecord(e,payment as unknown as Record<string,unknown>)&&payment.competence===month);return <tr key={e.id} className="border-t align-top dark:border-slate-700"><td className="min-w-52 space-y-1 p-3"><input aria-label={`Nome de ${e.name}`} value={draft.name} onChange={event=>setProfileDrafts(current=>({...current,[e.id]:{...draft,name:event.target.value}}))} onBlur={()=>{void saveProfileDraft(e,{...draft,name:draft.name},"name");}} className="w-full rounded border px-2 py-1 font-bold dark:bg-slate-800"/><input aria-label={`Cargo de ${e.name}`} value={draft.role} onChange={event=>setProfileDrafts(current=>({...current,[e.id]:{...draft,role:event.target.value}}))} onBlur={()=>{void saveProfileDraft(e,{...draft,role:draft.role},"role");}} placeholder="Cargo / função" className="w-full rounded border px-2 py-1 text-xs dark:bg-slate-800"/><div className="text-xs text-slate-500">CPF {e.cpf||"não informado"}</div></td><td className="min-w-32 p-3"><input aria-label={`Salário base de ${e.name}`} type="number" min="0" step="0.01" value={draft.salary} onChange={event=>setProfileDrafts(current=>({...current,[e.id]:{...draft,salary:event.target.value}}))} onBlur={()=>{void saveProfileDraft(e,{...draft,salary:draft.salary},"salary");}} className="w-32 rounded border px-2 py-1 dark:bg-slate-800"/><div className="text-xs text-slate-500">{savingSalary?"Salvando…":`Jornada ${e.monthlyHours||220} h/mês`}</div></td><td className="min-w-36 p-3"><input aria-label={`Horas extras e bônus de ${e.name}`} type="number" min="0" step="0.01" value={bonusDrafts[bonusKey]??String(e.manualBonusAmount)} onChange={event=>setBonusDrafts(current=>({...current,[bonusKey]:event.target.value}))} onBlur={()=>{void saveBonus(e);}} className="w-32 rounded border px-2 py-1 dark:bg-slate-800"/><div className="text-xs text-slate-500">HE 50% {money(e.extra50)} · HE 100% {money(e.extra100)}</div></td><td className="min-w-36 p-3 font-semibold">{money(e.advances+e.vales)}<div className="text-xs font-normal text-slate-500">Adiant. {money(e.advances)} · Vales {money(e.vales)}</div>{e.deductions.filter(item=>item.kind==="advance"||item.kind==="vale").map(item=><div key={item.id} className="text-xs text-slate-500">{item.date} · {item.kind==="vale"?"Vale":"Adiant."}: {money(item.amount)}</div>)}</td><td className="p-3">{money(e.otherDeductions)}<div className="text-xs text-slate-500">Empréstimos e faltas/atrasos</div></td><td className="whitespace-nowrap p-3 font-black">{money(e.estimated)}</td><td className="whitespace-nowrap p-3"><span className={e.paidAmount >= e.estimated ? "font-bold text-emerald-700" : "font-semibold text-amber-700"}>{money(e.paidAmount)}</span><div className="text-xs text-slate-500">{e.paidAmount >= e.estimated ? "Quitado" : `Saldo: ${money(Math.max(0,e.estimated-e.paidAmount))}`}</div>{employeePayments.map(payment=><button key={payment.id} type="button" onClick={()=>exportEmployeePayrollReceipt({employeeName:payment.employeeName||e.name,employeeRole:payment.employeeRole||e.role,competence:payment.competence,paymentDate:payment.paymentDate,method:payment.method,pixKey:payment.pixKey||e.pixKey,baseSalary:Number(payment.salaryBase??e.salary),bonus:Number(payment.bonus||0),deductions:payment.deductions||[],netPaid:Number(payment.amount||0)})} className="mt-1 block rounded border px-2 py-1 text-xs font-bold">Comprovante PDF</button>)}</td><td className="min-w-44 space-y-2 p-3"><button type="button" onClick={()=>void registerPayrollPayment(e)} disabled={e.paidAmount>=e.estimated||payingEmployeeId===e.id} className="block rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{payingEmployeeId===e.id?"Registrando…":"Fechar e Pagar Folha"}</button><button type="button" onClick={()=>{setEditingEmployee(e);setEditName(e.name||"");setEditRole(e.role||"");setEditCpf(formatCPF(e.cpf||""));setEditDepartment(e.department||"");setEditEmail(e.email||"");setEditPhone(e.phone||"");setEditAdmissionDate(e.admissionDate||"");setEditSalary(String(e.salary||""));setEditHours(String(e.monthlyHours||220));}} className="rounded-lg border px-2.5 py-1.5 text-xs font-bold text-blue-700">Editar cadastro</button></td></tr>;})}{!summary.length&&<tr><td colSpan={8} className="p-8 text-center text-slate-500">Cadastre funcionários para iniciar a folha.</td></tr>}</tbody></table></div>
     </section>
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900"><ShieldCheck className="mr-1 inline h-4 w-4"/> <b>Critério de cálculo:</b> valor-hora = salário base ÷ jornada mensal; HE 50% = horas × valor-hora × 1,5; HE 100% = horas × valor-hora × 2. Faltas e atrasos são estimados pelo valor-hora. O resultado ainda não é folha legal: INSS, IRRF, FGTS, DSR, férias, 13º, adicionais legais e convenções coletivas dependem de tabelas vigentes e regras aplicáveis, que precisam ser validadas pela contabilidade. Valores arredondados em centavos.</div>
     {editingEmployee && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><form onSubmit={saveSalary} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><div><h3 className="text-lg font-black">Editar funcionário</h3><p className="text-sm text-slate-500">Atualize os dados cadastrais e a remuneração.</p></div><label className="block text-xs font-semibold text-slate-500">Nome completo<input autoFocus required value={editName} onChange={e=>setEditName(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">CPF<input value={editCpf} onChange={e=>setEditCpf(formatCPF(e.target.value))} inputMode="numeric" maxLength={14} placeholder="000.000.000-00" className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">Cargo / função<input value={editRole} onChange={e=>setEditRole(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">Departamento<input value={editDepartment} onChange={e=>setEditDepartment(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">E-mail<input type="email" value={editEmail} onChange={e=>setEditEmail(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">Telefone<input value={editPhone} onChange={e=>setEditPhone(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">Data de admissão<input type="date" value={editAdmissionDate} onChange={e=>setEditAdmissionDate(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">Novo salário base (R$)<input type="number" min="0.01" step="0.01" required value={editSalary} onChange={e=>setEditSalary(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><label className="block text-xs font-semibold text-slate-500">Jornada mensal (horas)<input type="number" min="1" max="300" required value={editHours} onChange={e=>setEditHours(e.target.value)} className="mt-1 w-full rounded-xl border p-3 text-sm dark:bg-slate-800"/></label><p className="text-xs text-amber-700">Nome, função, salário e jornada são atualizados no cadastro. Os pagamentos já registrados permanecem no histórico com os dados da época.</p><div className="flex justify-end gap-2"><button type="button" onClick={()=>setEditingEmployee(null)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={savingSalary} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingSalary ? "Salvando..." : "Salvar alterações"}</button></div></form></div>}
