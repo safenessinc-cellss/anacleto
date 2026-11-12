@@ -211,6 +211,96 @@ app.post("/api/chat",async(req,res)=>{
  }catch(error){console.error("Public chat provider unavailable; local fallback:",error);return res.json({response:fallback,fallback:true});}
 });
 
+// Importador assistido de catálogo de fornecedores: IA estruturada + fallback local, sem serviços externos.
+const supplierCatalogWindows = new Map<string, { count: number; resetAt: number }>();
+const supplierCatalogSchema = {
+  type: "OBJECT",
+  properties: {
+    items: { type: "ARRAY", items: { type: "OBJECT", properties: {
+      code: { type: "STRING" }, supplier: { type: "STRING" }, category: { type: "STRING" },
+      description: { type: "STRING" }, unit: { type: "STRING" }, unitPrice: { type: "NUMBER" },
+      material: { type: "STRING" }, color: { type: "STRING" }, lengthMm: { type: "NUMBER" },
+      page: { type: "NUMBER" }
+    }, required: ["code", "supplier", "category", "description", "unit", "unitPrice"] } }
+  },
+  required: ["items"]
+};
+function supplierCategory(value: unknown) {
+  const v = normalizeCatalogName(value);
+  if (/vidro|temperad|laminad|espelho/.test(v)) return "Vidro";
+  if (/roldana|fecho|fechadura|dobrad|puxador|parafuso|borracha|ferragem/.test(v)) return "Ferragem";
+  if (/perfil|alumin|barra|trilho/.test(v)) return "Perfil de alumínio";
+  if (/box|banheiro|ducha/.test(v)) return "Box de banheiro";
+  if (/janela/.test(v)) return "Janela";
+  if (/porta/.test(v)) return "Porta";
+  if (/servico|mao de obra|instalacao/.test(v)) return "Serviço";
+  return "Outro";
+}
+function fallbackSupplierCatalog(text: string, supplier: string) {
+  return text.split(/\r?\n/).map((line, index) => {
+    const clean = line.replace(/\s+/g, " ").trim();
+    if (clean.length < 6 || /^(pagina|page|catalogo|catálogo|www\.|http)/i.test(clean)) return null;
+    const priceMatch = clean.match(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*$/i);
+    const price = priceMatch ? Number(priceMatch[1].replace(/\./g, "").replace(",", ".")) : 0;
+    const withoutPrice = priceMatch ? clean.slice(0, priceMatch.index).trim() : clean;
+    const columns = withoutPrice.split(/[;|\t]+/).map(part => part.trim()).filter(Boolean);
+    const code = columns.length > 1 ? columns[0] : "";
+    const description = columns.length > 1 ? columns.slice(1).join(" ") : withoutPrice;
+    if (description.length < 4 || /^\d+$/.test(description)) return null;
+    return { code, supplier, category: supplierCategory(description), description, unit: "un", unitPrice: Number.isFinite(price) ? price : 0, page: 0 };
+  }).filter(Boolean).slice(0, 500) as Array<Record<string, any>>;
+}
+app.post("/api/ai/catalog-extract", requireFirebaseAuth, requireQuoteRole, async (req, res) => {
+  const ip = String(req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+  const now = Date.now();
+  const quota = supplierCatalogWindows.get(ip);
+  if (!quota || now >= quota.resetAt) supplierCatalogWindows.set(ip, { count: 1, resetAt: now + 60_000 });
+  else if (quota.count >= 6) return res.status(200).json({ items: fallbackSupplierCatalog(String(req.body?.text || ""), String(req.body?.supplier || "Importado")), fallback: true, warning: "Limite temporário da IA atingido; revise todos os itens extraídos localmente." });
+  else quota.count++;
+  const textInput = String(req.body?.text || "").slice(0, 220_000);
+  const supplier = String(req.body?.supplier || "Fornecedor importado").trim().slice(0, 120);
+  if (textInput.trim().length < 10) return res.status(200).json({ items: [], fallback: true, warning: "O PDF não contém texto suficiente. Verifique se é um PDF digitalizado ou protegido." });
+  const local = fallbackSupplierCatalog(textInput, supplier);
+  try {
+    const result = await generateValidatedJson({
+      capability: "documentExtraction",
+      system: "Extraia itens comerciais de catálogos de perfis de alumínio, vidros, ferragens e serviços. Use somente fatos presentes no texto. Não invente códigos, preços, medidas, fornecedores nem unidades. Se o preço não estiver explícito, use 0. Normalize categoria para Perfil de alumínio, Vidro, Ferragem, Acessório, Janela, Porta, Box de banheiro, Serviço ou Outro. Retorne somente JSON.",
+      prompt: "Fornecedor: " + supplier + "\nTexto extraído do PDF (pode conter várias páginas e tabelas):\n" + textInput + "\nExtraia no máximo 500 itens distintos.",
+      responseSchema: supplierCatalogSchema,
+      temperature: 0.1,
+      maxOutputTokens: 7000,
+      validate: (value: any) => {
+        if (!value || !Array.isArray(value.items)) throw new Error("A resposta não contém a lista de itens.");
+        return { items: value.items.slice(0, 500).map((item: any) => {
+          const description = String(item.description || "").trim().slice(0, 500);
+          const price = Number(item.unitPrice);
+          if (!description || !Number.isFinite(price) || price < 0) return null;
+          return {
+            code: String(item.code || "").trim().slice(0, 100),
+            supplier: String(item.supplier || supplier).trim().slice(0, 120) || supplier,
+            category: supplierCategory(item.category || description),
+            description,
+            unit: String(item.unit || "un").trim().slice(0, 24) || "un",
+            unitPrice: price,
+            material: String(item.material || "").slice(0, 160),
+            color: String(item.color || "").slice(0, 80),
+            lengthMm: Number.isFinite(Number(item.lengthMm)) && Number(item.lengthMm) > 0 ? Number(item.lengthMm) : null,
+            page: Number.isFinite(Number(item.page)) && Number(item.page) > 0 ? Math.floor(Number(item.page)) : null
+          };
+        }).filter(Boolean) };
+      }
+    });
+    return res.status(200).json({ ...result, fallback: false });
+  } catch (error) {
+    console.warn("Supplier catalog AI extraction fallback:", error instanceof Error ? error.message : error);
+    return res.status(200).json({
+      items: local,
+      fallback: true,
+      warning: local.length ? "A IA está indisponível. Confira códigos, categorias e preços antes de salvar." : "Não foi possível estruturar o PDF automaticamente. Tente um PDF com texto selecionável ou importe um CSV."
+    });
+  }
+});
+
 // ----------------------------------------------------
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
