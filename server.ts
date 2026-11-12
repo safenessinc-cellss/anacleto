@@ -11,7 +11,6 @@ import technicalDrawingHandler from "./api/technical-drawing";
 import approvedSnapshotHandler from "./api/approved-snapshot";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate";
 import { recordAIAudit } from "./src/server/ai-audit";
-import { requestDrawingService, getDrawingServiceJob } from "./src/server/drawing-service-client";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -27,7 +26,6 @@ app.use(express.json({ limit: "16mb" }));
 const PORT = 3000;
 
 // Vercel AI Gateway supplies authentication in previews and deployments.
-const aiModel = getAIModel("default");
 
 const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
 const ownerEmail = "safeness.c.a@gmail.com";
@@ -187,55 +185,30 @@ function rateLimitByUser(bucket: string, limit: number, windowMs: number): expre
 // ----------------------------------------------------
 // 1. General AI Chat Proxy
 // ----------------------------------------------------
-app.post("/api/chat", requireFirebaseAuth, async (req, res) => {
-  try {
-    const { message, history, language = "es" } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ error: "Message is required" });
-    }
-
-
-    const systemInstruction = `
-      Eres el Asistente Técnico y Comercial de "Anacleto Pro", una plataforma SaaS moderna especializada en presupuestos inteligentes, facturación, CRM para empresas y Dibujo Técnico Arquitectónico para carpintería de aluminio, vidrio y mobiliario a medida.
-      Idioma principal: ${language}.
-      Sé conciso, técnico, profesional y resolutivo.
-    `;
-
-    const contents: any[] = [];
-    if (history && Array.isArray(history)) {
-      history.forEach((msg: any) => {
-        contents.push({
-          role: msg.role === "user" ? "user" : "model",
-          parts: [{ text: msg.text || msg.content || "" }],
-        });
-      });
-    }
-
-    contents.push({
-      role: "user",
-      parts: [{ text: message }],
-    });
-
-    const response = await generateText({
-      model: getAIModel("chat"),
-      system: systemInstruction,
-      messages: contents.map((content) => ({
-        role: content.role === "model" ? "assistant" : content.role,
-        content: content.parts?.[0]?.text || "",
-      })),
-      temperature: 0.7,
-    });
-
-    const replyText = response.text || "No se pudo procesar la respuesta en este momento.";
-    return res.json({ response: replyText });
-  } catch (error: any) {
-    console.error("Gemini chat error:", error);
-    return res.status(500).json({
-      error: "Error en el asistente de IA.",
-      details: error?.message || String(error),
-    });
-  }
+const publicChatWindows = new Map<string, { count: number; resetAt: number }>();
+function publicChatFallback(message: string, language: string): string {
+ const q=message.toLowerCase(),es=language==="es",en=language==="en";
+ if(/horar|abert|funcion|atend|abre|open|hours/.test(q))return es?"La atención y las visitas técnicas se coordinan mediante cita. WhatsApp +55 51 99819-3931 para confirmar disponibilidad.":en?"Service and technical visits are arranged by appointment. WhatsApp +55 51 99819-3931 to confirm availability.":"O atendimento e as visitas técnicas são mediante agendamento. WhatsApp +55 51 99819-3931 para confirmar disponibilidade.";
+ if(/garant|warrant/.test(q))return es?"Garantía estructural de 5 años para esquadrias de aluminio y hasta 10 años de fábrica para vidrios templados certificados, según condiciones del fabricante.":en?"5-year structural warranty for aluminum frames and up to 10-year manufacturer warranty for certified tempered glass, subject to terms.":"Garantia estrutural de 5 anos para esquadrias de alumínio e até 10 anos de fábrica para vidros temperados certificados, conforme condições do fabricante.";
+ if(/or[cç]ament|presupuest|budget|pre[cç]o|price|valor/.test(q))return es?"El presupuesto final depende de medidas, materiales, acabados y visita técnica. Solicite medición por WhatsApp +55 51 99819-3931.":en?"Final quotes depend on measurements, materials, finishes and a technical visit. Request a measurement via WhatsApp +55 51 99819-3931.":"O orçamento final depende das medidas, materiais, acabamentos e visita técnica. Solicite medição pelo WhatsApp +55 51 99819-3931.";
+ return es?"Puedo orientar sobre ventanas, puertas, cerramientos y vidrios. Contacte WhatsApp +55 51 99819-3931.":en?"I can help with windows, doors, enclosures and glass. Contact WhatsApp +55 51 99819-3931.":"Posso orientar sobre janelas, portas, fechamentos e vidros. Fale pelo WhatsApp +55 51 99819-3931.";
+}
+app.options("/api/chat",(_req,res)=>res.status(204).end());
+app.get("/api/chat",(_req,res)=>res.json({ok:true,service:"anacleto-public-chat"}));
+app.post("/api/chat",async(req,res)=>{
+ const ip=String(req.headers["x-real-ip"]||req.headers["x-forwarded-for"]||req.socket.remoteAddress||"unknown").split(",")[0].trim(),now=Date.now(),quota=publicChatWindows.get(ip);
+ if(!quota||now>=quota.resetAt)publicChatWindows.set(ip,{count:1,resetAt:now+60000});else if(quota.count>=12)return res.status(429).json({response:publicChatFallback(String(req.body?.message||""),String(req.body?.language||"pt")),code:"RATE_LIMITED"});else quota.count++;
+ const {message,history,language="pt"}=req.body||{};if(typeof message!=="string"||!message.trim())return res.status(400).json({error:"Mensagem obrigatória."});
+ const fallback=publicChatFallback(message,language);
+ try{
+  if(!process.env.AI_GATEWAY_API_KEY&&!process.env.GEMINI_API_KEY&&!process.env.GOOGLE_API_KEY)return res.json({response:fallback,fallback:true});
+  const systemInstruction="Você é o assistente comercial da Anacleto Esquadrias, em São Leopoldo, RS. Responda no idioma "+language+". Não invente preços nem disponibilidade. Garantia: 5 anos estrutural nas esquadrias de alumínio e até 10 anos de fábrica para vidros temperados certificados. WhatsApp +55 51 99819-3931.";
+  const geminiKey=process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY;
+  if(geminiKey){const {GoogleGenAI}=await import("@google/genai");const client=new GoogleGenAI({apiKey:geminiKey});const historyContents=Array.isArray(history)?history.slice(-8).map((m:any)=>({role:m.role==="assistant"?"model":"user",parts:[{text:String(m.text||m.content||"").slice(0,1500)}]})):[];const response=await client.models.generateContent({model:"gemini-2.5-flash",contents:[...historyContents,{role:"user",parts:[{text:message.trim().slice(0,3000)}]}],config:{systemInstruction,temperature:0.5,maxOutputTokens:700}});return res.json({response:response.text||fallback,fallback:!response.text});}
+  const gatewayHistory=Array.isArray(history)?history.slice(-8).map((m:any)=>({role:m.role==="assistant"?"assistant":"user",content:String(m.text||m.content||"").slice(0,1500)})):[];
+  const result=await generateText({model:getAIModel("chat"),system:systemInstruction,messages:[...gatewayHistory,{role:"user",content:message.trim().slice(0,3000)}] as any,temperature:0.5,maxOutputTokens:700});
+  return res.json({response:result.text||fallback,fallback:!result.text});
+ }catch(error){console.error("Public chat provider unavailable; local fallback:",error);return res.json({response:fallback,fallback:true});}
 });
 
 // ----------------------------------------------------
@@ -584,37 +557,7 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLi
 // ----------------------------------------------------
 app.post("/api/public/quote-estimate", (req, res) => publicQuoteEstimateHandler(req, res));
 
-app.post("/api/ai/technical-drawing", async (req, res) => {
-  if (!process.env.ANACLETO_DRAWING_SERVICE_URL) return technicalDrawingHandler(req, res);
-  try {
-    const job = await requestDrawingService(req.body, 5000, String(req.headers.authorization || ""));
-    if (job.status === "JOB_PROCESSING") {
-      return res.status(202).json({
-        status: "JOB_PROCESSING",
-        jobId: job.jobId,
-        pollUrl: job.pollUrl,
-        message: "O desenho continua sendo processado. Consulte o estado pelo identificador da tarefa.",
-      });
-    }
-    return res.status(200).json(job.result);
-  } catch (error) {
-    console.error("Independent drawing service request failed:", error);
-    return res.status(503).json({ error: "Serviço independente de desenho temporariamente indisponível.", code: "DRAWING_SERVICE_UNAVAILABLE" });
-  }
-});
-app.get("/api/ai/technical-drawing/jobs/:jobId", requireFirebaseAuth, async (req, res) => {
-  try {
-    const user = res.locals.firebaseUser as { role?: string } | undefined;
-    if (!user || !["super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role || "")) {
-      return res.status(403).json({ error: "Sem permissão para consultar tarefas técnicas." });
-    }
-    const job = await getDrawingServiceJob(String(req.params.jobId || ""), String(req.headers.authorization || ""));
-    return res.status(200).json(job);
-  } catch (error) {
-    console.error("Drawing job lookup failed:", error);
-    return res.status(503).json({ error: "Não foi possível consultar a tarefa técnica.", code: "DRAWING_JOB_LOOKUP_FAILED" });
-  }
-});
+app.post("/api/ai/technical-drawing",(req,res)=>technicalDrawingHandler(req,res));
 app.all("/api/approved-snapshot", (req, res) => approvedSnapshotHandler(req, res));
 
 // Setup Vite Dev Server / Serve build static files

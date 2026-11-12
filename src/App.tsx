@@ -39,18 +39,10 @@ import pergolaImg from "./assets/images/pergola_glass_1780594351717.png";
 
 
 
-// Detecta el idioma inicial: localStorage > navegador > portugués (fallback)
+// Padrão pt-BR; apenas seleção manual persistida.
 const detectInitialLanguage = (): LanguageCode => {
-  const savedLang = localStorage.getItem("anacleto_language") as LanguageCode;
-  if (savedLang && translations[savedLang]) return savedLang;
-
-  const browserLang = (navigator.language || "pt").toLowerCase();
-  if (browserLang.startsWith("pt")) return "pt";
-  if (browserLang.startsWith("es")) return "es";
-  if (browserLang.startsWith("en")) return "en";
-  if (browserLang.startsWith("fr")) return "fr";
-  if (browserLang.startsWith("ar")) return "ar";
-  return "pt";
+  try { const v=localStorage.getItem("anacleto_language"); return v==="pt"||v==="es"||v==="en" ? v : "pt"; }
+  catch { return "pt"; }
 };
 
 export default function App() {
@@ -68,13 +60,13 @@ export default function App() {
 
   const [senderConfig, setSenderConfig] = useState<any>({
     name: "Anacleto Esquadrias",
-    nif: "CNPJ 50.204.533/0001-99",
+    nif: "",
     address: "Av. Caxias do Sul, 1069 - Rio dos Sinos",
     postalCode: "93110-000",
     city: "São Leopoldo - RS",
     country: "Brasil",
     logoUrl: "",
-    bankAccount: "PIX: CNPJ 50.204.533/0001-99 - Banco Sicredi",
+    bankAccount: "",
     currency: "BRL",
     updatedAt: new Date().toISOString(),
     websiteLogoUrl: "",
@@ -85,15 +77,12 @@ export default function App() {
     profilePhone: "(51) 99311-0000",
     profileEmail: "contato@anacletoesquadrias.com.br",
     promotions: [
-      { id: "p1", title: "Campanha Especial de Inverno", description: "Fechamentos de sacadas com esquadria Linha Suprema ou Gold e isolamento de vidro temperado com 10% de desconto real.", discountBadge: "10% OFF", isActive: true },
-      { id: "p2", title: "Medição e Visita Gratuita", description: "Ganhe medição a laser residencial com orçamento completo sem compromisso.", discountBadge: "GRÁTIS", isActive: true }
+      { id: "p2", title: "Medição e Visita Técnica", description: "Agende uma visita para medição e orçamento sem compromisso.", discountBadge: "CONSULTE", isActive: true }
     ],
     publicity: [
       { id: "ads1", bannerText: "✨ NOVIDADE: Parcelamento facilitado em até 10x sem juros em todas as esquadrias de alumínio de alto padrão!", bannerLink: "#solicitar", isActive: true, bgColor: "bg-amber-500 text-slate-950" }
     ],
-    videos: [
-      { id: "v1", title: "Showcase: Mansão Alto Padrão", url: "https://www.youtube.com/embed/dQw4w9WgXcQ", description: "Confira a instalação de esquadrias Suprema." }
-    ]
+    videos: []
   });
 
   const [schName, setSchName] = useState("");
@@ -120,10 +109,8 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    const savedLang = localStorage.getItem("anacleto_language") as LanguageCode;
-    if (savedLang && translations[savedLang]) {
-      setLanguage(savedLang);
-    }
+    const savedLang = localStorage.getItem("anacleto_language");
+    if (savedLang === "pt" || savedLang === "es" || savedLang === "en") setLanguage(savedLang);
 
     const savedMode = localStorage.getItem("anacleto_theme_mode") || "light";
     const shouldUseDark = savedMode === "dark";
@@ -215,9 +202,14 @@ export default function App() {
   };
 
   const handleLanguageChange = (langCode: LanguageCode) => {
+    if (langCode !== "pt" && langCode !== "es" && langCode !== "en") return;
     setLanguage(langCode);
     localStorage.setItem("anacleto_language", langCode);
   };
+  useEffect(() => {
+    document.documentElement.lang = language === "pt" ? "pt-BR" : language;
+    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+  }, [language]);
 
   const handleLogout = async () => {
     try {
@@ -306,41 +298,29 @@ export default function App() {
     setVisCustomLines(visCustomLines.filter((l) => l.id !== id));
   };
 
-  // Consulta horas ocupadas para una fecha (visits + agenda_slots)
+  // Disponibilidade pública: consultar somente agenda_slots, nunca dados privados de visits.
   const refreshAvailableHours = async (date: string) => {
     if (!date) return;
     setCheckingHours(true);
+    const baseHours = ["09:00","10:00","11:00","14:00","15:00","16:00"];
     try {
-      const baseHours = ["09:00","10:00","11:00","14:00","15:00","16:00"];
+      const slotsSnap = await getDocs(query(collection(db, "agenda_slots"), where("date", "==", date)));
       const occupied = new Set<string>();
-
-      // Visitas ya solicitadas ese día
-      const visitsQ = query(collection(db, "visits"), where("preferDate", "==", date));
-      const visitsSnap = await getDocs(visitsQ);
-      visitsSnap.forEach((d) => {
-        const v: any = d.data();
-        if (v.status !== "cancelled") occupied.add(v.preferTime);
-      });
-
-      // Slots internos / bloqueados
-      const slotsQ = query(collection(db, "agenda_slots"), where("date", "==", date));
-      const slotsSnap = await getDocs(slotsQ);
       slotsSnap.forEach((d) => {
-        const s: any = d.data();
+        const slot: any = d.data();
         baseHours.forEach((h) => {
-          if (h >= s.startTime && h < s.endTime) occupied.add(h);
+          if ((slot.startTime && h >= slot.startTime && h < slot.endTime) || (Array.isArray(slot.hours) && slot.hours.includes(h)) || (slot.time === h && slot.available === false)) occupied.add(h);
         });
       });
-
       const free = baseHours.filter((h) => !occupied.has(h));
       setAvailableHours(free);
-      if (free.length > 0 && !free.includes(schTime)) setSchTime(free[0]);
-      if (free.length === 0) setSchTime("");
+      if (free.length && !free.includes(schTime)) setSchTime(free[0]);
+      if (!free.length) setSchTime("");
     } catch (err) {
-      console.warn("No se pudo consultar disponibilidad:", err);
-    } finally {
-      setCheckingHours(false);
-    }
+      console.warn("Agenda pública indisponível; horários padrão sujeitos à confirmação:", err);
+      setAvailableHours(baseHours);
+      if (!baseHours.includes(schTime)) setSchTime(baseHours[0]);
+    } finally { setCheckingHours(false); }
   };
 
   const handleVisitorScheduleVisit = async (e: React.FormEvent) => {
@@ -397,7 +377,7 @@ export default function App() {
   };
 
   const t = translations[language] || translations.pt;
-  const isRtl = language === "ar";
+  const isRtl = false;
 
   if (authLoading || animationLoading) {
     return <AnimatedWindowLoader onFinish={() => setAnimationLoading(false)} currentLanguage={language} />;
@@ -453,7 +433,7 @@ export default function App() {
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
             <select value={language} onChange={(e) => handleLanguageChange(e.target.value as LanguageCode)} className="px-2.5 py-1.5 text-xs font-bold border rounded-lg">
-              {Object.entries(languageMeta).map(([code, meta]) => (
+              {Object.entries(languageMeta).filter(([code]) => ["pt", "es", "en"].includes(code)).map(([code, meta]) => (
                 <option key={code} value={code}>{meta.flag} {code.toUpperCase()}</option>
               ))}
             </select>

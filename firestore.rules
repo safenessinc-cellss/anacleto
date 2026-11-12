@@ -51,7 +51,12 @@ service cloud.firestore {
     // Comercial: clientes, propostas, faturação e catálogo.
     match /companies/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /companies_crm/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
-    match /budgets/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /budgets/{id} {
+ allow read: if canOperate();
+ allow create: if canManageCommercial() || (request.resource.data.requestOnly == true && request.resource.data.source == 'website' && request.resource.data.status == 'pending' && !('total' in request.resource.data) && !('subtotal' in request.resource.data) && !('taxRate' in request.resource.data) && !('taxAmount' in request.resource.data));
+ allow update: if canManageCommercial();
+ allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+}
     match /quotes/{id} {
       allow read: if canOperate() || canManageProduction() || canManageFinance();
       allow create: if canManageCommercial();
@@ -63,6 +68,7 @@ service cloud.firestore {
     }
     match /ledger_entries/{id} { allow read, write: if canManageFinance(); }
     match /user_profiles/{uid} { allow read, write: if signedIn() && (request.auth.uid == uid || owner()); }
+    match /agenda_slots/{id} { allow read: if true; allow write: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor']); }
     match /chat_sessions/{id} {
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
       allow read: if owner() || (signedIn() && resource.data.ownerUid == request.auth.uid);

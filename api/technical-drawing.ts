@@ -5,7 +5,6 @@ import { parseAIJson } from "../src/server/ai-json";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data";
 import { recordAIAudit } from "../src/server/ai-audit";
 import { withDraftVectorWatermark } from "../src/server/drawing-vector";
-import { verifyServiceRequest, SERVICE_SIGNATURE_HEADER, SERVICE_TIMESTAMP_HEADER } from "../src/server/service-auth";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
@@ -302,22 +301,6 @@ export default async function handler(req: any, res: any) {
   let stage = "request";
 
   try {
-    if (req.method === "GET") {
-      const jobId = String(req.query?.jobId || "");
-      const timestamp = String(req.headers?.[SERVICE_TIMESTAMP_HEADER] || "");
-      const signature = String(req.headers?.[SERVICE_SIGNATURE_HEADER] || "");
-      const path = String(req.url || "/api/technical-drawing");
-      if (!/^[0-9a-f-]{36}$/i.test(jobId) || !verifyServiceRequest({ method: "GET", path, timestamp, signature, body: "" })) {
-        return json(res, 401, { error: "Consulta de tarefa não autorizada.", code: "INVALID_SERVICE_SIGNATURE" });
-      }
-      const user = await authenticate(req);
-      if (!user || !["owner","super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role)) {
-        return json(res, 403, { error: "Sem permissão para consultar tarefas técnicas.", code: "ROLE_FORBIDDEN" });
-      }
-      const job = await readDrawingJob(req, jobId);
-      if (!job || job.userUid !== user.uid) return json(res, 404, { error: "Tarefa técnica não encontrada.", code: "JOB_NOT_FOUND" });
-      return json(res, 200, job);
-    }
     if (req.method !== "POST") {
       res.setHeader?.("Allow", "GET, POST");
       return json(res, 405, { error: "Método não permitido.", code: "METHOD_NOT_ALLOWED" });
@@ -332,16 +315,6 @@ export default async function handler(req: any, res: any) {
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return json(res, 400, { error: "Corpo da solicitação inválido.", code: "INVALID_BODY" });
     }
-    const serviceSignature = String(req.headers?.[SERVICE_SIGNATURE_HEADER] || "");
-    if (serviceSignature) {
-      const validServiceSignature = verifyServiceRequest({
-        method: req.method, path: "/api/technical-drawing",
-        timestamp: String(req.headers?.[SERVICE_TIMESTAMP_HEADER] || ""),
-        signature: serviceSignature, body: JSON.stringify(body),
-      });
-      if (!validServiceSignature) return json(res, 401, { error: "Assinatura inter-serviço inválida.", code: "INVALID_SERVICE_SIGNATURE" });
-    }
-
     prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
     if (prompt.length < 3) {
       return json(res, 400, { error: "Descreva a peça e suas dimensões.", code: "PROMPT_REQUIRED" });
@@ -382,14 +355,6 @@ export default async function handler(req: any, res: any) {
     if (!allowRequest(user.uid)) {
       return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
     }
-    if (serviceSignature) {
-      const requestedJobId = String(body.requestId || req.headers?.["x-request-id"] || "");
-      if (!/^[0-9a-f-]{36}$/i.test(requestedJobId)) return json(res, 400, { error: "Identificador de tarefa inválido.", code: "INVALID_JOB_ID" });
-      drawingJobId = requestedJobId;
-      await createDrawingJob(req, drawingJobId, user.uid);
-      jobPersisted = true;
-    }
-
     stage = "ai_generation";
     const system = `Você é o engenheiro de produto, projetista e especialista em fabricação da Anacleto Pro. Interprete a solicitação inteira, não apenas palavras-chave. Identifique produto, material, tipo de abertura/encaixe, quantidade de folhas/portas, divisões, posição dos componentes e todas as dimensões explicitamente informadas. Diferencie largura, altura e profundidade conforme o produto; para móveis, não confunda profundidade com altura. Preserve a unidade original e converta somente quando o usuário pedir. Se o usuário solicitar alteração de um desenho existente, modifique somente os pontos pedidos e preserve os demais dados e componentes existentes; não reinicie o projeto. Se for um novo projeto, não reutilize o desenho anterior. Nunca invente dimensões, perfis, ferragens, folgas, descontos, espessuras, tolerâncias, fórmulas ou ângulos. Se faltar informação necessária, mantenha o campo vazio/zero e registre pergunta/pendência em assumptions; não apresente suposições como medidas confirmadas. A lista de corte é preliminar até validar sistema, ferragens e tabelas oficiais do fabricante. Gere somente JSON válido, sem markdown, com: title, description, category, unit, overallDimensions {width,height,depth}, pieces (array não vazio com id,pieceNumber,name,quantity,dimensions {width,height,depth,thickness,unit},material,color,cutAngle), dimensionLines (array), assemblyInstructions (array), steps (exatamente 5 objetos com stepNumber,phaseName,title,description,instructions), measurementPlan (array de {point,method,tool,checks}), cuttingPlan (array de {pieceNumber,name,material,quantity,length,width,thickness,unit,cutAngle,notes}), manufacturingSteps (array de {step,title,instructions,qualityGate}), modelDescription (string), finalAppearance (string), visualElements (array de elementos SVG estruturados para desenhar exatamente o produto solicitado, coordenadas normalizadas de 0 a 1000: retângulos {type:"rect",x,y,width,height,fill,stroke,strokeWidth,label}, linhas {type:"line",x1,y1,x2,y2,stroke,strokeWidth,label}, círculos {type:"circle",cx,cy,r,fill,stroke}, polígonos {type:"polygon",points:[{x,y}],fill,stroke}, textos {type:"text",x,y,text,fill,fontSize}). A geometria deve representar fielmente a configuração pedida: número e posição exatos de folhas, portas, gavetas, divisórias, prateleiras, puxadores, trilhos, montantes, travessas, pés, recortes e demais detalhes descritos. Cada elemento visual deve corresponder a um componente real descrito na solicitação ou na lista de peças; use coordenadas normalizadas de 0 a 1000, mantenha proporções coerentes e distribua os elementos dentro do contorno do produto. A vista frontal deve mostrar exatamente a quantidade de folhas/portas/divisões solicitadas, suas posições, puxadores e ferragens explicitamente mencionados. Não use uma ilustração genérica da categoria; não acrescente elementos que o usuário não pediu. Se não for possível determinar a geometria com segurança, registre a lacuna em assumptions em vez de inventar uma imagem. Use o catálogo quando aplicável: ${JSON.stringify(catalog)}.`;
 
@@ -505,14 +470,19 @@ export default async function handler(req: any, res: any) {
           console.error("Could not persist failed drawing job", jobError);
         }
       }
-      // Never fabricate a generic CAD geometry when the model is unavailable or
-      // returns invalid data. A false technical drawing could be mistaken for a
-      // manufacturing plan; leave the editor unchanged and ask for a retry.
-      return json(res, 503, {
-        error: "A IA não conseguiu gerar um desenho específico e validado. Nenhum desenho genérico foi criado. Verifique a disponibilidade do Gemini e tente novamente.",
-        code: "TECHNICAL_DRAWING_AI_UNAVAILABLE",
-        requestId,
-      });
+      // Rascunho local temporário: nunca liberado para fabricação sem validação técnica.
+      try {
+        const fallback = localFallback(prompt);
+        fallback.isDraft = true;
+        fallback.status = "LOCAL_PRELIMINARY_FALLBACK";
+        fallback.draftStatus = "preliminary";
+        fallback.draftLabel = "RASCUNHO LOCAL — NÃO UTILIZAR PARA FABRICAÇÃO";
+        fallback.assumptions = [...(Array.isArray(fallback.assumptions) ? fallback.assumptions : []), "Rascunho local sem IA: validar todas as medidas, perfis, ferragens e cortes antes de fabricar."];
+        return json(res, 200, withDraftVectorWatermark(fallback));
+      } catch (fallbackError) {
+        console.error("Local drawing fallback failed:", fallbackError);
+        return json(res, 503, { error: "IA indisponível e falha no rascunho local.", code: "TECHNICAL_DRAWING_UNAVAILABLE" });
+      }
     }
 
     if (stage === "authentication") {

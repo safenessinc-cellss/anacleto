@@ -178,8 +178,8 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
 
     setIsLoading(true);
 
-    // Boot firestore session dynamically first
-    try {
+    // Visitantes anônimos mantêm o histórico apenas no navegador.
+    if (auth.currentUser) try {
       await setDoc(
         doc(db, "chat_sessions", sessionId),
         {
@@ -203,7 +203,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
     }
 
     // Submit user message to firestore chat audit history
-    try {
+    if (auth.currentUser) try {
       await updateDoc(doc(db, "chat_sessions", sessionId), {
         messages: arrayUnion({
           role: "user",
@@ -217,22 +217,11 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
     }
 
     try {
-      // Call secure server API route (Gemini API server-side bridge)
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) throw new Error("Entre na sua conta para usar o assistente.");
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({
-          message: txt,
-          language: currentLanguage,
-          history: currentHistory.slice(0, -1).map((m) => ({
-            role: m.role,
-            text: m.text,
-          })),
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: txt, language: currentLanguage, history: currentHistory.slice(0, -1).map((m) => ({ role: m.role, text: m.text })) }),
       });
-
       if (!response.ok) {
         throw new Error("Não foi possível alcançar o assistente de inteligência artificial.");
       }
@@ -250,7 +239,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
       setMessages((prev) => [...prev, botMessage]);
 
       // Sync assistant replies back to firestore logs
-      try {
+      if (auth.currentUser) try {
         await updateDoc(doc(db, "chat_sessions", sessionId), {
           messages: arrayUnion({
             role: "assistant",
@@ -368,7 +357,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
             <button
               onClick={() => setIsOpen(false)}
               className="p-1 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
-              aria-label="Close Chat"
+              aria-label="Fechar conversa"
             >
               <X className="w-5 h-5" />
             </button>
@@ -499,7 +488,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
               type="submit"
               disabled={isLoading || !inputText.trim()}
               className="p-2 bg-luxury-gold hover:bg-luxury-gold-dark text-slate-950 font-black rounded-lg transition disabled:opacity-50 cursor-pointer"
-              aria-label="Send Message"
+              aria-label="Enviar mensagem"
             >
               <Send className="w-4 h-4" />
             </button>

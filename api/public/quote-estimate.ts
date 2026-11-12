@@ -17,31 +17,9 @@ function clientIp(req: any): string {
   return createHash("sha256").update(address).digest("hex");
 }
 async function consumePublicQuota(ip: string): Promise<boolean> {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (url && token) {
-    const key = "anacleto:public-quote:" + ip;
-    const response = await fetch(url.replace(/\/$/, "") + "/pipeline", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify([["INCR", key], ["EXPIRE", key, 3600, "NX"]]),
-      signal: AbortSignal.timeout(2500),
-    });
-    if (!response.ok) throw new Error("Distributed public rate limiter unavailable.");
-    const result = await response.json() as Array<{ result?: number }>;
-    return Number(result[0]?.result || 0) <= 3;
-  }
-  if (process.env.NODE_ENV === "production") throw new Error("Public quote rate limiting requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.");
-  const now = Date.now();
-  for (const [key, value] of localWindows) if (now >= value.resetAt) localWindows.delete(key);
-  const current = localWindows.get(ip);
-  if (!current || now >= current.resetAt) {
-    localWindows.set(ip, { count: 1, resetAt: now + 3600_000 });
-    return true;
-  }
-  if (current.count >= 3) return false;
-  current.count += 1;
-  return true;
+ const now=Date.now();for(const [key,value] of localWindows)if(now>=value.resetAt)localWindows.delete(key);
+ const current=localWindows.get(ip);if(!current||now>=current.resetAt){localWindows.set(ip,{count:1,resetAt:now+3600000});return true;}
+ current.count+=1;return current.count<=3;
 }
 export default async function handler(req: any, res: any) {
   const requestStartedAt = Date.now();
