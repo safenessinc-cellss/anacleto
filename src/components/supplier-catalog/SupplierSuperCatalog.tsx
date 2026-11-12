@@ -130,7 +130,10 @@ async function readXlsxRows(file: File): Promise<Record<string, string>[]> {
     return values;
   });
   const headers = (matrix.shift() || []).map(value => norm(String(value || "")).replace(/[^a-z0-9]/g, ""));
-  return matrix.map(values => Object.fromEntries(headers.map((header, index) => [header, String(values[index] || "")])).filter(([header]) => !!header) as Record<string, string>);
+  return matrix.map(values => {
+    const entries = headers.map((header, index) => [header, String(values[index] || "")] as [string, string]).filter(([header]) => !!header);
+    return Object.fromEntries(entries) as Record<string, string>;
+  });
 }
 
 export default function SupplierSuperCatalog({ onNavigateQuotes }: { onNavigateQuotes: () => void }) {
