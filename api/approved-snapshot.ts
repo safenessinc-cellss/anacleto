@@ -287,7 +287,8 @@ export default async function handler(req: any, res: any) {
         return send(res, 409, { error: "Somente orçamentos em rascunho ou pendentes podem ser aprovados." });
       }
       if (!Array.isArray(source.items) || source.items.length === 0 || source.items.length > 150) return send(res, 422, { error: "O orçamento deve possuir entre 1 e 150 itens." });
-      const catalog = await loadCatalogFromFirestore(req);
+      const requiresCatalogVerification = source.items.some((item: any) => item.catalogItemId || item.sku || item.itemId);
+      const catalog = requiresCatalogVerification ? await loadCatalogFromFirestore(req) : [];
       const reviewedItems = source.items.map((item: any) => {
         const quantity = Number(item.quantity);
         if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento: informe um valor positivo.");
