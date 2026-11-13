@@ -73,6 +73,10 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt','clientAdvanceTotal','balanceDue','productionStatus','productionOrderId','deliveryId','deliveryStatus','deliveredAt','deliveryEvidence'])
         )
       ) || (
+        canManageQuality() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'productionStatus','qualityStatus','qualityRecordId','qualityInspectedAt','updatedAt'
+        ])
+      ) || (
         (canManageCommercial() || canManageFinance())
         && request.resource.data.status == 'draft'
         && !('approvedSnapshotId' in request.resource.data)
@@ -125,6 +129,10 @@ service cloud.firestore {
           'status','workflowStage','nextStep','deliveryId','deliveryStatus','deliveredAt',
           'invoiceId','invoiceNumber','invoiceStatus','paymentStatus','paidAt','updatedAt'
         ])
+      ) || (
+        canManageQuality() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','workflowStage','nextStep','qualityStatus','qualityRecordId','qualityInspectedAt','updatedAt'
+        ])
       );
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
@@ -144,6 +152,11 @@ service cloud.firestore {
       allow read: if owner() || (signedIn() && resource.data.ownerUid == request.auth.uid);
       allow update: if owner() || (signedIn() && resource.data.ownerUid == request.auth.uid && request.resource.data.ownerUid == request.auth.uid);
       allow delete: if owner();
+    }
+    match /post_sale_records/{id} {
+      allow read: if canOperate() || canManageQuality();
+      allow create: if canOperate() || canManageQuality();
+      allow update, delete: if canManageQuality();
     }
     match /tipologias/{id} { allow read: if canOperate(); allow create, update: if canManageCommercial(); allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']); }
     match /projects/{id} {
