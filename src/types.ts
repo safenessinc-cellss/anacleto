@@ -86,6 +86,8 @@ export interface Quote {
   pdfGeneratedAt?: string;
   pdfFileSizeKb?: number;
   approvedSnapshotId?: string;
+  productionOrderId?: string;
+  productionStatus?: string;
   approvedAt?: string;
   approvedBy?: { uid: string; email: string; role: string };
   snapshotContentHash?: string;
