@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, orderBy, query, writeBatch } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Camera, CameraOff, CheckCircle2, ClipboardCheck, FileText, MapPin, PenLine, Plus, RefreshCw, Trash2, Truck, X } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
@@ -182,8 +182,15 @@ export default function DeliveryModule() {
         photos: uploadedPhotos, latitude: location.latitude, longitude: location.longitude,
         locationAt: location.capturedAt, operatorName, createdAt: stamp
       });
-      batch.update(doc(db, "quotes", selectedQuote.id), { ...deliveryEvidence, deliveryEvidence });
+      batch.update(doc(db, "quotes", selectedQuote.id), {
+        ...deliveryEvidence, deliveryEvidence, productionStatus: "delivered", updatedAt: serverTimestamp(),
+      });
       if (selectedInvoice) batch.update(doc(db, "invoices", selectedInvoice.id), { ...deliveryEvidence, deliveryEvidence });
+      const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", selectedQuote.id)));
+      linkedOrders.docs.forEach((orderDoc) => batch.update(orderDoc.ref, {
+        status: "delivered", workflowStage: "billing", nextStep: "emitir_fatura",
+        deliveryId: deliveryRef.id, deliveryStatus: "delivered", deliveredAt: stamp, updatedAt: serverTimestamp(),
+      }));
       await batch.commit();
       resetForm();
     } catch (error) {
