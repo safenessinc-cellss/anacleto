@@ -73,6 +73,10 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt','clientAdvanceTotal','balanceDue','productionStatus','productionOrderId','deliveryId','deliveryStatus','deliveredAt','deliveryEvidence'])
         )
       ) || (
+        canManageProduction() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'productionStatus','productionOrderId','updatedAt'
+        ])
+      ) || (
         canManageQuality() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'productionStatus','qualityStatus','qualityRecordId','qualityInspectedAt','updatedAt'
         ])
@@ -128,6 +132,12 @@ service cloud.firestore {
         canManageCommercial() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'status','workflowStage','nextStep','deliveryId','deliveryStatus','deliveredAt',
           'invoiceId','invoiceNumber','invoiceStatus','paymentStatus','paidAt','updatedAt'
+        ])
+      ) || (
+        canManageQuality() && resource.data.workflowStage == 'POS_VENDA_E_GARANTIA'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'workflowChecklist','updatedAt','lastWorkflowUpdateBy','workflowStage','workflowStageIndex',
+          'workflowCompletedAt','history','lastStageChangedAt','lastStageChangedBy','status'
         ])
       ) || (
         canManageQuality() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
