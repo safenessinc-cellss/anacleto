@@ -805,6 +805,9 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       };
       const finalInvoice: Invoice = baseInvoice;
       const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", approvedQuote.id)));
+      if (linkedOrders.docs.some((orderDoc) => !["delivered", "invoiced"].includes(String(orderDoc.data().status || "")))) {
+        throw new Error("Conclua a produção e registre a entrega antes de emitir a fatura final.");
+      }
       await runTransaction(db, async tx => {
         const current = await tx.get(quoteRef);
         if (!current.exists()) throw new Error("Orçamento não encontrado.");
