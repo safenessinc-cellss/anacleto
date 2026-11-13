@@ -410,17 +410,22 @@ export default function PayrollModule() {
     if (!window.confirm(`Remover ${employee.name} da lista de funcionários?`)) return;
     setError("");
     try {
-      const removals = employee.records.map((record) => {
+      const removals = new Map<string, Promise<void>>();
+      employee.records.forEach((record) => {
         const reference = doc(db, record.source, record.id);
-        if (record.source === "employees" || record.source === "funcionarios") return deleteDoc(reference);
-        return setDoc(reference, sanitizeFirestoreData({
-          deleted: true,
-          deletedAt: serverTimestamp(),
-          deletedBy: auth.currentUser?.email || "",
-        }), { merge: true });
+        if (removals.has(reference.path)) return;
+        const operation = record.source === "employees" || record.source === "funcionarios"
+          ? deleteDoc(reference)
+          : setDoc(reference, sanitizeFirestoreData({
+              deleted: true,
+              deletedAt: serverTimestamp(),
+              deletedBy: auth.currentUser?.email || "",
+            }), { merge: true });
+        removals.set(reference.path, operation);
       });
-      removals.push(deleteDoc(doc(db, "employees", employee.id)));
-      await Promise.all(removals);
+      const canonicalRef = doc(db, "employees", employee.id);
+      if (!removals.has(canonicalRef.path)) removals.set(canonicalRef.path, deleteDoc(canonicalRef));
+      await Promise.all(removals.values());
       setEditingEmployee((current) => current?.id === employee.id ? null : current);
     } catch (e) {
       setError(`Não foi possível remover ${employee.name}: ${(e as Error).message}`);

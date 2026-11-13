@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Quote, Invoice, TechnicalDrawing, SenderConfig } from "../types";
 import officialAnacletoLogo from "../assets/images/anacleto-logo-premium.svg";
+import { buildArchitecturalIsometricSvg } from "./architecturalSvg";
 
 // Format helper
 const formatMoney = (amount: number, currency: string = "BRL") => {
@@ -38,6 +39,28 @@ const getOfficialLogoDataUrl = async (): Promise<string> => {
   canvas.height = image.naturalHeight * scale;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Não foi possível preparar o logotipo oficial para o PDF.");
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
+};
+
+const svgToPngDataUrl = async (svg: string): Promise<string> => {
+  const image = new Image();
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Não foi possível renderizar a perspectiva arquitetônica para o PDF."));
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    if (image.complete) {
+      if (image.naturalWidth > 0) resolve();
+      else reject(new Error("Não foi possível renderizar a perspectiva arquitetônica para o PDF."));
+    }
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = 1800;
+  canvas.height = 1170;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Não foi possível preparar a perspectiva arquitetônica para o PDF.");
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
@@ -398,6 +421,22 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
     doc.setFontSize(10);
     doc.setTextColor(71, 85, 105);
     doc.text(desc.substring(0, 90), 14, 31);
+    const architecturalDrawing = Boolean(technicalDrawing && (
+      technicalDrawing.category === "aluminum_window" ||
+      technicalDrawing.category === "glass_door" ||
+      /janela|porta|esquadria|box|maxim.?ar/i.test(`${technicalDrawing.title || ""} ${technicalDrawing.tipologia || ""}`)
+    ));
+    if (technicalDrawing && architecturalDrawing) {
+      const isoImage = await svgToPngDataUrl(buildArchitecturalIsometricSvg(technicalDrawing));
+      doc.addImage(isoImage, "PNG", 24, 43, 162, 105);
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Largura: ${widthMm} mm  ·  Altura: ${heightMm} mm  ·  Profundidade: ${Math.round(Number(technicalDrawing.overallDimensions?.depth || 60))} ${technicalDrawing.unit || "mm"}`, 24, 157);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text("Perspectiva isométrica vetorial do desenho salvo · validar perfis, folgas e medidas antes da fabricação.", 14, 205);
+      doc.text(`Quantidade no orçamento: ${windowItem?.quantity || 1}`, 14, 214);
+    } else {
     doc.setDrawColor(71, 85, 105);
     doc.setLineWidth(2.5);
     doc.rect(frameX, frameY, frameW, frameH);
@@ -431,6 +470,7 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
     doc.setTextColor(100, 116, 139);
     doc.text(technicalDrawing ? "Desenho técnico vinculado; validar medidas finais antes da fabricação." : "Representação visual ilustrativa; confirmar medidas e abertura antes da fabricação.", 14, 205);
     doc.text(`Quantidade no orçamento: ${windowItem?.quantity || quote.items.find((item) => item.description.toLowerCase().includes(desc.toLowerCase()))?.quantity || 1}`, 14, 214);
+    }
   }
 
   // Footer

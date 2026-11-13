@@ -89,6 +89,8 @@ export interface Quote {
   approvedAt?: string;
   approvedBy?: { uid: string; email: string; role: string };
   snapshotContentHash?: string;
+  invoiceId?: string;
+  invoicedAt?: string;
   senderSnapshot?: SenderConfig;
   // Legacy compatibility fields
   clientNif?: string;

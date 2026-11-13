@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from "react";
 import { TechnicalDrawing, TechnicalPiece } from "../../types";
 import { ZoomIn, ZoomOut, RotateCcw, Eye, Layers } from "lucide-react";
 import { fitDrawingToViewport } from "../../utils/drawingViewport";
+import { buildArchitecturalElevationSvg, svgDataUri } from "../../utils/architecturalSvg";
 
 interface DrawingSvgCanvasProps {
   drawing: TechnicalDrawing;
@@ -32,6 +33,10 @@ export default function DrawingSvgCanvas({
   const unit = drawing.unit || "cm";
   const pieces = (drawing.pieces || []).filter(Boolean);
   const category = drawing.category || "custom";
+  const architecturalElevation = useMemo(
+    () => drawing.parametricSpec ? svgDataUri(buildArchitecturalElevationSvg(drawing)) : "",
+    [drawing],
+  );
 
   const canvasHeight = useMemo(() => {
     if (currentStep === 2) return Math.max(620, 125 + Math.ceil(pieces.length / 2) * 145);
@@ -191,7 +196,9 @@ export default function DrawingSvgCanvas({
           <rect x={x} y={y} width={w} height={h} fill="#0f172a" stroke={frame} strokeWidth="4" rx="2"/>
         </>
       )}
-      {visualElements.length > 0 ? <g>
+      {architecturalElevation ? (
+        <image href={architecturalElevation} x={x} y={y} width={w} height={h} preserveAspectRatio="xMidYMid meet" />
+      ) : visualElements.length > 0 ? <g>
         {visualElements.map((element: any, index: number) => {
           const type = String(element.type || "rect").toLowerCase();
           const stroke = element.stroke || "#cbd5e1";

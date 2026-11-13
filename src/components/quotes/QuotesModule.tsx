@@ -22,11 +22,13 @@ import {
   RefreshCw,
   FileDown,
   MessageCircle,
-  Mail
+  Mail,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, deleteField, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, deleteField, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -196,6 +198,25 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     } catch (error) {
       console.error("Quote rejection failed:", error);
       showToast((error as Error).message || "Não foi possível rejeitar o orçamento.", "error");
+    }
+  };
+
+  const handleDeleteQuote = async (quote: Quote) => {
+    if (!window.confirm(`Excluir o orçamento ${quote.number} permanentemente?`)) return;
+    try {
+      const linkedBudgets = await getDocs(query(collection(db, "budgets"), where("quoteId", "==", quote.id)));
+      const references = new Map<string, ReturnType<typeof doc>>();
+      references.set(`quotes/${quote.id}`, doc(db, "quotes", quote.id));
+      references.set(`budgets/${quote.id}`, doc(db, "budgets", quote.id));
+      linkedBudgets.docs.forEach((budget) => references.set(`budgets/${budget.id}`, doc(db, "budgets", budget.id)));
+      await Promise.all([...references.values()].map((reference) => deleteDoc(reference)));
+      setQuotes((current) => current.filter((item) => item.id !== quote.id));
+      setSelectedQuote((current) => current?.id === quote.id ? null : current);
+      setIsEditing(false);
+      showToast(`Orçamento ${quote.number} excluído.`, "success");
+    } catch (error) {
+      console.error("Quote deletion failed:", error);
+      showToast((error as Error).message || "Não foi possível excluir o orçamento.", "error");
     }
   };
 
@@ -555,24 +576,45 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   // Save only the light quote data; generate its PDF when requested.
   const handleSaveQuote = async (quoteToSave?: Quote, allowUnpricedDraft = false): Promise<boolean> => {
-    const requested = quoteToSave || selectedQuote!;
-    if (requested?.approvedSnapshotId) {
-      showToast("Orçamento aprovado: alterações bloqueadas. Crie uma nova revisão para modificar valores ou itens.", "warning");
+    const requested = quoteToSave || selectedQuote;
+    if (!requested) return false;
+    if (requested.invoiceId || requested.status === "invoiced") {
+      showToast("Este orçamento já foi faturado e não pode ser editado.", "warning");
       return false;
     }
-    let target = recalculateQuote(requested);
+    const editingExistingQuote = isEditing && quotes.some((quote) => quote.id === requested.id);
+    let target = recalculateQuote({
+      ...requested,
+      ...(editingExistingQuote && requested.status !== "draft" ? { status: "draft" as const } : {}),
+      ...(requested.approvedSnapshotId ? {
+        approvedSnapshotId: undefined,
+        approvedAt: undefined,
+        approvedBy: undefined,
+        snapshotContentHash: undefined,
+      } : {}),
+    });
     if (!allowUnpricedDraft && target.items.length > 0 && target.total <= 0) {
       showToast("O orçamento tem componentes sem preço confirmado ou estimado. Revise os valores antes de salvar um total de R$ 0,00.", "error");
       return false;
     }
     try {
-      await setDoc(doc(db, "quotes", target.id), {
+      const quoteRef = doc(db, "quotes", target.id);
+      const existing = await getDoc(quoteRef);
+      const payload = sanitizeFirestoreData({
         ...compactQuoteForFirestore(target),
         pdfDataUri: deleteField(),
         pdfFileName: deleteField(),
         pdfGeneratedAt: deleteField(),
         pdfFileSizeKb: deleteField(),
-      }, { merge: true });
+        ...(existing.data()?.approvedSnapshotId ? {
+          approvedSnapshotId: deleteField(),
+          approvedAt: deleteField(),
+          approvedBy: deleteField(),
+          snapshotContentHash: deleteField(),
+        } : {}),
+      });
+      if (existing.exists()) await updateDoc(quoteRef, payload);
+      else await setDoc(quoteRef, payload, { merge: true });
       setSelectedQuote(target);
       setIsEditing(false);
       showToast(`Orçamento ${target.number} salvo. O PDF será gerado ao visualizar ou exportar.`, "success");
@@ -1062,6 +1104,31 @@ const handleAddItem = () => {
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedQuote(q);
+                          setIsEditing(true);
+                        }}
+                        title={`Editar orçamento ${q.number}`}
+                        aria-label={`Editar orçamento ${q.number}`}
+                        className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-700 hover:text-blue-300"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleDeleteQuote(q);
+                        }}
+                        title={`Excluir orçamento ${q.number}`}
+                        aria-label={`Excluir orçamento ${q.number}`}
+                        className="rounded-lg p-1 text-rose-400 transition hover:bg-rose-500/15 hover:text-rose-300"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1088,15 +1155,26 @@ const handleAddItem = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {!selectedQuote.approvedSnapshotId && selectedQuote.status !== "invoiced" && (
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(true)}
-                        className="rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
-                      >
-                        Editar Orçamento
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedQuote.invoiceId || selectedQuote.status === "invoiced") {
+                          showToast("Este orçamento já foi faturado e não pode ser editado.", "warning");
+                          return;
+                        }
+                        setIsEditing(true);
+                      }}
+                      className="rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
+                    >
+                      Editar Orçamento
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteQuote(selectedQuote)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 dark:border-rose-900 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Excluir / Apagar
+                    </button>
                     {["draft", "pending", "pendente"].includes(String(selectedQuote.status).toLowerCase()) && (
                       <>
                         <button
@@ -1161,7 +1239,7 @@ const handleAddItem = () => {
                   </div>
                 </div>
 
-                <fieldset disabled={!isEditing || Boolean(selectedQuote.approvedSnapshotId)} className="contents">
+                <fieldset disabled={!isEditing || Boolean(selectedQuote.invoiceId || selectedQuote.status === "invoiced")} className="contents">
                 <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-2.5">
                   <form onSubmit={handleSendAiMessage} className="flex items-center gap-2">
                     <Sparkles className="ml-1 h-4 w-4 shrink-0 text-amber-400" />
