@@ -24,7 +24,7 @@ const base = () => {
 const documentResourceName = (path: string) => {
   const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
   const relativeRoot = "projects/" + firebaseConfig.projectId + "/databases/" + databaseId + "/documents";
-  return relativeRoot + "/" + path.replace(/^\\/+/, "");
+  return relativeRoot + "/" + path.replace(/^\/+/, "");
 };
 function send(res: any, status: number, body: unknown) {
   res.setHeader?.("Cache-Control", "no-store");
