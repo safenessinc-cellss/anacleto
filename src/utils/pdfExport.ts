@@ -45,6 +45,30 @@ const getOfficialLogoDataUrl = async (): Promise<string> => {
   return canvas.toDataURL("image/png");
 };
 
+const loadQuoteItemImage = async (src?: string): Promise<string | null> => {
+  if (!src?.trim()) return null;
+  try {
+    const image = new Image();
+    if (/^https?:\\/\\//i.test(src)) image.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Não foi possível carregar a imagem do item."));
+      image.src = src;
+      if (image.complete) image.naturalWidth > 0 ? resolve() : reject(new Error("Imagem indisponível."));
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(image, 0, 0);
+    return canvas.toDataURL("image/png");
+  } catch (error) {
+    console.warn("Imagem do item não pôde ser incluída no orçamento PDF:", error);
+    return null;
+  }
+};
+
 const svgToPngDataUrl = async (svg: string, width = 1800, height = 1170): Promise<string> => {
   const image = new Image();
   await new Promise<void>((resolve, reject) => {
@@ -72,72 +96,6 @@ export const exportArchitecturalSheetPdf = async (svg: string, title: string): P
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a3" });
   doc.addImage(image, "PNG", 10, 22, 277, 376);
   doc.save(`Ficha_Tecnica_${title.replace(/[^a-z0-9_-]+/gi, "_") || "Esquadria"}.pdf`);
-};
-
-
-// Miniatura vetorial isométrica: ilustração comercial do tipo de esquadria descrito.
-const drawQuoteItemMiniature3D = (doc: jsPDF, description: string, x: number, y: number, w: number, h: number) => {
-  const d = (description || "").toLowerCase();
-  const isShower = /box|banheiro|ducha|shower/.test(d);
-  const isDoor = /porta|door/.test(d);
-  const isSliding = /corredi|correr|sliding|2 folhas|duas folhas/.test(d);
-  const isCloset = /arm[aá]rio|closet|roupeiro/.test(d);
-  const isWindow = /janela|esquadria|window|frame/.test(d);
-  const isGeneric = !isShower && !isDoor && !isCloset && !isWindow && !isSliding;
-  const pad = 4;
-  const left = x + pad, top = y + 4, frontW = w - 2 * pad - 5, frontH = h - 9, depth = 4;
-  const right = left + frontW, bottom = top + frontH;
-  doc.setLineWidth(0.45);
-  doc.setDrawColor(100, 116, 139);
-  doc.setFillColor(239, 246, 255);
-  if (isGeneric) {
-    // Objeto genérico em perspectiva para itens/serviços sem tipologia de esquadria identificável.
-    doc.rect(left + 5, top + 7, frontW - 11, frontH - 13, "FD");
-    doc.line(left + 5, top + 7, left + 10, top + 3);
-    doc.line(left + frontW - 6, top + 7, left + frontW - 1, top + 3);
-    doc.line(left + 10, top + 3, left + frontW - 1, top + 3);
-    doc.line(left + frontW - 6, bottom - 6, left + frontW - 1, bottom - 10);
-    doc.line(left + frontW - 1, top + 3, left + frontW - 1, bottom - 10);
-    doc.line(left + 5, top + 7, left + 10, top + 3);
-  } else if (isShower) {
-    // Duas folhas de vidro em canto, com profundidade lateral.
-    doc.rect(left + 2, top + 2, frontW * 0.58, frontH - 3, "FD");
-    doc.line(left + 2, top + 2, left + frontW * 0.58 + depth, top - 1);
-    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58 + depth, top - 1);
-    doc.line(left + frontW * 0.58 + depth, top - 1, left + frontW * 0.58 + depth, bottom - 3);
-    doc.line(left + 2, bottom - 1, left + frontW * 0.58 + depth, bottom - 1);
-    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58, bottom - 3);
-    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58 + depth, top - 1);
-  } else {
-    // Marco frontal de alumínio com lateral superior/direita em perspectiva.
-    doc.rect(left, top + 2, frontW, frontH - 3, "FD");
-    doc.line(left, top + 2, left + depth, top - 1);
-    doc.line(right, top + 2, right + depth, top - 1);
-    doc.line(left + depth, top - 1, right + depth, top - 1);
-    doc.line(right, top + 2, right + depth, top - 1);
-    doc.line(right + depth, top - 1, right + depth, bottom - 4);
-    doc.line(right, bottom - 1, right + depth, bottom - 4);
-    if (isDoor || isCloset) {
-      doc.line(left + frontW * 0.72, top + 4, left + frontW * 0.72, bottom - 4);
-      doc.setDrawColor(148, 163, 184);
-      doc.line(left + frontW * 0.72 - 2, top + 4, right - 3, bottom - 4);
-      doc.setDrawColor(100, 116, 139);
-    } else if (isSliding) {
-      doc.line(left + frontW / 2, top + 3, left + frontW / 2, bottom - 3);
-      doc.setDrawColor(148, 163, 184);
-      doc.line(left + 3, top + 5, left + frontW / 2 - 2, bottom - 5);
-      doc.line(left + frontW / 2 + 2, top + 5, right - 3, bottom - 5);
-      doc.setDrawColor(100, 116, 139);
-    } else {
-      doc.line(left + frontW / 2, top + 3, left + frontW / 2, bottom - 3);
-      doc.line(left + 3, top + frontH / 2, right - 3, top + frontH / 2);
-    }
-  }
-  // Sombra/base discreta para reforçar a leitura tridimensional.
-  doc.setDrawColor(203, 213, 225);
-  doc.line(left + 1, bottom + 1, right + depth + 2, bottom + 1);
-  doc.setDrawColor(100, 116, 139);
-  doc.setLineWidth(0.2);
 };
 
 
@@ -309,27 +267,38 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
   doc.text(`Endereço: ${quote.clientAddress || "Não informado"}`, pageWidth / 2 + 10, yPos + 21);
   if (quote.validUntil) doc.text(`Válido até: ${quote.validUntil}`, pageWidth / 2 + 10, yPos + 26);
 
-  // Table of Items
-  const tableData = quote.items.map((item, idx) => [
-    idx + 1,
-    "",
-    item.sku
+  // A coluna de imagem só existe quando o usuário selecionou uma foto em pelo menos um item.
+  const itemImageData = await Promise.all(quote.items.map((item) => loadQuoteItemImage(item.itemPhotoUrl)));
+  const hasSelectedItemImages = itemImageData.some(Boolean);
+  const tableData = quote.items.map((item, idx) => {
+    const description = item.sku
       ? `${item.sku} · ${item.description}${Number(item.cutLengthMm) > 0 ? ` (${item.cutLengthMm} mm)` : ""}`
-      : item.description,
-    item.quantity,
-    formatMoney(item.unitPrice, currency),
-    formatMoney(item.subtotal || item.quantity * item.unitPrice, currency),
-  ]);
+      : item.description;
+    const row = [idx + 1];
+    if (hasSelectedItemImages) row.push("");
+    row.push(description, item.quantity, formatMoney(item.unitPrice, currency), formatMoney(item.subtotal || item.quantity * item.unitPrice, currency));
+    return row;
+  });
+  const descriptionColumn = hasSelectedItemImages ? 2 : 1;
+  const quantityColumn = descriptionColumn + 1;
+  const unitPriceColumn = descriptionColumn + 2;
+  const subtotalColumn = descriptionColumn + 3;
 
   autoTable(doc, {
     startY: yPos + 35,
-    head: [["#", "Vista 3D", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
+    head: [hasSelectedItemImages
+      ? ["#", "Imagem", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]
+      : ["#", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
     body: tableData,
     theme: "striped",
     didDrawCell: (data: any) => {
-      if (data.section === "body" && data.column.index === 1) {
-        const item = quote.items[data.row.index];
-        drawQuoteItemMiniature3D(doc, item?.description || "", data.cell.x, data.cell.y, data.cell.width, data.cell.height);
+      if (hasSelectedItemImages && data.section === "body" && data.column.index === 1) {
+        const imageData = itemImageData[data.row.index];
+        if (imageData) {
+          const size = Math.min(data.cell.width - 4, data.cell.height - 4);
+          try { doc.addImage(imageData, "PNG", data.cell.x + (data.cell.width - size) / 2, data.cell.y + (data.cell.height - size) / 2, size, size); }
+          catch (error) { console.warn("Não foi possível desenhar a foto do item no orçamento:", error); }
+        }
       }
     },
     headStyles: {
@@ -339,16 +308,16 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
     },
     columnStyles: {
       0: { cellWidth: 9, halign: "center" },
-      1: { cellWidth: 29, halign: "center" },
-      2: { cellWidth: "auto" },
-      3: { cellWidth: 15, halign: "center" },
-      4: { cellWidth: 29, halign: "right" },
-      5: { cellWidth: 30, halign: "right" },
+      ...(hasSelectedItemImages ? { 1: { cellWidth: 29, halign: "center" as const } } : {}),
+      [descriptionColumn]: { cellWidth: "auto" },
+      [quantityColumn]: { cellWidth: 15, halign: "center" },
+      [unitPriceColumn]: { cellWidth: 29, halign: "right" },
+      [subtotalColumn]: { cellWidth: 30, halign: "right" },
     },
     styles: {
       fontSize: 8,
       cellPadding: 3,
-      minCellHeight: 29,
+      minCellHeight: hasSelectedItemImages ? 29 : 10,
       valign: "middle",
     },
   });

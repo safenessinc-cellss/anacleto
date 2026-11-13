@@ -132,6 +132,23 @@ export function applyTheme(config: ThemeConfig): void {
       border-color: #e2e8f0 !important;
     }
 
+    /* Estado ativo: contraste garantizado en modo claro, independientemente de la paleta. */
+    html:not(.dark) aside nav button[aria-current="page"],
+    html:not(.dark) aside button[aria-current="page"] {
+      background-color: ${config.primaryLight} !important;
+      color: ${config.primaryDark} !important;
+      border-color: ${config.primaryLight} !important;
+    }
+    html:not(.dark) aside nav button[aria-current="page"] *,
+    html:not(.dark) aside button[aria-current="page"] * {
+      color: inherit !important;
+    }
+    html:not(.dark) main nav button[aria-current="page"] {
+      background-color: transparent !important;
+      color: ${config.primaryDark} !important;
+      border-bottom-color: ${config.primary} !important;
+    }
+
     /* ========== TOPBAR ========== */
     html:not(.dark) header {
       background-color: ${config.cardBg} !important;

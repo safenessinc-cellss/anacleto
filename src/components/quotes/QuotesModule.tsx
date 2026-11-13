@@ -578,8 +578,11 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     }
     setIsQuoteActionLoading(true);
     try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error("Faça login novamente para aprovar o orçamento.");
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("Sua sessão do Firebase não está ativa. Entre novamente antes de aprovar.");
+      // Force refresh to avoid sending an expired cached ID token to the approval API.
+      const token = await currentUser.getIdToken(true);
+      if (!token) throw new Error("Não foi possível renovar sua autenticação. Entre novamente para aprovar o orçamento.");
       const approvalCandidate = recalculateQuote(selectedQuote);
       const quoteRef = doc(db, "quotes", approvalCandidate.id);
       const persistedQuote = await getDoc(quoteRef);

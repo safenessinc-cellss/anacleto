@@ -33,16 +33,35 @@ function tokenOf(req: any) {
 }
 async function authenticate(req: any): Promise<AuthUser | null> {
   const token = tokenOf(req);
-  const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
-  if (!token || !apiKey) return null;
-  const identity = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + apiKey, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: token }),
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!identity.ok) return null;
-  const data = await identity.json() as { users?: Array<{ localId?: string; email?: string }> };
-  const account = data.users?.[0];
+  if (!token) return null;
+
+  // O frontend inicializa o Firebase diretamente com firebase-applet-config.json.
+  // Tente essa mesma chave primeiro; variáveis antigas no Vercel podem apontar
+  // para outro projeto e causar 401 mesmo com uma sessão válida no navegador.
+  const apiKeys = [...new Set([
+    firebaseConfig.apiKey,
+    process.env.VITE_FIREBASE_API_KEY,
+    process.env.FIREBASE_API_KEY,
+  ].map((value) => String(value || "").trim()).filter(Boolean))];
+  let account: { localId?: string; email?: string } | undefined;
+  for (const apiKey of apiKeys) {
+    try {
+      const identity = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + encodeURIComponent(apiKey), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: token }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!identity.ok) continue;
+      const data = await identity.json() as { users?: Array<{ localId?: string; email?: string }> };
+      const candidate = data.users?.[0];
+      if (candidate?.localId && candidate.email) { account = candidate; break; }
+    } catch (error) {
+      console.warn("Firebase identity lookup attempt failed:", error instanceof Error ? error.name : "unknown");
+    }
+  }
   if (!account?.localId || !account.email) return null;
+
   const email = account.email.toLowerCase();
   if (email === OWNER_EMAIL) return { uid: account.localId, email, role: "owner" };
   const roleResponse = await fetch(base() + "/admins/" + encodeURIComponent(email), {
