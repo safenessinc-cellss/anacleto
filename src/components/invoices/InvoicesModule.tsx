@@ -89,6 +89,8 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
         const invoiceSnap = await tx.get(invoiceRef);
         const receivableSnap = await tx.get(receivableRef);
         const ledgerSnap = await tx.get(ledgerRef);
+        const quoteRef = invoice.quoteId ? doc(db, "quotes", invoice.quoteId) : null;
+        const quoteSnap = quoteRef ? await tx.get(quoteRef) : null;
         if (!invoiceSnap.exists() || ["pago", "paid"].includes(String(invoiceSnap.data().status || ""))) throw new Error("A fatura já foi processada por outro usuário.");
         if (ledgerSnap.exists()) throw new Error("Já existe um lançamento financeiro para esta fatura.");
         const previousReceived = Number(receivableSnap.exists() ? receivableSnap.data().receivedAmount || 0 : 0);
@@ -112,6 +114,9 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
           status: "paid", workflowStage: "closed", nextStep: "concluido",
           paymentStatus: "paid", paidAt: serverTimestamp(), updatedAt: serverTimestamp(),
         }));
+        if (quoteRef && quoteSnap?.exists()) tx.update(quoteRef, {
+          productionStatus: "paid", updatedAt: serverTimestamp(),
+        });
       });
       setSelectedInvoice(updated);
       showToast(`Fatura ${invoice.number} recebida e conciliada no Financeiro.`, "success");
