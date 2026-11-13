@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState } from "react";
-import { TechnicalDrawing, TechnicalPiece } from "../../types";
+import { TechnicalDrawing } from "../../types";
 import { ZoomIn, ZoomOut, RotateCcw, Eye, Layers } from "lucide-react";
 import { fitDrawingToViewport } from "../../utils/drawingViewport";
-import { buildArchitecturalElevationSvg, svgDataUri } from "../../utils/architecturalSvg";
+import { buildArchitecturalElevationSvg, buildArchitecturalIsometricSvg, resolveAluminumSpec, svgDataUri } from "../../utils/architecturalSvg";
 
 interface DrawingSvgCanvasProps {
   drawing: TechnicalDrawing;
@@ -33,22 +33,43 @@ export default function DrawingSvgCanvas({
   const unit = drawing.unit || "cm";
   const pieces = (drawing.pieces || []).filter(Boolean);
   const category = drawing.category || "custom";
+  const descriptorText = `${drawing.title || ""} ${drawing.description || ""} ${drawing.tipologia || ""} ${category}`;
   const isArchitecturalDrawing = Boolean(
     drawing.parametricSpec ||
     category === "aluminum_window" ||
     category === "glass_door" ||
-    /janela|porta|esquadria|box|maxim.?ar/i.test(`${drawing.title || ""} ${drawing.tipologia || ""}`),
+    /janela|porta|esquadria|box|maxim.?ar|basculante|pivotante|correr|giro/i.test(descriptorText),
   );
-  const architecturalElevation = useMemo(
-    () => isArchitecturalDrawing ? svgDataUri(buildArchitecturalElevationSvg(drawing)) : "",
+  const architecturalSpec = useMemo(
+    () => isArchitecturalDrawing ? resolveAluminumSpec(drawing) : null,
     [drawing, isArchitecturalDrawing],
   );
+
+  const architecturalElevation = useMemo(() => {
+    if (!isArchitecturalDrawing) return "";
+    try {
+      return svgDataUri(buildArchitecturalElevationSvg(drawing));
+    } catch (error) {
+      console.error("Falha ao gerar alçado arquitetônico SVG:", error);
+      return "";
+    }
+  }, [drawing, isArchitecturalDrawing]);
+
+  const architecturalIsometric = useMemo(() => {
+    if (!isArchitecturalDrawing) return "";
+    try {
+      return svgDataUri(buildArchitecturalIsometricSvg(drawing));
+    } catch (error) {
+      console.error("Falha ao gerar perspectiva isométrica SVG:", error);
+      return "";
+    }
+  }, [drawing, isArchitecturalDrawing]);
 
   const canvasHeight = useMemo(() => {
     if (currentStep === 2) return Math.max(620, 125 + Math.ceil(pieces.length / 2) * 145);
     if (currentStep === 3) return Math.max(620, 125 + pieces.length * 118);
     if (currentStep === 4) return Math.max(620, 150 + Math.ceil(pieces.length / 2) * 185);
-    return 620;
+    return 650;
   }, [currentStep, pieces.length]);
 
   const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
@@ -75,6 +96,41 @@ export default function DrawingSvgCanvas({
   );
 
   const renderOverview = () => {
+    if (isArchitecturalDrawing && architecturalElevation && architecturalIsometric && architecturalSpec) {
+      const rawColor = drawing.parametricSpec?.cor_perfil || drawing.cor || "Branco";
+      const glass = drawing.parametricSpec?.tipo_vidro || drawing.parametricSpec?.cor_vidro || drawing.vidro || architecturalSpec.glassType || "A definir";
+      const typology = drawing.parametricSpec?.tipologia || drawing.tipologia || architecturalSpec.type.replaceAll("_", " ");
+      const line = drawing.parametricSpec?.linha_aluminio || drawing.linha || architecturalSpec.line;
+      const area = (architecturalSpec.width * architecturalSpec.height) / 1_000_000;
+      return (
+        <g>
+          <text x="40" y="42" fill="#f8fafc" fontSize="19" fontWeight="800">DESENHO TÉCNICO ARQUITETÔNICO — VISTAS 2D + 3D</text>
+          <text x="40" y="72" fill="#93c5fd" fontSize="13" fontWeight="700">ALÇADO FRONTAL · SVG VETORIAL</text>
+          <text x="560" y="72" fill="#93c5fd" fontSize="13" fontWeight="700">PERSPECTIVA ISOMÉTRICA · SVG VETORIAL</text>
+          <rect x="40" y="82" width="500" height="440" rx="5" fill="#f8fafb" stroke="#64748b" strokeWidth="1.2" />
+          <image href={architecturalElevation} x="40" y="82" width="500" height="440" preserveAspectRatio="xMidYMid meet" />
+          <rect x="560" y="82" width="500" height="440" rx="5" fill="#f7f9f9" stroke="#64748b" strokeWidth="1.2" />
+          <image href={architecturalIsometric} x="560" y="82" width="500" height="440" preserveAspectRatio="xMidYMid meet" />
+          <rect x="40" y="535" width="1020" height="72" rx="5" fill="#0f172a" stroke="#64748b" strokeWidth="1.2" />
+          <path d="M 40 570 H 1060 M 245 535 V 607 M 440 535 V 607 M 635 535 V 607 M 830 535 V 607" stroke="#475569" strokeWidth="1" />
+          <text x="54" y="553" fill="#94a3b8" fontSize="9" fontWeight="700">TIPOLOGIA</text>
+          <text x="54" y="590" fill="#f8fafc" fontSize="12" fontWeight="700">{String(typology).replaceAll("_", " ").toUpperCase()}</text>
+          <text x="259" y="553" fill="#94a3b8" fontSize="9" fontWeight="700">LINHA</text>
+          <text x="259" y="590" fill="#f8fafc" fontSize="12" fontWeight="700">{String(line).slice(0, 24)}</text>
+          <text x="454" y="553" fill="#94a3b8" fontSize="9" fontWeight="700">COR DO PERFIL</text>
+          <text x="454" y="590" fill="#f8fafc" fontSize="12" fontWeight="700">{String(rawColor).slice(0, 22)}</text>
+          <text x="649" y="553" fill="#94a3b8" fontSize="9" fontWeight="700">VIDRO</text>
+          <text x="649" y="590" fill="#f8fafc" fontSize="12" fontWeight="700">{String(glass).slice(0, 22)}</text>
+          <text x="844" y="553" fill="#94a3b8" fontSize="9" fontWeight="700">MEDIDAS · ÁREA</text>
+          <text x="844" y="580" fill="#f8fafc" fontSize="11" fontWeight="700">{Math.round(architecturalSpec.width)} × {Math.round(architecturalSpec.height)} mm</text>
+          <text x="844" y="597" fill="#fbbf24" fontSize="10" fontWeight="700">{area.toFixed(2)} m²</text>
+          {labelsVisible && (
+            <text x="40" y="624" fill="#94a3b8" fontSize="9">PERFIL: {Math.round(architecturalSpec.depth)} mm · {pieces.length} COMPONENTES · PRÉ-VISUALIZAÇÃO; VALIDAR FOLGAS E FERRAGENS ANTES DA FABRICAÇÃO.</text>
+          )}
+        </g>
+      );
+    }
+
     const frontScale = Math.min(350 / W, 245 / H);
     const fw = W * frontScale, fh = H * frontScale;
     const sideScale = Math.min(180 / D, 245 / H);
@@ -287,16 +343,16 @@ export default function DrawingSvgCanvas({
         onPointerCancel={onPointerUp}
         onPointerLeave={onPointerUp}
       >
-        <svg viewBox={`0 0 1000 ${canvasHeight}`} className="h-full min-h-[460px] w-full" style={{ minHeight: `${canvasHeight}px` }} role="img" aria-label={`Desenho técnico de ${drawing.title}`}>
+        <svg viewBox={`0 0 1100 ${canvasHeight}`} className="h-full min-h-[460px] w-full" style={{ minHeight: `${canvasHeight}px` }} role="img" aria-label={`Desenho técnico de ${drawing.title}`}>
           <defs>
             <pattern id="drawing-grid-small" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#334155" strokeWidth=".6" opacity=".45"/></pattern>
             <pattern id="drawing-grid-large" width="100" height="100" patternUnits="userSpaceOnUse"><rect width="100" height="100" fill="url(#drawing-grid-small)"/><path d="M 100 0 L 0 0 0 100" fill="none" stroke="#475569" strokeWidth="1" opacity=".5"/></pattern>
             <marker id="dim-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/></marker>
             <marker id="assembly-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/></marker>
           </defs>
-          <rect width="1000" height={canvasHeight} fill="url(#drawing-grid-large)"/>
+          <rect width="1100" height={canvasHeight} fill="url(#drawing-grid-large)"/>
           <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-            {currentStep === 1 && (drawing.parametricSpec ? renderFinal() : renderOverview())}
+            {currentStep === 1 && renderOverview()}
             {currentStep === 2 && renderParts()}
             {currentStep === 3 && renderCuts()}
             {currentStep === 4 && renderAssembly()}
@@ -304,7 +360,7 @@ export default function DrawingSvgCanvas({
           </g>
           {(drawing.isDraft !== false || drawing.status !== "APPROVED_FOR_MANUFACTURING") && (
             <g id="anacleto-draft-watermark" pointerEvents="none" opacity="0.28">
-              <text x="500" y={Math.max(260, canvasHeight / 2)} textAnchor="middle" transform={`rotate(-24 500 ${Math.max(260, canvasHeight / 2)})`} fill="#ef4444" stroke="#ffffff" strokeWidth="1.2" paintOrder="stroke" fontSize="34" fontWeight="900" letterSpacing="2">
+              <text x="550" y={Math.max(260, canvasHeight / 2)} textAnchor="middle" transform={`rotate(-24 550 ${Math.max(260, canvasHeight / 2)})`} fill="#ef4444" stroke="#ffffff" strokeWidth="1.2" paintOrder="stroke" fontSize="34" fontWeight="900" letterSpacing="2">
                 BORRADOR PRELIMINAR - NO VÁLIDO PARA FABRICACIÓN
               </text>
             </g>
@@ -318,4 +374,3 @@ export default function DrawingSvgCanvas({
     </div>
   );
 }
-
