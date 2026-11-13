@@ -138,16 +138,16 @@ export default function DeliveryModule() {
     const currentUser = auth.currentUser;
     if (!currentUser) { setErrorText("Sua sessão expirou. Entre novamente."); return; }
     setSaving(true); setErrorText("");
-    const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", selectedQuote.id)));
+    try {
+      const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", selectedQuote.id)));
     const orderNotReady = linkedOrders.docs.find((orderDoc) => !["completed", "delivered"].includes(String(orderDoc.data().status || "")));
     if (orderNotReady) {
       setSaving(false);
       setErrorText("A ordem de produção precisa estar concluída antes de registrar a entrega.");
       return;
     }
-    const deliveryRef = doc(collection(db, "deliveries"));
-    const stamp = new Date().toISOString();
-    try {
+      const deliveryRef = doc(collection(db, "deliveries"));
+      const stamp = new Date().toISOString();
       stopCamera();
       const uploadedPhotos: Delivery["photos"] = [];
       for (let index = 0; index < photos.length; index++) {
