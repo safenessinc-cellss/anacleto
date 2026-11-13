@@ -64,6 +64,10 @@ const parametricResponseSchema = {
 };
 async function generateDrawingJson(options: { system: string; prompt: string; images?: URL[]; temperature: number; maxOutputTokens: number; responseSchema?: any }) {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+  const gatewayKey = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_AI_GATEWAY_API_KEY || "";
+  if (!apiKey && !gatewayKey) {
+    throw new Error("Configure AI_GATEWAY_API_KEY ou GEMINI_API_KEY no ambiente de produção.");
+  }
   if (apiKey) {
     const parts: any[] = [{ text: options.prompt }];
     for (const imageUrl of options.images || []) {
@@ -396,10 +400,19 @@ export default async function handler(req: any, res: any) {
     if (!["owner","super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role)) {
       return json(res, 403, { error: "Seu perfil não possui permissão para operações de desenho técnico.", code: "ROLE_FORBIDDEN" });
     }
-    stage = "catalog_loading";
-    catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
     if (!allowRequest(user.uid)) {
       return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
+    }
+    // O catálogo enriquece preços, mas sua indisponibilidade não pode bloquear o desenho local/IA.
+    stage = "catalog_loading";
+    try {
+      catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
+    } catch (catalogError) {
+      catalog = [];
+      console.warn("Technical drawing continuing without catalog data", {
+        requestId,
+        error: catalogError instanceof Error ? catalogError.message : String(catalogError),
+      });
     }
     if (isAluminumPrompt(prompt)) {
       stage = "parametric_spec_extraction";
