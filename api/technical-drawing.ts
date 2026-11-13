@@ -579,7 +579,7 @@ export default async function handler(req: any, res: any) {
         return json(res, 200, withDraftVectorWatermark(fallback));
       } catch (fallbackError) {
         console.error("Local drawing fallback failed:", fallbackError);
-        const fallback = localFallback(prompt);
+        const fallback: any = localFallback(prompt);
         fallback.isDraft = true;
         fallback._fallback = true;
         fallback.draftStatus = "preliminary";
