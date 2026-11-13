@@ -357,6 +357,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const [aluminumPricePerKg, setAluminumPricePerKg] = useState(readAluminumPricePerKg);
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [activeToolTab, setActiveToolTab] = useState<"ai" | "saved">("ai");
+  const [aiDrawing, setAiDrawing] = useState<TechnicalDrawing | null>(null);
+  const [aiTitle, setAiTitle] = useState("");
+  const [selectedParametricModelId, setSelectedParametricModelId] = useState("");
 
   useEffect(() => {
     if (!authReady) return;
@@ -486,25 +490,6 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     setPrompt(command);
   };
 
-  const updatePromptPreview = (value: string) => {
-    setPrompt(value);
-    if (!isAluminumPrompt(value)) return;
-    setDrawing((current) => {
-      if (current.approvedSnapshotId || current.status === "APPROVED_FOR_MANUFACTURING") return current;
-      const currentSpec = current.parametricSpec || defaultCadSpec;
-      const parsed = localParametricSpec(value);
-      const hasProfileColor = /\b(preto|branco|bronze|anodizado|natural|prata)\b/i.test(value);
-      return rebuildParametricPreview(current, {
-        ...parsed,
-        largura_mm: parsed.largura_mm || currentSpec.largura_mm || defaultCadSpec.largura_mm,
-        altura_mm: parsed.altura_mm || currentSpec.altura_mm || defaultCadSpec.altura_mm,
-        linha_aluminio: parsed.linha_aluminio === "Linha a definir" ? currentSpec.linha_aluminio : parsed.linha_aluminio,
-        cor_perfil: hasProfileColor ? parsed.cor_perfil : currentSpec.cor_perfil,
-        tipo_vidro: parsed.tipo_vidro === "a definir" ? currentSpec.tipo_vidro : parsed.tipo_vidro,
-        cor_vidro: parsed.cor_vidro === "a definir" ? currentSpec.cor_vidro : parsed.cor_vidro,
-      }, value);
-    });
-  };
 
   const updateParametricField = (field: "largura_mm" | "altura_mm" | "folhas", value: number) => {
     if (!Number.isFinite(value) || value <= 0 || drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") return;
@@ -811,6 +796,82 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     }
   };
 
+  const handleSaveAiDrawing = async () => {
+    if (!aiDrawing) {
+      showToast("Gere um desenho antes de salvar.", "warning");
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      showToast("Faça login novamente para salvar o desenho gerado por IA.", "error");
+      return;
+    }
+    const title = aiTitle.trim();
+    if (!title) {
+      showToast("Informe um título para guardar este desenho no projeto.", "warning");
+      return;
+    }
+    try {
+      const now = new Date().toISOString();
+      const saved = withoutHeavyInlineData({
+        ...aiDrawing,
+        title,
+        drawingOrigin: "ai",
+        aiPrompt: prompt,
+        createdAt: aiDrawing.createdAt || now,
+        updatedAt: now,
+        ownerUid: user.uid,
+        schemaVersion: 2,
+      }) as TechnicalDrawing;
+      await setDoc(doc(db, "technical_drawings", saved.id), sanitizeFirestoreData(saved));
+      setAiDrawing(saved);
+      setSavedDrawings((previous) => [saved, ...previous.filter((item) => item.id !== saved.id)]);
+      showToast("Desenho de IA salvo no projeto com prompt e dados editáveis.", "success");
+    } catch (error) {
+      console.error("AI drawing save failed:", error);
+      showToast((error as Error).message || "Não foi possível salvar o desenho de IA.", "error");
+    }
+  };
+
+  const handleSaveAiAsParametricModel = async () => {
+    if (!aiDrawing?.parametricSpec) {
+      showToast("Gere uma esquadria com parâmetros reconhecidos antes de adicioná-la à biblioteca local.", "warning");
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) {
+      showToast("Faça login novamente para salvar o modelo paramétrico.", "error");
+      return;
+    }
+    if (!aiDrawing.parametricSpec.largura_mm || !aiDrawing.parametricSpec.altura_mm) {
+      showToast("O modelo precisa ter largura e altura válidas antes de entrar na biblioteca paramétrica.", "warning");
+      return;
+    }
+    try {
+      const now = new Date().toISOString();
+      const model = withoutHeavyInlineData({
+        ...aiDrawing,
+        id: "parametric_model_" + crypto.randomUUID(),
+        title: aiTitle.trim() || aiDrawing.title || "Modelo paramétrico sem título",
+        drawingOrigin: "ai",
+        aiPrompt: prompt,
+        parametricLibrary: true,
+        sourceDrawingId: aiDrawing.id,
+        createdAt: now,
+        updatedAt: now,
+        ownerUid: user.uid,
+        schemaVersion: 2,
+      }) as TechnicalDrawing;
+      await setDoc(doc(db, "technical_drawings", model.id), sanitizeFirestoreData(model));
+      setSavedDrawings((previous) => [model, ...previous.filter((item) => item.id !== model.id)]);
+      setSelectedParametricModelId(model.id);
+      showToast("Modelo adicionado à biblioteca de parâmetros arquitetônicos locais.", "success");
+    } catch (error) {
+      console.error("Parametric model save failed:", error);
+      showToast((error as Error).message || "Não foi possível guardar o modelo nos parâmetros locais.", "error");
+    }
+  };
+
   const handleDeleteDrawing = async (item: TechnicalDrawing) => {
     if (item.approvedSnapshotId || item.status === "APPROVED_FOR_MANUFACTURING") { showToast("Um desenho aprovado não pode ser excluído. Preserve o histórico industrial.", "warning"); return; }
     if (!auth.currentUser) { showToast("Faça login novamente para excluir o desenho.", "error"); return; }
@@ -893,7 +954,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     const selectedProject = projects.find((project) => project.id === selectedProjectId);
     generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
-    setDrawing(generated);
+    setAiDrawing(generated); setAiTitle(generated.title || inputPrompt);
     setCurrentStep(1);
     setPrompt(inputPrompt);
     const localDrawing = generated;
@@ -980,17 +1041,12 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     }
 
     try {
-      setDrawing(generated);
-      setCurrentStep(1);
+      setAiDrawing(generated);
+      setAiTitle(generated.title || inputPrompt);
       if (generationWarning) {
-        showToast("O desenho local já está aberto. Revise medidas e componentes antes de salvar ou fabricar.", "warning");
+        showToast("Rascunho técnico preparado. Revise os dados e salve quando estiver pronto.", "warning");
       } else {
-        const saved = await handleSaveDrawing(generated, true);
-        if (saved) {
-          showToast("Desenho gerado pela IA e salvo com PDF e dados editáveis.", "success");
-        } else {
-          showToast("Desenho gerado, mas não foi possível salvar automaticamente. Ele permanece aberto; use Salvar projeto para tentar novamente.", "warning");
-        }
+        showToast("Desenho técnico gerado por IA. Defina um título e salve no projeto.", "success");
       }
     } finally {
       setIsLoading(false);
@@ -1032,6 +1088,29 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const currentStepData = drawing.steps?.[currentStep - 1];
   const parametricSpec = drawing.parametricSpec || defaultCadSpec;
   const canEditParametric = !drawing.approvedSnapshotId && drawing.status !== "APPROVED_FOR_MANUFACTURING";
+  const parametricModels = savedDrawings.filter((item) => Boolean((item as any).parametricLibrary && item.parametricSpec));
+
+  const applyParametricModel = (model: TechnicalDrawing) => {
+    if (!model.parametricSpec) {
+      showToast("Este desenho não possui parâmetros arquitetônicos estruturados.", "warning");
+      return;
+    }
+    if (!canEditParametric) {
+      showToast("Este projeto está aprovado e bloqueado. Duplique-o para aplicar outro modelo.", "warning");
+      return;
+    }
+    const command = promptForSpec(model.parametricSpec);
+    setDrawing((current) => ({
+      ...rebuildParametricPreview(current, model.parametricSpec!, command),
+      title: model.title || command,
+      description: command,
+      projectId: selectedProjectId || current.projectId,
+      projectName: projects.find((project) => project.id === selectedProjectId)?.name || current.projectName,
+    }));
+    setPrompt(command);
+    setSelectedParametricModelId(model.id);
+    showToast("Modelo aplicado aos parâmetros locais. As vistas CAD foram atualizadas sem IA.", "success");
+  };
 
   const presets = [
     "una mesa de madera de 120x80x75 cm con 4 patas",
@@ -1193,68 +1272,99 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         </div>
       </div>
 
-      {/* Two-Panel Layout: Left = Chat / Controls; Right = Scalable SVG Canvas */}
+      <nav aria-label="Ferramentas adicionais do Projeto CAD" className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
+        <button type="button" onClick={() => setActiveToolTab("ai")} aria-current={activeToolTab === "ai" ? "page" : undefined} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold ${activeToolTab === "ai" ? "border-violet-600 text-violet-700 dark:text-violet-300" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>Desenhe com IA</button>
+        <button type="button" onClick={() => setActiveToolTab("saved")} aria-current={activeToolTab === "saved" ? "page" : undefined} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold ${activeToolTab === "saved" ? "border-blue-600 text-blue-700 dark:text-blue-300" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>Desenhos salvos</button>
+      </nav>
+
+      {/* Projeto CAD permanece independente; as abas auxiliares não substituem o motor local. */}
+      {/* Two-Panel Layout: Left = Controls; Right = Scalable SVG Canvas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT PANEL: Chat / Instructions / Step by Step (5 cols) */}
         <div className="lg:order-2 lg:col-span-5 space-y-6">
-          {/* Natural Language Prompt Box */}
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl">
-            <div className="flex items-center justify-between mb-3">
+          {activeToolTab === "ai" ? (
+            <section className="space-y-4 rounded-2xl border border-violet-200 bg-white p-4 shadow-sm dark:border-violet-900 dark:bg-slate-900">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
-                  Instruções para a IA
-                </h3>
+                <Sparkles className="h-5 w-5 text-violet-600" />
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Desenhe com IA</h3>
+                  <p className="text-xs text-slate-500">Gere um desenho técnico vetorial separado do CAD local.</p>
+                </div>
               </div>
-              <span className="text-[10px] font-mono text-slate-500">Desenho 2D + medidas + encaixes</span>
-            </div>
-
-            <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-              Descreva em linguagem natural qualquer peça arquitetônica, esquadria de alumínio ou móvel com suas medidas:
-            </p>
-            <label className="mb-3 block text-[11px] font-bold uppercase tracking-wide text-slate-400">Associar este modelo a um projeto</label>
-            <select value={selectedProjectId} onChange={(e) => { const id = e.target.value; const project = projects.find((item) => item.id === id); setSelectedProjectId(id); setDrawing((current) => ({ ...current, projectId: project?.id, projectName: project?.name, updatedAt: new Date().toISOString() })); }} className="mb-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-xs text-white">
-              <option value="">Sem projeto associado</option>
-              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-            </select>
-
-            {/* Quick Preset Pills */}
-            <div className="flex flex-wrap gap-1.5 mb-3.5">
-              {presets.map((p, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleGenerate(p)}
-                  disabled={isLoading}
-                  className="text-[10px] px-2.5 py-1 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border border-slate-700 rounded-lg transition text-left"
-                >
-                  ⚡ {p}
+              <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Associar a um projeto</label>
+              <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="w-full rounded-lg border bg-white px-3 py-2 text-xs dark:bg-slate-950">
+                <option value="">Sem projeto associado</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+              <div className="flex flex-wrap gap-1.5">
+                {presets.map((p, i) => (
+                  <button key={i} type="button" onClick={() => setPrompt(p)} disabled={isLoading} className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-left text-[10px] text-violet-800 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-200">
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <form onSubmit={(e) => { e.preventDefault(); void handleGenerate(); }} className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Descreva o desenho desejado</label>
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ex.: Janela de correr de duas folhas, linha Suprema, 1500 × 1200 mm, alumínio anodizado natural e vidro temperado..." rows={4} className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+                <button type="submit" disabled={isLoading || !prompt.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50">
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  Gerar desenho com IA
                 </button>
-              ))}
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleGenerate();
-              }}
-              className="relative"
-            >
-              <textarea
-                value={prompt}
-                onChange={(e) => updatePromptPreview(e.target.value)}
-                placeholder="Ex: uma mesa de madeira de 120x80x75 cm com 4 pernas..."
-                rows={3}
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 focus:border-amber-500/60 rounded-2xl text-xs text-white placeholder-slate-500 outline-none resize-none transition pr-12"
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !prompt.trim()}
-                className="absolute right-3 bottom-3 p-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 rounded-xl transition shadow-md"
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </button>
-            </form>
-          </div>
+              </form>
+              {aiDrawing && (
+                <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Título para salvar no projeto
+                    <input value={aiTitle} onChange={(e) => setAiTitle(e.target.value)} placeholder="Ex.: Janela Suprema — modelo 01" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm dark:bg-slate-950" />
+                  </label>
+                  <div className="max-h-[420px] overflow-auto rounded-xl border border-slate-200 bg-slate-950 p-2 dark:border-slate-700">
+                    <DrawingSvgCanvas drawing={aiDrawing} currentStep={1} showDimensions showLabels />
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-950 p-2 dark:border-slate-700">
+                    <DrawingThreePreview drawing={aiDrawing} />
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button type="button" onClick={() => void handleSaveAiDrawing()} disabled={isSaving || !aiTitle.trim()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+                      <Save className="h-4 w-4" /> Salvar desenho no projeto
+                    </button>
+                    <button type="button" onClick={() => void handleSaveAiAsParametricModel()} disabled={isSaving || !aiDrawing.parametricSpec} className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 disabled:opacity-50 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+                      <Layers className="h-4 w-4" /> Adicionar aos parâmetros locais
+                    </button>
+                  </div>
+                  {!aiDrawing.parametricSpec && <p className="text-[11px] text-amber-700 dark:text-amber-300">Este desenho ainda não possui uma ficha paramétrica de esquadria para reutilização automática.</p>}
+                </div>
+              )}
+            </section>
+          ) : (
+            <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Desenhos salvos</h3>
+                  <p className="text-xs text-slate-500">Abra desenhos ou reutilize modelos paramétricos adicionados à biblioteca.</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{savedDrawings.length}</span>
+              </div>
+              {savedDrawings.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-6 text-center text-xs text-slate-500">Ainda não há desenhos salvos neste espaço.</div>
+              ) : (
+                <div className="max-h-[620px] space-y-2 overflow-y-auto pr-1">
+                  {savedDrawings.map((item) => (
+                    <article key={item.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="truncate text-xs font-bold text-slate-900 dark:text-white">{item.title || "Desenho sem título"}</h4>
+                          <p className="mt-1 text-[10px] text-slate-500">{(item as any).parametricLibrary ? "Modelo paramétrico local" : (item as any).drawingOrigin === "ai" ? "Gerado por IA" : "Projeto CAD"} · {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString("pt-BR") : "Data não informada"}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => handleOpenSavedDrawing(item)} className="rounded-lg bg-blue-600 px-3 py-2 text-[10px] font-bold text-white">Abrir no Projeto CAD</button>
+                        {item.parametricSpec && <button type="button" onClick={() => applyParametricModel(item)} className="rounded-lg border border-emerald-300 px-3 py-2 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">Aplicar parâmetros locais</button>}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4">
             <h3 className="text-sm font-bold text-slate-900">Parâmetros arquitetônicos · atualização local instantânea</h3>
@@ -1298,6 +1408,16 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 </select>
               </label>
             </div>
+            <div className="mt-4 grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-[1fr_auto]">
+              <label className="text-[10px] font-semibold text-slate-500">Biblioteca de modelos paramétricos locais
+                <select value={selectedParametricModelId} onChange={(event) => setSelectedParametricModelId(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs dark:bg-slate-950">
+                  <option value="">Selecionar modelo salvo...</option>
+                  {parametricModels.map((model) => <option key={model.id} value={model.id}>{model.title}</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={() => { const model = parametricModels.find((item) => item.id === selectedParametricModelId); if (model) applyParametricModel(model); }} disabled={!selectedParametricModelId || !canEditParametric} className="self-end rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 disabled:opacity-50 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">Aplicar modelo</button>
+            </div>
+            {parametricModels.length === 0 && <p className="mt-2 text-[10px] text-slate-500">Modelos gerados por IA e adicionados à biblioteca aparecerão aqui.</p>}
           </section>
 
           {/* 5-Step Phase Controller */}
