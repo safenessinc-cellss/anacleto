@@ -131,6 +131,7 @@ export default function DeliveryModule() {
   const saveDelivery = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedQuote) { setErrorText("Selecione um orçamento para vincular a entrega."); return; }
+    if (selectedQuote.deliveryId || selectedQuote.deliveryStatus === "Entregue") { setErrorText("Este orçamento já possui uma entrega registrada."); return; }
     if (!photos.length) { setErrorText("Registre pelo menos uma fotografia feita no local."); return; }
     if (!location) { setErrorText("Registre a localização GPS no local da entrega."); return; }
     if (!signedBy.trim() || !hasSignature()) { setErrorText("Informe o nome do cliente e recolha sua assinatura no quadro."); return; }
