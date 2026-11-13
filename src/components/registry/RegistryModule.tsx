@@ -8,14 +8,13 @@ import ImageLightbox from "../common/ImageLightbox";
 import PdfPageThumbnails, { countPdfPages } from "../common/PdfPageThumbnails";
 import Papa from "papaparse";
 
-export type RegistryKind = "items" | "products" | "esquadrias" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials";
+export type RegistryKind = "items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials";
 
 type CatalogAttachment = { id: string; fileName: string; fileType: string; mimeType: string; size: number; storagePath: string; downloadUrl: string; pageCount?: number; uploadedAt: string };
 type RecordRow = { id: string; name: string; code?: string; category?: string; unit?: string; price?: number; status?: string; notes?: string; width?: number; height?: number; depth?: number; catalogFiles?: CatalogAttachment[]; itemPhotoUrls?: string[]; itemPhotoStoragePaths?: string[]; itemThumbnailUrls?: string[]; createdAt?: string; updatedAt?: string };
 const config: Record<RegistryKind, { title: string; subtitle: string; collection: string; codeLabel: string; categories: string[]; unitLabel: string }> = {
   items: { title: "Cadastro de Itens", subtitle: "Cadastro geral de componentes e insumos.", collection: "registry_items", codeLabel: "Código / SKU", categories: ["Perfil", "Vidro", "Ferragem", "Acessório", "Outro"], unitLabel: "Unidade" },
   products: { title: "Esquadrias", subtitle: "Modelos de janelas, portas, fachadas e boxes para reutilização em projetos e orçamentos.", collection: "registry_products", codeLabel: "Código da esquadria", categories: ["Janela de correr", "Janela maxim-ar", "Janela basculante", "Porta de correr", "Porta de giro", "Porta pivotante", "Box de banheiro", "Fachada", "Outro"], unitLabel: "Unidade" },
-  esquadrias: { title: "Esquadrias", subtitle: "Biblioteca de modelos de janelas, portas, fachadas e boxes para reutilização em projetos e orçamentos.", collection: "registry_esquadrias", codeLabel: "Código da esquadria", categories: ["Janela de correr", "Janela maxim-ar", "Janela basculante", "Porta de correr", "Porta de giro", "Porta pivotante", "Box de banheiro", "Fachada", "Outro"], unitLabel: "Unidade" },
   services: { title: "Serviços", subtitle: "Serviços e mão de obra que podem compor um orçamento.", collection: "registry_services", codeLabel: "Código do serviço", categories: ["Instalação", "Medição", "Manutenção", "Fabricação", "Outro"], unitLabel: "Unidade" },
   payment_methods: { title: "Formas de Pagamento", subtitle: "Condições de pagamento oferecidas aos clientes.", collection: "payment_methods", codeLabel: "Código", categories: ["PIX", "Dinheiro", "Cartão", "Transferência", "Boleto", "Outro"], unitLabel: "Condição" },
   measurement: { title: "Ficha de Medição", subtitle: "Registre medições feitas no local antes de liberar o orçamento para fabricação.", collection: "measurement_sheets", codeLabel: "Nº da ficha", categories: ["Janela", "Porta", "Box de banheiro", "Outro"], unitLabel: "mm" },
