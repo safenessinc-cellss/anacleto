@@ -36,7 +36,7 @@ export default function PostSaleModule() {
 
   useEffect(() => onSnapshot(query(collection(db, "post_sale_records"), orderBy("createdAt", "desc")), snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Entry))), err => console.error("Erro ao carregar pós-venda:", err)), []);
   useEffect(() => onSnapshot(collection(db, "quotes"), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Erro ao carregar orçamentos para qualidade:", err)), []);
-  const qualityQuotes = quotes.filter(quote => quote.productionStatus === "awaiting_quality" || quote.productionStatus === "quality_hold");
+  const qualityQuotes = quotes.filter(quote => ["awaiting_quality", "quality_hold", "delivered"].includes(String(quote.productionStatus || "")));
   const selectedQualityQuote = quotes.find(quote => quote.id === qualityQuoteId);
   const visible = useMemo(() => entries.filter(e => (filter === "all" || e.kind === filter) && [e.customer, e.orderNumber, e.product, e.title].join(" ").toLowerCase().includes(search.toLowerCase())), [entries, filter, search]);
   const ratings = entries.filter(e => e.kind === "satisfaction" && e.rating);
