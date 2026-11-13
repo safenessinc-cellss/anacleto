@@ -94,7 +94,10 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateInvoice
         const current = snap.data() as any;
         if (action === "start") {
           if (current.status !== "planned") throw new Error("Somente ordens planejadas podem iniciar.");
+          const quoteRef = doc(db, "quotes", order.quoteId);
+          const quoteSnap = await tx.get(quoteRef);
           tx.update(orderRef, { status: "in_progress", workflowStage: "production", nextStep: "concluir_producao", startedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+          if (quoteSnap.exists()) tx.update(quoteRef, { productionStatus: "in_progress", updatedAt: serverTimestamp() });
           return;
         }
         if (!["planned", "in_progress"].includes(current.status)) throw new Error("Esta ordem já foi encerrada.");
@@ -102,6 +105,8 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateInvoice
         const refs = reserved.map(m => doc(db, "inventory_items", m.itemId));
         const snapshots = [];
         for (const ref of refs) snapshots.push(await tx.get(ref));
+        const quoteRef = doc(db, "quotes", order.quoteId);
+        const quoteSnap = await tx.get(quoteRef);
         for (let i = 0; i < refs.length; i++) {
           const material = reserved[i]; const stockSnap = snapshots[i];
           if (!stockSnap.exists()) throw new Error(`Material ${material.name} não encontrado.`);
@@ -120,6 +125,10 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateInvoice
         tx.update(orderRef, action === "complete"
           ? { status: "completed", workflowStage: "delivery", nextStep: "registrar_entrega", completedAt: serverTimestamp(), updatedAt: serverTimestamp() }
           : { status: "cancelled", workflowStage: "cancelled", nextStep: "encerrado", cancelledAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        if (quoteSnap.exists()) tx.update(quoteRef, {
+          productionStatus: action === "complete" ? "ready_for_delivery" : "cancelled",
+          updatedAt: serverTimestamp(),
+        });
       });
       setMessage(action === "complete" ? "Produção concluída. Materiais consumidos e estoque atualizado." : action === "cancel" ? "Ordem cancelada. As reservas foram devolvidas ao estoque." : "Produção iniciada.");
     } catch (err) { setMessage((err as Error).message || "Não foi possível atualizar a ordem."); }
