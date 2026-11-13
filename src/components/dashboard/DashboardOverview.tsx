@@ -119,23 +119,33 @@ export default function DashboardOverview({ quotes, invoices, drawings, senderCo
     return matchesType && (!query || `${item.title} ${item.details} ${item.number} ${item.pdfFileName}`.toLocaleLowerCase().includes(query));
   });
 
-  const getPdf = (item: VaultItem) => {
+  const getPdf = async (item: VaultItem) => {
     if (item.type === "quote") return buildQuotePdf(item.raw as Quote, senderConfig);
     if (item.type === "invoice") return buildInvoicePdf(item.raw as Invoice, senderConfig);
     return buildTechnicalDrawingPdf(item.raw as TechnicalDrawing, senderConfig);
   };
-  const downloadPdf = (item: VaultItem) => {
-    const pdf = getPdf(item);
-    const link = document.createElement("a");
-    link.href = pdf.dataUri;
-    link.download = pdf.fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  const downloadPdf = async (item: VaultItem) => {
+    try {
+      const pdf = await getPdf(item);
+      const link = document.createElement("a");
+      link.href = pdf.dataUri;
+      link.download = pdf.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Document PDF download failed:", error);
+      setDataError((error as Error).message || "Não foi possível baixar o PDF.");
+    }
   };
-  const openPdf = (item: VaultItem) => {
-    const pdf = getPdf(item);
-    setActivePdfModal({ isOpen: true, title: item.title, subtitle: `${item.number} · ${item.details}`, dataUri: pdf.dataUri, fileName: pdf.fileName, sizeKb: "sizeKb" in pdf ? pdf.sizeKb : undefined, type: item.type });
+  const openPdf = async (item: VaultItem) => {
+    try {
+      const pdf = await getPdf(item);
+      setActivePdfModal({ isOpen: true, title: item.title, subtitle: `${item.number} · ${item.details}`, dataUri: pdf.dataUri, fileName: pdf.fileName, sizeKb: "sizeKb" in pdf ? pdf.sizeKb : undefined, type: item.type });
+    } catch (error) {
+      console.error("Document PDF preview failed:", error);
+      setDataError((error as Error).message || "Não foi possível preparar o PDF.");
+    }
   };
 
   const stats = [

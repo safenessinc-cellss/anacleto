@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Quote, Invoice, TechnicalDrawing, SenderConfig } from "../types";
+import officialAnacletoLogo from "../assets/images/anacleto-logo-premium.svg";
 
 // Format helper
 const formatMoney = (amount: number, currency: string = "BRL") => {
@@ -17,6 +18,31 @@ export interface PdfDocumentResult {
   fileName: string;
   sizeKb: number;
 }
+
+const getOfficialLogoDataUrl = async (): Promise<string> => {
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Não foi possível carregar o logotipo oficial da Anacleto."));
+    image.src = officialAnacletoLogo;
+    if (image.complete) {
+      if (image.naturalWidth > 0) resolve();
+      else reject(new Error("Não foi possível carregar o logotipo oficial da Anacleto."));
+    }
+  });
+
+  const scale = 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth * scale;
+  canvas.height = image.naturalHeight * scale;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Não foi possível preparar o logotipo oficial para o PDF.");
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
+};
 
 
 // Miniatura vetorial isométrica: ilustração comercial do tipo de esquadria descrito.
@@ -86,8 +112,8 @@ const drawQuoteItemMiniature3D = (doc: jsPDF, description: string, x: number, y:
 
 
 /** Insere a marca oficial configurada no CRM; sem upload, usa assinatura vetorial da marca. */
-const drawDocumentLogo = (doc: jsPDF, sender: SenderConfig | undefined, x: number, y: number, w: number, h: number) => {
-  const logo = sender?.logoUrl;
+const drawDocumentLogo = (doc: jsPDF, sender: SenderConfig | undefined, x: number, y: number, w: number, h: number, officialLogo?: string) => {
+  const logo = officialLogo || sender?.logoUrl;
   if (logo?.startsWith("data:image/")) {
     try {
       const mime = logo.slice(5, logo.indexOf(";")).toLowerCase();
@@ -152,50 +178,24 @@ const applyDocumentWatermark = (doc: jsPDF, sender?: SenderConfig) => {
   doc.setPage(pageCount);
 };
 
-const applyQuoteWatermark = (doc: jsPDF, quote: Quote, sender?: SenderConfig) => {
+const applyQuoteWatermark = (doc: jsPDF, quote: Quote) => {
   const pageCount = doc.getNumberOfPages();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const logo = sender?.logoUrl?.startsWith("data:image/")
-    ? sender.logoUrl
-    : sender?.watermarkLogoUrl?.startsWith("data:image/") ? sender.watermarkLogoUrl : null;
   const watermarkText = quote.status === "approved" ? "APROVADO" : "ORÇAMENTO";
 
   for (let page = 1; page <= pageCount; page += 1) {
     doc.setPage(page);
     try {
-      (doc as any).setGState(new (doc as any).GState({ opacity: 0.08 }));
+      (doc as any).setGState(new (doc as any).GState({ opacity: 0.1 }));
     } catch (error) {
       console.warn("Não foi possível aplicar transparência à marca d'água do orçamento:", error);
     }
 
-    let logoDrawn = false;
-    if (logo) {
-      try {
-        const mime = logo.slice(5, logo.indexOf(";")).toLowerCase();
-        const format = mime.includes("jpeg") ? "JPEG" : mime.includes("webp") ? "WEBP" : "PNG";
-        doc.addImage(logo, format, pageWidth / 2 - 42, pageHeight / 2 - 21, 84, 42, undefined, "FAST", 45);
-        logoDrawn = true;
-      } catch (error) {
-        console.warn("Não foi possível inserir o logotipo na marca d'água do orçamento:", error);
-      }
-    }
-    if (!logoDrawn) {
-      doc.setDrawColor(190, 195, 202);
-      doc.setLineWidth(1);
-      doc.rect(pageWidth / 2 - 12, pageHeight / 2 - 31, 24, 24, "S");
-      doc.line(pageWidth / 2, pageHeight / 2 - 29, pageWidth / 2, pageHeight / 2 - 9);
-      doc.line(pageWidth / 2 - 10, pageHeight / 2 - 19, pageWidth / 2 + 10, pageHeight / 2 - 19);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.setTextColor(190, 195, 202);
-      doc.text("ANACLETO ESQUADRIAS", pageWidth / 2, pageHeight / 2 + 1, { align: "center", angle: 45 });
-    }
-
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(190, 195, 202);
-    doc.text(watermarkText, pageWidth / 2, pageHeight / 2 + 24, { align: "center", angle: 45 });
+    doc.setFontSize(30);
+    doc.setTextColor(226, 232, 240);
+    doc.text(watermarkText, pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
 
     try {
       (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
@@ -206,7 +206,8 @@ const applyQuoteWatermark = (doc: jsPDF, quote: Quote, sender?: SenderConfig) =>
   doc.setPage(pageCount);
 };
 
-export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
+export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promise<PdfDocumentResult> => {
+  const officialLogo = await getOfficialLogoDataUrl();
   const doc = new jsPDF();
   if (quote.approvedAt) {
     doc.setCreationDate(new Date(quote.approvedAt));
@@ -224,7 +225,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   doc.rect(0, 42, pageWidth, 3, "F");
 
   // Logotipo do CRM presente em todos os documentos comerciais.
-  drawDocumentLogo(doc, sender, 14, 7, 25, 25);
+  drawDocumentLogo(doc, sender, 14, 7, 25, 25, officialLogo);
 
   // Brand Title
   doc.setFont("helvetica", "bold");
@@ -344,7 +345,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   totalRows.forEach(([label, amount], index) => {
     const rowY = finalY + 4 + index * 7;
     doc.text(label, totalsX, rowY);
-    if (label.startsWith("Desconto")) doc.setTextColor(220, 38, 38);
+    if (label.startsWith("Desconto")) doc.setTextColor(71, 85, 105);
     doc.text(amount, pageWidth - 14, rowY, { align: "right" });
     doc.setTextColor(71, 85, 105);
   });
@@ -377,7 +378,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   const technicalDrawing = quote.technicalDrawing;
   if (technicalDrawing || windowItem) {
     doc.addPage();
-    drawDocumentLogo(doc, sender, 14, 7, 25, 25);
+    drawDocumentLogo(doc, sender, 14, 7, 25, 25, officialLogo);
     const desc = technicalDrawing?.title || windowItem?.description || "Esquadria";
     const dimensions = desc.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
     const unitFactor = technicalDrawing?.unit === "mm" ? 1 : 10;
@@ -443,7 +444,7 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
     { align: "center" }
   );
 
-  applyQuoteWatermark(doc, quote, sender);
+  applyQuoteWatermark(doc, quote);
   const fileName = `Orcamento_${quote.number || "PRE"}.pdf`;
   const dataUri = doc.output("datauristring");
   const sizeKb = Math.max(1, Math.round((dataUri.length * 0.75) / 1024));
@@ -451,8 +452,8 @@ export const buildQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentR
   return { doc, dataUri, fileName, sizeKb };
 };
 
-export const exportQuotePdf = (quote: Quote, sender?: SenderConfig): PdfDocumentResult => {
-  const result = buildQuotePdf(quote, sender);
+export const exportQuotePdf = async (quote: Quote, sender?: SenderConfig): Promise<PdfDocumentResult> => {
+  const result = await buildQuotePdf(quote, sender);
   result.doc.save(result.fileName);
   return result;
 };

@@ -20,6 +20,7 @@ import {
   Scissors,
   Check,
   Eye,
+  Plus,
   Trash2
 } from "lucide-react";
 import { TechnicalDrawing, SenderConfig, Quote } from "../../types";
@@ -345,6 +346,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [drawing, setDrawing] = useState<TechnicalDrawing>(initialSampleDrawing);
+  const [activeView, setActiveView] = useState<"list" | "studio">("list");
   const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
   const [projects, setProjects] = useState<Array<{id:string;name:string}>>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -738,6 +740,24 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     } catch (err) { console.error("Drawing delete failed:", err); showToast("Não foi possível excluir o desenho.", "error"); }
   };
 
+  const handleStartNewDrawing = (project?: { id: string; name: string }) => {
+    const now = new Date().toISOString();
+    setDrawing({
+      ...initialSampleDrawing,
+      id: `draw_${crypto.randomUUID()}`,
+      title: project?.name || "Novo projeto técnico",
+      description: "",
+      projectId: project?.id,
+      projectName: project?.name,
+      createdAt: now,
+      updatedAt: now,
+    });
+    setPrompt(defaultCadPrompt);
+    setSelectedProjectId(project?.id || "");
+    setCurrentStep(1);
+    setActiveView("studio");
+  };
+
   const handleOpenSavedDrawing = (item: TechnicalDrawing) => {
     // Registros novos contêm o desenho completo e podem voltar ao editor.
     if (Array.isArray(item.pieces) && item.pieces.length > 0) {
@@ -745,12 +765,14 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       setSelectedProjectId(item.projectId || "");
       setCurrentStep(Math.min(Math.max(Number(item.currentStep) || 1, 1), 5));
       setIsPdfModalOpen(false);
+      setActiveView("studio");
       showToast("Projeto técnico carregado para edição.", "success");
       return;
     }
     // Compatibilidade com os registros antigos que armazenavam somente o PDF.
     if ((item as any).pdfUrl || item.pdfDataUri) {
       setDrawing(item);
+      setActiveView("studio");
       handleOpenDrawingPdf(item);
       showToast("Este projeto antigo contém somente o PDF. O arquivo foi aberto para consulta.", "warning");
       return;
@@ -932,6 +954,101 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   return (
     <div className="space-y-6">
+      <nav aria-label="Projetos e Oficina CAD" className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
+        <button
+          type="button"
+          onClick={() => setActiveView("list")}
+          aria-current={activeView === "list" ? "page" : undefined}
+          className={`shrink-0 border-b-2 px-3 py-3 text-sm font-medium ${activeView === "list" ? "border-blue-600 text-blue-700 dark:text-blue-300" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}
+        >
+          Lista de Projetos & Desenhos Salvos
+        </button>
+        <button
+          type="button"
+          onClick={() => activeView === "studio" ? setActiveView("studio") : handleStartNewDrawing()}
+          aria-current={activeView === "studio" ? "page" : undefined}
+          className={`shrink-0 border-b-2 px-3 py-3 text-sm font-medium ${activeView === "studio" ? "border-blue-600 text-blue-700 dark:text-blue-300" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}
+        >
+          Estúdio CAD & Orçamento
+        </button>
+      </nav>
+
+      {activeView === "list" ? (
+        <section className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Projetos & Desenhos Salvos</h2>
+              <p className="mt-1 text-sm text-slate-500">Abra um desenho editável ou inicie um novo projeto CAD.</p>
+            </div>
+            <button type="button" onClick={() => handleStartNewDrawing()} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
+              <Plus className="h-4 w-4" /> Novo Projeto / Desenho
+            </button>
+          </div>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Projetos</h3>
+            {projects.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500 dark:border-slate-700">Nenhum projeto cadastrado. Crie um projeto ou abra o estúdio para iniciar um desenho.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {projects.map((project) => {
+                  const projectDrawing = savedDrawings.find((item) => item.projectId === project.id);
+                  return (
+                    <article key={project.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                      <div className="min-w-0">
+                        <h4 className="truncate text-sm font-semibold text-slate-900 dark:text-white">{project.name}</h4>
+                        <p className="mt-1 text-xs text-slate-500">{savedDrawings.filter((item) => item.projectId === project.id).length} desenhos salvos</p>
+                      </div>
+                      <button type="button" onClick={() => projectDrawing ? handleOpenSavedDrawing(projectDrawing) : handleStartNewDrawing(project)} className="shrink-0 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950">
+                        {projectDrawing ? "Abrir projeto" : "Novo desenho"}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Desenhos salvos ({savedDrawings.length})</h3>
+              {savedDrawings[0] && <span className="text-xs text-slate-500">Atualizado {new Date(savedDrawings[0].updatedAt || savedDrawings[0].createdAt).toLocaleString("pt-BR")}</span>}
+            </div>
+            {savedDrawings.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
+                <FolderOpen className="mx-auto mb-2 h-8 w-8 text-slate-400" />
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Nenhum desenho salvo ainda</p>
+                <p className="mt-1 text-xs text-slate-500">Os projetos salvos no estúdio aparecerão nesta lista.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {savedDrawings.map((item) => {
+                  const editable = Array.isArray(item.pieces) && item.pieces.length > 0;
+                  const savedAt = item.updatedAt || item.createdAt;
+                  return (
+                    <article key={item.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
+                      <div className="min-w-0">
+                        <h4 className="truncate text-sm font-bold text-slate-900 dark:text-white">{item.title || "Projeto técnico sem título"}</h4>
+                        <p className="mt-1 truncate text-xs text-slate-500">{item.projectName || "Sem projeto associado"} · {savedAt ? new Date(savedAt).toLocaleString("pt-BR") : "Data não informada"}</p>
+                        <p className="mt-1 text-xs text-slate-500">{item.overallDimensions?.width || "—"} × {item.overallDimensions?.height || "—"}{item.overallDimensions?.depth ? ` × ${item.overallDimensions.depth}` : ""} {item.unit || "cm"} · {editable ? "Desenho editável" : "PDF legado"}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button type="button" onClick={() => handleOpenSavedDrawing(item)} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700">
+                          <FolderOpen className="h-3.5 w-3.5" /> {editable ? "Abrir / editar" : "Abrir PDF"}
+                        </button>
+                        <button type="button" onClick={() => handleDeleteDrawing(item)} title="Excluir desenho" aria-label={`Excluir desenho ${item.title}`} className="inline-flex items-center justify-center rounded-lg border border-rose-200 p-2 text-rose-600 hover:bg-rose-50 dark:border-rose-900 dark:hover:bg-slate-800">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </section>
+      ) : (
+      <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-5">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
@@ -1262,56 +1379,6 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
           </div>
           <ManufacturingRoute drawing={drawing} title={drawing.title || "Projeto técnico"} />
 
-          {/* Projetos técnicos salvos: lista completa, mais recente primeiro */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-3xl shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <div>
-                <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4 text-blue-600" />
-                  Projetos Técnicos Guardados ({savedDrawings.length})
-                </h4>
-                <p className="text-[11px] text-slate-500 mt-1">O projeto salvo mais recentemente aparece primeiro.</p>
-              </div>
-              {savedDrawings[0] && (
-                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
-                  Último salvo: {new Date(savedDrawings[0].updatedAt || savedDrawings[0].createdAt).toLocaleString("pt-BR")}
-                </span>
-              )}
-            </div>
-
-            {savedDrawings.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-6 text-center">
-                <FolderOpen className="w-8 h-8 mx-auto mb-2 text-slate-400" />
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Nenhum desenho salvo ainda</p>
-                <p className="text-xs text-slate-500 mt-1">Os desenhos gerados são salvos automaticamente neste histórico.</p>
-              </div>
-            ) : (
-              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
-                {savedDrawings.map((item) => {
-                  const editable = Array.isArray(item.pieces) && item.pieces.length > 0;
-                  const savedAt = item.updatedAt || item.createdAt;
-                  return (
-                    <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl border ${drawing.id === item.id ? "border-blue-300 bg-blue-50/70 dark:border-blue-700 dark:bg-blue-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"}`}>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title || "Projeto técnico sem título"}</p>
-                        <p className="text-[11px] text-slate-500 truncate">{item.projectName || "Sem projeto associado"} · {savedAt ? new Date(savedAt).toLocaleString("pt-BR") : "Data não informada"}</p>
-                        <p className="text-[10px] text-slate-500 mt-1">{item.overallDimensions?.width || "—"} × {item.overallDimensions?.height || "—"}{item.overallDimensions?.depth ? ` × ${item.overallDimensions.depth}` : ""} {item.unit || "cm"} · {editable ? "Desenho editável" : "PDF legado para consulta"}</p>
-                        <p className="text-[10px] text-slate-500 mt-1">{item.pdfFileName || "Arquivo PDF"}{item.pdfFileSizeKb ? ` · PDF (${item.pdfFileSizeKb} KB)` : " · Tamanho do PDF indisponível"}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button type="button" onClick={() => handleOpenSavedDrawing(item)} className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-2 text-xs font-bold text-white transition">
-                          <FolderOpen className="w-3.5 h-3.5" /> {editable ? "Abrir / editar" : "Abrir PDF"}
-                        </button>
-                        <button type="button" onClick={() => handleDeleteDrawing(item)} title="Excluir desenho" aria-label={`Excluir desenho ${item.title}`} className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-white hover:bg-rose-50 dark:border-rose-900 dark:bg-slate-900 p-2 text-rose-600 transition">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -1327,6 +1394,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         storedAt={drawing.pdfGeneratedAt || drawing.updatedAt}
         type="drawing"
       />
+      </div>
+      )}
     </div>
   );
 }

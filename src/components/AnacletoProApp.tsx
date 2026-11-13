@@ -9,7 +9,6 @@ import DashboardOverview from "./dashboard/DashboardOverview";
 import CrmModule from "./crm/CrmModule";
 import QuotesModule from "./quotes/QuotesModule";
 import InvoicesModule from "./invoices/InvoicesModule";
-import TechnicalDrawingModule from "./technical-drawing/TechnicalDrawingModule";
 import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
 import FinanceModule from "./finance/FinanceModule";
@@ -176,7 +175,6 @@ export default function AnacletoProApp({
     ] },
     { id: "projects", label: "Projetos & Oficina CAD", icon: Compass, tabs: [
       { id: "projects", label: "Projetos" },
-      { id: "technical_drawing", label: "Oficina CAD" },
     ] },
     { id: "production", label: "Produção & Obras", icon: Factory, tabs: [
       { id: "production", label: "Ordens de Produção & Corte" },
@@ -216,7 +214,9 @@ export default function AnacletoProApp({
   };
   const activeSectionId = sectionForTab(activeTab);
   const activeSection = navigationSections.find((section) => section.id === activeSectionId);
-  const activeSectionTabs = activeSection?.tabs.filter((tab) => canSeeNavigation(tab.id)) || settingsTabs;
+  const activeSectionTabs = activeSection?.tabs.filter((tab) =>
+    canSeeNavigation(tab.id) || (activeSection.id === "projects" && canSeeNavigation("technical_drawing"))
+  ) || settingsTabs;
   const selectNavigationTab = (tab: NavigationTab) => {
     setActiveTab(tab);
     setMobileMenuOpen(false);
@@ -264,10 +264,14 @@ export default function AnacletoProApp({
           </div>
 
           <nav aria-label="Navegação principal" className="space-y-1">
-            {navigationSections.filter((section) => section.tabs.some((tab) => canSeeNavigation(tab.id))).map((section) => {
+            {navigationSections.filter((section) => section.tabs.some((tab) =>
+              canSeeNavigation(tab.id) || (section.id === "projects" && canSeeNavigation("technical_drawing"))
+            )).map((section) => {
               const Icon = section.icon;
               const selected = activeSectionId === section.id;
-              const firstTab = section.tabs.find((tab) => canSeeNavigation(tab.id));
+              const firstTab = section.tabs.find((tab) =>
+                canSeeNavigation(tab.id) || (section.id === "projects" && canSeeNavigation("technical_drawing"))
+              );
               if (!firstTab) return null;
               return <button key={section.id} type="button" onClick={() => selectNavigationTab(firstTab.id)} title={section.label} aria-label={section.label} aria-current={selected ? "page" : undefined}
                 className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl text-sm font-medium transition ${selected ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900"}`}>
@@ -383,10 +387,6 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "agenda" && (<AgendaModule language={language} />)}
-
-        {activeTab === "technical_drawing" && (
-            <TechnicalDrawingModule language={language} senderConfig={senderConfig} />
-          )}
 
           {activeTab === "catalog" && (<CatalogModule />)}
           {activeTab === "cadastro_items" && <div className="space-y-8"><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}

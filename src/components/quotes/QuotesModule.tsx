@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   FileText,
   Plus,
@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, deleteField, doc, getDoc, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -45,6 +45,7 @@ interface QuotesModuleProps {
 }
 
 export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt"}: QuotesModuleProps) {
+  const { showToast } = useToast();
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
@@ -57,7 +58,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   useEffect(() => {
     return onSnapshot(collection(db, "technical_drawings"), (snap) => {
       setSavedDrawings(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TechnicalDrawing)));
-    }, (err) => console.warn("Technical drawings listener (quotes):", err));
+    }, (err) => {
+      console.error("Technical drawings listener (quotes):", err);
+      showToast("Não foi possível carregar os desenhos técnicos.", "error");
+    });
   }, []);
 
   // Cargar catálogo
@@ -66,27 +70,39 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       onSnapshot(collection(db, "catalog"), (snap) => {
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, name: data.name || data.description || "Item sem nome", sku: data.sku || data.code || "", price: Number(data.price || 0), source: "catalog" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "catalog"), ...list]);
-      }, (err) => console.warn("Catalog listener (quotes):", err)),
+      }, (err) => {
+        console.error("Catalog listener (quotes):", err);
+        showToast("Não foi possível carregar o catálogo de produtos.", "error");
+      }),
       onSnapshot(collection(db, "supplier_catalog"), (snap) => {
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), supplier: data.supplier || "", category: data.category || "", unit: data.unit || "un", source: "supplier_catalog" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...list]);
-      }, (err) => console.warn("Supplier catalog listener (quotes):", err)),
+      }, (err) => {
+        console.error("Supplier catalog listener (quotes):", err);
+        showToast("Não foi possível carregar o catálogo de fornecedores.", "error");
+      }),
       onSnapshot(collection(db, "registry_items"), (snap) => {
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, itemId: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", width: data.width || 0, height: data.height || 0, depth: data.depth || 0, itemPhotoUrls: data.itemPhotoUrls || [], source: "registry_items" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "registry_items"), ...list]);
-      }, (err) => console.warn("Items registry listener (quotes):", err)),
+      }, (err) => {
+        console.error("Items registry listener (quotes):", err);
+        showToast("Não foi possível carregar os itens cadastrados.", "error");
+      }),
       onSnapshot(collection(db, "price_table"), (snap) => {
         const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", supplier: data.priceSupplier || data.supplier || "", source: "price_table" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "price_table"), ...list]);
-      }, (err) => console.warn("Price table listener (quotes):", err)),
+      }, (err) => {
+        console.error("Price table listener (quotes):", err);
+        showToast("Não foi possível carregar a tabela de preços.", "error");
+      }),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, []);
 
 
-  const { showToast } = useToast();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const selectedQuoteIdRef = useRef<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -94,6 +110,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [generatingPublicLink, setGeneratingPublicLink] = useState(false);
   const [aluminumPricePerKg, setAluminumPricePerKg] = useState(readAluminumPricePerKg);
+
+  useEffect(() => {
+    selectedQuoteIdRef.current = selectedQuote?.id || null;
+  }, [selectedQuote?.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedCatalogSearch(catalogSearch.trim().toLowerCase()), 250);
@@ -115,12 +135,14 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           loaded.push({ id: docSnap.id, ...docSnap.data() } as Quote);
         });
         setQuotes(loaded);
-        if (loaded.length > 0 && !selectedQuote) {
-          setSelectedQuote(loaded[0]);
-        }
+        const selectedId = selectedQuoteIdRef.current;
+        const refreshedSelection = selectedId ? loaded.find((quote) => quote.id === selectedId) : undefined;
+        if (refreshedSelection) setSelectedQuote(refreshedSelection);
+        else if (!selectedId && loaded.length > 0) setSelectedQuote(loaded[0]);
       },
       (err) => {
-        console.warn("Firestore quotes load warning:", err);
+        console.error("Firestore quotes load failed:", err);
+        showToast("Não foi possível carregar os orçamentos.", "error");
       }
     );
     return () => unsub();
@@ -159,6 +181,22 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     };
     setSelectedQuote(newQ);
     setIsEditing(true);
+  };
+
+  const handleRejectQuote = async () => {
+    if (!selectedQuote || !["draft", "pending", "pendente"].includes(String(selectedQuote.status).toLowerCase())) return;
+    const updatedAt = new Date().toISOString();
+    try {
+      await updateDoc(doc(db, "quotes", selectedQuote.id), { status: "rejected", updatedAt });
+      const rejected = { ...selectedQuote, status: "rejected" as const, updatedAt };
+      setSelectedQuote(rejected);
+      setQuotes((current) => current.map((quote) => quote.id === rejected.id ? rejected : quote));
+      setIsEditing(false);
+      showToast(`Orçamento ${rejected.number} rejeitado.`, "success");
+    } catch (error) {
+      console.error("Quote rejection failed:", error);
+      showToast((error as Error).message || "Não foi possível rejeitar o orçamento.", "error");
+    }
   };
 
   // Recalculate totals
@@ -340,7 +378,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       priceSource: unitPrice > 0 ? (Number(match?.price || 0) > 0 ? "catalog" : "estimated") : "pending",
       notes: unitPrice > 0
         ? estimated && Number(match?.price || 0) <= 0
-          ? `Estimativa a partir do peso kg/m e R$ ${aluminumPricePerKg.toFixed(2)}/kg; validar a composição antes de aprovar.`
+          ? `Estimativa a partir do peso kg/m e R$ ${Number(aluminumPricePerKg).toFixed(2)}/kg; validar a composição antes de aprovar.`
           : "Item associado ao catálogo de fornecedores pelo assistente local."
         : "Referência local sem preço confirmado; informar o preço antes de aprovar.",
       ...(size ? { itemDimensions: size } : {}),
@@ -401,7 +439,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         pdfQuote = recalculateQuote(selectedQuote);
         pdfSender = await preparePdfSender();
       }
-      const pdf = buildQuotePdf(pdfQuote, pdfSender);
+      const pdf = await buildQuotePdf(pdfQuote, pdfSender);
       pdf.doc.save(pdf.fileName);
       const message = `Olá, ${pdfQuote.clientName}. Segue o orçamento ${pdfQuote.number} no valor de ${formatCurrency(pdfQuote.total, pdfQuote.currency)}. O PDF foi baixado; anexe o arquivo nesta conversa.`;
       if (channel === "whatsapp") {
@@ -441,11 +479,11 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     try {
       if (quote.approvedSnapshotId) {
         const snapshot = await loadApprovedQuoteSnapshot(quote.approvedSnapshotId);
-        const pdf = buildQuotePdf(snapshot.document as Quote, snapshot.senderSnapshot as SenderConfig | undefined);
+        const pdf = await buildQuotePdf(snapshot.document as Quote, snapshot.senderSnapshot as SenderConfig | undefined);
         pdf.doc.save(pdf.fileName);
       } else {
         const sender = await preparePdfSender();
-        exportQuotePdf(quote, sender);
+        await exportQuotePdf(quote, sender);
       }
     } catch (error) {
       console.error("Quote PDF download failed:", error);
@@ -498,7 +536,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       } else {
         sender = await preparePdfSender();
       }
-      const pdfRes = buildQuotePdf(target, sender);
+      const pdfRes = await buildQuotePdf(target, sender);
       target = {
         ...target,
         pdfDataUri: pdfRes.dataUri,
@@ -528,7 +566,13 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       return false;
     }
     try {
-      await setDoc(doc(db, "quotes", target.id), compactQuoteForFirestore(target));
+      await setDoc(doc(db, "quotes", target.id), {
+        ...compactQuoteForFirestore(target),
+        pdfDataUri: deleteField(),
+        pdfFileName: deleteField(),
+        pdfGeneratedAt: deleteField(),
+        pdfFileSizeKb: deleteField(),
+      }, { merge: true });
       setSelectedQuote(target);
       setIsEditing(false);
       showToast(`Orçamento ${target.number} salvo. O PDF será gerado ao visualizar ou exportar.`, "success");
@@ -686,7 +730,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       const res = await fetch("/api/ai/quote-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        signal: AbortSignal.timeout(4_000),
+        signal: AbortSignal.timeout(3_000),
         body: JSON.stringify({
           message: userText,
           currentQuote: {
@@ -801,7 +845,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         const addedItems = localQuote.items.slice(selectedQuote.items.length);
         const hasUnpricedItems = addedItems.some((item) => item.priceSource === "pending");
         const failureReason = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")
-          ? "A API de IA excedeu o limite de 4 segundos."
+          ? "A API de IA excedeu o limite de 3 segundos."
           : "A API de IA falhou ou está indisponível.";
         const localReply = addedItems.length === 0
           ? `${failureReason} Apliquei e salvei o ajuste localmente.`
@@ -972,7 +1016,10 @@ const handleAddItem = () => {
               filteredQuotes.map((q) => (
                 <div
                   key={q.id}
-                  onClick={() => setSelectedQuote(q)}
+                  onClick={() => {
+                    setSelectedQuote(q);
+                    setIsEditing(false);
+                  }}
                   className={`p-4 rounded-2xl border cursor-pointer transition ${
                     selectedQuote?.id === q.id
                       ? "bg-slate-800/90 border-amber-500/60 shadow-lg"
@@ -988,7 +1035,7 @@ const handleAddItem = () => {
                       className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
                         q.status === "approved"
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                          : q.status === "rejeitado"
+                          : ["rejeitado", "rejected"].includes(String(q.status).toLowerCase())
                           ? "bg-rose-500/20 text-rose-400"
                           : "bg-amber-500/20 text-amber-400"
                       }`}
@@ -1041,6 +1088,33 @@ const handleAddItem = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {!selectedQuote.approvedSnapshotId && selectedQuote.status !== "invoiced" && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(true)}
+                        className="rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
+                      >
+                        Editar Orçamento
+                      </button>
+                    )}
+                    {["draft", "pending", "pendente"].includes(String(selectedQuote.status).toLowerCase()) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleApproveQuote}
+                          className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                        >
+                          Marcar como Aprovado
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleRejectQuote}
+                          className="rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          Cancelar / Rejeitar
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => void handleGeneratePublicLink()}
                       disabled={generatingPublicLink}
@@ -1075,15 +1149,19 @@ const handleAddItem = () => {
                         Aprovado
                       </span>
                     )}
-                    <button
-                      onClick={() => handleSaveQuote()}
-                      className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
-                    >
-                      Salvar orçamento
-                    </button>
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveQuote()}
+                        className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+                      >
+                        Salvar orçamento
+                      </button>
+                    )}
                   </div>
                 </div>
 
+                <fieldset disabled={!isEditing || Boolean(selectedQuote.approvedSnapshotId)} className="contents">
                 <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-2.5">
                   <form onSubmit={handleSendAiMessage} className="flex items-center gap-2">
                     <Sparkles className="ml-1 h-4 w-4 shrink-0 text-amber-400" />
@@ -1157,7 +1235,6 @@ const handleAddItem = () => {
                     <p className="text-[11px] text-slate-500 mt-2">Nenhum desenho salvo encontrado. Crie e salve o produto no módulo Desenho Técnico.</p>
                   )}
                 </div>
-
                 {/* Table of Items */}
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center justify-between">
@@ -1340,7 +1417,7 @@ const handleAddItem = () => {
                         </label>
                       ))}
                     </div>
-                    <div className="flex justify-between w-64 pt-2 border-t border-slate-800 text-sm font-black text-amber-400">
+                    <div className="flex justify-between border-t border-slate-800 pt-2 text-sm font-black text-amber-400">
                       <span>TOTAL:</span>
                       <span className="font-mono text-base">{selectedQuote.total?.toFixed(2)} R$</span>
                     </div>
@@ -1354,9 +1431,10 @@ const handleAddItem = () => {
                     </div>
                   </details>
                 </div>
+                </fieldset>
               </div>
 
-              {itemPhotoViewer && <ImageLightbox images={itemPhotoViewer} onClose={() => setItemPhotoViewer(null)} />}
+                {itemPhotoViewer && <ImageLightbox images={itemPhotoViewer} onClose={() => setItemPhotoViewer(null)} />}
             </div>
           ) : (
             <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-3xl">
