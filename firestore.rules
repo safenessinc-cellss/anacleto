@@ -122,7 +122,7 @@ service cloud.firestore {
     match /employee_payments/{id} { allow read, write: if canManagePayroll(); }
     match /time_entries/{id} { allow read, write: if canManagePayroll(); }
     match /production_orders/{id} {
-      allow read: if canOperate() || canManageProduction() || canManageFinance();
+      allow read: if canOperate() || canManageProduction() || canManageFinance() || canManageQuality();
       allow create: if canManageProduction() || canManageFinance() || canManageCommercial();
       allow update: if canManageProduction() || canManageFinance() || (
         canManageCommercial() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
