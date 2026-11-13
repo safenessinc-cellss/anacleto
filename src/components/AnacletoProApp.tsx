@@ -24,10 +24,11 @@ import BusinessWorkspace from "./workspace/BusinessWorkspace";
 import PostSaleModule from "./post-sale/PostSaleModule";
 import DeliveryModule from "./deliveries/DeliveryModule";
 import ProductionModule from "./production/ProductionModule";
+import WorkflowDashboard from "./production/WorkflowDashboard";
 import InventoryModule from "./inventory/InventoryModule";
 import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "workflow" | "inventory";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -177,6 +178,7 @@ export default function AnacletoProApp({
       { id: "projects", label: "Projetos" },
     ] },
     { id: "production", label: "Produção & Obras", icon: Factory, tabs: [
+      { id: "workflow", label: "Fluxo de Trabalho" },
       { id: "production", label: "Ordens de Produção & Corte" },
       { id: "deliveries", label: "Entregas e Instalações" },
       { id: "agenda", label: "Agenda de Medição" },
@@ -395,6 +397,7 @@ export default function AnacletoProApp({
           {activeTab === "contracts" && <RegistryModule kind="contracts" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
+        {activeTab === "workflow" && <WorkflowDashboard />}
         {activeTab === "production" && <ProductionModule onNavigateDelivery={() => setActiveTab("deliveries")} onNavigateQuality={() => setActiveTab("post_sale")} onNavigateInvoice={() => setActiveTab("invoices")} />}
         {activeTab === "inventory" && <InventoryModule />}
         {activeTab === "deliveries" && <DeliveryModule />}
