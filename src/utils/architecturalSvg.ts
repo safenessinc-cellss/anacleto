@@ -262,7 +262,7 @@ export function buildArchitecturalDrawingSheetSvg(drawing: DrawingInput): string
 
 /** Retorna o conteúdo interno de um SVG gerado localmente para renderização vetorial inline. */
 export function svgInnerMarkup(svg: string): string {
-  const match = svg.match(/^\\s*<svg\\b[^>]*>([\\s\\S]*)<\\/svg>\\s*$/i);
+  const match = svg.match(/^\s*<svg\b[^>]*>([\s\S]*)<\/svg>\s*$/i);
   return match?.[1] ?? svg;
 }
 
