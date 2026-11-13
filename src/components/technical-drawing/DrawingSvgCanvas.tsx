@@ -6,7 +6,7 @@ import {
   buildArchitecturalElevationSvg,
   buildArchitecturalIsometricSvg,
   resolveAluminumSpec,
-  svgDataUri,
+  svgInnerMarkup,
 } from "../../utils/architecturalSvg";
 
 interface DrawingSvgCanvasProps {
@@ -53,7 +53,7 @@ export default function DrawingSvgCanvas({
   const architecturalElevation = useMemo(() => {
     if (!isArchitecturalDrawing) return "";
     try {
-      return svgDataUri(buildArchitecturalElevationSvg(drawing));
+      return buildArchitecturalElevationSvg(drawing);
     } catch (error) {
       console.error("Falha ao gerar alçado arquitetônico SVG:", error);
       return "";
@@ -63,7 +63,7 @@ export default function DrawingSvgCanvas({
   const architecturalIsometric = useMemo(() => {
     if (!isArchitecturalDrawing) return "";
     try {
-      return svgDataUri(buildArchitecturalIsometricSvg(drawing));
+      return buildArchitecturalIsometricSvg(drawing);
     } catch (error) {
       console.error("Falha ao gerar perspectiva isométrica SVG:", error);
       return "";
@@ -133,24 +133,32 @@ export default function DrawingSvgCanvas({
 
           {/* Alçado arquitetônico completo: caixilho, folhas, vidro, ferragens e cotas. */}
           <rect x="40" y="82" width="500" height="440" rx="5" fill="#f8fafb" stroke="#64748b" strokeWidth="1.2" />
-          <image
-            href={architecturalElevation}
+          <svg
             x="40"
             y="82"
             width="500"
             height="440"
+            viewBox="0 0 1200 850"
             preserveAspectRatio="xMidYMid meet"
+            overflow="hidden"
+            role="img"
+            aria-label="Alçado arquitetônico frontal"
+            dangerouslySetInnerHTML={{ __html: svgInnerMarkup(architecturalElevation) }}
           />
 
           {/* Perspectiva isométrica real em SVG: profundidade do perfil e trilhos sobrepostos. */}
           <rect x="560" y="82" width="500" height="440" rx="5" fill="#f7f9f9" stroke="#64748b" strokeWidth="1.2" />
-          <image
-            href={architecturalIsometric}
+          <svg
             x="560"
             y="82"
             width="500"
             height="440"
+            viewBox="0 0 1200 780"
             preserveAspectRatio="xMidYMid meet"
+            overflow="hidden"
+            role="img"
+            aria-label="Perspectiva isométrica vetorial"
+            dangerouslySetInnerHTML={{ __html: svgInnerMarkup(architecturalIsometric) }}
           />
 
           {/* Carimbo técnico comum às duas vistas. */}
@@ -308,7 +316,16 @@ export default function DrawingSvgCanvas({
         </>
       )}
       {architecturalElevation ? (
-        <image href={architecturalElevation} x={x} y={y} width={w} height={h} preserveAspectRatio="xMidYMid meet" />
+        <svg
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          viewBox="0 0 1200 850"
+          preserveAspectRatio="xMidYMid meet"
+          overflow="hidden"
+          dangerouslySetInnerHTML={{ __html: svgInnerMarkup(architecturalElevation) }}
+        />
       ) : visualElements.length > 0 ? <g>
         {visualElements.map((element: any, index: number) => {
           const type = String(element.type || "rect").toLowerCase();
