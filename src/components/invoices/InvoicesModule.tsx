@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Invoice, InvoiceStatus, SenderConfig } from "../../types";
 import { exportInvoicePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, doc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, deleteDoc, getDocs, onSnapshot, query, orderBy, runTransaction, serverTimestamp, where } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -82,6 +82,9 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
       const invoiceRef = doc(db, "invoices", invoice.id);
       const receivableRef = doc(db, "receivables", invoice.id);
       const ledgerRef = doc(db, "ledger_entries", `invoice-paid-${invoice.id}`);
+      const linkedOrders = invoice.quoteId
+        ? await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", invoice.quoteId)))
+        : null;
       await runTransaction(db, async tx => {
         const invoiceSnap = await tx.get(invoiceRef);
         const receivableSnap = await tx.get(receivableRef);
@@ -104,6 +107,10 @@ export default function InvoicesModule({ senderConfig, language = "pt", canManag
           description: `Recebimento da fatura ${invoice.number}`, amount: receiptDelta,
           date: new Date().toISOString().slice(0, 10), status: "posted", createdAt: serverTimestamp(),
           createdBy: auth.currentUser?.email || ""
+        }));
+        linkedOrders?.docs.forEach((orderDoc) => tx.update(orderDoc.ref, {
+          status: "paid", workflowStage: "closed", nextStep: "concluido",
+          paymentStatus: "paid", paidAt: serverTimestamp(), updatedAt: serverTimestamp(),
         }));
       });
       setSelectedInvoice(updated);
