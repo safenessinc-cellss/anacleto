@@ -40,6 +40,7 @@ import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg 
 import { compactApprovalSenderSnapshot, compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 import ManufacturingRoute from "../production/ManufacturingRoute";
+import OptionalAluminumCostCalculator from "./OptionalAluminumCostCalculator";
 
 interface QuotesModuleProps {
   senderConfig: SenderConfig;
@@ -1398,6 +1399,26 @@ const handleAddItem = () => {
                     <p className="text-[11px] text-slate-500 mt-2">Nenhum desenho salvo encontrado. Crie e salve o produto no módulo Desenho Técnico.</p>
                   )}
                 </div>
+                <OptionalAluminumCostCalculator
+                  catalogItems={catalogItems}
+                  disabled={!isEditing || Boolean(selectedQuote.approvedSnapshotId)}
+                  onApply={(price, notes) => {
+                    const calculatedItem: QuoteItem = {
+                      id: "calc_" + crypto.randomUUID(),
+                      description: "Custo técnico de esquadrias · materiais, vidro, componentes e mão de obra",
+                      quantity: 1,
+                      unitPrice: price,
+                      subtotal: price,
+                      priceSource: "manual",
+                      notes,
+                    };
+                    setSelectedQuote(recalculateQuote({
+                      ...selectedQuote,
+                      items: [...selectedQuote.items, calculatedItem],
+                    }));
+                    showToast("Cálculo técnico adicionado como item do orçamento. Revise antes de salvar.", "success");
+                  }}
+                />
                 {/* Table of Items */}
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center justify-between">
