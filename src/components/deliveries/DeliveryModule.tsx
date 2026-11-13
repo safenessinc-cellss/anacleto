@@ -138,6 +138,13 @@ export default function DeliveryModule() {
     const currentUser = auth.currentUser;
     if (!currentUser) { setErrorText("Sua sessão expirou. Entre novamente."); return; }
     setSaving(true); setErrorText("");
+    const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", selectedQuote.id)));
+    const orderNotReady = linkedOrders.docs.find((orderDoc) => !["completed", "delivered"].includes(String(orderDoc.data().status || "")));
+    if (orderNotReady) {
+      setSaving(false);
+      setErrorText("A ordem de produção precisa estar concluída antes de registrar a entrega.");
+      return;
+    }
     const deliveryRef = doc(collection(db, "deliveries"));
     const stamp = new Date().toISOString();
     try {
@@ -186,7 +193,6 @@ export default function DeliveryModule() {
         ...deliveryEvidence, deliveryEvidence, productionStatus: "delivered", updatedAt: serverTimestamp(),
       });
       if (selectedInvoice) batch.update(doc(db, "invoices", selectedInvoice.id), { ...deliveryEvidence, deliveryEvidence });
-      const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", selectedQuote.id)));
       linkedOrders.docs.forEach((orderDoc) => batch.update(orderDoc.ref, {
         status: "delivered", workflowStage: "billing", nextStep: "emitir_fatura",
         deliveryId: deliveryRef.id, deliveryStatus: "delivered", deliveredAt: stamp, updatedAt: serverTimestamp(),
