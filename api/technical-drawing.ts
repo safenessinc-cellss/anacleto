@@ -447,7 +447,7 @@ export default async function handler(req: any, res: any) {
         return value;
       });
       if (spec.largura_mm <= 0 || spec.altura_mm <= 0) {
-        const fallback = localTechnicalFallback(prompt, catalog);
+        const fallback: any = localTechnicalFallback(prompt, catalog);
         return json(res, 200, withDraftVectorWatermark(fallback));
       }
       const responseDrawing = withDraftVectorWatermark(buildParametricDrawing(spec, prompt, catalog));
