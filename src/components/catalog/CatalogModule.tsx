@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, setDoc } from "firebase/firestore";
 import { db, auth, storage } from "../../firebase";
-import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { Package, Plus, Trash2, Edit, Search, FileUp } from "lucide-react";
 import Papa from "papaparse";
@@ -48,7 +48,8 @@ export default function CatalogModule() {
     try {
       const recordRef = editing?.id ? doc(db, "catalog", editing.id) : doc(collection(db, "catalog"));
       const attachments = [...(editing?.attachments || [])];
-      await setDoc(recordRef, { ...form, attachments, updatedAt: new Date().toISOString(), ...(!editing?.id ? { createdAt: new Date().toISOString() } : {}) }, { merge: true });
+      const productData = { sku: form.sku, name: form.name, category: form.category, unit: form.unit, price: Number(form.price || 0), supplier: form.supplier };
+      await setDoc(recordRef, { ...productData, attachments, updatedAt: new Date().toISOString(), ...(!editing?.id ? { createdAt: new Date().toISOString() } : {}) }, { merge: true });
       for (const file of uploads) {
         const extension = file.name.split(".").pop()?.toLowerCase() || "";
         if (!["pdf", "xls", "xlsx", "csv"].includes(extension)) throw new Error("Use somente arquivos PDF, Excel XLS/XLSX ou CSV.");
@@ -70,7 +71,15 @@ export default function CatalogModule() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Excluir este produto?")) await deleteDoc(doc(db, "catalog", id));
+    const item = items.find(row => row.id === id);
+    if (!confirm("Excluir este produto e seus arquivos anexados?")) return;
+    try {
+      await Promise.all((item?.attachments || []).map(file => deleteObject(storageRef(storage, file.storagePath)).catch(() => undefined)));
+      await deleteDoc(doc(db, "catalog", id));
+    } catch (error) {
+      console.error("Catalog delete failed:", error);
+      alert("Não foi possível excluir o produto.");
+    }
   };
 
   const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
