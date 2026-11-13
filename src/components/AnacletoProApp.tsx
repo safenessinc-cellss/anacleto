@@ -282,7 +282,7 @@ export default function AnacletoProApp({
 
         {/* Sidebar Footer */}
         <div className={`p-3 border-t border-slate-200 dark:border-slate-800 space-y-2 ${sidebarCollapsed ? "flex flex-col items-center" : ""}`}>
-          {settingsTabs.length > 0 && <button type="button" onClick={() => selectNavigationTab(settingsTabs[0].id)} title="Configurações, equipe e perfil" aria-label="Configurações, equipe e perfil"
+          {settingsTabs.length > 0 && <button type="button" onClick={() => selectNavigationTab(settingsTabs[0].id)} title="Configurações, equipe e perfil" aria-label="Configurações, equipe e perfil" aria-current={activeSectionId === "settings" ? "page" : undefined}
             className={`flex items-center justify-center rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 ${sidebarCollapsed ? "w-11" : "w-11"} ${activeSectionId === "settings" ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : ""}`}>
             <Settings className="h-5 w-5 shrink-0" />
           </button>}
