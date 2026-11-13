@@ -282,6 +282,10 @@ export interface TechnicalDrawing {
   projectName?: string;
   ownerUid?: string;
   schemaVersion?: number;
+  drawingOrigin?: "ai" | "local";
+  aiPrompt?: string;
+  parametricLibrary?: boolean;
+  sourceDrawingId?: string;
 }
 
 export interface TechnicalDrawingReference {
