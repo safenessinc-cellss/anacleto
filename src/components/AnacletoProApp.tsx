@@ -395,7 +395,7 @@ export default function AnacletoProApp({
           {activeTab === "contracts" && <RegistryModule kind="contracts" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
-        {activeTab === "production" && <ProductionModule onNavigateDelivery={() => setActiveTab("deliveries")} onNavigateInvoice={() => setActiveTab("invoices")} />}
+        {activeTab === "production" && <ProductionModule onNavigateDelivery={() => setActiveTab("deliveries")} onNavigateQuality={() => setActiveTab("post_sale")} onNavigateInvoice={() => setActiveTab("invoices")} />}
         {activeTab === "inventory" && <InventoryModule />}
         {activeTab === "deliveries" && <DeliveryModule />}
         {activeTab === "post_sale" && <PostSaleModule />}
