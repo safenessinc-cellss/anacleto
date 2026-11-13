@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, getDocs, where, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Award, ClipboardCheck, MessageSquareHeart, Plus, Search, Trash2, Wrench, X } from "lucide-react";
@@ -11,6 +11,8 @@ const escapeHtml = (value: unknown) => String(value ?? "—").replace(/[&<>"']/g
 
 export default function PostSaleModule() {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]);
+  const [qualityQuoteId, setQualityQuoteId] = useState("");
   const [filter, setFilter] = useState<"all" | Kind>("all");
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -33,18 +35,35 @@ export default function PostSaleModule() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => onSnapshot(query(collection(db, "post_sale_records"), orderBy("createdAt", "desc")), snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Entry))), err => console.error("Erro ao carregar pós-venda:", err)), []);
+  useEffect(() => onSnapshot(collection(db, "quotes"), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Erro ao carregar orçamentos para qualidade:", err)), []);
+  const qualityQuotes = quotes.filter(quote => quote.productionStatus === "awaiting_quality" || quote.productionStatus === "quality_hold");
+  const selectedQualityQuote = quotes.find(quote => quote.id === qualityQuoteId);
   const visible = useMemo(() => entries.filter(e => (filter === "all" || e.kind === filter) && [e.customer, e.orderNumber, e.product, e.title].join(" ").toLowerCase().includes(search.toLowerCase())), [entries, filter, search]);
   const ratings = entries.filter(e => e.kind === "satisfaction" && e.rating);
   const average = ratings.length ? (ratings.reduce((sum, e) => sum + (e.rating || 0), 0) / ratings.length).toFixed(1) : "—";
-  const reset = () => { setOpen(false); setCustomer(""); setOrderNumber(""); setProduct(""); setTitle(""); setStatus("Em andamento"); setRating(5); setSerialNumber(""); setInspection("Aprovado"); setInstallationRating(5); setRecommendation(10); setServiceType("Ajuste / regulagem"); setPriority("Normal"); setTechnician(""); setResolution(""); setNotes(""); };
+  const reset = () => { setOpen(false); setQualityQuoteId(""); setCustomer(""); setOrderNumber(""); setProduct(""); setTitle(""); setStatus("Em andamento"); setRating(5); setSerialNumber(""); setInspection("Aprovado"); setInstallationRating(5); setRecommendation(10); setServiceType("Ajuste / regulagem"); setPriority("Normal"); setTechnician(""); setResolution(""); setNotes(""); };
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!customer.trim() || !title.trim()) return;
+    if (kind === "quality_certificate" && !qualityQuoteId) { window.alert("Selecione o orçamento entregue que será inspecionado."); return; }
     setSaving(true);
     try {
-      await addDoc(collection(db, "post_sale_records"), { kind, customer: customer.trim(), orderNumber: orderNumber.trim(), product: product.trim(), title: title.trim(), status, rating: kind === "satisfaction" ? rating : null, serialNumber: kind === "quality_certificate" ? serialNumber.trim() : "", installationRating: kind === "satisfaction" ? installationRating : null, recommendation: kind === "satisfaction" ? recommendation : null, serviceType: kind === "service" ? serviceType : "", priority: kind === "service" ? priority : "", technician: kind === "service" ? technician.trim() : "", resolution: kind === "service" ? resolution.trim() : "", inspection: kind === "quality_certificate" ? inspection : "", notes: notes.trim(), createdAt: new Date().toISOString() });
+      const stamp = new Date().toISOString();
+      const recordRef = doc(collection(db, "post_sale_records"));
+      const record = { kind, customer: customer.trim(), orderNumber: orderNumber.trim(), product: product.trim(), title: title.trim(), status, rating: kind === "satisfaction" ? rating : null, serialNumber: kind === "quality_certificate" ? serialNumber.trim() : "", installationRating: kind === "satisfaction" ? installationRating : null, recommendation: kind === "satisfaction" ? recommendation : null, serviceType: kind === "service" ? serviceType : "", priority: kind === "service" ? priority : "", technician: kind === "service" ? technician.trim() : "", resolution: kind === "service" ? resolution.trim() : "", inspection: kind === "quality_certificate" ? inspection : "", notes: notes.trim(), ...(kind === "quality_certificate" && selectedQualityQuote ? { quoteId: selectedQualityQuote.id, quoteNumber: selectedQualityQuote.number } : {}), createdAt: stamp };
+      const batch = writeBatch(db);
+      batch.set(recordRef, record);
+      if (kind === "quality_certificate" && selectedQualityQuote) {
+        const orders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", selectedQualityQuote.id)));
+        if (!orders.docs.length) throw new Error("Não foi encontrada ordem de produção vinculada ao orçamento.");
+        const approved = inspection === "Aprovado";
+        batch.update(doc(db, "quotes", selectedQualityQuote.id), { productionStatus: approved ? "quality_approved" : "quality_hold", qualityStatus: approved ? "approved" : "pending", qualityRecordId: recordRef.id, qualityInspectedAt: stamp, updatedAt: serverTimestamp() });
+        orders.docs.forEach(order => batch.update(order.ref, { status: approved ? "quality_approved" : "delivered", workflowStage: "quality", nextStep: approved ? "emitir_fatura" : "corrigir_qualidade", qualityStatus: approved ? "approved" : "pending", qualityRecordId: recordRef.id, qualityInspectedAt: stamp, updatedAt: serverTimestamp() }));
+      }
+      await batch.commit();
       reset();
-    } catch (error) { console.error(error); window.alert("Não foi possível salvar. Verifique as permissões do Firestore."); }
+      if (kind === "quality_certificate") window.alert(inspection === "Aprovado" ? "Inspeção aprovada. O orçamento foi liberado para faturamento." : "Inspeção registrada. O faturamento permanece bloqueado até a aprovação da qualidade.");
+    } catch (error) { console.error(error); window.alert(error instanceof Error ? error.message : "Não foi possível salvar. Verifique as permissões do Firestore."); }
     finally { setSaving(false); }
   };
   const remove = async (id: string) => {
@@ -94,6 +113,7 @@ export default function PostSaleModule() {
     </section>
     {open&&<div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4"><form onSubmit={save} className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"><div className="flex items-center justify-between"><div><h2 className="text-lg font-black dark:text-white">Novo registro de pós-venda</h2><p className="text-xs text-slate-500">Registre a experiência do cliente.</p></div><button type="button" onClick={reset} className="p-2 text-slate-400"><X/></button></div>
       <label className="block text-xs font-bold">Tipo de registro<select value={kind} onChange={e=>setKind(e.target.value as Kind)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="quality_certificate">Certificado de qualidade</option><option value="satisfaction">Pesquisa de satisfação</option><option value="service">Atendimento / assistência técnica</option></select></label>
+      {kind === "quality_certificate" && <label className="block text-xs font-bold">Orçamento entregue para inspeção *<select required value={qualityQuoteId} onChange={event => { const id = event.target.value; setQualityQuoteId(id); const quote = quotes.find(item => item.id === id); if (quote) { setCustomer(quote.clientName || ""); setOrderNumber(quote.number || ""); setProduct((quote.items || []).map((item: any) => item.description).join(", ")); setTitle("Inspeção de qualidade · " + (quote.number || "Orçamento")); } }} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="">Selecione uma entrega aguardando qualidade</option>{qualityQuotes.map(quote => <option key={quote.id} value={quote.id}>{quote.number} · {quote.clientName}</option>)}</select></label>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{[{label:"Cliente *",value:customer,set:setCustomer,required:true},{label:"Orçamento / pedido",value:orderNumber,set:setOrderNumber},{label:"Produto / serviço",value:product,set:setProduct},{label:"Título do registro *",value:title,set:setTitle,required:true}].map(field=><label key={field.label} className="text-xs font-bold">{field.label}<input required={!!field.required} value={field.value} onChange={e=>field.set(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label>)}
       {kind==="quality_certificate"&&<><label className="text-xs font-bold">Número de série / identificação<input value={serialNumber} onChange={e=>setSerialNumber(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></label><label className="text-xs font-bold">Resultado da inspeção<select value={inspection} onChange={e=>setInspection(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950"><option>Aprovado</option><option>Aprovado com ressalvas</option><option>Reprovado</option></select></label></>}
       {kind==="satisfaction"&&<div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
