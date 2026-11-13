@@ -69,7 +69,7 @@ export default function DrawingSvgCanvas({
     if (currentStep === 2) return Math.max(620, 125 + Math.ceil(pieces.length / 2) * 145);
     if (currentStep === 3) return Math.max(620, 125 + pieces.length * 118);
     if (currentStep === 4) return Math.max(620, 150 + Math.ceil(pieces.length / 2) * 185);
-    return 620;
+    return 650;
   }, [currentStep, pieces.length]);
 
   const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
