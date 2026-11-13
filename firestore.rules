@@ -70,7 +70,7 @@ service cloud.firestore {
       allow update: if (
         (canManageCommercial() || canManageFinance()) && (
           !('approvedSnapshotId' in resource.data) ||
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt','clientAdvanceTotal','balanceDue','productionStatus','deliveryId','deliveryStatus','deliveredAt','deliveryEvidence'])
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt','clientAdvanceTotal','balanceDue','productionStatus','productionOrderId','deliveryId','deliveryStatus','deliveredAt','deliveryEvidence'])
         )
       ) || (
         (canManageCommercial() || canManageFinance())
