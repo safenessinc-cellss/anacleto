@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import type { TechnicalDrawing } from "../../types";
-import { buildArchitecturalIsometricSvg, resolveAluminumSpec, svgDataUri } from "../../utils/architecturalSvg";
+import { buildArchitecturalIsometricSvg, resolveAluminumSpec } from "../../utils/architecturalSvg";
 
 type Props = { drawing: TechnicalDrawing };
 
@@ -9,7 +9,7 @@ export default function DrawingThreePreview({ drawing }: Props) {
   const spec = useMemo(() => resolveAluminumSpec(drawing), [drawing]);
   const preview = useMemo(() => {
     try {
-      return svgDataUri(buildArchitecturalIsometricSvg(drawing));
+      return buildArchitecturalIsometricSvg(drawing);
     } catch (error) {
       console.error("Falha ao gerar a perspectiva isométrica:", error);
       return "";
@@ -40,13 +40,11 @@ export default function DrawingThreePreview({ drawing }: Props) {
         </div>
         <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300">SEM WEBGL</span>
       </div>
-      <img
-        src={preview}
-        alt={"Perspectiva isométrica técnica de " + (drawing.title || "esquadria de alumínio")}
-        loading="eager"
-        decoding="sync"
-        draggable={false}
-        className="block h-auto max-h-[540px] w-full object-contain"
+      <div
+        role="img"
+        aria-label={"Perspectiva isométrica técnica de " + (drawing.title || "esquadria de alumínio")}
+        className="w-full overflow-hidden [&>svg]:block [&>svg]:h-auto [&>svg]:max-h-[540px] [&>svg]:w-full [&>svg]:object-contain"
+        dangerouslySetInnerHTML={{ __html: preview }}
       />
     </section>
   );
