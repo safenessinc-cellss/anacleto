@@ -1113,10 +1113,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   };
 
   const presets = [
-    "una mesa de madera de 120x80x75 cm con 4 patas",
-    "un armario de 2 puertas de 180x60x200 cm",
-    "una pieza en L de 90x90 cm con un corte a 45°",
-    "ventana de aluminio de 150x120 cm con 2 hojas corredizas",
+    "Mesa de madeira de 120 × 80 × 75 cm com quatro pés",
+    "Armário de duas portas de 180 × 60 × 200 cm",
+    "Peça em L de 90 × 90 cm com corte em 45 graus",
+    "Janela de alumínio de 150 × 120 cm com duas folhas de correr",
   ];
 
   return (
@@ -1402,6 +1402,13 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                   <option value="duplo">Duplo</option>
                 </select>
               </label>
+              <label className="text-[10px] font-semibold text-slate-500">Espessura do vidro (mm)<input type="number" min="3" max="30" value={parametricSpec.espessura_mm} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ espessura_mm: Number(event.target.value) })} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
+              <label className="text-[10px] font-semibold text-slate-500">Tipo de abertura
+                <input value={parametricSpec.abertura} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ abertura: event.target.value })} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" />
+              </label>
+              <label className="text-[10px] font-semibold text-slate-500">Módulo fixo
+                <select value={parametricSpec.modulo_fixo ? "sim" : "nao"} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ modulo_fixo: event.target.value === "sim" })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50"><option value="nao">Não</option><option value="sim">Sim</option></select>
+              </label>
             </div>
             <div className="mt-4 grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-[1fr_auto]">
               <label className="text-[10px] font-semibold text-slate-500">Biblioteca de modelos paramétricos locais
@@ -1601,7 +1608,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                   <div className="min-h-[420px] rounded-2xl border border-slate-700 bg-slate-950 p-2"><p className="mb-2 text-[10px] font-bold uppercase text-slate-400">Boceto isométrico</p><DrawingThreePreview drawing={aiDrawing} /></div>
                 </div>
                 <p className="mt-3 text-xs text-slate-400">A pré-visualização da IA fica separada do desenho paramétrico local. Revise dimensões e componentes antes de reutilizar.</p>
-              </> : <div className="flex flex-1 flex-col items-center justify-center text-center text-slate-400"><Sparkles className="mb-3 h-10 w-10 text-violet-400"/><h3 className="font-bold text-white">O boceto aparecerá aqui</h3><p className="mt-2 max-w-sm text-xs">Descreva a esquadria na aba à esquerda e gere o desenho. O Projeto CAD local não será alterado.</p></div>}
+              </> : <div className="flex flex-1 flex-col items-center justify-center text-center text-slate-400"><Sparkles className="mb-3 h-10 w-10 text-violet-400"/><h3 className="font-bold text-white">O esboço aparecerá aqui</h3><p className="mt-2 max-w-sm text-xs">Descreva a esquadria na aba à esquerda e gere o desenho. O Projeto CAD local não será alterado.</p></div>}
             </div>
           ) : (
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-2xl flex flex-col h-[680px]">
