@@ -54,7 +54,7 @@ export default function CatalogModule() {
         if (!["pdf", "xls", "xlsx", "csv"].includes(extension)) throw new Error("Use somente arquivos PDF, Excel XLS/XLSX ou CSV.");
         if (file.size > 25 * 1024 * 1024) throw new Error(file.name + " excede 25 MB.");
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `catalog/${recordRef.id}/${Date.now()}-${safeName}`;
+        const path = `catalogs/${recordRef.id}/${Date.now()}-${safeName}`;
         const fileRef = storageRef(storage, path);
         await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
         attachments.push({ id: crypto.randomUUID(), fileName: file.name, fileType: extension, size: file.size, storagePath: path, downloadUrl: await getDownloadURL(fileRef), uploadedAt: new Date().toISOString() });
