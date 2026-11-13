@@ -7,6 +7,7 @@ export interface EmployeeDirectoryRecord {
 export interface EmployeeDirectoryEntry {
   id: string;
   aliases: string[];
+  records: EmployeeDirectoryRecord[];
   uid?: string;
   name: string;
   email?: string;
@@ -42,6 +43,7 @@ const sourcePriority: Record<EmployeeDirectoryRecord["source"], number> = {
 
 function toEntry(record: EmployeeDirectoryRecord): EmployeeDirectoryEntry | null {
   const { data } = record;
+  if (data.deleted === true) return null;
   const name = firstString(data, ["name", "displayName", "fullName", "requestedName", "nome"]);
   const email = firstString(data, ["email", "workEmail", "userEmail"]).toLowerCase();
   const uid = firstString(data, ["uid", "userId", "authUid"]) || (record.source === "user_profiles" ? record.id : "");
@@ -49,6 +51,7 @@ function toEntry(record: EmployeeDirectoryRecord): EmployeeDirectoryEntry | null
   return {
     id: record.source === "employees" || record.source === "funcionarios" || record.source === "staff" ? record.id : uid || email || record.id,
     aliases: [...new Set([record.id, uid, email].filter(Boolean))],
+    records: [record],
     uid: uid || undefined,
     name: name || email.split("@")[0] || record.id,
     email: email || undefined,
@@ -98,6 +101,7 @@ export function mergeEmployeeDirectory(records: EmployeeDirectoryRecord[]): Empl
           ...existing.entry,
           ...duplicate.entry,
           aliases: [...new Set([...existing.entry.aliases, ...duplicate.entry.aliases])],
+          records: [...existing.entry.records, ...duplicate.entry.records],
         };
         existing.priority = duplicate.priority;
       }
@@ -109,6 +113,7 @@ export function mergeEmployeeDirectory(records: EmployeeDirectoryRecord[]): Empl
         ...existing.entry,
         ...entry,
         aliases: [...new Set([...existing.entry.aliases, ...entry.aliases])],
+        records: [...existing.entry.records, ...entry.records],
       };
       existing.priority = nextPriority;
     } else {
@@ -116,6 +121,7 @@ export function mergeEmployeeDirectory(records: EmployeeDirectoryRecord[]): Empl
         ...entry,
         ...existing.entry,
         aliases: [...new Set([...existing.entry.aliases, ...entry.aliases])],
+        records: [...existing.entry.records, ...entry.records],
         name: existing.entry.name || entry.name,
         email: existing.entry.email || entry.email,
         uid: existing.entry.uid || entry.uid,

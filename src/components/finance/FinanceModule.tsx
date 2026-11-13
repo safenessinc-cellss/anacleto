@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { BarChart3, BriefcaseBusiness, FileText, HandCoins, Receipt, Users } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, FileText, HandCoins, Receipt } from "lucide-react";
 import type { SenderConfig } from "../../types";
 import ClientAdvancesModule from "./ClientAdvancesModule";
-import EmployeeAdvancesModule from "./EmployeeAdvancesModule";
 import FinanceDashboard from "./FinanceDashboard";
 import FinancialReportsModule from "./FinancialReportsModule";
 import FiscalDocumentsModule from "./FiscalDocumentsModule";
@@ -11,18 +10,17 @@ import PayablesModule from "./PayablesModule";
 import PurchasesModule from "./PurchasesModule";
 import SuppliersModule from "./SuppliersModule";
 import InventoryModule from "../inventory/InventoryModule";
-import EmployeePaymentsModule from "./EmployeePaymentsModule";
 import PayrollModule from "../hr/PayrollModule";
 import InvoicesModule from "../invoices/InvoicesModule";
 import DailyExpensesModule from "./DailyExpensesModule";
 
-type FinanceTab = "overview" | "client_advances" | "employee_advances" | "daily_expenses" | "payables" | "reports";
-type Subsection = "purchases" | "payables" | "suppliers" | "inventory" | "reports" | "fiscal" | "boletos" | "invoices" | "payroll" | "payments";
+type FinanceTab = "overview" | "client_advances" | "payroll" | "daily_expenses" | "payables" | "reports";
+type Subsection = "purchases" | "payables" | "suppliers" | "inventory" | "reports" | "fiscal" | "boletos" | "invoices";
 
 const primaryTabs: Array<{ id: FinanceTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "overview", label: "Visão Geral & Gráficos", icon: BarChart3 },
   { id: "client_advances", label: "Adiantamentos de Clientes (Sinal)", icon: HandCoins },
-  { id: "employee_advances", label: "Adiantamentos de Funcionários (Vales)", icon: Users },
+  { id: "payroll", label: "Folha de Pagamento", icon: FileText },
   { id: "daily_expenses", label: "Gastos Diários", icon: Receipt },
   { id: "payables", label: "Contas a Pagar & Fornecedores", icon: BriefcaseBusiness },
   { id: "reports", label: "Relatórios & Notas Fiscais", icon: FileText },
@@ -39,7 +37,6 @@ export default function FinanceModule({ language = "pt", senderConfig, canManage
     reports: [
       { id: "reports", label: "Relatórios" }, { id: "invoices", label: "Notas emitidas" },
       { id: "fiscal", label: "Notas fiscais" }, { id: "boletos", label: "Boletos pendentes" },
-      { id: "payroll", label: "Folha" }, { id: "payments", label: "Pagamentos" },
     ],
   };
   const activeSubsections = tab === "payables" || tab === "reports" ? subsections[tab] : [];
@@ -52,7 +49,7 @@ export default function FinanceModule({ language = "pt", senderConfig, canManage
       </nav>
       {tab === "overview" && <FinanceDashboard />}
       {tab === "client_advances" && <ClientAdvancesModule />}
-      {tab === "employee_advances" && <EmployeeAdvancesModule />}
+      {tab === "payroll" && <PayrollModule />}
       {tab === "daily_expenses" && <DailyExpensesModule />}
       {(tab === "payables" || tab === "reports") && <>
         <nav aria-label="Subseções financeiras" className="flex flex-wrap gap-2 border-b pb-3">{activeSubsections.map((item) => <button key={item.id} type="button" onClick={() => setSubsection(item.id)} aria-current={subsection === item.id ? "page" : undefined} className={`rounded-lg px-3 py-2 text-xs font-bold ${subsection === item.id ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900" : "border bg-white dark:bg-slate-900"}`}>{item.label}</button>)}</nav>
@@ -64,8 +61,6 @@ export default function FinanceModule({ language = "pt", senderConfig, canManage
         {subsection === "invoices" && tab === "reports" && <InvoicesModule language={language} senderConfig={senderConfig} canManageFinance={canManageFinance} />}
         {subsection === "fiscal" && tab === "reports" && <FiscalDocumentsModule />}
         {subsection === "boletos" && tab === "reports" && <PendingBoletosModule />}
-        {subsection === "payroll" && tab === "reports" && <PayrollModule />}
-        {subsection === "payments" && tab === "reports" && <EmployeePaymentsModule />}
       </>}
     </div>
   );

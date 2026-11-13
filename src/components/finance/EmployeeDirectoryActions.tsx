@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { RefreshCw, UserPlus, X } from "lucide-react";
 import { auth, db } from "../../firebase";
+import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
 
 export default function EmployeeDirectoryActions({ onSync, syncing }: { onSync: () => void; syncing: boolean }) {
   const [open, setOpen] = useState(false);
@@ -9,6 +10,7 @@ export default function EmployeeDirectoryActions({ onSync, syncing }: { onSync: 
   const [role, setRole] = useState("");
   const [salary, setSalary] = useState("");
   const [pixKey, setPixKey] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -22,20 +24,22 @@ export default function EmployeeDirectoryActions({ onSync, syncing }: { onSync: 
     setSaving(true);
     setError("");
     try {
-      await addDoc(collection(db, "employees"), {
+      await addDoc(collection(db, "funcionarios"), sanitizeFirestoreData({
         name: name.trim(),
         role: role.trim(),
         salary: Math.round(baseSalary * 100) / 100,
         pixKey: pixKey.trim(),
+        phone: phone.trim(),
         active: true,
         additions: [],
         createdAt: serverTimestamp(),
         createdBy: auth.currentUser?.uid || "",
-      });
+      }));
       setName("");
       setRole("");
       setSalary("");
       setPixKey("");
+      setPhone("");
       setOpen(false);
     } catch (reason) {
       setError(`Não foi possível cadastrar o funcionário: ${reason instanceof Error ? reason.message : String(reason)}`);
@@ -61,6 +65,7 @@ export default function EmployeeDirectoryActions({ onSync, syncing }: { onSync: 
         <label className="block text-xs font-semibold text-slate-500">Cargo / função<input value={role} onChange={(event) => setRole(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
         <label className="block text-xs font-semibold text-slate-500">Salário base (R$)<input required type="number" min="0.01" step="0.01" value={salary} onChange={(event) => setSalary(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
         <label className="block text-xs font-semibold text-slate-500">Chave PIX<input value={pixKey} onChange={(event) => setPixKey(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
+        <label className="block text-xs font-semibold text-slate-500">Telefone / WhatsApp<input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
         <div className="flex justify-end gap-2"><button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{saving ? "Salvando..." : "Cadastrar funcionário"}</button></div>
       </form>
     </div>}

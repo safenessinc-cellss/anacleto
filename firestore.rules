@@ -28,6 +28,9 @@ service cloud.firestore {
     function canManageFinance() {
       return hasRole(['super_admin','super_usuario','ceo','admin','financeiro']);
     }
+    function canManagePayroll() {
+      return hasRole(['super_admin','super_usuario','ceo','admin','financeiro','rh']);
+    }
     function canManageQuality() {
       return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','colaborador','qualidade']);
     }
@@ -39,12 +42,16 @@ service cloud.firestore {
     }
 
     match /admins/{email} {
-      allow read: if signedIn() && (request.auth.token.email.lower() == email || owner() || canManageFinance());
+      allow read: if signedIn() && (request.auth.token.email.lower() == email || owner() || canManagePayroll());
       allow create, update, delete: if owner();
+      allow update: if canManageFinance()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted','deletedAt','deletedBy']);
     }
     match /pending_users/{uid} {
       allow create, update: if signedIn() && request.auth.uid == uid;
-      allow read: if (signedIn() && request.auth.uid == uid) || owner() || canManageFinance();
+      allow update: if canManageFinance()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted','deletedAt','deletedBy']);
+      allow read: if (signedIn() && request.auth.uid == uid) || owner() || canManagePayroll();
       allow delete: if owner();
     }
 
@@ -66,30 +73,53 @@ service cloud.firestore {
       );
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']) && !('approvedSnapshotId' in resource.data);
     }
-    match /ledger_entries/{id} { allow read, write: if canManageFinance(); }
+    match /ledger_entries/{id} {
+      allow read: if canManageFinance() || (hasRole(['rh']) && resource.data.category in ['employee_advance','payroll']);
+      allow create: if canManageFinance() || (hasRole(['rh']) && request.resource.data.category in ['employee_advance','payroll']);
+      allow update: if canManageFinance() || (hasRole(['rh'])
+        && resource.data.category == 'employee_advance'
+        && request.resource.data.category == 'employee_advance'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['settled','settledAt','payrollPaymentId']));
+      allow delete: if canManageFinance();
+    }
     match /daily_expenses/{id} { allow read, write: if canManageFinance(); }
     match /client_advances/{id} { allow read, write: if canManageFinance(); }
     match /purchase_orders/{id} { allow read, write: if canManageFinance(); }
     match /payables/{id} { allow read, write: if canManageFinance(); }
-    match /payments/{id} { allow read, write: if canManageFinance(); }
+    match /payments/{id} {
+      allow read, update, delete: if canManageFinance();
+      allow create: if canManageFinance() || (hasRole(['rh']) && request.resource.data.category == 'payroll'
+        && request.resource.data.sourceType == 'employee_payment');
+    }
     match /receivables/{id} { allow read, write: if canManageFinance(); }
     match /suppliers/{id} { allow read, write: if canManageFinance(); }
-    match /payroll_adjustments/{id} { allow read, write: if canManageFinance(); }
-    match /employees/{id} { allow read, write: if canManageFinance(); }
-    match /funcionarios/{id} { allow read: if canManageFinance(); }
+    match /payroll_adjustments/{id} { allow read, write: if canManagePayroll(); }
+    match /employees/{id} {
+      allow read, create, update, delete: if canManageFinance();
+    }
+    match /funcionarios/{id} {
+      allow read, create, update, delete: if canManageFinance();
+    }
+    match /employee_advances/{id} { allow read: if canManagePayroll(); allow write: if canManageFinance(); }
+    match /advances/{id} { allow read: if canManagePayroll(); allow write: if canManageFinance(); }
     match /transactions/{id} { allow read: if canManageFinance(); }
-    match /employee_payments/{id} { allow read, write: if canManageFinance(); }
-    match /time_entries/{id} { allow read, write: if canManageFinance(); }
+    match /employee_payments/{id} { allow read, write: if canManagePayroll(); }
+    match /time_entries/{id} { allow read, write: if canManagePayroll(); }
     match /production_orders/{id} {
       allow read: if canOperate() || canManageProduction() || canManageFinance();
       allow create, update: if canManageProduction() || canManageFinance();
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
     match /user_profiles/{uid} {
-      allow read: if signedIn() && (request.auth.uid == uid || owner() || canManageFinance());
+      allow read: if signedIn() && (request.auth.uid == uid || owner() || canManagePayroll());
       allow write: if signedIn() && (request.auth.uid == uid || owner());
+      allow update: if canManageFinance()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted','deletedAt','deletedBy']);
     }
-    match /staff/{id} { allow read: if canManageFinance(); allow write: if canManageFinance(); }
+    match /staff/{id} {
+      allow read: if canManagePayroll();
+      allow create, update, delete: if canManageFinance();
+    }
     match /agenda_slots/{id} { allow read: if true; allow write: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor']); }
     match /chat_sessions/{id} {
       allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
