@@ -33,9 +33,15 @@ export default function DrawingSvgCanvas({
   const unit = drawing.unit || "cm";
   const pieces = (drawing.pieces || []).filter(Boolean);
   const category = drawing.category || "custom";
+  const isArchitecturalDrawing = Boolean(
+    drawing.parametricSpec ||
+    category === "aluminum_window" ||
+    category === "glass_door" ||
+    /janela|porta|esquadria|box|maxim.?ar/i.test(`${drawing.title || ""} ${drawing.tipologia || ""}`),
+  );
   const architecturalElevation = useMemo(
-    () => drawing.parametricSpec ? svgDataUri(buildArchitecturalElevationSvg(drawing)) : "",
-    [drawing],
+    () => isArchitecturalDrawing ? svgDataUri(buildArchitecturalElevationSvg(drawing)) : "",
+    [drawing, isArchitecturalDrawing],
   );
 
   const canvasHeight = useMemo(() => {

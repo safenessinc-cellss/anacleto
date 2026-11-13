@@ -55,10 +55,8 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
     : /porta/.test(text) && /giro|abrir|dobradi[cç]a/.test(text) ? "porta_giro"
     : /porta/.test(text) ? "porta_correr"
     : "janela_correr";
-  const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is)/)?.[1] || 2);
-  const leaves = tipologia === "porta_correr" || tipologia === "janela_correr"
-    ? Math.min(8, Math.max(1, requestedLeaves))
-    : 1;
+  const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is)/)?.[1] || (tipologia === "box_banheiro" ? 2 : 1));
+  const leaves = Math.min(8, Math.max(tipologia === "box_banheiro" ? 2 : 1, requestedLeaves));
   const widthMatch = prompt.match(/largura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
   const heightMatch = prompt.match(/altura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
   const width = toMm(widthMatch?.[1] || match?.[1], widthMatch?.[2] || match?.[2], 0);
@@ -70,7 +68,11 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   return {
     tipologia,
     linha_aluminio: namedLine ? `Linha ${namedLine.replace(/\b\w/g, (letter) => letter.toUpperCase())}` : "Linha a definir",
-    cor_perfil: /preto/.test(text) ? "#1f2937" : /branco/.test(text) ? "#f8fafc" : "#94a3b8",
+    cor_perfil: /bronze/.test(text) ? "#80552f"
+      : /anodiz|natural|prata/.test(text) ? "#9da8ae"
+      : /preto/.test(text) ? "#1f2937"
+      : /branco/.test(text) ? "#f8fafc"
+      : "#94a3b8",
     cor_vidro: text.match(/\b(incolor|bronze|verde|fum[eê]|cinza)\b/i)?.[1]?.toLowerCase() || "a definir",
     largura_mm: width,
     altura_mm: height,

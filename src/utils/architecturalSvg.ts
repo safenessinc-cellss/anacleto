@@ -69,7 +69,6 @@ export function resolveAluminumSpec(drawing: DrawingInput): AluminumSpec {
   const leaves = clamp(Math.floor(numeric(supplied?.folhas, /3\s*folhas/i.test(titleAndType) ? 3 : 2)), 1, 8);
   const rawColor = supplied?.cor_perfil || drawing.cor || "";
   const rawGlass = supplied?.cor_vidro || drawing.vidro || "";
-  const sliding = type === "janela_correr" || type === "porta_correr" || type === "box_banheiro";
   return {
     type,
     line: String(supplied?.linha_aluminio || drawing.linha || "Linha a definir").slice(0, 60),
@@ -79,7 +78,7 @@ export function resolveAluminumSpec(drawing: DrawingInput): AluminumSpec {
     width,
     height,
     depth,
-    leaves: sliding ? leaves : 1,
+    leaves: type === "box_banheiro" ? Math.max(2, leaves) : leaves,
     fixed: Boolean(supplied?.modulo_fixo),
     opening: String(supplied?.abertura || "central"),
   };
@@ -93,7 +92,7 @@ export function buildArchitecturalElevationSvg(drawing: DrawingInput): string {
   const cf = spec.frameColor;
   const glass = spec.glassColor;
   const innerX = x + 24, innerY = y + 24, innerW = w - 48, innerH = h - 48;
-  const leafCount = spec.type === "box_banheiro" ? 2 : spec.leaves;
+  const leafCount = spec.leaves;
   const paneWidth = innerW / leafCount;
   const handles = spec.type === "porta_correr" || spec.type === "janela_correr" || spec.type === "box_banheiro";
   const leaves = Array.from({ length: leafCount }, (_, index) => {
@@ -125,7 +124,7 @@ export function buildArchitecturalElevationSvg(drawing: DrawingInput): string {
   const hardware = spec.type === "maxim_ar" || spec.type === "basculante"
     ? `<path d="M ${x + 92} ${y + h - 62} L ${x + w / 2} ${y + h / 2} L ${x + w - 92} ${y + 62}" fill="none" stroke="#75858b" stroke-width="3" stroke-dasharray="8 7"/><path d="M ${x + 72} ${y + h - 80} l 42 -35 l 22 17" fill="none" stroke="#596b70" stroke-width="7" stroke-linecap="round"/><text x="${x + 96}" y="${y + h - 97}" fill="#40545b" font-size="11">BRAÇO ARTICULADO</text>`
     : spec.type === "porta_giro" || spec.type === "porta_pivotante"
-      ? `<circle cx="${spec.opening === "esquerda" ? x + 37 : x + w - 37}" cy="${y + h / 2}" r="8" fill="#d1ad62" stroke="#58451d" stroke-width="2"/><path d="M ${x + 45} ${y + 50} A ${w * .7} ${h * .72} 0 0 1 ${x + w - 20} ${y + h - 30}" fill="none" stroke="#607178" stroke-width="2" stroke-dasharray="7 7"/>`
+      ? `<circle cx="${spec.opening === "esquerda" ? x + 37 : x + w - 37}" cy="${y + h / 2}" r="8" fill="#d1ad62" stroke="#58451d" stroke-width="2"/><path d="M ${x + 45} ${y + 50} A ${w * .7} ${h * .72} 0 0 1 ${x + w - 20} ${y + h - 30}" fill="none" stroke="#607178" stroke-width="2" stroke-dasharray="7 7"/><path d="M ${x + 38} ${y + h / 2} L ${x + w - 26} ${y + 44} L ${x + w - 26} ${y + h - 44} Z" fill="none" stroke="#607178" stroke-width="1.8" stroke-dasharray="6 6"/>`
       : spec.type === "box_banheiro"
         ? `<g fill="#e1e7e8" stroke="#45565b" stroke-width="3"><circle cx="${x + w * .62}" cy="${y + 36}" r="10"/><circle cx="${x + w * .82}" cy="${y + 36}" r="10"/></g><text x="${x + w * .72}" y="${y + 62}" text-anchor="middle" fill="#33444a" font-size="10">ROLDANAS DUPLAS</text>`
         : "";
@@ -182,7 +181,7 @@ export function buildArchitecturalIsometricSvg(drawing: DrawingInput): string {
   const dx = depthOffset, dy = -depthOffset * .56;
   const frame = spec.frameColor, glass = spec.glassColor;
   const inset = 24, innerW = w - inset * 2, innerH = h - inset * 2;
-  const leafCount = spec.type === "box_banheiro" ? 2 : spec.leaves;
+  const leafCount = spec.leaves;
   const sashWidth = innerW / leafCount;
   const rearSashes = Array.from({ length: leafCount }, (_, index) => {
     const px = x + inset + index * sashWidth + dx * .46;
@@ -194,6 +193,7 @@ export function buildArchitecturalIsometricSvg(drawing: DrawingInput): string {
       <rect x="${px + sashWidth - 10}" y="${py}" width="10" height="${innerH}" fill="url(#iso-metal)" stroke="#35454a" stroke-width="2"/>
       <rect x="${px}" y="${py}" width="${sashWidth}" height="10" fill="url(#iso-metal)" stroke="#35454a" stroke-width="2"/>
       <rect x="${px}" y="${py + innerH - 10}" width="${sashWidth}" height="10" fill="url(#iso-metal)" stroke="#35454a" stroke-width="2"/>
+      ${spec.type === "janela_correr" ? `<rect x="${px}" y="${py + innerH / 2 - 5}" width="${sashWidth}" height="10" fill="url(#iso-metal)" stroke="#35454a" stroke-width="2"/>` : ""}
     </g>`;
   }).join("");
   const frontSashes = Array.from({ length: Math.min(leafCount, 4) }, (_, index) => {
@@ -207,6 +207,7 @@ export function buildArchitecturalIsometricSvg(drawing: DrawingInput): string {
       <rect x="${px + width - 13}" y="${py}" width="13" height="${innerH}" fill="url(#iso-metal)" stroke="#2d3e44" stroke-width="2"/>
       <rect x="${px}" y="${py}" width="${width}" height="13" fill="url(#iso-metal)" stroke="#2d3e44" stroke-width="2"/>
       <rect x="${px}" y="${py + innerH - 13}" width="${width}" height="13" fill="url(#iso-metal)" stroke="#2d3e44" stroke-width="2"/>
+      ${spec.type === "janela_correr" ? `<rect x="${px}" y="${py + innerH / 2 - 6}" width="${width}" height="12" fill="url(#iso-metal)" stroke="#2d3e44" stroke-width="2"/>` : ""}
       ${index === 0 && spec.type.includes("correr") ? `<path d="M ${px + width * .76} ${py + innerH * .52 - 13} q 7 0 7 7 v 22 q 0 7 -7 7 h -3 v -36 z" fill="#33464b" stroke="#e1e7e8" stroke-width="2"/>` : ""}
     </g>`;
   }).join("");
@@ -244,6 +245,15 @@ export function buildArchitecturalIsometricSvg(drawing: DrawingInput): string {
     <text x="720" y="704" fill="#40545a" font-family="Arial,sans-serif" font-size="12">${spec.leaves} folha(s) · trilhos deslocados</text>
     <text x="920" y="668" fill="#273a40" font-family="Arial,sans-serif" font-size="11" font-weight="700">VALIDAÇÃO</text>
     <text x="920" y="704" fill="#40545a" font-family="Arial,sans-serif" font-size="12">Conferir perfis e folgas do fabricante</text>
+  </svg>`;
+}
+
+export function buildArchitecturalDrawingSheetSvg(drawing: DrawingInput): string {
+  const elevation = svgDataUri(buildArchitecturalElevationSvg(drawing));
+  const isometric = svgDataUri(buildArchitecturalIsometricSvg(drawing));
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1630" viewBox="0 0 1200 1630" role="img" aria-label="Ficha técnica arquitetônica em vistas frontal e isométrica">
+    <image href="${elevation}" x="0" y="0" width="1200" height="850"/>
+    <image href="${isometric}" x="0" y="850" width="1200" height="780" preserveAspectRatio="xMidYMid meet"/>
   </svg>`;
 }
 

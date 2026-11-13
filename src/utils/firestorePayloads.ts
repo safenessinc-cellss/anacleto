@@ -97,6 +97,23 @@ export function compactInvoiceForFirestore(invoice: Invoice): Invoice {
   })), "A fatura");
 }
 
+export function compactApprovalSenderSnapshot(sender?: SenderConfig): Partial<SenderConfig> | undefined {
+  if (!sender) return undefined;
+  const compact = {
+    name: sender.name,
+    nif: sender.nif,
+    address: sender.address,
+    postalCode: sender.postalCode,
+    city: sender.city,
+    country: sender.country,
+    currency: sender.currency,
+    bankAccount: sender.bankAccount,
+    profilePhone: sender.profilePhone,
+    profileEmail: sender.profileEmail,
+  };
+  return assertUnder10Kb(sanitizeFirestoreData(compact), "Os metadados do emissor");
+}
+
 export function withoutHeavyInlineData<T>(value: T): T {
   return stripInlineImages(value);
 }

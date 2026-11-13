@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   FileText,
   Plus,
@@ -24,7 +25,8 @@ import {
   MessageCircle,
   Mail,
   Pencil,
-  Trash2
+  Trash2,
+  Save
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
@@ -35,7 +37,7 @@ import PdfViewerModal from "../common/PdfViewerModal";
 import ImageLightbox from "../common/ImageLightbox";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
 import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
-import { compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
+import { compactApprovalSenderSnapshot, compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 import ManufacturingRoute from "../production/ManufacturingRoute";
 
@@ -111,10 +113,42 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [viewerPdfQuote, setViewerPdfQuote] = useState<Quote | null>(null);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [generatingPublicLink, setGeneratingPublicLink] = useState(false);
+  const [isQuoteActionLoading, setIsQuoteActionLoading] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const [actionsMenuPosition, setActionsMenuPosition] = useState({ top: 0, right: 8 });
+  const actionsMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
   const [aluminumPricePerKg, setAluminumPricePerKg] = useState(readAluminumPricePerKg);
 
   useEffect(() => {
+    if (!actionsMenuOpen) return;
+    const handleOutsideMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (actionsMenuButtonRef.current?.contains(target) || actionsMenuRef.current?.contains(target)) return;
+      setActionsMenuOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActionsMenuOpen(false);
+    };
+    const closeOnLayoutChange = () => setActionsMenuOpen(false);
+    document.addEventListener("mousedown", handleOutsideMouseDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closeOnLayoutChange);
+    window.addEventListener("scroll", closeOnLayoutChange, true);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideMouseDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closeOnLayoutChange);
+      window.removeEventListener("scroll", closeOnLayoutChange, true);
+    };
+  }, [actionsMenuOpen]);
+
+  useEffect(() => {
     selectedQuoteIdRef.current = selectedQuote?.id || null;
+  }, [selectedQuote?.id]);
+
+  useEffect(() => {
+    setActionsMenuOpen(false);
   }, [selectedQuote?.id]);
 
   useEffect(() => {
@@ -203,6 +237,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   const handleDeleteQuote = async (quote: Quote) => {
     if (!window.confirm(`Excluir o orçamento ${quote.number} permanentemente?`)) return;
+    closeActionsMenu();
     try {
       const linkedBudgets = await getDocs(query(collection(db, "budgets"), where("quoteId", "==", quote.id)));
       const references = new Map<string, ReturnType<typeof doc>>();
@@ -217,6 +252,8 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     } catch (error) {
       console.error("Quote deletion failed:", error);
       showToast((error as Error).message || "Não foi possível excluir o orçamento.", "error");
+    } finally {
+      closeActionsMenu();
     }
   };
 
@@ -496,6 +533,18 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     return data;
   };
 
+  const closeActionsMenu = () => setActionsMenuOpen(false);
+
+  const toggleActionsMenu = () => {
+    if (actionsMenuOpen) {
+      setActionsMenuOpen(false);
+      return;
+    }
+    const rect = actionsMenuButtonRef.current?.getBoundingClientRect();
+    if (rect) setActionsMenuPosition({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) });
+    setActionsMenuOpen(true);
+  };
+
   const handleDownloadQuotePdf = async (quote: Quote) => {
     try {
       if (quote.approvedSnapshotId) {
@@ -513,21 +562,31 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   };
 
   const handleApproveQuote = async () => {
+    closeActionsMenu();
     if (!selectedQuote) return;
     if (selectedQuote.approvedSnapshotId) {
       showToast("Este orçamento já está aprovado e bloqueado por instantânea.", "warning");
+      return;
+    }
+    if (isEditing) {
+      showToast("Salve as alterações do orçamento antes de aprová-lo.", "warning");
       return;
     }
     if (selectedQuote.items.some((item) => item.priceSource === "pending")) {
       showToast("Confirme os preços pendentes do orçamento antes de aprová-lo.", "warning");
       return;
     }
+    setIsQuoteActionLoading(true);
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("Faça login novamente para aprovar o orçamento.");
       const approvalCandidate = recalculateQuote(selectedQuote);
-      await setDoc(doc(db, "quotes", approvalCandidate.id), compactQuoteForFirestore(approvalCandidate));
-      const senderSnapshot = await preparePdfSender();
+      const quoteRef = doc(db, "quotes", approvalCandidate.id);
+      const persistedQuote = await getDoc(quoteRef);
+      if (!persistedQuote.exists()) {
+        await setDoc(quoteRef, compactQuoteForFirestore(approvalCandidate));
+      }
+      const senderSnapshot = compactApprovalSenderSnapshot(senderConfig);
       const response = await fetch("/api/approved-snapshot", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
@@ -542,6 +601,9 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     } catch (error) {
       console.error("Quote approval failed:", error);
       showToast((error as Error).message || "Falha ao aprovar o orçamento.", "error");
+    } finally {
+      setIsQuoteActionLoading(false);
+      closeActionsMenu();
     }
   };
 
@@ -576,6 +638,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   // Save only the light quote data; generate its PDF when requested.
   const handleSaveQuote = async (quoteToSave?: Quote, allowUnpricedDraft = false): Promise<boolean> => {
+    closeActionsMenu();
     const requested = quoteToSave || selectedQuote;
     if (!requested) return false;
     if (requested.invoiceId || requested.status === "invoiced") {
@@ -597,6 +660,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       showToast("O orçamento tem componentes sem preço confirmado ou estimado. Revise os valores antes de salvar um total de R$ 0,00.", "error");
       return false;
     }
+    setIsQuoteActionLoading(true);
     try {
       const quoteRef = doc(db, "quotes", target.id);
       const existing = await getDoc(quoteRef);
@@ -623,6 +687,9 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       console.error(err);
       showToast("Erro ao salvar orçamento no Firestore.", "error");
       return false;
+    } finally {
+      setIsQuoteActionLoading(false);
+      closeActionsMenu();
     }
   };
 
@@ -660,6 +727,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
 
   // Convert the approved quote to an invoice; the PDF is generated on demand.
   const handleConvertQuoteToInvoice = async (quote: Quote) => {
+    closeActionsMenu();
+    if (isEditing) {
+      showToast("Salve as alterações do orçamento antes de gerar a fatura.", "warning");
+      return;
+    }
+    setIsQuoteActionLoading(true);
     try {
       let approvedQuote = quote;
       let invoiceSender: SenderConfig = senderConfig;
@@ -671,8 +744,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         if (!token) throw new Error("Faça login novamente para gerar a fatura.");
         // Freeze the same recalculated totals that will be used by the invoice PDF.
         approvedQuote = recalculateQuote(quote);
-        await setDoc(doc(db, "quotes", approvedQuote.id), compactQuoteForFirestore(approvedQuote));
-        const senderSnapshot = await preparePdfSender();
+        const quoteRef = doc(db, "quotes", approvedQuote.id);
+        const persistedQuote = await getDoc(quoteRef);
+        if (!persistedQuote.exists()) {
+          await setDoc(quoteRef, compactQuoteForFirestore(approvedQuote));
+        }
+        const senderSnapshot = compactApprovalSenderSnapshot(senderConfig);
         const approvalResponse = await fetch("/api/approved-snapshot", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
@@ -742,6 +819,9 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     } catch (err) {
       console.error(err);
       showToast("Erro ao gerar fatura: " + ((err as Error).message || "erro desconhecido"), "error");
+    } finally {
+      setIsQuoteActionLoading(false);
+      closeActionsMenu();
     }
   };
 
@@ -1201,27 +1281,16 @@ const handleAddItem = () => {
                       {generatingPublicLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                       Gerar Link para Cliente
                     </button>
-                    <details className="relative">
-                      <summary className="cursor-pointer list-none rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                        Ações ▾
-                      </summary>
-                      <div className="absolute right-0 z-30 mt-2 grid min-w-52 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-                        <button type="button" onClick={() => handleOpenQuotePdf(selectedQuote)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Eye className="h-4 w-4" />Gerar e visualizar PDF</button>
-                        <button type="button" onClick={() => handleDownloadQuotePdf(selectedQuote)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Download className="h-4 w-4" />Baixar PDF</button>
-                        <button type="button" onClick={() => handleSendQuote("whatsapp")} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><MessageCircle className="h-4 w-4" />Enviar por WhatsApp</button>
-                        <button type="button" onClick={() => handleSendQuote("email")} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Mail className="h-4 w-4" />Enviar por e-mail</button>
-                        <button type="button" onClick={() => handleConvertQuoteToInvoice(selectedQuote)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><FileCheck className="h-4 w-4" />Converter em fatura</button>
-                        {!selectedQuote.approvedSnapshotId && (
-                      <button
-                        type="button"
-                        onClick={handleApproveQuote}
-                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
-                      >
-                        <CheckCircle className="h-4 w-4" />Aprovar e congelar versão
-                      </button>
-                        )}
-                      </div>
-                    </details>
+                    <button
+                      ref={actionsMenuButtonRef}
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={actionsMenuOpen}
+                      onClick={toggleActionsMenu}
+                      className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      Ações ▾
+                    </button>
                     {selectedQuote.approvedSnapshotId && (
                       <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-semibold uppercase text-emerald-700">
                         Aprovado
@@ -1231,6 +1300,7 @@ const handleAddItem = () => {
                       <button
                         type="button"
                         onClick={() => void handleSaveQuote()}
+                        disabled={isQuoteActionLoading}
                         className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
                       >
                         Salvar orçamento
@@ -1536,6 +1606,26 @@ const handleAddItem = () => {
         storedAt={viewerPdfQuote?.pdfGeneratedAt || viewerPdfQuote?.updatedAt}
         type="quote"
       />
+      {actionsMenuOpen && selectedQuote && createPortal(
+        <div
+          ref={actionsMenuRef}
+          role="menu"
+          aria-label="Ações do orçamento"
+          style={{ position: "fixed", top: actionsMenuPosition.top, right: actionsMenuPosition.right, zIndex: 1000 }}
+          className="grid min-w-56 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        >
+          <button type="button" role="menuitem" onClick={() => { closeActionsMenu(); void handleOpenQuotePdf(selectedQuote); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Eye className="h-4 w-4" />Gerar e visualizar PDF</button>
+          <button type="button" role="menuitem" onClick={() => { closeActionsMenu(); void handleDownloadQuotePdf(selectedQuote); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Download className="h-4 w-4" />Baixar PDF</button>
+          <button type="button" role="menuitem" onClick={() => { closeActionsMenu(); void handleSendQuote("whatsapp"); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><MessageCircle className="h-4 w-4" />Enviar por WhatsApp</button>
+          <button type="button" role="menuitem" onClick={() => { closeActionsMenu(); void handleSendQuote("email"); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Mail className="h-4 w-4" />Enviar por e-mail</button>
+          <button type="button" role="menuitem" disabled={isQuoteActionLoading} onClick={() => { closeActionsMenu(); void handleConvertQuoteToInvoice(selectedQuote); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><FileCheck className="h-4 w-4" />Converter em fatura</button>
+          {!selectedQuote.approvedSnapshotId && <button type="button" role="menuitem" disabled={isQuoteActionLoading} onClick={() => { closeActionsMenu(); void handleApproveQuote(); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><CheckCircle className="h-4 w-4" />Aprovar e congelar versão</button>}
+          <button type="button" role="menuitem" disabled={Boolean(selectedQuote.invoiceId || selectedQuote.status === "invoiced")} onClick={() => { closeActionsMenu(); setIsEditing(true); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><Pencil className="h-4 w-4" />Editar orçamento</button>
+          {isEditing && <button type="button" role="menuitem" disabled={isQuoteActionLoading} onClick={() => { closeActionsMenu(); void handleSaveQuote(); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><Save className="h-4 w-4" />Salvar alterações</button>}
+          <button type="button" role="menuitem" onClick={() => { closeActionsMenu(); void handleDeleteQuote(selectedQuote); }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950"><Trash2 className="h-4 w-4" />Excluir orçamento</button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

@@ -130,8 +130,6 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
   const sourceUpdate = collection === "quotes"
     ? {
         status: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now,
-        items: snapshot.document.items, subtotal: snapshot.document.subtotal, discountAmount: snapshot.document.discountAmount,
-        taxAmount: snapshot.document.taxAmount, total: snapshot.document.total, senderSnapshot: snapshot.senderSnapshot,
       }
     : {
         isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedSnapshotId: snapshotId,

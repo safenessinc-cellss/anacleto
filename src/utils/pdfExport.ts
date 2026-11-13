@@ -45,7 +45,7 @@ const getOfficialLogoDataUrl = async (): Promise<string> => {
   return canvas.toDataURL("image/png");
 };
 
-const svgToPngDataUrl = async (svg: string): Promise<string> => {
+const svgToPngDataUrl = async (svg: string, width = 1800, height = 1170): Promise<string> => {
   const image = new Image();
   await new Promise<void>((resolve, reject) => {
     image.onload = () => resolve();
@@ -57,14 +57,21 @@ const svgToPngDataUrl = async (svg: string): Promise<string> => {
     }
   });
   const canvas = document.createElement("canvas");
-  canvas.width = 1800;
-  canvas.height = 1170;
+  canvas.width = width;
+  canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Não foi possível preparar a perspectiva arquitetônica para o PDF.");
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL("image/png");
+};
+
+export const exportArchitecturalSheetPdf = async (svg: string, title: string): Promise<void> => {
+  const image = await svgToPngDataUrl(svg, 2400, 3260);
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a3" });
+  doc.addImage(image, "PNG", 10, 22, 277, 376);
+  doc.save(`Ficha_Tecnica_${title.replace(/[^a-z0-9_-]+/gi, "_") || "Esquadria"}.pdf`);
 };
 
 

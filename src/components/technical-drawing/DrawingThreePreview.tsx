@@ -23,6 +23,8 @@ export default function DrawingThreePreview({ drawing }: Props) {
       <img
         src={preview}
         alt={`Perspectiva isométrica técnica de ${drawing.title || "esquadria de alumínio"}`}
+        loading="eager"
+        decoding="sync"
         className="block h-auto max-h-[540px] w-full object-contain"
       />
     </section>

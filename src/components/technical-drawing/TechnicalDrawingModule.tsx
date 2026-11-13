@@ -21,13 +21,14 @@ import {
   Check,
   Eye,
   Plus,
-  Trash2
+  Trash2,
+  FileText
 } from "lucide-react";
 import { TechnicalDrawing, SenderConfig, Quote } from "../../types";
 import DrawingSvgCanvas from "./DrawingSvgCanvas";
 import DrawingThreePreview from "./DrawingThreePreview";
 import ManufacturingRoute from "../production/ManufacturingRoute";
-import { exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
+import { exportArchitecturalSheetPdf, exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ref as storageRef, deleteObject } from "firebase/storage";
@@ -37,9 +38,10 @@ import { db, storage } from "../../firebase";
 import { useToast } from "../ToastContext";
 import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
 import PdfViewerModal from "../common/PdfViewerModal";
-import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
+import { buildParametricDrawing, isAluminumPrompt, localParametricSpec, type ParametricWindowSpec } from "../../utils/parametricCad";
 import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
 import { compactQuoteForFirestore, withoutHeavyInlineData } from "../../utils/firestorePayloads";
+import { buildArchitecturalDrawingSheetSvg } from "../../utils/architecturalSvg";
 
 interface TechnicalDrawingModuleProps {
   senderConfig: SenderConfig;
@@ -168,17 +170,17 @@ const furnitureSampleDrawing: TechnicalDrawing = {
   updatedAt: new Date().toISOString(),
 };
 
-const defaultCadPrompt = "Janela de Correr 2 Folhas - Linha Suprema - 1500x1200mm - Vidro Incolor 8mm";
+const defaultCadPrompt = "Janela de Correr 2 Folhas - Linha Suprema - 1500x1200mm - Vidro Temperado 8mm";
 const defaultCadSpec = {
   tipologia: "janela_correr",
   linha_aluminio: "Linha Suprema",
-  cor_perfil: "#94a3b8",
+  cor_perfil: "#9da8ae",
   cor_vidro: "incolor",
   largura_mm: 1500,
   altura_mm: 1200,
   folhas: 2,
   modulo_fixo: false,
-  tipo_vidro: "comum",
+  tipo_vidro: "temperado",
   espessura_mm: 8,
   abertura: "central",
 } as const;
@@ -346,7 +348,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [drawing, setDrawing] = useState<TechnicalDrawing>(initialSampleDrawing);
-  const [activeView, setActiveView] = useState<"list" | "studio">("list");
+  const [activeView, setActiveView] = useState<"list" | "studio">("studio");
   const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
   const [projects, setProjects] = useState<Array<{id:string;name:string}>>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -429,7 +431,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   const rebuildParametricPreview = (
     current: TechnicalDrawing,
-    spec: typeof defaultCadSpec | ReturnType<typeof localParametricSpec>,
+    spec: ParametricWindowSpec,
     description: string,
   ): TechnicalDrawing => {
     const updated = buildParametricDrawing(spec, description, [...catalogItems, ...supplierCatalog]);
@@ -458,6 +460,32 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     };
   };
 
+  const promptForSpec = (spec: ParametricWindowSpec) => {
+    const typeLabels: Record<ParametricWindowSpec["tipologia"], string> = {
+      janela_correr: "Janela de Correr",
+      porta_correr: "Porta de Correr",
+      porta_giro: "Porta de Giro",
+      porta_pivotante: "Porta Pivotante",
+      maxim_ar: "Maxim-ar",
+      basculante: "Basculante",
+      box_banheiro: "Box de Banheiro",
+    };
+    const colorLabel = /branc/i.test(spec.cor_perfil) ? "Branco"
+      : /pret|#1f2937/i.test(spec.cor_perfil) ? "Preto"
+      : /bronze|#80552f/i.test(spec.cor_perfil) ? "Bronze"
+      : "Anodizado Natural";
+    return `${typeLabels[spec.tipologia]} ${spec.folhas} Folhas - ${spec.linha_aluminio} - ${spec.largura_mm}x${spec.altura_mm}mm - ${spec.cor_perfil === "#f8fafc" ? "Branco" : colorLabel} - Vidro ${spec.tipo_vidro} ${spec.cor_vidro || ""} ${spec.espessura_mm}mm`.replace(/\s+/g, " ").trim();
+  };
+
+  const updateDrawingSpec = (patch: Partial<ParametricWindowSpec>) => {
+    if (drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") return;
+    const spec = { ...(drawing.parametricSpec || defaultCadSpec), ...patch };
+    if (spec.tipologia === "box_banheiro") spec.folhas = Math.max(2, spec.folhas);
+    const command = promptForSpec(spec);
+    setDrawing((current) => rebuildParametricPreview(current, spec, command));
+    setPrompt(command);
+  };
+
   const updatePromptPreview = (value: string) => {
     setPrompt(value);
     if (!isAluminumPrompt(value)) return;
@@ -465,7 +493,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       if (current.approvedSnapshotId || current.status === "APPROVED_FOR_MANUFACTURING") return current;
       const currentSpec = current.parametricSpec || defaultCadSpec;
       const parsed = localParametricSpec(value);
-      const hasProfileColor = /\b(preto|branco)\b/i.test(value);
+      const hasProfileColor = /\b(preto|branco|bronze|anodizado|natural|prata)\b/i.test(value);
       return rebuildParametricPreview(current, {
         ...parsed,
         largura_mm: parsed.largura_mm || currentSpec.largura_mm || defaultCadSpec.largura_mm,
@@ -480,11 +508,12 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   const updateParametricField = (field: "largura_mm" | "altura_mm" | "folhas", value: number) => {
     if (!Number.isFinite(value) || value <= 0 || drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") return;
-    const boundedValue = field === "folhas" ? Math.min(8, value) : Math.min(20_000, value);
-    setDrawing((current) => {
-      const spec = current.parametricSpec || defaultCadSpec;
-      return rebuildParametricPreview(current, { ...spec, [field]: Math.round(boundedValue) }, current.description || defaultCadPrompt);
-    });
+    const minValue = field === "folhas" && drawing.parametricSpec?.tipologia === "box_banheiro" ? 2 : 1;
+    const boundedValue = field === "folhas" ? Math.min(8, Math.max(minValue, value)) : Math.min(20_000, value);
+    const nextValue = Math.round(boundedValue);
+    updateDrawingSpec(field === "largura_mm" ? { largura_mm: nextValue }
+      : field === "altura_mm" ? { altura_mm: nextValue }
+      : { folhas: nextValue });
   };
 
   const addSupplierBudgetItem = (productId: string) => {
@@ -618,6 +647,64 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     if (!response.ok) throw new Error(data?.error || "Não foi possível recuperar o snapshot do desenho.");
     if (data?.type !== "drawing" || !data?.document) throw new Error("Snapshot de desenho inválido.");
     return data;
+  };
+
+  const drawingFileBaseName = () => (drawing.title || "Esquadria")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9_-]+/gi, "_");
+
+  const handleDownloadDrawingSvg = () => {
+    try {
+      const blob = new Blob([buildArchitecturalDrawingSheetSvg(drawing)], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `Desenho_Arquitetonico_${drawingFileBaseName()}.svg`;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      console.error("Architectural SVG export failed:", error);
+      showToast("Não foi possível exportar o desenho SVG.", "error");
+    }
+  };
+
+  const handleDownloadDrawingPng = async () => {
+    try {
+      const image = new Image();
+      const imageReady = new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("Não foi possível renderizar a ficha SVG."));
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(buildArchitecturalDrawingSheetSvg(drawing))}`;
+      });
+      await imageReady;
+      const canvas = document.createElement("canvas");
+      canvas.width = 2400;
+      canvas.height = 3260;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Não foi possível preparar a imagem PNG.");
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const anchor = document.createElement("a");
+      anchor.href = canvas.toDataURL("image/png");
+      anchor.download = `Desenho_Arquitetonico_${drawingFileBaseName()}.png`;
+      anchor.click();
+      showToast("Desenho PNG em alta resolução exportado.", "success");
+    } catch (error) {
+      console.error("Architectural PNG export failed:", error);
+      showToast(error instanceof Error ? error.message : "Não foi possível exportar o desenho PNG.", "error");
+    }
+  };
+
+  const handleExportArchitecturalPdf = async () => {
+    try {
+      await exportArchitecturalSheetPdf(buildArchitecturalDrawingSheetSvg(drawing), drawingFileBaseName());
+      showToast("Ficha técnica arquitetônica PDF exportada.", "success");
+    } catch (error) {
+      console.error("Architectural PDF export failed:", error);
+      showToast(error instanceof Error ? error.message : "Não foi possível exportar a ficha técnica PDF.", "error");
+    }
   };
 
   const handleApproveDrawing = async () => {
@@ -762,6 +849,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     // Registros novos contêm o desenho completo e podem voltar ao editor.
     if (Array.isArray(item.pieces) && item.pieces.length > 0) {
       setDrawing(item);
+      setPrompt(item.description || item.title || defaultCadPrompt);
       setSelectedProjectId(item.projectId || "");
       setCurrentStep(Math.min(Math.max(Number(item.currentStep) || 1, 1), 5));
       setIsPdfModalOpen(false);
@@ -807,7 +895,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
     generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
     setDrawing(generated);
     setCurrentStep(1);
-    if (!presetPrompt) setPrompt("");
+    setPrompt(inputPrompt);
     const localDrawing = generated;
 
     try {
@@ -1075,6 +1163,15 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <button type="button" onClick={handleDownloadDrawingPng} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+            <Download className="h-4 w-4" /> Baixar Desenho (PNG Alta Resolução)
+          </button>
+          <button type="button" onClick={handleDownloadDrawingSvg} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
+            <Download className="h-4 w-4" /> Baixar SVG vetorial
+          </button>
+          <button type="button" onClick={() => void handleExportArchitecturalPdf()} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+            <FileText className="h-4 w-4" /> Exportar Ficha Técnica (PDF)
+          </button>
           <button
             onClick={() => handleSaveDrawing()}
             disabled={isSaving}
@@ -1160,12 +1257,46 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
           </div>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4">
-            <h3 className="text-sm font-bold text-slate-900">Geometria paramétrica · edição local</h3>
-            <p className="mt-1 text-xs text-slate-500">A vista, o orçamento e o roteiro de corte são atualizados sem aguardar a IA.</p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <h3 className="text-sm font-bold text-slate-900">Parâmetros arquitetônicos · atualização local instantânea</h3>
+            <p className="mt-1 text-xs text-slate-500">O comando e todos os campos abaixo alimentam diretamente as vistas 2D e isométrica, sem depender de IA.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <label className="text-[10px] font-semibold text-slate-500">Tipologia
+                <select value={parametricSpec.tipologia} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ tipologia: event.target.value as ParametricWindowSpec["tipologia"] })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50">
+                  <option value="janela_correr">Janela de Correr</option>
+                  <option value="porta_correr">Porta de Correr</option>
+                  <option value="porta_giro">Porta de Giro</option>
+                  <option value="porta_pivotante">Porta Pivotante</option>
+                  <option value="maxim_ar">Maxim-ar</option>
+                  <option value="box_banheiro">Box de Banheiro</option>
+                </select>
+              </label>
               <label className="text-[10px] font-semibold text-slate-500">Largura (mm)<input type="number" min="1" max="20000" value={parametricSpec.largura_mm} disabled={!canEditParametric} onChange={(event) => updateParametricField("largura_mm", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
-              <label className="text-[10px] font-semibold text-slate-500">Altura (mm)<input type="number" min="1" max="20000" value={parametricSpec.altura_mm} disabled={!canEditParametric} onChange={(event) => updateParametricField("altura_mm", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
-              <label className="text-[10px] font-semibold text-slate-500">Folhas<input type="number" min="1" max="8" value={parametricSpec.folhas} disabled={!canEditParametric} onChange={(event) => updateParametricField("folhas", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
+              <label className="text-[10px] font-semibold text-slate-500">Alto (mm)<input type="number" min="1" max="20000" value={parametricSpec.altura_mm} disabled={!canEditParametric} onChange={(event) => updateParametricField("altura_mm", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
+              <label className="text-[10px] font-semibold text-slate-500">Nº de Hojas<input type="number" min={parametricSpec.tipologia === "box_banheiro" ? 2 : 1} max="8" value={parametricSpec.folhas} disabled={!canEditParametric} onChange={(event) => updateParametricField("folhas", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
+              <label className="text-[10px] font-semibold text-slate-500">Línea
+                <select value={parametricSpec.linha_aluminio} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ linha_aluminio: event.target.value })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50">
+                  <option value="Linha Suprema">Suprema</option>
+                  <option value="Linha Gold">Gold</option>
+                  <option value="Linha 25">Linha 25</option>
+                </select>
+              </label>
+              <label className="text-[10px] font-semibold text-slate-500">Cor do Alumínio
+                <select value={parametricSpec.cor_perfil} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ cor_perfil: event.target.value })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50">
+                  <option value="#f8fafc">Branco</option>
+                  <option value="#1f2937">Preto</option>
+                  <option value="#9da8ae">Anodizado Natural</option>
+                  <option value="#80552f">Bronze</option>
+                </select>
+              </label>
+              <label className="text-[10px] font-semibold text-slate-500">Tipo de Vidro
+                <select value={parametricSpec.tipo_vidro} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ tipo_vidro: event.target.value })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50">
+                  <option value="temperado">Temperado</option>
+                  <option value="laminado">Laminado</option>
+                  <option value="comum">Comum / Float</option>
+                  <option value="insulado">Insulado</option>
+                  <option value="duplo">Duplo</option>
+                </select>
+              </label>
             </div>
           </section>
 
