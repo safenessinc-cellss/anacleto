@@ -65,7 +65,7 @@ service cloud.firestore {
  allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
 }
     match /quotes/{id} {
-      allow read: if canOperate() || canManageProduction() || canManageFinance();
+      allow read: if canOperate() || canManageProduction() || canManageFinance() || canManageQuality();
       allow create: if canManageCommercial();
       allow update: if (
         (canManageCommercial() || canManageFinance()) && (
