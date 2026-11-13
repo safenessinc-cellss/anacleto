@@ -1359,7 +1359,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 </div>
               )}
             </section>
-          )}
+          ) : null}
 
           {activeToolTab === "params" && <section className="rounded-2xl border border-slate-200 bg-white p-4">
             <h3 className="text-sm font-bold text-slate-900">Parâmetros arquitetônicos · atualização local instantânea</h3>
