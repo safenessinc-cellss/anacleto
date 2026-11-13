@@ -356,7 +356,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const [aluminumPricePerKg, setAluminumPricePerKg] = useState(readAluminumPricePerKg);
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
-  const [activeToolTab, setActiveToolTab] = useState<"ai" | "saved">("ai");
+  const [activeToolTab, setActiveToolTab] = useState<"ai" | "saved" | "params">("ai");
   const [aiDrawing, setAiDrawing] = useState<TechnicalDrawing | null>(null);
   const [aiTitle, setAiTitle] = useState("");
   const [selectedParametricModelId, setSelectedParametricModelId] = useState("");
@@ -1275,6 +1275,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       <nav aria-label="Ferramentas adicionais do Projeto CAD" className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
         <button type="button" onClick={() => setActiveToolTab("ai")} aria-current={activeToolTab === "ai" ? "page" : undefined} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold ${activeToolTab === "ai" ? "border-violet-600 text-violet-700 dark:text-violet-300" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>Desenhe com IA</button>
         <button type="button" onClick={() => setActiveToolTab("saved")} aria-current={activeToolTab === "saved" ? "page" : undefined} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold ${activeToolTab === "saved" ? "border-blue-600 text-blue-700 dark:text-blue-300" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>Desenhos salvos</button>
+        <button type="button" onClick={() => setActiveToolTab("params")} aria-current={activeToolTab === "params" ? "page" : undefined} className={`shrink-0 border-b-2 px-4 py-3 text-sm font-semibold ${activeToolTab === "params" ? "border-emerald-600 text-emerald-700 dark:text-emerald-300" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}>Parâmetros arquitetônicos</button>
       </nav>
 
       {/* Projeto CAD permanece independente; as abas auxiliares não substituem o motor local. */}
@@ -1316,12 +1317,6 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                   <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Título para salvar no projeto
                     <input value={aiTitle} onChange={(e) => setAiTitle(e.target.value)} placeholder="Ex.: Janela Suprema — modelo 01" className="mt-1 w-full rounded-lg border px-3 py-2 text-sm dark:bg-slate-950" />
                   </label>
-                  <div className="max-h-[420px] overflow-auto rounded-xl border border-slate-200 bg-slate-950 p-2 dark:border-slate-700">
-                    <DrawingSvgCanvas drawing={aiDrawing} currentStep={1} showDimensions showLabels />
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-950 p-2 dark:border-slate-700">
-                    <DrawingThreePreview drawing={aiDrawing} />
-                  </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <button type="button" onClick={() => void handleSaveAiDrawing()} disabled={isSaving || !aiTitle.trim()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50">
                       <Save className="h-4 w-4" /> Salvar desenho no projeto
@@ -1334,7 +1329,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 </div>
               )}
             </section>
-          ) : (
+          ) : activeToolTab === "saved" ? (
             <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -1366,7 +1361,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             </section>
           )}
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          {activeToolTab === "params" && <section className="rounded-2xl border border-slate-200 bg-white p-4">
             <h3 className="text-sm font-bold text-slate-900">Parâmetros arquitetônicos · atualização local instantânea</h3>
             <p className="mt-1 text-xs text-slate-500">O comando e todos os campos abaixo alimentam diretamente as vistas 2D e isométrica, sem depender de IA.</p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1418,8 +1413,9 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               <button type="button" onClick={() => { const model = parametricModels.find((item) => item.id === selectedParametricModelId); if (model) applyParametricModel(model); }} disabled={!selectedParametricModelId || !canEditParametric} className="self-end rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 disabled:opacity-50 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">Aplicar modelo</button>
             </div>
             {parametricModels.length === 0 && <p className="mt-2 text-[10px] text-slate-500">Modelos gerados por IA e adicionados à biblioteca aparecerão aqui.</p>}
-          </section>
+          </section>}
 
+          {activeToolTab === "params" && <div className="space-y-6">
           {/* 5-Step Phase Controller */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl space-y-4">
             <div className="flex items-center justify-between">
@@ -1588,10 +1584,26 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               <button type="button" onClick={async () => { const saved = await handleSaveDrawing(); if (saved) await handleExportPdf(); }} disabled={isSaving || Boolean(drawing.approvedSnapshotId)} className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">{isSaving ? "Salvando..." : "Guardar Projeto e Gerar Orçamento PDF"}</button>
             </div>
           )}
+          </div>}
         </div>
 
         {/* RIGHT PANEL: Scalable SVG Canvas (7 cols) */}
         <div className="lg:order-1 lg:col-span-7 space-y-4">
+          {activeToolTab === "ai" ? (
+            <div className="bg-slate-900 border border-violet-800/60 p-4 rounded-3xl shadow-2xl flex flex-col min-h-[680px]">
+              {aiDrawing ? <>
+                <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-2 mb-2 border-b border-slate-800/80">
+                  <div><h2 className="text-sm font-black text-white">{aiTitle || aiDrawing.title}</h2><p className="text-[11px] text-slate-400">{aiDrawing.description}</p></div>
+                  <span className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[10px] font-bold text-violet-200">RASCUNHO GERADO POR IA</span>
+                </div>
+                <div className="grid flex-1 gap-3 xl:grid-cols-2">
+                  <div className="min-h-[420px] overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 p-2"><p className="mb-2 text-[10px] font-bold uppercase text-slate-400">Vista técnica 2D</p><DrawingSvgCanvas drawing={aiDrawing} currentStep={1} showDimensions showLabels /></div>
+                  <div className="min-h-[420px] rounded-2xl border border-slate-700 bg-slate-950 p-2"><p className="mb-2 text-[10px] font-bold uppercase text-slate-400">Boceto isométrico</p><DrawingThreePreview drawing={aiDrawing} /></div>
+                </div>
+                <p className="mt-3 text-xs text-slate-400">A pré-visualização da IA fica separada do desenho paramétrico local. Revise dimensões e componentes antes de reutilizar.</p>
+              </> : <div className="flex flex-1 flex-col items-center justify-center text-center text-slate-400"><Sparkles className="mb-3 h-10 w-10 text-violet-400"/><h3 className="font-bold text-white">O boceto aparecerá aqui</h3><p className="mt-2 max-w-sm text-xs">Descreva a esquadria na aba à esquerda e gere o desenho. O Projeto CAD local não será alterado.</p></div>}
+            </div>
+          ) : (
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-2xl flex flex-col h-[680px]">
             {/* Header info bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-2 mb-2 border-b border-slate-800/80">
@@ -1629,6 +1641,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             </div>
           </div>
           <ManufacturingRoute drawing={drawing} title={drawing.title || "Projeto técnico"} />
+          </div>)}
 
         </div>
       </div>
