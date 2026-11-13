@@ -119,7 +119,13 @@ service cloud.firestore {
     match /time_entries/{id} { allow read, write: if canManagePayroll(); }
     match /production_orders/{id} {
       allow read: if canOperate() || canManageProduction() || canManageFinance();
-      allow create, update: if canManageProduction() || canManageFinance();
+      allow create: if canManageProduction() || canManageFinance() || canManageCommercial();
+      allow update: if canManageProduction() || canManageFinance() || (
+        canManageCommercial() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','workflowStage','nextStep','deliveryId','deliveryStatus','deliveredAt',
+          'invoiceId','invoiceNumber','invoiceStatus','paymentStatus','paidAt','updatedAt'
+        ])
+      );
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
     match /user_profiles/{uid} {
