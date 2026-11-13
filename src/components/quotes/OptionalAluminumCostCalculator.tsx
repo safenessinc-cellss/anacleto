@@ -39,9 +39,10 @@ export default function OptionalAluminumCostCalculator({
   const profiles = useMemo(() => catalogItems.map(profile => ({ ...profile, kgm: weightPerMeter(profile) })).filter(profile => profile.kgm), [catalogItems]);
   const calc = useMemo(() => {
     const pricePerKg = Math.max(0, Number(priceKg) || 0);
+    const invalidCutCount = cuts.filter(cut => cut.lengthMm <= 0 || cut.lengthMm > 5996 || cut.quantity <= 0 || !profiles.some(profile => profile.id === cut.profileId)).length;
     const expanded = cuts.flatMap(cut => {
       const profile = profiles.find(item => item.id === cut.profileId);
-      if (!profile || !profile.kgm || cut.lengthMm <= 0 || cut.quantity <= 0) return [];
+      if (!profile || !profile.kgm || cut.lengthMm <= 0 || cut.lengthMm > 5996 || cut.quantity <= 0) return [];
       return Array.from({ length: Math.min(1000, Math.floor(cut.quantity)) }, () => ({ profileId: profile.id, sku: profile.sku || profile.code || profile.id, name: profile.name || profile.description || profile.id, lengthMm: Math.ceil(cut.lengthMm), kgm: profile.kgm as number }));
     });
     let aluminumKg = 0;
@@ -75,7 +76,11 @@ export default function OptionalAluminumCostCalculator({
     const laborCost = Math.max(0, Number(hours) || 0) * Math.max(0, Number(hourlyRate) || 0);
     const direct = aluminumCost + glassCost + componentCost + laborCost;
     const factor = Math.max(1, Number(markup) || 1);
-    return { aluminumKg, bars, aluminumCost, glassArea, glassCost, componentCost, laborCost, direct, factor, sale: direct * factor, margin: direct * factor - direct, pieces: expanded.length, width, height };
+    const missingAluminumPrice = expanded.length > 0 && pricePerKg <= 0;
+    const missingGlassPrice = glassArea > 0 && !(Number(glassPrice) > 0);
+    const missingLaborRate = Number(hours) > 0 && !(Number(hourlyRate) > 0);
+    const ready = invalidCutCount === 0 && !missingAluminumPrice && !missingGlassPrice && !missingLaborRate;
+    return { aluminumKg, bars, aluminumCost, glassArea, glassCost, componentCost, laborCost, direct, factor, sale: direct * factor, margin: direct * factor - direct, pieces: expanded.length, width, height, invalidCutCount, missingAluminumPrice, missingGlassPrice, missingLaborRate, ready };
   }, [cuts, profiles, method, actualScale, priceKg, glassWidth, glassHeight, glassQty, glassPrice, components, hours, hourlyRate, markup]);
 
   const addCut = () => setCuts(rows => [...rows, { id: crypto.randomUUID(), profileId: profiles[0]?.id || "", lengthMm: 1000, quantity: 1 }]);
@@ -131,9 +136,10 @@ export default function OptionalAluminumCostCalculator({
             <div><span className="text-slate-500">Componentes + mão de obra</span><strong className="block">{money(calc.componentCost + calc.laborCost)}</strong></div>
             <div><span className="text-slate-500">Barras estimadas</span><strong className="block">{method === "barra" ? calc.bars : "—"}</strong></div>
           </div>
+          {!calc.ready && <p className="text-[11px] text-amber-300">{calc.invalidCutCount > 0 ? "Há cortes inválidos: cada peça deve ter entre 1 e 5.996 mm e perfil com peso cadastrado. " : ""}{calc.missingAluminumPrice ? "Informe o preço real do alumínio por kg. " : ""}{calc.missingGlassPrice ? "Informe o preço real do vidro por m². " : ""}{calc.missingLaborRate ? "Informe o custo por hora para as horas de mão de obra." : ""}</p>}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 pt-3">
             <div><p className="text-[10px] text-slate-400">Custo direto: {money(calc.direct)} · Margem bruta: {money(calc.margin)}</p><p className="text-lg font-black text-emerald-300">Preço de venda: {money(calc.sale)}</p></div>
-            <button type="button" disabled={disabled || calc.direct <= 0 || !Number.isFinite(calc.sale)} onClick={()=>onApply(Number(calc.sale.toFixed(2)), `Cálculo técnico opcional · acabamento: ${finish}; método: ${method === "barra" ? "barras 6m" : "peso consumido +12%"}; alumínio: ${calc.aluminumKg.toFixed(3)} kg / ${money(calc.aluminumCost)}; vidro: ${calc.glassArea.toFixed(3)} m² / ${money(calc.glassCost)}; componentes: ${money(calc.componentCost)}; mão de obra: ${money(calc.laborCost)}; custo direto: ${money(calc.direct)}; markup: ${calc.factor.toFixed(2)}; margem bruta: ${money(calc.margin)}; barras: ${calc.bars}; lista de corte: ${calc.pieces} peças; plano estimado FFD com serra 4mm.`)} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 disabled:opacity-40">Adicionar ao orçamento</button>
+            <button type="button" disabled={disabled || !calc.ready || calc.direct <= 0 || !Number.isFinite(calc.sale)} onClick={()=>onApply(Number(calc.sale.toFixed(2)), `Cálculo técnico opcional · acabamento: ${finish}; método: ${method === "barra" ? "barras 6m" : "peso consumido +12%"}; alumínio: ${calc.aluminumKg.toFixed(3)} kg / ${money(calc.aluminumCost)}; vidro: ${calc.glassArea.toFixed(3)} m² / ${money(calc.glassCost)}; componentes: ${money(calc.componentCost)}; mão de obra: ${money(calc.laborCost)}; custo direto: ${money(calc.direct)}; markup: ${calc.factor.toFixed(2)}; margem bruta: ${money(calc.margin)}; barras: ${calc.bars}; lista de corte: ${calc.pieces} peças; plano estimado FFD com serra 4mm.`)} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 disabled:opacity-40">Adicionar ao orçamento</button>
           </div>
         </div>
       )}
