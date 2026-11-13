@@ -124,7 +124,7 @@ export default function CatalogModule() {
               className="pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800"
             />
           </div>
-          <button onClick={() => { setEditing(null); setForm({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" }); }} className="flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold">
+          <button onClick={() => { setEditing(null); setUploads([]); setForm({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" }); }} className="flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold">
             <Plus className="w-4 h-4" /> Novo item
           </button>
           <label className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-emerald-700">
@@ -167,7 +167,7 @@ export default function CatalogModule() {
                 <td className="p-3"><span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{item.category}</span></td>
                 <td className="p-3 font-bold">R$ {item.price.toFixed(2)}</td>
                 <td className="p-3">
-                  <button onClick={() => { setEditing(item); setForm(item); }} className="p-1 text-blue-600"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => { setEditing(item); setUploads([]); setForm(item); }} className="p-1 text-blue-600"><Edit className="w-4 h-4" /></button>
                   <button onClick={() => handleDelete(item.id!)} className="p-1 text-rose-600"><Trash2 className="w-4 h-4" /></button>
                 </td>
               </tr>
