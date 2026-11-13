@@ -134,7 +134,7 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
   const sourceUpdate = collection === "quotes"
     ? {
         status: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy,
-        productionOrderId, productionStatus: "planned", updatedAt: now,
+        productionOrderId, productionStatus: String(snapshot.document.productionStatus || "planned"), updatedAt: now,
       }
     : {
         isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedSnapshotId: snapshotId,
@@ -316,8 +316,25 @@ export default async function handler(req: any, res: any) {
           capturedAt: new Date().toISOString(),
         },
       };
-      snapshot.document.productionOrderId = "quote_" + documentId;
-      snapshot.document.productionStatus = "planned";
+      const orderQueryResponse = await fetch(base() + ":runQuery", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + tokenOf(req), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: "production_orders" }],
+            where: { fieldFilter: { field: { fieldPath: "quoteId" }, op: "EQUAL", value: { stringValue: documentId } } },
+            limit: 1,
+          },
+        }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!orderQueryResponse.ok) throw new Error("Não foi possível verificar ordens de produção já vinculadas ao orçamento.");
+      const orderQueryRows = await orderQueryResponse.json() as any[];
+      const existingOrderName = Array.isArray(orderQueryRows) ? orderQueryRows.find((row: any) => row.document?.name)?.document.name : "";
+      const existingOrderId = existingOrderName ? String(existingOrderName).split("/").pop() : "";
+      const existingOrder = existingOrderId ? await readDocument(req, "production_orders", existingOrderId) : null;
+      snapshot.document.productionOrderId = existingOrderId || ("quote_" + documentId);
+      snapshot.document.productionStatus = String(existingOrder?.data.status || "planned");
       snapshot.budgetSnapshot = createBudgetSnapshot({
         documentId, documentNumber: String(source.number || ""), approvedAt,
         approvedBy: snapshot.approvedBy, currency: String(source.currency || "BRL"),
