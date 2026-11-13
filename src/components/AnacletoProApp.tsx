@@ -185,9 +185,8 @@ export default function AnacletoProApp({
     ] },
     { id: "catalog", label: "Catálogo & Estoque", icon: Package, tabs: [
       { id: "cadastro_items", label: "Catálogo de Fornecedores" },
-      { id: "catalog", label: "Catálogo" },
-      { id: "products", label: "Produtos & Tipologias" },
-      { id: "tipologias", label: "Modelos de Esquadrias" },
+      { id: "products", label: "Esquadrias" },
+      { id: "catalog", label: "Produtos" },
       { id: "services", label: "Serviços" },
       { id: "inventory", label: "Estoque" },
       { id: "payment_methods", label: "Meios de Pagamento" },
@@ -348,7 +347,7 @@ export default function AnacletoProApp({
             </nav>
           )}
           {activeTab === "reports" && <BusinessWorkspace kind="reports" quotes={quotes} invoices={invoices} />}
-          {activeTab === "tipologias" && <BusinessWorkspace kind="tipologias" />}
+          
           {activeTab === "projects" && <ProjectEngineeringModule language={language} senderConfig={senderConfig} />}
           {activeTab === "profile" && <BusinessWorkspace kind="profile" />}
           {activeTab === "suggestions" && <BusinessWorkspace kind="suggestions" />}
@@ -388,7 +387,7 @@ export default function AnacletoProApp({
 
           {activeTab === "agenda" && (<AgendaModule language={language} />)}
 
-          {activeTab === "catalog" && (<CatalogModule />)}
+          {activeTab === "catalog" && <CatalogModule />}
           {activeTab === "cadastro_items" && <div className="space-y-8"><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
