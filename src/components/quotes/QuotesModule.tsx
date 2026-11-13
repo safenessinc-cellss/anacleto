@@ -594,10 +594,14 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error || "Não foi possível congelar o orçamento.");
-      const approved = { ...result.snapshot.document, approvedSnapshotId: result.snapshotId };
+      const approved = {
+        ...result.snapshot.document,
+        approvedSnapshotId: result.snapshotId,
+        productionOrderId: result.productionOrderId || result.snapshot.document.productionOrderId,
+      };
       setSelectedQuote(approved);
       setQuotes((previous) => previous.map((item) => item.id === approved.id ? approved : item));
-      showToast("Orçamento aprovado. Snapshot imutável criado; PDF e fatura usarão esta versão.", "success");
+      showToast("Orçamento aprovado e congelado. Ordem de produção criada automaticamente no painel Produção & Obras.", "success");
     } catch (error) {
       console.error("Quote approval failed:", error);
       showToast((error as Error).message || "Falha ao aprovar o orçamento.", "error");
@@ -813,7 +817,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           paymentMethod: "transferencia", status: "pending", invoiceId, quoteId: approvedQuote.id,
           notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         }));
-        tx.update(quoteRef, sanitizeFirestoreData({ status: "invoiced", invoiceId, invoicedAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+        tx.update(quoteRef, sanitizeFirestoreData({ status: "invoiced", invoiceId, invoicedAt: serverTimestamp(), productionStatus: "invoiced", updatedAt: serverTimestamp() }));
+        const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", approvedQuote.id)));
+        linkedOrders.docs.forEach((orderDoc) => tx.update(orderDoc.ref, {
+          status: "invoiced", workflowStage: "payment", nextStep: "registrar_recebimento",
+          invoiceId, invoiceNumber, invoiceStatus: "pending", updatedAt: serverTimestamp(),
+        }));
       });
       showToast(`Fatura ${invoiceNumber} gerada e vinculada ao Financeiro.`, "success");
     } catch (err) {
