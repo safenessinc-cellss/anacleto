@@ -191,11 +191,11 @@ export default function DeliveryModule() {
         locationAt: location.capturedAt, operatorName, createdAt: stamp
       });
       batch.update(doc(db, "quotes", selectedQuote.id), {
-        ...deliveryEvidence, deliveryEvidence, productionStatus: "delivered", updatedAt: serverTimestamp(),
+        ...deliveryEvidence, deliveryEvidence, productionStatus: "awaiting_quality", updatedAt: serverTimestamp(),
       });
       if (selectedInvoice) batch.update(doc(db, "invoices", selectedInvoice.id), { ...deliveryEvidence, deliveryEvidence });
       linkedOrders.docs.forEach((orderDoc) => batch.update(orderDoc.ref, {
-        status: "delivered", workflowStage: "billing", nextStep: "emitir_fatura",
+        status: "delivered", workflowStage: "quality", nextStep: "registrar_qualidade",
         deliveryId: deliveryRef.id, deliveryStatus: "delivered", deliveredAt: stamp, updatedAt: serverTimestamp(),
       }));
       await batch.commit();
