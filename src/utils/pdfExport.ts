@@ -45,6 +45,30 @@ const getOfficialLogoDataUrl = async (): Promise<string> => {
   return canvas.toDataURL("image/png");
 };
 
+const loadQuoteItemImage = async (src?: string): Promise<string | null> => {
+  if (!src?.trim()) return null;
+  try {
+    const image = new Image();
+    if (/^https?:\\/\\//i.test(src)) image.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Não foi possível carregar a imagem do item."));
+      image.src = src;
+      if (image.complete) image.naturalWidth > 0 ? resolve() : reject(new Error("Imagem indisponível."));
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(image, 0, 0);
+    return canvas.toDataURL("image/png");
+  } catch (error) {
+    console.warn("Imagem do item não pôde ser incluída no orçamento PDF:", error);
+    return null;
+  }
+};
+
 const svgToPngDataUrl = async (svg: string, width = 1800, height = 1170): Promise<string> => {
   const image = new Image();
   await new Promise<void>((resolve, reject) => {
@@ -309,27 +333,38 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
   doc.text(`Endereço: ${quote.clientAddress || "Não informado"}`, pageWidth / 2 + 10, yPos + 21);
   if (quote.validUntil) doc.text(`Válido até: ${quote.validUntil}`, pageWidth / 2 + 10, yPos + 26);
 
-  // Table of Items
-  const tableData = quote.items.map((item, idx) => [
-    idx + 1,
-    "",
-    item.sku
+  // A coluna de imagem só existe quando o usuário selecionou uma foto em pelo menos um item.
+  const itemImageData = await Promise.all(quote.items.map((item) => loadQuoteItemImage(item.itemPhotoUrl)));
+  const hasSelectedItemImages = itemImageData.some(Boolean);
+  const tableData = quote.items.map((item, idx) => {
+    const description = item.sku
       ? `${item.sku} · ${item.description}${Number(item.cutLengthMm) > 0 ? ` (${item.cutLengthMm} mm)` : ""}`
-      : item.description,
-    item.quantity,
-    formatMoney(item.unitPrice, currency),
-    formatMoney(item.subtotal || item.quantity * item.unitPrice, currency),
-  ]);
+      : item.description;
+    const row = [idx + 1];
+    if (hasSelectedItemImages) row.push("");
+    row.push(description, item.quantity, formatMoney(item.unitPrice, currency), formatMoney(item.subtotal || item.quantity * item.unitPrice, currency));
+    return row;
+  });
+  const descriptionColumn = hasSelectedItemImages ? 2 : 1;
+  const quantityColumn = descriptionColumn + 1;
+  const unitPriceColumn = descriptionColumn + 2;
+  const subtotalColumn = descriptionColumn + 3;
 
   autoTable(doc, {
     startY: yPos + 35,
-    head: [["#", "Vista 3D", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
+    head: [hasSelectedItemImages
+      ? ["#", "Imagem", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]
+      : ["#", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
     body: tableData,
     theme: "striped",
     didDrawCell: (data: any) => {
-      if (data.section === "body" && data.column.index === 1) {
-        const item = quote.items[data.row.index];
-        drawQuoteItemMiniature3D(doc, item?.description || "", data.cell.x, data.cell.y, data.cell.width, data.cell.height);
+      if (hasSelectedItemImages && data.section === "body" && data.column.index === 1) {
+        const imageData = itemImageData[data.row.index];
+        if (imageData) {
+          const size = Math.min(data.cell.width - 4, data.cell.height - 4);
+          try { doc.addImage(imageData, "PNG", data.cell.x + (data.cell.width - size) / 2, data.cell.y + (data.cell.height - size) / 2, size, size); }
+          catch (error) { console.warn("Não foi possível desenhar a foto do item no orçamento:", error); }
+        }
       }
     },
     headStyles: {
@@ -339,16 +374,16 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
     },
     columnStyles: {
       0: { cellWidth: 9, halign: "center" },
-      1: { cellWidth: 29, halign: "center" },
-      2: { cellWidth: "auto" },
-      3: { cellWidth: 15, halign: "center" },
-      4: { cellWidth: 29, halign: "right" },
-      5: { cellWidth: 30, halign: "right" },
+      ...(hasSelectedItemImages ? { 1: { cellWidth: 29, halign: "center" as const } } : {}),
+      [descriptionColumn]: { cellWidth: "auto" },
+      [quantityColumn]: { cellWidth: 15, halign: "center" },
+      [unitPriceColumn]: { cellWidth: 29, halign: "right" },
+      [subtotalColumn]: { cellWidth: 30, halign: "right" },
     },
     styles: {
       fontSize: 8,
       cellPadding: 3,
-      minCellHeight: 29,
+      minCellHeight: hasSelectedItemImages ? 29 : 10,
       valign: "middle",
     },
   });
