@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from "firebase/firestore";
-import { db, auth } from "../../firebase";
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, setDoc } from "firebase/firestore";
+import { db, auth, storage } from "../../firebase";
+import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { Package, Plus, Trash2, Edit, Search, FileUp } from "lucide-react";
 import Papa from "papaparse";
@@ -13,6 +14,7 @@ interface CatalogItem {
   unit: string;
   price: number;
   supplier: string;
+  attachments?: { id: string; fileName: string; fileType: string; size: number; storagePath: string; downloadUrl: string; uploadedAt: string }[];
 }
 
 export default function CatalogModule() {
@@ -20,6 +22,8 @@ export default function CatalogModule() {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [form, setForm] = useState<CatalogItem>({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" });
+  const [uploads, setUploads] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const [authReady, setAuthReady] = useState(false);
   useEffect(() => {
@@ -40,17 +44,42 @@ export default function CatalogModule() {
 
   const handleSave = async () => {
     if (!form.sku || !form.name) return alert("Código e nome são obrigatórios");
-    if (editing?.id) {
-      await updateDoc(doc(db, "catalog", editing.id), { ...form });
-    } else {
-      await addDoc(collection(db, "catalog"), { ...form });
-    }
-    setEditing(null);
-    setForm({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" });
+    setSaving(true);
+    try {
+      const recordRef = editing?.id ? doc(db, "catalog", editing.id) : doc(collection(db, "catalog"));
+      const attachments = [...(editing?.attachments || [])];
+      const productData = { sku: form.sku, name: form.name, category: form.category, unit: form.unit, price: Number(form.price || 0), supplier: form.supplier };
+      await setDoc(recordRef, { ...productData, attachments, updatedAt: new Date().toISOString(), ...(!editing?.id ? { createdAt: new Date().toISOString() } : {}) }, { merge: true });
+      for (const file of uploads) {
+        const extension = file.name.split(".").pop()?.toLowerCase() || "";
+        if (!["pdf", "xls", "xlsx", "csv"].includes(extension)) throw new Error("Use somente arquivos PDF, Excel XLS/XLSX ou CSV.");
+        if (file.size > 25 * 1024 * 1024) throw new Error(file.name + " excede 25 MB.");
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `catalogs/${recordRef.id}/${Date.now()}-${safeName}`;
+        const fileRef = storageRef(storage, path);
+        await uploadBytes(fileRef, file, { contentType: file.type || "application/octet-stream" });
+        attachments.push({ id: crypto.randomUUID(), fileName: file.name, fileType: extension, size: file.size, storagePath: path, downloadUrl: await getDownloadURL(fileRef), uploadedAt: new Date().toISOString() });
+      }
+      await updateDoc(recordRef, { attachments, updatedAt: new Date().toISOString() });
+      setEditing(null);
+      setUploads([]);
+      setForm({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" });
+    } catch (error) {
+      console.error("Catalog save failed:", error);
+      alert(error instanceof Error ? error.message : "Não foi possível salvar o produto e seus arquivos.");
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Excluir este produto?")) await deleteDoc(doc(db, "catalog", id));
+    const item = items.find(row => row.id === id);
+    if (!confirm("Excluir este produto e seus arquivos anexados?")) return;
+    try {
+      await Promise.all((item?.attachments || []).map(file => deleteObject(storageRef(storage, file.storagePath)).catch(() => undefined)));
+      await deleteDoc(doc(db, "catalog", id));
+    } catch (error) {
+      console.error("Catalog delete failed:", error);
+      alert("Não foi possível excluir o produto.");
+    }
   };
 
   const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,7 +123,7 @@ export default function CatalogModule() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Catálogo de Itens</h2>
+        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Produtos</h2>
         <div className="flex gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
@@ -104,7 +133,7 @@ export default function CatalogModule() {
               className="pl-9 pr-4 py-2 text-sm border rounded-lg bg-white dark:bg-slate-800"
             />
           </div>
-          <button onClick={() => { setEditing(null); setForm({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" }); }} className="flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold">
+          <button onClick={() => { setEditing(null); setUploads([]); setForm({ sku: "", name: "", category: "Perfil", unit: "UN", price: 0, supplier: "Esquadrimax" }); }} className="flex items-center gap-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold">
             <Plus className="w-4 h-4" /> Novo item
           </button>
           <label className="flex items-center gap-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold cursor-pointer hover:bg-emerald-700">
@@ -125,7 +154,13 @@ export default function CatalogModule() {
           <input placeholder="Unidade" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="p-2 border rounded text-sm" />
           <input type="number" placeholder="Preço" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value)})} className="p-2 border rounded text-sm" />
         </div>
-        <button onClick={handleSave} className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold">Salvar</button>
+        <label className="mt-4 block rounded-xl border border-dashed border-slate-300 p-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+          Arquivos do produto · PDF, Excel XLS/XLSX ou CSV · até 25 MB por arquivo
+          <input type="file" multiple accept=".pdf,.xls,.xlsx,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={event => { const selected = Array.from(event.target.files || []); const valid = selected.filter(file => ["pdf","xls","xlsx","csv"].includes(file.name.split(".").pop()?.toLowerCase() || "") && file.size <= 25 * 1024 * 1024); if (valid.length !== selected.length) alert("Alguns arquivos foram ignorados. Use PDF, XLS, XLSX ou CSV até 25 MB."); setUploads(valid); event.currentTarget.value = ""; }} className="mt-2 block w-full" />
+          {uploads.length > 0 && <span className="mt-2 block">{uploads.length} arquivo(s) selecionado(s).</span>}
+          {!!editing?.attachments?.length && <span className="mt-2 block">{editing.attachments.length} arquivo(s) já anexado(s).</span>}
+        </label>
+        <button onClick={handleSave} disabled={saving} className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold disabled:opacity-50">{saving ? "Salvando..." : "Salvar"}</button>
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-xl border overflow-hidden">
@@ -137,11 +172,11 @@ export default function CatalogModule() {
             {filtered.map(item => (
               <tr key={item.id} className="border-t hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td className="p-3 font-mono text-xs">{item.sku}</td>
-                <td className="p-3">{item.name}</td>
+                <td className="p-3">{item.name}{!!item.attachments?.length && <div className="mt-1 flex flex-wrap gap-2">{item.attachments.map(file => <a key={file.id} href={file.downloadUrl} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 underline">{file.fileType.toUpperCase()} · {file.fileName}</a>)}</div>}</td>
                 <td className="p-3"><span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{item.category}</span></td>
                 <td className="p-3 font-bold">R$ {item.price.toFixed(2)}</td>
                 <td className="p-3">
-                  <button onClick={() => { setEditing(item); setForm(item); }} className="p-1 text-blue-600"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => { setEditing(item); setUploads([]); setForm(item); }} className="p-1 text-blue-600"><Edit className="w-4 h-4" /></button>
                   <button onClick={() => handleDelete(item.id!)} className="p-1 text-rose-600"><Trash2 className="w-4 h-4" /></button>
                 </td>
               </tr>

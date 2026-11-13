@@ -805,8 +805,11 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       };
       const finalInvoice: Invoice = baseInvoice;
       const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", approvedQuote.id)));
-      if (linkedOrders.docs.some((orderDoc) => !["delivered", "invoiced"].includes(String(orderDoc.data().status || "")))) {
-        throw new Error("Conclua a produção e registre a entrega antes de emitir a fatura final.");
+      if (!linkedOrders.docs.length) {
+        throw new Error("Este orçamento aprovado ainda não possui uma ordem de produção vinculada. Crie ou sincronize a OP antes de faturar.");
+      }
+      if (linkedOrders.docs.some((orderDoc) => !["quality_approved", "invoiced"].includes(String(orderDoc.data().status || "")))) {
+        throw new Error("O fluxo exige produção concluída, entrega registrada e inspeção de qualidade aprovada antes da emissão da fatura.");
       }
       await runTransaction(db, async tx => {
         const current = await tx.get(quoteRef);

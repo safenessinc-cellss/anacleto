@@ -88,6 +88,9 @@ export interface Quote {
   approvedSnapshotId?: string;
   productionOrderId?: string;
   productionStatus?: string;
+  qualityStatus?: "pending" | "approved" | "rejected";
+  qualityRecordId?: string;
+  qualityInspectedAt?: string;
   approvedAt?: string;
   approvedBy?: { uid: string; email: string; role: string };
   snapshotContentHash?: string;
