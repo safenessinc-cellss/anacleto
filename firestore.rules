@@ -73,6 +73,10 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt','clientAdvanceTotal','balanceDue','productionStatus','productionOrderId','deliveryId','deliveryStatus','deliveredAt','deliveryEvidence'])
         )
       ) || (
+        canManageProduction() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'productionStatus','productionOrderId','updatedAt'
+        ])
+      ) || (
         canManageQuality() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'productionStatus','qualityStatus','qualityRecordId','qualityInspectedAt','updatedAt'
         ])
