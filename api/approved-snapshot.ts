@@ -20,6 +20,9 @@ const base = () => {
   const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
   return "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/" + databaseId + "/documents";
 };
+// Firestore REST commit exige resource names relativos, nunca URLs HTTPS completas.
+const documentResourceName = (path: string) =>
+  base().replace("https://firestore.googleapis.com/v1/", "") + path;
 function send(res: any, status: number, body: unknown) {
   res.setHeader?.("Cache-Control", "no-store");
   return res.status(status).json(body);
@@ -124,12 +127,14 @@ function canReadSnapshot(user: AuthUser, type: "quote" | "drawing") {
 
 async function commitSnapshot(req: any, collection: string, documentId: string, updateTime: string, snapshot: any) {
   const snapshotId = (collection === "quotes" ? "quote_" : "drawing_") + documentId + "_" + randomUUID();
-  const snapshotName = base() + "/approved_snapshots/" + snapshotId;
-  const sourceName = base() + "/" + collection + "/" + encodeURIComponent(documentId);
+  const snapshotName = documentResourceName("/approved_snapshots/" + snapshotId);
+  const sourceName = documentResourceName("/" + collection + "/" + encodeURIComponent(documentId));
   const now = new Date().toISOString();
+  const productionOrderId = collection === "quotes" ? String(snapshot.document.productionOrderId || ("quote_" + documentId)) : "";
   const sourceUpdate = collection === "quotes"
     ? {
-        status: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy, updatedAt: now,
+        status: "approved", approvedSnapshotId: snapshotId, approvedAt: now, approvedBy: snapshot.approvedBy,
+        productionOrderId, productionStatus: String(snapshot.document.productionStatus || "planned"), updatedAt: now,
       }
     : {
         isDraft: false, status: "APPROVED_FOR_MANUFACTURING", draftStatus: "approved", approvedSnapshotId: snapshotId,
@@ -154,8 +159,8 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
     const first = { ...common, id: randomUUID(), timestamp: now, fromState: "SUGGESTED_BY_AI", toState: "REVIEWED_BY_ENGINEER", reason: "Revisão e validação confirmadas no fluxo de aprovação do documento." };
     const second = { ...common, id: randomUUID(), timestamp: now, fromState: "REVIEWED_BY_ENGINEER", toState: "APPROVED_FOR_MANUFACTURING", reason: "Linha incluída na instantânea imutável aprovada." };
     return [
-      { update: { name: base() + "/budget_line_audit/" + first.id, fields: encodeFields(first) }, currentDocument: { exists: false } },
-      { update: { name: base() + "/budget_line_audit/" + second.id, fields: encodeFields(second) }, currentDocument: { exists: false } },
+      { update: { name: documentResourceName("/budget_line_audit/" + first.id), fields: encodeFields(first) }, currentDocument: { exists: false } },
+      { update: { name: documentResourceName("/budget_line_audit/" + second.id), fields: encodeFields(second) }, currentDocument: { exists: false } },
     ];
   });
   const writes = [
@@ -163,6 +168,31 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
     { update: { name: sourceName, fields: encodeFields(sourceUpdate) }, updateMask: { fieldPaths: Object.keys(sourceUpdate) }, currentDocument: { updateTime } },
     ...auditWrites,
   ];
+  if (collection === "quotes") {
+    const existingOrder = await readDocument(req, "production_orders", productionOrderId);
+    if (existingOrder && String(existingOrder.data.quoteId || "") !== documentId) {
+      throw new Error("Conflito: a ordem de produção já está vinculada a outro orçamento.");
+    }
+    if (!existingOrder) {
+      const quote = snapshot.document || {};
+      const order = {
+        number: "OP-" + new Date().getFullYear() + "-" + productionOrderId.slice(-8).toUpperCase(),
+        quoteId: documentId, quoteNumber: String(quote.number || ""),
+        clientName: String(quote.clientName || "Cliente"), clientAddress: String(quote.clientAddress || ""),
+        description: "Produção do orçamento " + String(quote.number || documentId),
+        status: "planned", workflowStage: "production", nextStep: "iniciar_producao",
+        targetDate: "", assignedTo: "", materials: [], quoteItems: Array.isArray(quote.items) ? quote.items : [],
+        ...(quote.technicalDrawing?.id || quote.drawingId ? { drawingId: quote.technicalDrawing?.id || quote.drawingId } : {}),
+        quoteTotal: Number(quote.total || 0), currency: String(quote.currency || "BRL"),
+        deliveryStatus: "pending", invoiceStatus: "pending", paymentStatus: "pending",
+        approvedSnapshotId: snapshotId, createdAt: now, updatedAt: now, createdBy: snapshot.approvedBy.email,
+      };
+      writes.push({
+        update: { name: documentResourceName("/production_orders/" + productionOrderId), fields: encodeFields(order) },
+        currentDocument: { exists: false },
+      });
+    }
+  }
   const result = await fetch(base() + ":commit", {
     method: "POST", headers: { Authorization: "Bearer " + tokenOf(req), "Content-Type": "application/json" },
     body: JSON.stringify({ writes }), signal: AbortSignal.timeout(15000),
@@ -286,6 +316,25 @@ export default async function handler(req: any, res: any) {
           capturedAt: new Date().toISOString(),
         },
       };
+      const orderQueryResponse = await fetch(base() + ":runQuery", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + tokenOf(req), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: "production_orders" }],
+            where: { fieldFilter: { field: { fieldPath: "quoteId" }, op: "EQUAL", value: { stringValue: documentId } } },
+            limit: 1,
+          },
+        }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!orderQueryResponse.ok) throw new Error("Não foi possível verificar ordens de produção já vinculadas ao orçamento.");
+      const orderQueryRows = await orderQueryResponse.json() as any[];
+      const existingOrderName = Array.isArray(orderQueryRows) ? orderQueryRows.find((row: any) => row.document?.name)?.document.name : "";
+      const existingOrderId = existingOrderName ? String(existingOrderName).split("/").pop() : "";
+      const existingOrder = existingOrderId ? await readDocument(req, "production_orders", existingOrderId) : null;
+      snapshot.document.productionOrderId = existingOrderId || ("quote_" + documentId);
+      snapshot.document.productionStatus = String(existingOrder?.data.status || "planned");
       snapshot.budgetSnapshot = createBudgetSnapshot({
         documentId, documentNumber: String(source.number || ""), approvedAt,
         approvedBy: snapshot.approvedBy, currency: String(source.currency || "BRL"),
@@ -346,7 +395,10 @@ export default async function handler(req: any, res: any) {
     snapshot.contentHash = digest(snapshot);
     snapshot.document.snapshotContentHash = snapshot.contentHash;
     const snapshotId = await commitSnapshot(req, collection, documentId, found.updateTime, snapshot);
-    return send(res, 201, { snapshotId, snapshot, immutable: true });
+    return send(res, 201, {
+      snapshotId, snapshot, immutable: true,
+      ...(collection === "quotes" ? { productionOrderId: snapshot.document.productionOrderId } : {}),
+    });
   } catch (error: any) {
     console.error("Approved snapshot operation failed:", error?.message || error);
     return send(res, 422, { error: error?.message || "Não foi possível aprovar e congelar o documento." });

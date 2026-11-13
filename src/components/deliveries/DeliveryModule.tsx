@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, orderBy, query, writeBatch } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Camera, CameraOff, CheckCircle2, ClipboardCheck, FileText, MapPin, PenLine, Plus, RefreshCw, Trash2, Truck, X } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
@@ -131,6 +131,7 @@ export default function DeliveryModule() {
   const saveDelivery = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedQuote) { setErrorText("Selecione um orçamento para vincular a entrega."); return; }
+    if (selectedQuote.deliveryId || selectedQuote.deliveryStatus === "Entregue") { setErrorText("Este orçamento já possui uma entrega registrada."); return; }
     if (!photos.length) { setErrorText("Registre pelo menos uma fotografia feita no local."); return; }
     if (!location) { setErrorText("Registre a localização GPS no local da entrega."); return; }
     if (!signedBy.trim() || !hasSignature()) { setErrorText("Informe o nome do cliente e recolha sua assinatura no quadro."); return; }
@@ -138,9 +139,16 @@ export default function DeliveryModule() {
     const currentUser = auth.currentUser;
     if (!currentUser) { setErrorText("Sua sessão expirou. Entre novamente."); return; }
     setSaving(true); setErrorText("");
-    const deliveryRef = doc(collection(db, "deliveries"));
-    const stamp = new Date().toISOString();
     try {
+      const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", selectedQuote.id)));
+    const orderNotReady = linkedOrders.docs.find((orderDoc) => !["completed", "delivered"].includes(String(orderDoc.data().status || "")));
+    if (orderNotReady) {
+      setSaving(false);
+      setErrorText("A ordem de produção precisa estar concluída antes de registrar a entrega.");
+      return;
+    }
+      const deliveryRef = doc(collection(db, "deliveries"));
+      const stamp = new Date().toISOString();
       stopCamera();
       const uploadedPhotos: Delivery["photos"] = [];
       for (let index = 0; index < photos.length; index++) {
@@ -182,8 +190,14 @@ export default function DeliveryModule() {
         photos: uploadedPhotos, latitude: location.latitude, longitude: location.longitude,
         locationAt: location.capturedAt, operatorName, createdAt: stamp
       });
-      batch.update(doc(db, "quotes", selectedQuote.id), { ...deliveryEvidence, deliveryEvidence });
+      batch.update(doc(db, "quotes", selectedQuote.id), {
+        ...deliveryEvidence, deliveryEvidence, productionStatus: "delivered", updatedAt: serverTimestamp(),
+      });
       if (selectedInvoice) batch.update(doc(db, "invoices", selectedInvoice.id), { ...deliveryEvidence, deliveryEvidence });
+      linkedOrders.docs.forEach((orderDoc) => batch.update(orderDoc.ref, {
+        status: "delivered", workflowStage: "billing", nextStep: "emitir_fatura",
+        deliveryId: deliveryRef.id, deliveryStatus: "delivered", deliveredAt: stamp, updatedAt: serverTimestamp(),
+      }));
       await batch.commit();
       resetForm();
     } catch (error) {

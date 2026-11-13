@@ -5,12 +5,18 @@ import { CheckCircle2, Factory, Loader2, PackageCheck, Play, Plus, XCircle } fro
 import CuttingPlanTab from "./CuttingPlanTab";
 import type { TechnicalDrawing } from "../../types";
 
-type QuoteRecord = { id: string; number?: string; clientName?: string; status?: string; items?: any[]; total?: number; drawingId?: string; technicalDrawing?: { id?: string } };
+type QuoteRecord = { id: string; number?: string; clientName?: string; status?: string; productionOrderId?: string; items?: any[]; total?: number; drawingId?: string; technicalDrawing?: { id?: string } };
 type Material = { id: string; name: string; sku?: string; unit?: string; quantity: number; reservedQuantity?: number };
 type ReservedMaterial = { itemId: string; name: string; sku?: string; unit: string; quantity: number };
-type WorkOrder = { id: string; number: string; quoteId: string; quoteNumber: string; clientName: string; description: string; targetDate: string; assignedTo: string; status: "planned" | "in_progress" | "completed" | "cancelled"; materials: ReservedMaterial[]; drawingId?: string; quoteItems?: QuoteRecord["items"]; createdAt?: any };
+type WorkOrder = {
+  id: string; number: string; quoteId: string; quoteNumber: string; clientName: string;
+  description: string; targetDate: string; assignedTo: string;
+  status: "planned" | "in_progress" | "completed" | "delivered" | "invoiced" | "paid" | "cancelled";
+  workflowStage?: string; nextStep?: string; invoiceId?: string;
+  materials: ReservedMaterial[]; drawingId?: string; quoteItems?: QuoteRecord["items"]; createdAt?: any;
+};
 
-export default function ProductionModule() {
+export default function ProductionModule({ onNavigateDelivery, onNavigateInvoice }: { onNavigateDelivery?: () => void; onNavigateInvoice?: () => void } = {}) {
   const [quotes, setQuotes] = useState<QuoteRecord[]>([]);
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [stock, setStock] = useState<Material[]>([]);
@@ -38,7 +44,7 @@ export default function ProductionModule() {
     return () => { a(); b(); c(); d(); };
   }, []);
 
-  const approvedQuotes = useMemo(() => quotes.filter(q => q.status === "approved" || q.status === "aprovado"), [quotes]);
+  const approvedQuotes = useMemo(() => quotes.filter(q => (q.status === "approved" || q.status === "aprovado") && !q.productionOrderId), [quotes]);
   const selectedStock = stock.find(x => x.id === materialId);
   const addMaterial = () => {
     const qty = Number(materialQty);
@@ -72,7 +78,8 @@ export default function ProductionModule() {
           tx.update(materialRefs[i], { reservedQuantity: Number(data.reservedQuantity || 0) + requested, updatedAt: serverTimestamp() });
         }
         const number = `OP-${new Date().getFullYear()}-${orderRef.id.slice(0, 6).toUpperCase()}`;
-        tx.set(orderRef, { number, quoteId: quote.id, quoteNumber: quote.number || "", clientName: quote.clientName || "Cliente", description: description.trim() || `Produção do orçamento ${quote.number || ""}`, targetDate, assignedTo: assignedTo.trim(), status: "planned", materials, quoteItems: quote.items || [], ...(quote.technicalDrawing?.id || quote.drawingId ? { drawingId: quote.technicalDrawing?.id || quote.drawingId } : {}), quoteTotal: Number(quote.total || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        tx.set(orderRef, { number, quoteId: quote.id, quoteNumber: quote.number || "", clientName: quote.clientName || "Cliente", description: description.trim() || `Produção do orçamento ${quote.number || ""}`, targetDate, assignedTo: assignedTo.trim(), status: "planned", workflowStage: "production", nextStep: "iniciar_producao", materials, quoteItems: quote.items || [], ...(quote.technicalDrawing?.id || quote.drawingId ? { drawingId: quote.technicalDrawing?.id || quote.drawingId } : {}), quoteTotal: Number(quote.total || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        tx.update(quoteRef, { productionOrderId: orderRef.id, productionStatus: "planned", updatedAt: serverTimestamp() });
       });
       setQuoteId(""); setDescription(""); setTargetDate(""); setAssignedTo(""); setMaterials([]); setMessage("Ordem criada. Os materiais foram reservados e vinculados ao orçamento.");
     } catch (err) { setMessage((err as Error).message || "Não foi possível criar a ordem."); }
@@ -88,7 +95,10 @@ export default function ProductionModule() {
         const current = snap.data() as any;
         if (action === "start") {
           if (current.status !== "planned") throw new Error("Somente ordens planejadas podem iniciar.");
-          tx.update(orderRef, { status: "in_progress", startedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+          const quoteRef = doc(db, "quotes", order.quoteId);
+          const quoteSnap = await tx.get(quoteRef);
+          tx.update(orderRef, { status: "in_progress", workflowStage: "production", nextStep: "concluir_producao", startedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+          if (quoteSnap.exists()) tx.update(quoteRef, { productionStatus: "in_progress", updatedAt: serverTimestamp() });
           return;
         }
         if (!["planned", "in_progress"].includes(current.status)) throw new Error("Esta ordem já foi encerrada.");
@@ -96,6 +106,8 @@ export default function ProductionModule() {
         const refs = reserved.map(m => doc(db, "inventory_items", m.itemId));
         const snapshots = [];
         for (const ref of refs) snapshots.push(await tx.get(ref));
+        const quoteRef = doc(db, "quotes", order.quoteId);
+        const quoteSnap = await tx.get(quoteRef);
         for (let i = 0; i < refs.length; i++) {
           const material = reserved[i]; const stockSnap = snapshots[i];
           if (!stockSnap.exists()) throw new Error(`Material ${material.name} não encontrado.`);
@@ -111,13 +123,23 @@ export default function ProductionModule() {
           }
           tx.update(refs[i], update);
         }
-        tx.update(orderRef, { status: action === "complete" ? "completed" : "cancelled", ...(action === "complete" ? { completedAt: serverTimestamp() } : { cancelledAt: serverTimestamp() }), updatedAt: serverTimestamp() });
+        tx.update(orderRef, action === "complete"
+          ? { status: "completed", workflowStage: "delivery", nextStep: "registrar_entrega", completedAt: serverTimestamp(), updatedAt: serverTimestamp() }
+          : { status: "cancelled", workflowStage: "cancelled", nextStep: "encerrado", cancelledAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        if (quoteSnap.exists()) tx.update(quoteRef, {
+          productionStatus: action === "complete" ? "ready_for_delivery" : "cancelled",
+          updatedAt: serverTimestamp(),
+        });
       });
       setMessage(action === "complete" ? "Produção concluída. Materiais consumidos e estoque atualizado." : action === "cancel" ? "Ordem cancelada. As reservas foram devolvidas ao estoque." : "Produção iniciada.");
     } catch (err) { setMessage((err as Error).message || "Não foi possível atualizar a ordem."); }
   };
 
-  const statusLabel: Record<string,string> = { planned: "Planejada", in_progress: "Em produção", completed: "Concluída", cancelled: "Cancelada" };
+  const statusLabel: Record<string,string> = {
+    planned: "Aguardando produção", in_progress: "Em produção", completed: "Pronta para entrega",
+    delivered: "Entregue · aguardando fatura", invoiced: "Faturada · aguardando pagamento",
+    paid: "Concluída e recebida", cancelled: "Cancelada",
+  };
   return <div className="space-y-5">
     <nav className="flex gap-2 border-b pb-3">
       <button type="button" onClick={() => setActiveTab("orders")} aria-current={activeTab === "orders" ? "page" : undefined} className={`rounded-lg px-4 py-2 text-sm font-bold ${activeTab === "orders" ? "bg-indigo-600 text-white" : "border"}`}>Ordens de Produção</button>
@@ -140,7 +162,7 @@ export default function ProductionModule() {
       <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="mb-2 text-sm font-semibold">Reservar materiais do estoque</p><div className="flex flex-wrap gap-2"><select className="min-w-0 flex-1 rounded-lg border px-3 py-2" value={materialId} onChange={e=>setMaterialId(e.target.value)}><option value="">Selecionar material</option>{stock.map(m=><option key={m.id} value={m.id}>{m.name} · disponível {Math.max(0,Number(m.quantity||0)-Number(m.reservedQuantity||0))} {m.unit || "un"}</option>)}</select><input className="w-24 rounded-lg border px-3 py-2" type="number" min="0.001" step="0.001" value={materialQty} onChange={e=>setMaterialQty(e.target.value)}/><button type="button" onClick={addMaterial} className="rounded-lg border px-3 py-2"><Plus className="h-4 w-4"/></button></div>{materials.map(m=><div key={m.itemId} className="mt-2 flex items-center justify-between text-sm"><span>{m.name}</span><span>{m.quantity} {m.unit} <button type="button" onClick={()=>setMaterials(prev=>prev.filter(x=>x.itemId!==m.itemId))} className="ml-2 text-rose-600"><XCircle className="inline h-4 w-4"/></button></span></div>)}</div>
       <div className="flex items-center justify-between gap-3"><p className="text-sm text-slate-500" role="status">{message}</p><button disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : "Criar ordem"}</button></div>
     </form>
-    <div className="space-y-3">{orders.map(order=><div key={order.id} className="rounded-xl border bg-white p-4 dark:bg-slate-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-bold">{order.number}</h3><span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{statusLabel[order.status] || order.status}</span></div><p className="text-sm text-slate-600 dark:text-slate-300">{order.clientName} · {order.quoteNumber}</p><p className="text-sm text-slate-500">{order.description}</p><p className="mt-1 text-xs text-slate-500">Prazo: {order.targetDate || "Não definido"} · Responsável: {order.assignedTo || "Não atribuído"}</p></div><div className="flex flex-wrap gap-2">{order.status === "planned" && <button onClick={()=>updateOrder(order,"start")} className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"><Play className="mr-1 inline h-4 w-4"/>Iniciar</button>}{["planned","in_progress"].includes(order.status) && <><button onClick={()=>updateOrder(order,"complete")} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white"><CheckCircle2 className="mr-1 inline h-4 w-4"/>Concluir</button><button onClick={()=>updateOrder(order,"cancel")} className="rounded-lg border px-3 py-2 text-sm"><XCircle className="mr-1 inline h-4 w-4"/>Cancelar</button></>}</div></div><div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">{(order.materials || []).map(m=><span key={m.itemId} className="rounded bg-slate-100 px-2 py-1 dark:bg-slate-800"><PackageCheck className="mr-1 inline h-3 w-3"/>{m.name}: {m.quantity} {m.unit}</span>)}</div></div>)}{!orders.length && <div className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500 dark:bg-slate-900">Nenhuma ordem de produção registrada.</div>}</div>
+    <div className="space-y-3">{orders.map(order=><div key={order.id} className="rounded-xl border bg-white p-4 dark:bg-slate-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h3 className="font-bold">{order.number}</h3><span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{statusLabel[order.status] || order.status}</span></div><p className="text-sm text-slate-600 dark:text-slate-300">{order.clientName} · {order.quoteNumber}</p><p className="text-sm text-slate-500">{order.description}</p><p className="mt-1 text-xs text-slate-500">Prazo: {order.targetDate || "Não definido"} · Responsável: {order.assignedTo || "Não atribuído"}</p></div><div className="flex flex-wrap gap-2">{order.status === "planned" && <button onClick={()=>updateOrder(order,"start")} className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"><Play className="mr-1 inline h-4 w-4"/>Iniciar</button>}{["planned","in_progress"].includes(order.status) && <><button onClick={()=>updateOrder(order,"complete")} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white"><CheckCircle2 className="mr-1 inline h-4 w-4"/>Concluir produção</button><button onClick={()=>updateOrder(order,"cancel")} className="rounded-lg border px-3 py-2 text-sm"><XCircle className="mr-1 inline h-4 w-4"/>Cancelar</button></>}{order.status === "completed" && <button onClick={onNavigateDelivery} className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white">Próxima etapa: entrega →</button>}{order.status === "delivered" && <button onClick={onNavigateInvoice} className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white">Próxima etapa: emitir fatura →</button>}{order.status === "invoiced" && <button onClick={onNavigateInvoice} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white">Próxima etapa: registrar recebimento →</button>}</div></div><div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">Etapa: <b>{order.workflowStage === "delivery" ? "Entrega e instalação" : order.workflowStage === "payment" ? "Faturamento e recebimento" : order.workflowStage === "closed" ? "Finalizada" : "Produção"}</b> · Próximo passo: {order.nextStep === "concluir_producao" ? "Concluir fabricação" : order.nextStep === "registrar_entrega" ? "Registrar entrega" : order.nextStep === "emitir_fatura" ? "Emitir fatura" : order.nextStep === "registrar_recebimento" ? "Registrar recebimento" : order.nextStep === "concluido" ? "Nenhum — processo concluído" : "Iniciar fabricação"}</div><div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">{(order.materials || []).map(m=><span key={m.itemId} className="rounded bg-slate-100 px-2 py-1 dark:bg-slate-800"><PackageCheck className="mr-1 inline h-3 w-3"/>{m.name}: {m.quantity} {m.unit}</span>)}</div></div>)}{!orders.length && <div className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500 dark:bg-slate-900">Nenhuma ordem de produção registrada.</div>}</div>
     </>}
   </div>;
 }
