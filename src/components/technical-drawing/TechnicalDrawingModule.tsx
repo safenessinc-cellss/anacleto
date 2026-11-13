@@ -953,8 +953,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
     const selectedProject = projects.find((project) => project.id === selectedProjectId);
     generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
-    setAiDrawing(generated); setAiTitle(generated.title || inputPrompt);
-    setCurrentStep(1);
+    setAiDrawing(generated);
+    setAiTitle(generated.title || inputPrompt);
     setPrompt(inputPrompt);
     const localDrawing = generated;
 
@@ -1039,6 +1039,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       generated = localDrawing;
     }
 
+    generated = { ...generated, projectId: selectedProject?.id, projectName: selectedProject?.name };
     try {
       setAiDrawing(generated);
       setAiTitle(generated.title || inputPrompt);
