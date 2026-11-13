@@ -1611,6 +1611,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               </> : <div className="flex flex-1 flex-col items-center justify-center text-center text-slate-400"><Sparkles className="mb-3 h-10 w-10 text-violet-400"/><h3 className="font-bold text-white">O esboço aparecerá aqui</h3><p className="mt-2 max-w-sm text-xs">Descreva a esquadria na aba à esquerda e gere o desenho. O Projeto CAD local não será alterado.</p></div>}
             </div>
           ) : (
+          <>
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-2xl flex flex-col h-[680px]">
             {/* Header info bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-2 mb-2 border-b border-slate-800/80">
@@ -1648,7 +1649,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             </div>
           </div>
           <ManufacturingRoute drawing={drawing} title={drawing.title || "Projeto técnico"} />
-          </div>)}
+          </>)}
 
         </div>
       </div>
