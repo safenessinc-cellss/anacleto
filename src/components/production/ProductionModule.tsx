@@ -78,7 +78,8 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateInvoice
           tx.update(materialRefs[i], { reservedQuantity: Number(data.reservedQuantity || 0) + requested, updatedAt: serverTimestamp() });
         }
         const number = `OP-${new Date().getFullYear()}-${orderRef.id.slice(0, 6).toUpperCase()}`;
-        tx.set(orderRef, { number, quoteId: quote.id, quoteNumber: quote.number || "", clientName: quote.clientName || "Cliente", description: description.trim() || `Produção do orçamento ${quote.number || ""}`, targetDate, assignedTo: assignedTo.trim(), status: "planned", materials, quoteItems: quote.items || [], ...(quote.technicalDrawing?.id || quote.drawingId ? { drawingId: quote.technicalDrawing?.id || quote.drawingId } : {}), quoteTotal: Number(quote.total || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        tx.set(orderRef, { number, quoteId: quote.id, quoteNumber: quote.number || "", clientName: quote.clientName || "Cliente", description: description.trim() || `Produção do orçamento ${quote.number || ""}`, targetDate, assignedTo: assignedTo.trim(), status: "planned", workflowStage: "production", nextStep: "iniciar_producao", materials, quoteItems: quote.items || [], ...(quote.technicalDrawing?.id || quote.drawingId ? { drawingId: quote.technicalDrawing?.id || quote.drawingId } : {}), quoteTotal: Number(quote.total || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        tx.update(quoteRef, { productionOrderId: orderRef.id, productionStatus: "planned", updatedAt: serverTimestamp() });
       });
       setQuoteId(""); setDescription(""); setTargetDate(""); setAssignedTo(""); setMaterials([]); setMessage("Ordem criada. Os materiais foram reservados e vinculados ao orçamento.");
     } catch (err) { setMessage((err as Error).message || "Não foi possível criar a ordem."); }
