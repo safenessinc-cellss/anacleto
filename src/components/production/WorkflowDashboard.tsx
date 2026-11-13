@@ -17,7 +17,7 @@ type Quote = { id: string; number?: string; clientName?: string; status?: string
 type WorkOrder = { id: string; number?: string; quoteId: string; quoteNumber?: string; clientName?: string; description?: string; targetDate?: string; assignedTo?: string; status?: string; workflowStage?: string; workflowStageIndex?: number; workflowChecklist?: Record<string, boolean>; signalPaid?: boolean; signalAmount?: number; quoteTotal?: number; balanceDue?: number; createdAt?: any; updatedAt?: any; history?: any[] };
 
 const stageIndex = (order: WorkOrder) => {
-  if (Number.isInteger(order.workflowStageIndex)) return Math.min(6, Math.max(0, Number(order.workflowStageIndex)));
+  if (Number.isInteger(order.workflowStageIndex)) return Math.min(7, Math.max(0, Number(order.workflowStageIndex)));
   const found = STAGES.findIndex(stage => stage.id === order.workflowStage);
   return found >= 0 ? found : 0;
 };
@@ -40,7 +40,7 @@ export default function WorkflowDashboard() {
   const approvedWithoutOrder = useMemo(() => quotes.filter(q => ["approved", "aprovado"].includes(String(q.status).toLowerCase()) && !q.productionOrderId && !orderQuoteIds.has(q.id)), [quotes, orderQuoteIds]);
   const activeOrders = useMemo(() => orders.filter(o => o.status !== "cancelled" && stageIndex(o) < 7), [orders]);
   const visibleOrders = selectedStage === "ALL" ? activeOrders : activeOrders.filter(o => STAGES[stageIndex(o)]?.id === selectedStage);
-  const completedCount = orders.filter(o => o.workflowStage === "POS_VENDA_E_GARANTIA" && o.status !== "cancelled").length;
+  const completedCount = orders.filter(o => Number(o.workflowStageIndex) >= 7 && o.status !== "cancelled").length;
 
   const createTracking = async (quote: Quote) => {
     setBusyId(quote.id); setNotice("");
