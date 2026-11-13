@@ -197,9 +197,12 @@ export function buildArchitecturalIsometricSvg(drawing: DrawingInput): string {
     </g>`;
   }).join("");
   const frontSashes = Array.from({ length: Math.min(leafCount, 4) }, (_, index) => {
-    const px = x + inset + index * sashWidth + (index % 2 ? dx * .58 : 0);
-    const py = y + inset + (index % 2 ? dy * .58 : 0);
-    const width = Math.max(20, sashWidth - Math.abs(dx * .58) - 6);
+    const isSliding = spec.type.includes("correr") || spec.type === "box_banheiro";
+    const travel = isSliding ? sashWidth * 0.12 : 0;
+    const slideX = index % 2 === 0 ? -travel : travel;
+    const px = x + inset + index * sashWidth + slideX;
+    const py = y + inset;
+    const width = Math.max(20, sashWidth - 6);
     return `<g>
       <rect x="${px + 5}" y="${py + 5}" width="${width - 10}" height="${innerH - 10}" fill="url(#iso-glass-front)" stroke="#d4e5e7" stroke-width="2"/>
       <path d="M ${px + 12} ${py + innerH - 22} L ${px + width * .7} ${py + 12}" stroke="#fff" stroke-width="4" opacity=".56"/>
@@ -255,6 +258,12 @@ export function buildArchitecturalDrawingSheetSvg(drawing: DrawingInput): string
     <image href="${elevation}" x="0" y="0" width="1200" height="850"/>
     <image href="${isometric}" x="0" y="850" width="1200" height="780" preserveAspectRatio="xMidYMid meet"/>
   </svg>`;
+}
+
+/** Retorna o conteúdo interno de um SVG gerado localmente para renderização vetorial inline. */
+export function svgInnerMarkup(svg: string): string {
+  const match = svg.match(/^\\s*<svg\\b[^>]*>([\\s\\S]*)<\\/svg>\\s*$/i);
+  return match?.[1] ?? svg;
 }
 
 export function svgDataUri(svg: string): string {
