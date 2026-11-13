@@ -2,7 +2,12 @@ import React, { useMemo, useRef, useState } from "react";
 import { TechnicalDrawing } from "../../types";
 import { ZoomIn, ZoomOut, RotateCcw, Eye, Layers } from "lucide-react";
 import { fitDrawingToViewport } from "../../utils/drawingViewport";
-import { buildArchitecturalElevationSvg, buildArchitecturalIsometricSvg, resolveAluminumSpec, svgDataUri } from "../../utils/architecturalSvg";
+import {
+  buildArchitecturalElevationSvg,
+  buildArchitecturalIsometricSvg,
+  resolveAluminumSpec,
+  svgDataUri,
+} from "../../utils/architecturalSvg";
 
 interface DrawingSvgCanvasProps {
   drawing: TechnicalDrawing;
@@ -97,20 +102,58 @@ export default function DrawingSvgCanvas({
 
   const renderOverview = () => {
     if (isArchitecturalDrawing && architecturalElevation && architecturalIsometric && architecturalSpec) {
-      const rawColor = drawing.parametricSpec?.cor_perfil || drawing.cor || "Branco";
-      const glass = drawing.parametricSpec?.tipo_vidro || drawing.parametricSpec?.cor_vidro || drawing.vidro || architecturalSpec.glassType || "A definir";
-      const typology = drawing.parametricSpec?.tipologia || drawing.tipologia || architecturalSpec.type.replaceAll("_", " ");
+      const rawColor =
+        drawing.parametricSpec?.cor_perfil ||
+        drawing.cor ||
+        "Branco";
+      const glass =
+        drawing.parametricSpec?.tipo_vidro ||
+        drawing.parametricSpec?.cor_vidro ||
+        drawing.vidro ||
+        architecturalSpec.glassType ||
+        "A definir";
+      const typology =
+        drawing.parametricSpec?.tipologia ||
+        drawing.tipologia ||
+        architecturalSpec.type.replaceAll("_", " ");
       const line = drawing.parametricSpec?.linha_aluminio || drawing.linha || architecturalSpec.line;
       const area = (architecturalSpec.width * architecturalSpec.height) / 1_000_000;
+
       return (
         <g>
-          <text x="40" y="42" fill="#f8fafc" fontSize="19" fontWeight="800">DESENHO TÉCNICO ARQUITETÔNICO — VISTAS 2D + 3D</text>
-          <text x="40" y="72" fill="#93c5fd" fontSize="13" fontWeight="700">ALÇADO FRONTAL · SVG VETORIAL</text>
-          <text x="560" y="72" fill="#93c5fd" fontSize="13" fontWeight="700">PERSPECTIVA ISOMÉTRICA · SVG VETORIAL</text>
+          <text x="40" y="42" fill="#f8fafc" fontSize="19" fontWeight="800">
+            DESENHO TÉCNICO ARQUITETÔNICO — VISTAS 2D + 3D
+          </text>
+          <text x="40" y="72" fill="#93c5fd" fontSize="13" fontWeight="700">
+            ALÇADO FRONTAL · SVG VETORIAL
+          </text>
+          <text x="560" y="72" fill="#93c5fd" fontSize="13" fontWeight="700">
+            PERSPECTIVA ISOMÉTRICA · SVG VETORIAL
+          </text>
+
+          {/* Alçado arquitetônico completo: caixilho, folhas, vidro, ferragens e cotas. */}
           <rect x="40" y="82" width="500" height="440" rx="5" fill="#f8fafb" stroke="#64748b" strokeWidth="1.2" />
-          <image href={architecturalElevation} x="40" y="82" width="500" height="440" preserveAspectRatio="xMidYMid meet" />
+          <image
+            href={architecturalElevation}
+            x="40"
+            y="82"
+            width="500"
+            height="440"
+            preserveAspectRatio="xMidYMid meet"
+          />
+
+          {/* Perspectiva isométrica real em SVG: profundidade do perfil e trilhos sobrepostos. */}
           <rect x="560" y="82" width="500" height="440" rx="5" fill="#f7f9f9" stroke="#64748b" strokeWidth="1.2" />
-          <image href={architecturalIsometric} x="560" y="82" width="500" height="440" preserveAspectRatio="xMidYMid meet" />
+          <image
+            href={architecturalIsometric}
+            x="560"
+            y="82"
+            width="500"
+            height="440"
+            preserveAspectRatio="xMidYMid meet"
+          />
+
+          {/* Carimbo técnico comum às duas vistas. */}
           <rect x="40" y="535" width="1020" height="72" rx="5" fill="#0f172a" stroke="#64748b" strokeWidth="1.2" />
           <path d="M 40 570 H 1060 M 245 535 V 607 M 440 535 V 607 M 635 535 V 607 M 830 535 V 607" stroke="#475569" strokeWidth="1" />
           <text x="54" y="553" fill="#94a3b8" fontSize="9" fontWeight="700">TIPOLOGIA</text>
@@ -122,10 +165,16 @@ export default function DrawingSvgCanvas({
           <text x="649" y="553" fill="#94a3b8" fontSize="9" fontWeight="700">VIDRO</text>
           <text x="649" y="590" fill="#f8fafc" fontSize="12" fontWeight="700">{String(glass).slice(0, 22)}</text>
           <text x="844" y="553" fill="#94a3b8" fontSize="9" fontWeight="700">MEDIDAS · ÁREA</text>
-          <text x="844" y="580" fill="#f8fafc" fontSize="11" fontWeight="700">{Math.round(architecturalSpec.width)} × {Math.round(architecturalSpec.height)} mm</text>
-          <text x="844" y="597" fill="#fbbf24" fontSize="10" fontWeight="700">{area.toFixed(2)} m²</text>
+          <text x="844" y="580" fill="#f8fafc" fontSize="11" fontWeight="700">
+            {Math.round(architecturalSpec.width)} × {Math.round(architecturalSpec.height)} mm
+          </text>
+          <text x="844" y="597" fill="#fbbf24" fontSize="10" fontWeight="700">
+            {area.toFixed(2)} m²
+          </text>
           {labelsVisible && (
-            <text x="40" y="624" fill="#94a3b8" fontSize="9">PERFIL: {Math.round(architecturalSpec.depth)} mm · {pieces.length} COMPONENTES · PRÉ-VISUALIZAÇÃO; VALIDAR FOLGAS E FERRAGENS ANTES DA FABRICAÇÃO.</text>
+            <text x="40" y="624" fill="#94a3b8" fontSize="9">
+              PERFIL: {Math.round(architecturalSpec.depth)} mm · {pieces.length} COMPONENTES · PRÉ-VISUALIZAÇÃO; VALIDAR FOLGAS E FERRAGENS ANTES DA FABRICAÇÃO.
+            </text>
           )}
         </g>
       );
