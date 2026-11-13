@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   Compass,
   Sparkles,
-  Send,
   Download,
   ChevronLeft,
   ChevronRight,
