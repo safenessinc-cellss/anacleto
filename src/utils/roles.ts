@@ -143,7 +143,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     id: "qualidade", label: "Qualidade", labelPT: "Qualidade", level: 30,
     color: "bg-teal-100 text-teal-800 border-teal-300",
     description: "Inspeções, entregas, garantias e pós-venda.",
-    tabs: ["dashboard", "post_sale", "deliveries", "reports", "profile", "suggestions"],
+    tabs: ["dashboard", "post_sale", "deliveries", "workflow", "reports", "profile", "suggestions"],
     canManageUsers: false, canManageRolesBelow: [],
   },
   estoque: {
