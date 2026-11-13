@@ -804,6 +804,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
       const finalInvoice: Invoice = baseInvoice;
+      const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", approvedQuote.id)));
       await runTransaction(db, async tx => {
         const current = await tx.get(quoteRef);
         if (!current.exists()) throw new Error("Orçamento não encontrado.");
@@ -818,7 +819,6 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
           notes: "Gerado automaticamente na conversão do orçamento.", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         }));
         tx.update(quoteRef, sanitizeFirestoreData({ status: "invoiced", invoiceId, invoicedAt: serverTimestamp(), productionStatus: "invoiced", updatedAt: serverTimestamp() }));
-        const linkedOrders = await getDocs(query(collection(db, "production_orders"), where("quoteId", "==", approvedQuote.id)));
         linkedOrders.docs.forEach((orderDoc) => tx.update(orderDoc.ref, {
           status: "invoiced", workflowStage: "payment", nextStep: "registrar_recebimento",
           invoiceId, invoiceNumber, invoiceStatus: "pending", updatedAt: serverTimestamp(),
