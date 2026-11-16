@@ -592,3 +592,23 @@ html.dark [role="tab"]:active {
   color: #edf4ff !important;
 }
 
+
+
+/* ANACLETO · remover o azul escuro persistente após clique */
+html:not(.dark) button:focus:not(:focus-visible),
+html:not(.dark) a:focus:not(:focus-visible),
+html:not(.dark) [role="button"]:focus:not(:focus-visible) {
+  outline: none !important;
+  background-color: #eaf2ff !important;
+  color: #294b78 !important;
+  box-shadow: inset 0 0 0 1px rgba(111, 159, 232, .2) !important;
+}
+html:not(.dark) nav[aria-label="Seções da folha de pagamento"] button[aria-current="page"],
+html:not(.dark) nav[aria-label="Seções da folha de pagamento"] button[data-state="active"] {
+  background-color: #eaf2ff !important;
+  color: #294b78 !important;
+}
+html:not(.dark) nav[aria-label="Seções da folha de pagamento"] button:focus {
+  background-color: #eaf2ff !important;
+  color: #294b78 !important;
+}
