@@ -5,7 +5,7 @@ import { Plus, Trash2, Pencil, BriefcaseBusiness } from "lucide-react";
 
 type WorkItem = { id: string; obra: string; servico: string; detalhe: string; valor: string; data: string };
 type AdvanceItem = { id: string; data: string; valor: string; detalhe: string };
-type SavedAdvance = { data: string; valor: number; detalhe: string };
+type SavedAdvance = { id: string; data: string; valor: number; detalhe: string };
 type OutsourcedRecord = { id: string; nome: string; cpf?: string; competencia: string; data: string; itens: Array<{ obra: string; servico: string; detalhe: string; valor: number; data?: string }>; adiantamentos?: SavedAdvance[]; totalAdiantado?: number; saldoPendente?: number; total: number; status?: string };
 const money = (value: number) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -59,19 +59,18 @@ export default function OutsourcedServicesModule() {
     const payload = {
       nome: nome.trim(), cpf: cpf.trim(), competencia, data,
       itens: validItems.map(item => ({ obra: item.obra.trim(), servico: item.servico.trim(), detalhe: item.detalhe.trim(), valor: Number(Number(item.valor).toFixed(2)), data: item.data || data })),
-      adiantamentos: adiantamentos.filter(item => Number(item.valor) > 0).map(item => ({ data: item.data, valor: Number(Number(item.valor).toFixed(2)), detalhe: item.detalhe.trim() })),
+      adiantamentos: adiantamentos.filter(item => Number(item.valor) > 0).map(item => ({ id: item.id, data: item.data, valor: Number(Number(item.valor).toFixed(2)), detalhe: item.detalhe.trim() })),
       total: Number(total.toFixed(2)), totalAdiantado: Number(paidNow.toFixed(2)), saldoPendente: Number(balanceNow.toFixed(2)), status: "posted",
       updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "",
     };
     try {
       if (editingId) {
         await updateDoc(doc(db, "payroll_outsourced_services", editingId), payload);
-        const ledgerRef = doc(db, "ledger_entries", `outsourced-service-${editingId}`);
-        if (payload.totalAdiantado > 0) await setDoc(ledgerRef, { direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: editingId, description: `Adiantamentos/abonos · ${nome.trim()} · ${competencia}`, amount: payload.totalAdiantado, date: payload.adiantamentos[payload.adiantamentos.length - 1]?.data || date, status: "posted", updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "" }, { merge: true });
-        else await deleteDoc(ledgerRef);
+        await deleteDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}`)).catch(() => undefined);
+        for (const payment of payload.adiantamentos) await setDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}-advance-${payment.id}`), { direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: editingId, description: `Adiantamento · ${nome.trim()} · ${payment.detalhe || competencia}`, amount: payment.valor, date: payment.data, status: "posted", updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "" }, { merge: true });
       } else {
         const created = await addDoc(collection(db, "payroll_outsourced_services"), { ...payload, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
-        if (payload.totalAdiantado > 0) await setDoc(doc(db, "ledger_entries", `outsourced-service-${created.id}`), { direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: created.id, description: `Adiantamentos/abonos · ${nome.trim()} · ${competencia}`, amount: payload.totalAdiantado, date: payload.adiantamentos[payload.adiantamentos.length - 1]?.data || date, status: "posted", createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        for (const payment of payload.adiantamentos) await setDoc(doc(db, "ledger_entries", `outsourced-service-${created.id}-advance-${payment.id}`), { direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: created.id, description: `Adiantamento · ${nome.trim()} · ${payment.detalhe || competencia}`, amount: payment.valor, date: payment.data, status: "posted", createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
       }
       reset();
     } catch (reason) {
@@ -90,11 +89,12 @@ export default function OutsourcedServicesModule() {
     try {
       await deleteDoc(doc(db, "payroll_outsourced_services", row.id));
       await deleteDoc(doc(db, "ledger_entries", `outsourced-service-${row.id}`));
+      for (const payment of row.adiantamentos || []) if (payment.id) await deleteDoc(doc(db, "ledger_entries", `outsourced-service-${row.id}-advance-${payment.id}`));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Não foi possível excluir o lançamento."); }
   };
 
   return <section className="space-y-4 rounded-2xl border border-violet-200 bg-violet-50/50 p-5 dark:border-slate-700 dark:bg-slate-900">
-    <header className="flex items-start gap-3"><div className="rounded-xl bg-violet-100 p-3 text-violet-700"><BriefcaseBusiness/></div><div><p className="text-xs font-bold uppercase tracking-widest text-violet-700">Prestadores por obra</p><h2 className="text-xl font-black">Funcionários terceirizados</h2><p className="mt-1 text-sm text-slate-500">Cadastre a pessoa uma única vez por lançamento e detalhe todos os serviços e obras. O sistema calcula um único total consolidado e registra uma única saída no caixa.</p></div></header>
+    <header className="flex items-start gap-3"><div className="rounded-xl bg-violet-100 p-3 text-violet-700"><BriefcaseBusiness/></div><div><p className="text-xs font-bold uppercase tracking-widest text-violet-700">Prestadores por obra</p><h2 className="text-xl font-black">Funcionários terceirizados</h2><p className="mt-1 text-sm text-slate-500">Cadastre o prestador e detalhe os serviços por obra. Cada adiantamento fica registrado separadamente com sua própria data; o saldo pendente é calculado automaticamente.</p></div></header>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     <div className="grid gap-3 sm:grid-cols-4"><div className="rounded-xl border bg-white p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">Lançamentos na competência</p><strong className="text-xl">{monthRecords.length}</strong></div><div className="rounded-xl border bg-white p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">Total contratado</p><strong className="text-xl">{money(monthTotal)}</strong></div><div className="rounded-xl border bg-white p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">Total adiantado / pago</p><strong className="text-xl text-emerald-700">{money(monthPaid)}</strong></div><div className="rounded-xl border bg-white p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">Saldo pendente</p><strong className="text-xl text-amber-700">{money(Math.max(0, monthTotal - monthPaid))}</strong></div></div>
     <form id="outsourced-services-form" onSubmit={save} className="space-y-4 rounded-xl border bg-white p-4 dark:bg-slate-800">
