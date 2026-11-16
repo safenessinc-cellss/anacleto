@@ -490,7 +490,7 @@ export default function App() {
               onClick={() => setCurrentView("pro")}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-lg shadow-amber-500/20"
             >
-              <Compass className="w-4 h-4" /> Panel Anacleto Pro
+              <Compass className="w-4 h-4" /> Acessar Dashboard
             </button>
             <div className="flex items-center gap-2 bg-luxury-dark border px-3 py-1.5 rounded-2xl border-luxury-border/30">
               <Globe className="w-4 h-4 text-luxury-gold" />
