@@ -10,7 +10,7 @@ export default function PublicShowroom3D({config,opened}:Props) {
  renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"low-power"});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));renderer.setSize(node.clientWidth,node.clientHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;node.replaceChildren(renderer.domElement);
  scene.add(new THREE.HemisphereLight(0xffffff,0x65717b,2.2));const key=new THREE.DirectionalLight(0xffffff,3.5);key.position.set(3,7,5);scene.add(key);const rim=new THREE.DirectionalLight(0xb9d8e9,2);rim.position.set(-4,3,-4);scene.add(rim);
  const group=new THREE.Group();scene.add(group);
- const palette:Record<string,string>={"Preto Fosco":"#25282c","Branco":"#edf0f2","Bronze":"#94704e","Anodizado":"#aeb8c1"};
+ const palette:Record<string,string>={"Preto Fosco":"#25282c","Branco":"#edf0f2","Bronze":"#94704e","Anodizado":"#aeb8c1","Champagne":"#c6a77b","Amadeirado":"#76543d"};
  const glassPalette:Record<string,string>={"Incolor":"#b8deeb","Fumê":"#526577","Reflecta":"#c5a878"};
  const metal=new THREE.MeshStandardMaterial({color:palette[config.color]||"#25282c",metalness:.86,roughness:.24});
  const pane=new THREE.MeshPhysicalMaterial({color:glassPalette[config.glass]||"#b8deeb",metalness:.16,roughness:.1,transparent:true,opacity:.62,transmission:.32,thickness:.1,side:THREE.DoubleSide});
