@@ -21,10 +21,10 @@ export default function PublicAssemblyIntro({onComplete,onSkip}:Props) {
  ];
  const leafW=(W-T*2)/2;
  const leaves=[new THREE.Group(),new THREE.Group()];leaves.forEach((leaf,i)=>{assembly.add(leaf);leaf.position.set((i===0?-1:1)*leafW/2,0,.035);const bar=(x:number,y:number,w:number,h:number,d:number,mat:any)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,0);leaf.add(m);return m;};bar(0,0,T,H-.18,.12,alloy);bar(0,H/2-.04,leafW-.05,T,.12,alloy);bar(0,-H/2+.04,leafW-.05,T,.12,alloy);bar(0,0,leafW-.17,H-.18,.028,glassMat);});
- const seals=[make(W-.1,.018,.11,sealMat,0,H/2-.13,.03),make(W-.1,.018,.11,sealMat,0,-H/2+.13,.03)];
+ const panes=[make(leafW-.17,H-.18,.028,glassMat,-leafW/2,0,.005),make(leafW-.17,H-.18,.028,glassMat,leafW/2,0,.005)];\n const seals=[make(W-.1,.018,.11,sealMat,0,H/2-.13,.03),make(W-.1,.018,.11,sealMat,0,-H/2+.13,.03)];
  const paneTrim=[make(.018,H-.2,.1,darkAlloy,-.03,0,.12),make(.018,H-.2,.1,darkAlloy,.03,0,.12)];
  const handle=make(.045,.28,.065,alloy,leafW/2-.13,.02,.13);const lock=make(.08,.07,.08,darkAlloy,leafW/2-.13,-.17,.13);
- const pieces=[...profiles,...seals,...paneTrim,...leaves,handle,lock];const targets=pieces.map(p=>p.position.clone());
+ const pieces=[...profiles,...seals,...paneTrim,...leaves,...panes,handle,lock];const targets=pieces.map(p=>p.position.clone());
  profiles.forEach((p,i)=>{p.position.add(new THREE.Vector3(i%2===0?0:(i===2?-3:3),i<2?(i===0?3:-3):0,2));});
  seals.forEach((p,i)=>p.position.add(new THREE.Vector3(i===0?0:0,i===0?2:-2,-1)));
  paneTrim.forEach((p,i)=>p.position.add(new THREE.Vector3(i===0?-2:2,0,1)));
