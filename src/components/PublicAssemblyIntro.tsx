@@ -15,9 +15,12 @@ export default function PublicAssemblyIntro({onComplete,onSkip}:Props) {
  const alloy=new THREE.MeshStandardMaterial({color:"#aeb8c1",metalness:.92,roughness:.23});const darkAlloy=new THREE.MeshStandardMaterial({color:"#30373e",metalness:.88,roughness:.28});const sealMat=new THREE.MeshStandardMaterial({color:"#101317",roughness:.85});const glassMat=new THREE.MeshPhysicalMaterial({color:"#b8d9e8",metalness:.12,roughness:.08,transparent:true,opacity:.32,transmission:.65,thickness:.12,ior:1.48,side:THREE.DoubleSide});
  const make=(w:number,h:number,d:number,mat:any,x:number,y:number,z:number)=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);mesh.position.set(x,y,z);assembly.add(mesh);return mesh;};
  const W=3.25,H=2.35,D=.16,T=.095;
+ const miteredProfile=(points:number[][])=>{const shape=new THREE.Shape();shape.moveTo(points[0][0],points[0][1]);points.slice(1).forEach(([x,y])=>shape.lineTo(x,y));shape.closePath();const geometry=new THREE.ExtrudeGeometry(shape,{depth:D,bevelEnabled:true,bevelThickness:.006,bevelSize:.006,bevelSegments:1,curveSegments:1});const mesh=new THREE.Mesh(geometry,alloy);mesh.position.z=-D/2;assembly.add(mesh);return mesh;};
  const profiles=[
-  make(W,T,D,alloy,0,H/2,0),make(W,T,D,alloy,0,-H/2,0),
-  make(T,H,D,alloy,-W/2,0,0),make(T,H,D,alloy,W/2,0,0)
+  miteredProfile([[-W/2-T/2,H/2+T/2],[W/2+T/2,H/2+T/2],[W/2-T/2,H/2-T/2],[-W/2+T/2,H/2-T/2]]),
+  miteredProfile([[-W/2+T/2,-H/2+T/2],[W/2-T/2,-H/2+T/2],[W/2+T/2,-H/2-T/2],[-W/2-T/2,-H/2-T/2]]),
+  miteredProfile([[-W/2-T/2,H/2+T/2],[-W/2+T/2,H/2-T/2],[-W/2+T/2,-H/2+T/2],[-W/2-T/2,-H/2-T/2]]),
+  miteredProfile([[W/2+T/2,H/2+T/2],[W/2-T/2,H/2-T/2],[W/2-T/2,-H/2+T/2],[W/2+T/2,-H/2-T/2]])
  ];
  const leafW=(W-T*2)/2;
  const leaves=[new THREE.Group(),new THREE.Group()];leaves.forEach((leaf,i)=>{assembly.add(leaf);leaf.position.set((i===0?-1:1)*leafW/2,0,.035);const bar=(x:number,y:number,w:number,h:number,d:number,mat:any)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,0);leaf.add(m);return m;};bar(0,0,T,H-.18,.12,alloy);bar(0,H/2-.04,leafW-.05,T,.12,alloy);bar(0,-H/2+.04,leafW-.05,T,.12,alloy);});
