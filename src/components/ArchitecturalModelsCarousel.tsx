@@ -40,6 +40,7 @@ export default function ArchitecturalModelsCarousel({ onConfigure }: Props) {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [active, setActive] = useState<ArchitecturalModel | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const track = useRef<HTMLDivElement>(null);
   const items = useMemo(() => [...generated, ...baseModels], [generated]);
 
@@ -93,7 +94,7 @@ export default function ArchitecturalModelsCarousel({ onConfigure }: Props) {
       <div className="amc-suggestions">{suggestions.map(s=><button key={s} type="button" onClick={()=>setPrompt(s)}>{s}</button>)}</div>
       {notice&&<p className="amc-notice" role="status">{notice}</p>}
     </div>
-    <div className="amc-track" ref={track} aria-label="Carrossel de modelos arquitetônicos" tabIndex={0}>
+    <div className="amc-track" ref={track} aria-label="Carrossel de modelos arquitetônicos" tabIndex={0} onScroll={e=>{const node=e.currentTarget;const card=node.querySelector<HTMLElement>(".amc-card");if(card)setActiveIndex(Math.max(0,Math.min(items.length-1,Math.round(node.scrollLeft/(card.offsetWidth+18)))));}}>
       {items.map(item=><article className="amc-card" key={item.id}>
         <button className="amc-image-button" type="button" onClick={()=>setActive(item)} aria-label={`Ampliar ${item.title}`}><img src={item.image} alt={`Render técnico de ${item.title}, acabamento ${item.color}`} loading={item.generated?"eager":"lazy"}/><span className="amc-zoom"><Expand size={15}/> VER DETALHES</span></button>
         <div className="amc-card-content"><span className="amc-badge">{item.badge}</span><h3>{item.title}</h3><p>{item.detail}</p><div className="amc-meta"><span><i style={{background:item.color==="Branco"?"#f2f2ef":item.color==="Bronze"?"#9a704d":item.color==="Natural Fosco"?"#aeb6b9":"#24282e"}}/>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button className="amc-configure" type="button" onClick={()=>onConfigure(item)}>Configurar este modelo <MoveUpRight size={16}/></button></div>
