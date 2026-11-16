@@ -27,7 +27,7 @@ export default function PublicShowroom3D({ config, opened }: Props) {
         const glassColor = config.glass==="Fumê"?"#536879":config.glass==="Verde"?"#73978c":config.glass==="Reflecta"?"#8fa9b9":"#a9d6e8";
         const metal = new THREE.MeshStandardMaterial({color:metalColor,metalness:.82,roughness:.28});
         const pane = new THREE.MeshPhysicalMaterial({color:glassColor,metalness:.18,roughness:.12,transparent:true,opacity:.58,transmission:.28,thickness:.08,side:THREE.DoubleSide});
-        const width = 3.0, height = 2.25, depth = .13;
+        const width = Math.max(1.5, Math.min(4.8, 3 * config.width / 1600)), height = Math.max(1.3, Math.min(4, 2.25 * config.height / 1200)), depth = .13;
         const bar = (x:number,y:number,z:number,w:number,h:number,d:number,mat:any) => { const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); mesh.position.set(x,y,z); group.add(mesh); return mesh; };
         const roof = config.model==="Cobertura de Vidro";
         if (roof) {
