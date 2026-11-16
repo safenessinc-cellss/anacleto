@@ -90,13 +90,16 @@ service cloud.firestore {
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
     match /ledger_entries/{id} {
-      allow read: if canManageFinance() || (hasRole(['rh']) && resource.data.category in ['employee_advance','payroll']);
-      allow create: if canManageFinance() || (hasRole(['rh']) && request.resource.data.category in ['employee_advance','payroll']);
+      allow read: if canManageFinance() || (hasRole(['rh']) && resource.data.category in ['employee_advance','payroll','third_party_services']);
+      allow create: if canManageFinance() || (hasRole(['rh']) && request.resource.data.category in ['employee_advance','payroll','third_party_services']);
       allow update: if canManageFinance() || (hasRole(['rh'])
+        && resource.data.category == 'third_party_services'
+        && request.resource.data.category == 'third_party_services'
+        && request.resource.data.sourceType == 'payroll_outsourced_services') || (hasRole(['rh'])
         && resource.data.category == 'employee_advance'
         && request.resource.data.category == 'employee_advance'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['settled','settledAt','payrollPaymentId']));
-      allow delete: if canManageFinance();
+      allow delete: if canManageFinance() || (hasRole(['rh']) && resource.data.category == 'third_party_services');
     }
     match /daily_expenses/{id} { allow read, write: if canManageFinance(); }
     match /client_advances/{id} { allow read, write: if canManageFinance(); }
@@ -110,6 +113,7 @@ service cloud.firestore {
     match /receivables/{id} { allow read, write: if canManageFinance(); }
     match /suppliers/{id} { allow read, write: if canManageFinance(); }
     match /payroll_adjustments/{id} { allow read, write: if canManagePayroll(); }
+    match /payroll_outsourced_services/{id} { allow read, write: if canManagePayroll(); }
     match /employees/{id} {
       allow read, create, update, delete: if canManagePayroll();
     }
