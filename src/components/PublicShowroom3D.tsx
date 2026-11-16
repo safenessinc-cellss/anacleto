@@ -35,14 +35,14 @@ export default function PublicShowroom3D({ config, opened }: Props) {
           for(let i=0;i<4;i++){bar(-1.45+i*.96,1.97,-1.05,.055,.06,2.1,metal); const p=bar(-.98+i*.96,1.94,-1.05,.88,.025,2.04,pane); p.rotation.x=-.08;}
           for(let i=0;i<3;i++) bar(-1.35+i*1.35,1,-2.08,.08,2,.08,metal);
         } else {
-          bar(0,height/2,0,width,.11,depth,metal); bar(0,-height/2+height,0,width,.11,depth,metal);
+          bar(0,height/2,0,width,.11,depth,metal); bar(0,.055,0,width,.11,depth,metal);
           bar(-width/2,.0,0,.11,height,depth,metal); bar(width/2,.0,0,.11,height,depth,metal);
           bar(0,0,-.025,.055,height-.15,.1,metal);
           const pane1=bar(-.74,1.12,0,1.38,2.08,.035,pane);
           const pane2=bar(.74,1.12,0,1.38,2.08,.035,pane);
           bar(0,.08,.075,width-.2,.045,.07,metal);
-          if(config.model==="Maxim-Ar"){pane1.rotation.z=opened?-.18:0;pane2.rotation.z=opened?.18:0;}
-          if(config.model==="Porta Camarão"){pane1.rotation.y=opened?-.65:0;pane2.rotation.y=opened?.65:0;}
+          if(config.model==="Maxim-Ar"){pane1.rotation.z=opened ? -.18 : 0;pane2.rotation.z=opened ? .18 : 0;}
+          if(config.model==="Porta Camarão"){pane1.rotation.y=opened ? -.65 : 0;pane2.rotation.y=opened ? .65 : 0;}
           if(config.model==="Porta Balcão"||config.model==="Janela de Correr"){pane1.position.x=opened?-1.12:-.74;pane2.position.x=opened?1.12:.74;}
           if(config.line==="Gold") bar(0,height-.23,.055,width-.2,.025,.045,metal);
         }
