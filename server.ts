@@ -653,8 +653,7 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
         `Serviço: ${service || "-"}`,
         `Endereço: ${address || "-"}`,
         notes ? `Notas: ${notes}` : null,
-      ].filter(Boolean).join("
-"),
+      ].filter(Boolean).join("\n"),
       location: address || "",
       start: { dateTime: startDateTime, timeZone: "America/Sao_Paulo" },
       end: { dateTime: endDateTime, timeZone: "America/Sao_Paulo" },
@@ -696,9 +695,7 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
     const repaired = await generateText({
       model: getAIModel("documentExtraction"),
       system: "Corrija somente a estrutura JSON da extração. Não invente, complete ou altere nenhum dado do documento. Retorne apenas JSON válido.",
-      prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "
-Resposta original:
-" + String(response.text || "").slice(0, 30000),
+      prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "\nResposta original:\n" + String(response.text || "").slice(0, 30000),
       temperature: 0,
       maxOutputTokens,
       abortSignal: AbortSignal.timeout(AI_CONFIG.documentExtraction.timeoutMs),
