@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { Plus, Trash2, Pencil, BriefcaseBusiness } from "lucide-react";
 
@@ -56,7 +56,6 @@ export default function OutsourcedServicesModule() {
         });
       } else {
         const created = await addDoc(collection(db, "payroll_outsourced_services"), { ...payload, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
-        const { setDoc } = await import("firebase/firestore");
         await setDoc(doc(db, "ledger_entries", `outsourced-service-${created.id}`), {
           direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: created.id,
           description: `Serviços terceirizados · ${nome.trim()} · ${competencia}`, amount: payload.total, date, status: "posted",
