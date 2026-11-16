@@ -389,7 +389,7 @@ export default function App() {
             <Login t={t} language={language} onLoginSuccess={() => {}} />
           </div>
           <button onClick={() => setLegalDocument("privacy")} className="fixed bottom-4 left-4 z-[80] rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-lg">Legal e Privacidade</button>
-          {legalDocument && <LegalCenter initialDocument={legalDocument} onClose={() => setLegalDocument(null)} contactEmail={senderConfig.profileEmail || "contato@anacletoesquadrias.com.br"} companyName={senderConfig.name || "Anacleto Esquadrias"} />}
+          {legalDocument && <LegalCenter initialDocument={legalDocument} onClose={() => setLegalDocument(null)} contactEmail={senderConfig.profileEmail || "contato@anacletoesquadrias.com.br"} companyName="ANACLETOESQUADRIAS" />}
           <CookieConsent />
         </>
       );
