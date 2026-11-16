@@ -10,7 +10,7 @@ import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFir
 import technicalDrawingHandler from "./api/technical-drawing.js";
 import approvedSnapshotHandler from "./api/approved-snapshot.js";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate.js";
-import publicProposalHandler from "./api/proposta.js";
+import publicProposalHandler from "./api/proposta.js";\nimport architecturalVisualizationHandler from "./api/public/architectural-visualization.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -22,7 +22,7 @@ dotenv.config();
 // Create Express app and HTTP server
 const app = express();
 const httpServer = http.createServer(app);
-app.use(express.json({ limit: "16mb" }));
+app.use(express.json({ limit: "16mb" }));\napp.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
 
 const PORT = 3000;
 
