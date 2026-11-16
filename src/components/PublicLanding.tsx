@@ -32,7 +32,22 @@ export default function PublicLanding() {
   const [config, setConfig] = useState<Config>(defaults);
   const [opened, setOpened] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [faqOpen, setFaqOpen] = useState<number | null>(0);\n  const viewerRef = useRef<HTMLDivElement>(null);\n  const [show3D, setShow3D] = useState(false);\n  useEffect(() => {\n    const target = viewerRef.current;\n    if (!target) return;\n    if (!("IntersectionObserver" in window)) { setShow3D(true); return; }\n    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { setShow3D(true); observer.disconnect(); } }, { rootMargin: "240px" });\n    observer.observe(target);\n    return () => observer.disconnect();\n  }, []);
+  const [faqOpen, setFaqOpen] = useState<number | null>(0);
+  const viewerRef = useRef<HTMLDivElement>(null);
+  const [show3D, setShow3D] = useState(false);
+  useEffect(() => {
+    const target = viewerRef.current;
+    if (!target) return;
+    if (!("IntersectionObserver" in window)) { setShow3D(true); return; }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        setShow3D(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "240px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
   const message = useMemo(() => `Olá, Anacleto! Gostaria de solicitar um orçamento para este modelo:\nModelo: ${config.model}\nLinha: ${config.line}\nCor do alumínio: ${config.color}\nVidro: ${config.glass}\nMedidas: ${config.width} mm (largura) × ${config.height} mm (altura).\nAguardo o contato para medição e orientação técnica.`, [config]);
   const set = <K extends keyof Config>(key: K, value: Config[K]) => setConfig(c => ({ ...c, [key]: value }));
   const nav = [["Showroom 3D","#showroom"],["Soluções","#solucoes"],["Obras","#obras"],["Processo","#processo"],["FAQ","#faq"]];
