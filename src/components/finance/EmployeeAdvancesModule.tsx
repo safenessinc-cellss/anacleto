@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import EmployeeDirectoryActions from "./EmployeeDirectoryActions";
 import { useEmployeeDirectory } from "../../hooks/useEmployeeDirectory";
