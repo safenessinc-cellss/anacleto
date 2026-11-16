@@ -20,7 +20,7 @@ export default function PublicShowroom3D({config,opened}:Props) {
  if(roof){const roofGroup=new THREE.Group();roofGroup.rotation.x=-.1;roofGroup.position.y=1.8;group.add(roofGroup);box(roofGroup,0,0,0,width,.1,.13,metal);box(roofGroup,0,0,-2.35,width,.1,.13,metal);for(let i=0;i<5;i++){const x=-width/2+.12+i*(width-.24)/4;box(roofGroup,x,0,-1.15,.055,.06,2.3,metal);}for(let i=0;i<4;i++)box(roofGroup,-width/2+.38+i*(width-.55)/3,.025,-1.15,(width-.55)/4,.035,2.25,pane);for(let i=0;i<3;i++)box(group,-width/2+.15+i*(width-.3)/2, .9,-2.35,.08,1.8,.08,metal);
  }else{
  const frame=new THREE.Group();group.add(frame);box(frame,0,height/2,0,width,.11,.14,metal);box(frame,0,.055,0,width,.11,.14,metal);box(frame,-width/2,0,0,.11,height,.14,metal);box(frame,width/2,0,0,.11,height,.14,metal);
- const leafCount=fold?3:2;const leafW=(width-.22)/leafCount;const leaves:any[]=[];
+ const leafCount=Math.max(1,Math.min(6,config.panels|| (fold?3:2)));const leafW=(width-.22)/leafCount;const leaves:any[]=[];
  for(let i=0;i<leafCount;i++){const leaf=new THREE.Group();leaf.position.set(-width/2+.055+i*leafW,0,.02);frame.add(leaf);box(leaf,leafW/2,height/2,0,.065,height-.12,.09,metal);box(leaf,leafW/2,.04,0,leafW-.04,.065,.09,metal);box(leaf,leafW/2,height-.04,0,leafW-.04,.065,.09,metal);const glass=box(leaf,leafW/2,height/2,-.025,leafW-.12,height-.28,.025,pane);leaves.push(leaf);if(fold){leaf.userData.hinge=i;leaf.position.x=-width/2+.055+i*leafW;}}
  if(config.line==="Gold")box(frame,0,height-.22,.08,width-.12,.025,.05,metal);
  if(door){leaves.forEach((leaf:any,i:number)=>{leaf.userData.slide=i===0?-.65:.65;leaf.userData.baseX=leaf.position.x;});}
