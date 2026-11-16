@@ -43,7 +43,7 @@ export default function PublicShowroom3D({ config, opened }: Props) {
           bar(0,.08,.075,width-.2,.045,.07,metal);
           if(config.model==="Maxim-Ar"){pane1.rotation.z=opened ? -.18 : 0;pane2.rotation.z=opened ? .18 : 0;}
           if(config.model==="Porta Camarão"){pane1.rotation.y=opened ? -.65 : 0;pane2.rotation.y=opened ? .65 : 0;}
-          if(config.model==="Porta Balcão"||config.model==="Janela de Correr"){pane1.position.x=opened?-1.12:-.74;pane2.position.x=opened?1.12:.74;}
+          if(config.model==="Porta Balcão"||config.model==="Janela de Correr"){pane1.position.x=opened?-width*.38:-width*.25;pane2.position.x=opened?width*.38:width*.25;}
           if(config.line==="Gold") bar(0,height-.23,.055,width-.2,.025,.045,metal);
         }
         const floorMat=new THREE.MeshStandardMaterial({color:"#d8e0e6",roughness:.9});
