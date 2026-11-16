@@ -10,7 +10,8 @@ import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFir
 import technicalDrawingHandler from "./api/technical-drawing.js";
 import approvedSnapshotHandler from "./api/approved-snapshot.js";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate.js";
-import publicProposalHandler from "./api/proposta.js";\nimport architecturalVisualizationHandler from "./api/public/architectural-visualization.js";
+import publicProposalHandler from "./api/proposta.js";
+import architecturalVisualizationHandler from "./api/public/architectural-visualization.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -22,7 +23,8 @@ dotenv.config();
 // Create Express app and HTTP server
 const app = express();
 const httpServer = http.createServer(app);
-app.use(express.json({ limit: "16mb" }));\napp.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
+app.use(express.json({ limit: "16mb" }));
+app.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
 
 const PORT = 3000;
 
@@ -144,7 +146,9 @@ app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole,
     const result = await generateValidatedJson({
       capability: "chat",
       system: `Você é o Assistente Financeiro da Anacleto Esquadrias. Responda no idioma ${language === "es" ? "espanhol" : "português brasileiro"}. Use EXCLUSIVAMENTE os dados reais fornecidos no contexto. Não invente custos, preços, impostos, margens, lucros, datas ou saldos. Diferencie faturamento emitido, valores efetivamente recebidos, contas em aberto, compras registradas e pagamentos efetivos. Lucro só pode ser afirmado quando houver receita e custos efetivos suficientemente completos no ledger; caso contrário, explique a limitação. Para custo de alumínio/vidro, procure itens identificados no estoque e catálogo; se não houver custo unitário confiável, informe que o dado não está cadastrado. A resposta deve ser objetiva, explicar cálculos e apontar dados faltantes. Retorne somente JSON com answer (string), metrics (array de {label,value,explanation}), warnings (array de strings).`,
-      prompt: `Dados atuais do sistema (BRL): ${JSON.stringify(context)}\nHistórico recente: ${JSON.stringify(history)}\nPergunta: ${question}`,
+      prompt: `Dados atuais do sistema (BRL): ${JSON.stringify(context)}
+Histórico recente: ${JSON.stringify(history)}
+Pergunta: ${question}`,
       responseSchema: FINANCIAL_ASSISTANT_SCHEMA,
       validate: (value:any) => {
         if (!value || typeof value.answer !== "string" || !value.answer.trim() || !Array.isArray(value.metrics) || !Array.isArray(value.warnings)) throw new Error("Resposta financeira incompleta.");
@@ -304,11 +308,15 @@ Regras obrigatórias:
 - "generate_invoice" só pode ser retornado quando o usuário pedir explicitamente a emissão da fatura. Isso NÃO aprova o orçamento.
 - Se não houver alteração solicitada, use action="none".
 `;
-    const transcript = history.map((entry: any) => `${entry.role}: ${entry.text}`).join("\\n");
+    const transcript = history.map((entry: any) => `${entry.role}: ${entry.text}`).join("\
+");
     const parsed = await generateValidatedJson({
       capability: "quote",
       system: systemPrompt,
-      prompt: `Histórico recente:\\n${transcript}\\n\\nSolicitação atual: ${message}`,
+      prompt: `Histórico recente:\
+${transcript}\
+\
+Solicitação atual: ${message}`,
       responseSchema: QUOTE_AGENT_SCHEMA,
       onGeneration: ({ usage }) => {
         aiUsage.inputTokens += Number(usage?.inputTokens ?? usage?.promptTokens ?? 0);
@@ -645,7 +653,8 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
         `Serviço: ${service || "-"}`,
         `Endereço: ${address || "-"}`,
         notes ? `Notas: ${notes}` : null,
-      ].filter(Boolean).join("\n"),
+      ].filter(Boolean).join("
+"),
       location: address || "",
       start: { dateTime: startDateTime, timeZone: "America/Sao_Paulo" },
       end: { dateTime: endDateTime, timeZone: "America/Sao_Paulo" },
@@ -687,7 +696,9 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
     const repaired = await generateText({
       model: getAIModel("documentExtraction"),
       system: "Corrija somente a estrutura JSON da extração. Não invente, complete ou altere nenhum dado do documento. Retorne apenas JSON válido.",
-      prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "\nResposta original:\n" + String(response.text || "").slice(0, 30000),
+      prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "
+Resposta original:
+" + String(response.text || "").slice(0, 30000),
       temperature: 0,
       maxOutputTokens,
       abortSignal: AbortSignal.timeout(AI_CONFIG.documentExtraction.timeoutMs),
