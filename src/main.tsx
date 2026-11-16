@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import PublicLanding from "./components/PublicLanding";
 import { ToastProvider } from "./components/ToastContext.tsx";
 import ErrorBoundary from "./components/ErrorBoundary";
-import "./index.css";
 
 const ManagementApp = lazy(() => import("./App.tsx"));
 const PublicProposalPage = lazy(() => import("./components/quotes/PublicProposalPage"));
