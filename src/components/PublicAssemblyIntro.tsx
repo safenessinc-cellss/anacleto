@@ -20,7 +20,7 @@ export default function PublicAssemblyIntro({onComplete,onSkip}:Props) {
   make(T,H,D,alloy,-W/2,0,0),make(T,H,D,alloy,W/2,0,0)
  ];
  const leafW=(W-T*2)/2;
- const leaves=[new THREE.Group(),new THREE.Group()];leaves.forEach((leaf,i)=>{assembly.add(leaf);leaf.position.set((i===0?-1:1)*leafW/2,0,.035);const bar=(x:number,y:number,w:number,h:number,d:number,mat:any)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,0);leaf.add(m);return m;};bar(0,0,T,H-.18,.12,alloy);bar(0,H/2-.04,leafW-.05,T,.12,alloy);bar(0,-H/2+.04,leafW-.05,T,.12,alloy);bar(0,0,leafW-.17,H-.18,.028,glassMat);});
+ const leaves=[new THREE.Group(),new THREE.Group()];leaves.forEach((leaf,i)=>{assembly.add(leaf);leaf.position.set((i===0?-1:1)*leafW/2,0,.035);const bar=(x:number,y:number,w:number,h:number,d:number,mat:any)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,0);leaf.add(m);return m;};bar(0,0,T,H-.18,.12,alloy);bar(0,H/2-.04,leafW-.05,T,.12,alloy);bar(0,-H/2+.04,leafW-.05,T,.12,alloy);});
  const panes=[make(leafW-.17,H-.18,.028,glassMat,-leafW/2,0,.005),make(leafW-.17,H-.18,.028,glassMat,leafW/2,0,.005)];
  const seals=[make(W-.1,.018,.11,sealMat,0,H/2-.13,.03),make(W-.1,.018,.11,sealMat,0,-H/2+.13,.03)];
  const paneTrim=[make(.018,H-.2,.1,darkAlloy,-.03,0,.12),make(.018,H-.2,.1,darkAlloy,.03,0,.12)];
@@ -35,7 +35,7 @@ export default function PublicAssemblyIntro({onComplete,onSkip}:Props) {
  const resize=()=>{camera.aspect=node.clientWidth/Math.max(1,node.clientHeight);camera.updateProjectionMatrix();renderer.setSize(node.clientWidth,node.clientHeight);};const ro=new ResizeObserver(resize);ro.observe(node);
  const smooth=(v:number)=>{const x=Math.max(0,Math.min(1,v));return x*x*(3-2*x);};
  const animate=(now:number)=>{if(disposed)return;raf=requestAnimationFrame(animate);const elapsed=now-startTime;const p=Math.min(1,elapsed/3500);setProgress(Math.round(p*100));setPhase(p<.3?"PERFIS DE ALUMÍNIO":p<.6?"FOLHAS E VEDAÇÃO":p<.85?"VIDRO TEMPERADO E FERRAGENS":"ACABAMENTO / SHOWROOM");
-  pieces.forEach((piece,i)=>{let gate=0;if(i<4)gate=smooth(p/.3);else if(i<6)gate=smooth((p-.3)/.3);else if(i<8)gate=smooth((p-.3)/.3);else if(i<10)gate=smooth((p-.6)/.25);else if(i<12)gate=smooth((p-.6)/.25);else gate=smooth((p-.72)/.13);piece.position.lerpVectors(piece.userData.start||piece.position,targets[i],gate);});
+  pieces.forEach((piece,i)=>{let gate=0;if(i<4)gate=smooth(p/.3);else if(i<6)gate=smooth((p-.3)/.3);else if(i<8)gate=smooth((p-.3)/.3);else if(i<10)gate=smooth((p-.3)/.3);else if(i<12)gate=smooth((p-.6)/.25);else gate=smooth((p-.72)/.13);piece.position.lerpVectors(piece.userData.start||piece.position,targets[i],gate);});
   if(p>=.3){leaves[0].position.x=THREE.MathUtils.lerp(-leafW/2-2.6,-leafW/2,.75*smooth((p-.3)/.3));leaves[1].position.x=THREE.MathUtils.lerp(leafW/2+2.6,leafW/2,.75*smooth((p-.3)/.3));}
   const dolly=smooth((p-.85)/.15);camera.position.set(4.8-1.15*dolly,3.2-.25*dolly,8.5-2.4*dolly);camera.lookAt(0,1.25,0);assembly.rotation.y=.08*Math.sin(p*Math.PI*2)*(1-dolly);assembly.scale.setScalar(1+.025*dolly);
   fill.intensity=35+45*smooth((p-.85)/.15);renderer.render(scene,camera);
