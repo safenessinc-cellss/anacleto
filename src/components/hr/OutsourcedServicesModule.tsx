@@ -12,11 +12,16 @@ const today = () => new Date().toISOString().slice(0, 10);
 const newItem = (): WorkItem => ({ id: crypto.randomUUID(), obra: "", servico: "", detalhe: "", valor: "", data: today() });
 const newAdvance = (): AdvanceItem => ({ id: crypto.randomUUID(), data: today(), valor: "", detalhe: "" });
 
-export default function OutsourcedServicesModule() {
+type OutsourcedSummary = { total: number; paid: number; pending: number; records: number };
+type OutsourcedServicesModuleProps = {
+  competence: string;
+  onCompetenceChange: (value: string) => void;
+  onSummaryChange: (summary: OutsourcedSummary) => void;
+};
+export default function OutsourcedServicesModule({ competence, onCompetenceChange, onSummaryChange }: OutsourcedServicesModuleProps) {
   const [records, setRecords] = useState<OutsourcedRecord[]>([]);
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
-  const [competencia, setCompetencia] = useState(today().slice(0, 7));
   const [data, setData] = useState(today());
   const [itens, setItens] = useState<WorkItem[]>([newItem()]);
   const [adiantamentos, setAdiantamentos] = useState<AdvanceItem[]>([]);
@@ -30,15 +35,18 @@ export default function OutsourcedServicesModule() {
   }, []);
 
   const total = useMemo(() => itens.reduce((sum, item) => sum + Math.max(0, Number(item.valor) || 0), 0), [itens]);
-  const monthRecords = records.filter(row => row.competencia === competencia).sort((a, b) => b.data.localeCompare(a.data));
+  const monthRecords = records.filter(row => row.competencia === competence).sort((a, b) => b.data.localeCompare(a.data));
   const monthTotal = monthRecords.reduce((sum, row) => sum + Number(row.total || 0), 0);
   const monthPaid = monthRecords.reduce((sum, row) => sum + Number(row.totalAdiantado ?? (row.adiantamentos || []).reduce((a, p) => a + Number(p.valor || 0), 0)), 0);
+  useEffect(() => {
+    onSummaryChange({ total: monthTotal, paid: monthPaid, pending: Math.max(0, monthTotal - monthPaid), records: monthRecords.length });
+  }, [monthTotal, monthPaid, monthRecords.length, onSummaryChange]);
   const obraTotals = useMemo(() => { const grouped = new Map<string, { total: number; count: number; dates: string[] }>(); monthRecords.forEach(row => row.itens.forEach(item => { const key = item.obra.trim() || "Obra não informada"; const current = grouped.get(key) || { total: 0, count: 0, dates: [] }; current.total += Number(item.valor || 0); current.count += 1; if (item.data) current.dates.push(item.data); grouped.set(key, current); })); return Array.from(grouped.entries()).sort((a,b) => a[0].localeCompare(b[0])); }, [monthRecords]);
   const paidNow = adiantamentos.reduce((sum, item) => sum + Math.max(0, Number(item.valor) || 0), 0);
   const balanceNow = Math.max(0, total - paidNow);
   const changeItem = (id: string, field: keyof Omit<WorkItem, "id">, value: string) => setItens(current => current.map(item => item.id === id ? { ...item, [field]: value } : item));
 
-  const reset = () => { setNome(""); setCpf(""); setCompetencia(today().slice(0, 7)); setData(today()); setItens([newItem()]); setAdiantamentos([]); setEditingId(""); };
+  const reset = () => { setNome(""); setCpf(""); onCompetenceChange(today().slice(0, 7)); setData(today()); setItens([newItem()]); setAdiantamentos([]); setEditingId(""); };
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -57,7 +65,7 @@ export default function OutsourcedServicesModule() {
     }
     setSaving(true); setError("");
     const payload = {
-      nome: nome.trim(), cpf: cpf.trim(), competencia, data,
+      nome: nome.trim(), cpf: cpf.trim(), competencia: competence, data,
       itens: validItems.map(item => ({ obra: item.obra.trim(), servico: item.servico.trim(), detalhe: item.detalhe.trim(), valor: Number(Number(item.valor).toFixed(2)), data: item.data || data })),
       adiantamentos: adiantamentos.filter(item => Number(item.valor) > 0).map(item => ({ id: item.id, data: item.data, valor: Number(Number(item.valor).toFixed(2)), detalhe: item.detalhe.trim() })),
       total: Number(total.toFixed(2)), totalAdiantado: Number(paidNow.toFixed(2)), saldoPendente: Number(balanceNow.toFixed(2)), status: "posted",
@@ -69,7 +77,7 @@ export default function OutsourcedServicesModule() {
         await deleteDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}`)).catch(() => undefined);
         const previousRecord = records.find(row => row.id === editingId);
         for (const previousPayment of previousRecord?.adiantamentos || []) if (previousPayment.id && !payload.adiantamentos.some(payment => payment.id === previousPayment.id)) await deleteDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}-advance-${previousPayment.id}`));
-        for (const payment of payload.adiantamentos) await setDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}-advance-${payment.id}`), { direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: editingId, description: `Adiantamento · ${nome.trim()} · ${payment.detalhe || competencia}`, amount: payment.valor, date: payment.data, status: "posted", updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "" }, { merge: true });
+        for (const payment of payload.adiantamentos) await setDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}-advance-${payment.id}`), { direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: editingId, description: `Adiantamento · ${nome.trim()} · ${payment.detalhe || competence}`, amount: payment.valor, date: payment.data, status: "posted", updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "" }, { merge: true });
       } else {
         const created = await addDoc(collection(db, "payroll_outsourced_services"), { ...payload, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
         for (const payment of payload.adiantamentos) await setDoc(doc(db, "ledger_entries", `outsourced-service-${created.id}-advance-${payment.id}`), { direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: created.id, description: `Adiantamento · ${nome.trim()} · ${payment.detalhe || competencia}`, amount: payment.valor, date: payment.data, status: "posted", createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
@@ -81,7 +89,7 @@ export default function OutsourcedServicesModule() {
   };
 
   const edit = (row: OutsourcedRecord) => {
-    setEditingId(row.id); setNome(row.nome); setCpf(row.cpf || ""); setCompetencia(row.competencia); setData(row.data);
+    setEditingId(row.id); setNome(row.nome); setCpf(row.cpf || ""); onCompetenceChange(row.competencia); setData(row.data);
     setItens(row.itens.map(item => ({ ...item, id: crypto.randomUUID(), valor: String(item.valor), data: item.data || row.data }))); setAdiantamentos((row.adiantamentos || []).map(item => ({ ...item, id: crypto.randomUUID(), valor: String(item.valor) })));
     document.getElementById("outsourced-services-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
@@ -104,7 +112,7 @@ export default function OutsourcedServicesModule() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="text-xs font-semibold text-slate-500 sm:col-span-2">Nome do prestador<input required value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome completo" className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-900"/></label>
         <label className="text-xs font-semibold text-slate-500">CPF / CNPJ (opcional)<input value={cpf} onChange={e => setCpf(e.target.value)} placeholder="Documento" className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-900"/></label>
-        <label className="text-xs font-semibold text-slate-500">Competência<input required type="month" value={competencia} onChange={e => setCompetencia(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-900"/></label>
+        <label className="text-xs font-semibold text-slate-500">Competência<input required type="month" value={competence} onChange={e => onCompetenceChange(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-900"/></label>
         <label className="text-xs font-semibold text-slate-500">Data do lançamento<input required type="date" value={data} onChange={e => setData(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-900"/></label>
       </div>
       <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-bold">Detalhamento por obra e serviço</h4><button type="button" onClick={() => setItens(current => [...current, newItem()])} className="inline-flex items-center gap-1 rounded-lg border border-violet-300 px-3 py-2 text-xs font-bold text-violet-700"><Plus className="h-4 w-4"/>Adicionar obra / serviço</button></div>
