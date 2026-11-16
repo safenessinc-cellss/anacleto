@@ -24,6 +24,7 @@ import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
 import Chatbot from "./components/Chatbot";
 import WhatsAppButton from "./components/WhatsAppButton";
+import LegalCenter, { CookieConsent } from "./components/LegalCenter";
 import { useToast } from "./components/ToastContext";
 import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
 import AnacletoProApp from "./components/AnacletoProApp";
@@ -58,6 +59,7 @@ export default function App() {
   const [isAdminPortal, setIsAdminPortal] = useState(false);
   const [language, setLanguage] = useState<LanguageCode>(detectInitialLanguage);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("anacleto_theme_mode") === "dark");
+  const [legalDocument, setLegalDocument] = useState<"privacy" | "cookies" | "terms" | "service" | "rights" | null>(null);
 
   const [senderConfig, setSenderConfig] = useState<any>({
     name: "Anacleto Esquadrias",
@@ -397,15 +399,20 @@ export default function App() {
     }
     // 4) Autorizado → dashboard
     return (
-      <AnacletoProApp
-        senderConfig={senderConfig}
-        setSenderConfig={setSenderConfig}
-        onSwitchToPublicLanding={() => setCurrentView("landing")}
-        onLogout={handleLogout}
-        language={language}
-        onLanguageChange={handleLanguageChange}
-        userRole={userRole || "usuario"}
-      />
+      <>
+        <AnacletoProApp
+          senderConfig={senderConfig}
+          setSenderConfig={setSenderConfig}
+          onSwitchToPublicLanding={() => setCurrentView("landing")}
+          onLogout={handleLogout}
+          language={language}
+          onLanguageChange={handleLanguageChange}
+          userRole={userRole || "usuario"}
+        />
+        <button onClick={() => setLegalDocument("privacy")} className="fixed bottom-4 left-4 z-[80] rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-lg">Legal e Privacidade</button>
+        {legalDocument && <LegalCenter initialDocument={legalDocument} onClose={() => setLegalDocument(null)} contactEmail={senderConfig.profileEmail || "contato@anacletoesquadrias.com.br"} companyName={senderConfig.name || "Anacleto Esquadrias"} />}
+        <CookieConsent />
+      </>
     );
   }
 
@@ -615,6 +622,7 @@ export default function App() {
                 </select>
               </div>
               <textarea value={schNotes} onChange={(e) => setSchNotes(e.target.value)} rows={3} placeholder="Observações..." className="w-full px-3.5 py-2.5 text-xs border border-luxury-border bg-luxury-darker text-white rounded-lg focus:outline-none focus:border-luxury-gold"></textarea>
+              <label className="flex items-start gap-2 text-xs text-slate-400"><input type="checkbox" required className="mt-0.5" /><span>Li a <button type="button" onClick={() => setLegalDocument("privacy")} className="underline text-blue-500">Política de Privacidade</button> e estou ciente do tratamento dos dados para atendimento desta solicitação.</span></label>
               <button type="submit" disabled={schIsSubmitting} className="w-full py-3.5 bg-luxury-gold hover:bg-luxury-gold-light text-luxury-darker rounded-2xl text-xs font-black uppercase disabled:opacity-50 transition cursor-pointer">
                 {schIsSubmitting ? "Sinalizando..." : "Agendar Visita Gratuita"}
               </button>
@@ -664,6 +672,7 @@ export default function App() {
                 ))}
               </div>
 
+              <label className="flex items-start gap-2 text-xs text-slate-400"><input type="checkbox" required className="mt-0.5" /><span>Li a <button type="button" onClick={() => setLegalDocument("privacy")} className="underline text-blue-500">Política de Privacidade</button> e estou ciente do uso dos dados para análise e resposta ao orçamento.</span></label>
               <button type="submit" disabled={visIsSubmitting} className="w-full py-3.5 bg-luxury-gold hover:bg-luxury-gold-light text-luxury-darker rounded-2xl text-xs font-black uppercase disabled:opacity-50 transition cursor-pointer">
                 {visIsSubmitting ? "Enviando..." : "Enviar Solicitação de Orçamento"}
               </button>
@@ -674,8 +683,18 @@ export default function App() {
 
       <footer className="py-10 text-center border-t border-luxury-border/20 bg-luxury-darker">
         <p className="text-xs text-slate-400">{t.footerRights}</p>
+        <nav aria-label="Links legais" className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 px-4 text-xs text-slate-400">
+          <button onClick={() => setLegalDocument("privacy")} className="underline hover:text-blue-500">Política de Privacidade</button>
+          <button onClick={() => setLegalDocument("cookies")} className="underline hover:text-blue-500">Política de Cookies</button>
+          <button onClick={() => setLegalDocument("terms")} className="underline hover:text-blue-500">Termos de Uso</button>
+          <button onClick={() => setLegalDocument("service")} className="underline hover:text-blue-500">Orçamentos e Contratação</button>
+          <button onClick={() => setLegalDocument("rights")} className="underline hover:text-blue-500">Direitos LGPD</button>
+          <button onClick={() => window.dispatchEvent(new Event("anacleto:cookie-settings"))} className="underline hover:text-blue-500">Preferências de cookies</button>
+        </nav>
       </footer>
 
+      {legalDocument && <LegalCenter initialDocument={legalDocument} onClose={() => setLegalDocument(null)} contactEmail={senderConfig.profileEmail || "contato@anacletoesquadrias.com.br"} companyName={senderConfig.name || "Anacleto Esquadrias"} />}
+      <CookieConsent />
       <Chatbot currentLanguage={language} t={t} />
       <WhatsAppButton currentLanguage={language} />
     </div>
