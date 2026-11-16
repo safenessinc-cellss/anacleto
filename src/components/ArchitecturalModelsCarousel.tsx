@@ -9,7 +9,7 @@ export type ArchitecturalModel = {
   line: "Suprema" | "Gold";
   model: "Janela de Correr Suprema" | "Porta Balcão" | "Maxim-Ar" | "Porta Camarão";
   color: string;
-  panels: number;
+        panels: panelCount,
   detail: string;
   image: string;
   generated?: boolean;
@@ -65,7 +65,9 @@ export default function ArchitecturalModelsCarousel({ onConfigure }: Props) {
       });
       const data = await response.json();
       if (!response.ok || !data.image) throw new Error(data.error || "Não foi possível gerar o render.");
-      const panelMatch = description.match(/(\\d+)\\s*folhas?/i);\n      const panelCount = Math.min(6, Math.max(1, Number(panelMatch?.[1] ?? 2)));\n      const model: ArchitecturalModel = {
+      const panelMatch = description.match(/(\d+)\s*folhas?/i);
+      const panelCount = Math.min(6, Math.max(1, Number(panelMatch?.[1] ?? 2)));
+      const model: ArchitecturalModel = {
         id: `ai-${Date.now()}`, title: description.length > 54 ? `${description.slice(0, 51)}…` : description,
         badge: "Render IA • Sob medida", line: /gold/i.test(description) ? "Gold" : "Suprema",
         model: /maxim/i.test(description) ? "Maxim-Ar" : /camarão|camarao/i.test(description) ? "Porta Camarão" : /porta/i.test(description) ? "Porta Balcão" : "Janela de Correr Suprema",
