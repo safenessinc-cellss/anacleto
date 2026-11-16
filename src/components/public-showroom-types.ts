@@ -1,0 +1,1 @@
+export type Config = { model: string; line: string; color: string; glass: string; width: number; height: number };
