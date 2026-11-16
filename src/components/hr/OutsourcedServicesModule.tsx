@@ -44,7 +44,15 @@ export default function OutsourcedServicesModule() {
     event.preventDefault();
     const validItems = itens.filter(item => item.obra.trim() && item.servico.trim() && Number(item.valor) > 0);
     if (!nome.trim() || !validItems.length || validItems.length !== itens.length) {
-      setError("Informe o nome do prestador e, em cada linha, obra, serviço e valor maior que zero.");
+      setError("Informe o nome do prestador e, em cada linha, obra, serviço, data e valor maior que zero.");
+      return;
+    }
+    if (paidNow > total) {
+      setError("A soma dos abonos/adiantamentos não pode ser maior que o total dos serviços.");
+      return;
+    }
+    if (adiantamentos.some(item => Number(item.valor) > 0 && !item.data)) {
+      setError("Informe a data de cada abono ou adiantamento.");
       return;
     }
     setSaving(true); setError("");
