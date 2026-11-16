@@ -552,3 +552,39 @@ html:not(.dark) .shadow-lg,
 html:not(.dark) .shadow-xl {
   --tw-shadow-color: rgb(15 23 42 / 7%) !important;
 }
+
+
+/* FIX DEFINITIVO DE CONTRASTE: navegação ativa no modo claro/escuro.
+   Usa aria-current para prevalecer sobre utilitários globais com !important. */
+html:not(.dark) aside nav button[aria-current="page"],
+html:not(.dark) aside button[aria-current="page"] {
+  background: #e8f0fe !important;
+  background-color: #e8f0fe !important;
+  color: #174ea6 !important;
+  border-color: #c6dafc !important;
+}
+html:not(.dark) aside nav button[aria-current="page"] *,
+html:not(.dark) aside button[aria-current="page"] * {
+  color: #174ea6 !important;
+  fill: none;
+}
+html:not(.dark) main nav button[aria-current="page"] {
+  color: #174ea6 !important;
+  border-bottom-color: #4285f4 !important;
+  background-color: transparent !important;
+}
+html:not(.dark) main nav button[aria-current="page"] * { color: #174ea6 !important; }
+html.dark aside nav button[aria-current="page"],
+html.dark aside button[aria-current="page"] {
+  background: #1e3a8a !important;
+  background-color: #1e3a8a !important;
+  color: #eff6ff !important;
+  border-color: #3b82f6 !important;
+}
+html.dark aside nav button[aria-current="page"] *,
+html.dark aside button[aria-current="page"] * { color: #eff6ff !important; }
+html.dark main nav button[aria-current="page"] {
+  color: #bfdbfe !important;
+  border-bottom-color: #60a5fa !important;
+}
+html.dark main nav button[aria-current="page"] * { color: #bfdbfe !important; }

@@ -273,7 +273,7 @@ export default function AnacletoProApp({
               );
               if (!firstTab) return null;
               return <button key={section.id} type="button" onClick={() => selectNavigationTab(firstTab.id)} title={section.label} aria-label={section.label} aria-current={selected ? "page" : undefined}
-                className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl text-sm font-medium transition ${selected ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900"}`}>
+                className={`w-full flex items-center ${sidebarCollapsed ? "justify-center px-2" : "gap-3 px-3"} py-2.5 rounded-xl text-sm font-medium transition ${selected ? (isDark ? "bg-blue-900/30 text-blue-200" : "!bg-[#E8F0FE] !text-[#1557B0]") : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900"}`} style={selected ? (isDark ? { backgroundColor: "#1E3A8A", color: "#BFDBFE" } : { backgroundColor: "#E8F0FE", color: "#1557B0" }) : undefined}>
                 <Icon className="h-5 w-5 shrink-0" />{!sidebarCollapsed && <span className="truncate">{section.label}</span>}
               </button>;
             })}
@@ -282,7 +282,7 @@ export default function AnacletoProApp({
 
         {/* Sidebar Footer */}
         <div className={`p-3 border-t border-slate-200 dark:border-slate-800 space-y-2 ${sidebarCollapsed ? "flex flex-col items-center" : ""}`}>
-          {settingsTabs.length > 0 && <button type="button" onClick={() => selectNavigationTab(settingsTabs[0].id)} title="Configurações, equipe e perfil" aria-label="Configurações, equipe e perfil"
+          {settingsTabs.length > 0 && <button type="button" onClick={() => selectNavigationTab(settingsTabs[0].id)} title="Configurações, equipe e perfil" aria-label="Configurações, equipe e perfil" aria-current={activeSectionId === "settings" ? "page" : undefined}
             className={`flex items-center justify-center rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 ${sidebarCollapsed ? "w-11" : "w-11"} ${activeSectionId === "settings" ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : ""}`}>
             <Settings className="h-5 w-5 shrink-0" />
           </button>}
