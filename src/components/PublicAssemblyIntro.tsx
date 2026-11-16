@@ -29,7 +29,7 @@ export default function PublicAssemblyIntro({onComplete,onSkip}:Props) {
  profiles.forEach((p,i)=>{p.position.add(new THREE.Vector3(i%2===0?0:(i===2?-3:3),i<2?(i===0?3:-3):0,2));});
  seals.forEach((p,i)=>p.position.add(new THREE.Vector3(i===0?0:0,i===0?2:-2,-1)));
  paneTrim.forEach((p,i)=>p.position.add(new THREE.Vector3(i===0?-2:2,0,1)));
- leaves.forEach((p,i)=>{p.position.x+=(i===0?-2.6:2.6);p.position.z+=1.5;});
+ leaves.forEach((p,i)=>{p.position.x+=(i===0?-2.6:2.6);p.position.z+=1.5;});\n panes.forEach((p,i)=>p.position.add(new THREE.Vector3(i===0?-1.3:1.3,0,1.5)));
  handle.position.add(new THREE.Vector3(1.4,1.5,1));lock.position.add(new THREE.Vector3(1.4,-1,1));
  const startTime=performance.now();let completed=false;
  const resize=()=>{camera.aspect=node.clientWidth/Math.max(1,node.clientHeight);camera.updateProjectionMatrix();renderer.setSize(node.clientWidth,node.clientHeight);};const ro=new ResizeObserver(resize);ro.observe(node);
