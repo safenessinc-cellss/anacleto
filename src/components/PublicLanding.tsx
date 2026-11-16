@@ -18,8 +18,8 @@ const wa = (message: string) => `https://wa.me/${phone}?text=${encodeURIComponen
 function Preview({config,opened}:{config:Config;opened:boolean}) {
   const frame = colors.find(c=>c.name===config.color)?.hex ?? "#202328";
   const glass = config.glass==="Fumê"?"#526577":config.glass==="Reflecta"?"#c4a77b":"#a9d3e5";
-  const roof = config.model==="Cobertura de Vidro";
-  const fold = config.model==="Porta Camarão + Mão Amiga";
+  const roof = false;
+  const fold = config.model==="Porta Camarão";
   return <svg className="iso-preview" viewBox="0 0 760 520" role="img" aria-label={`Modelo ${config.model}, alumínio ${config.color}, vidro ${config.glass}`}>
     <defs><linearGradient id="glassByYou" x1="0" y1="0" x2="1" y2="1"><stop stopColor={glass} stopOpacity=".9"/><stop offset="1" stopColor="#f7fbff" stopOpacity=".3"/></linearGradient><linearGradient id="metalByYou" x1="0" y1="0" x2="1" y2="1"><stop stopColor={frame}/><stop offset=".48" stopColor="#aab3ba"/><stop offset="1" stopColor={frame}/></linearGradient><filter id="softFloor"><feGaussianBlur stdDeviation="15"/></filter></defs>
     <ellipse cx="382" cy="440" rx="238" ry="27" fill="#17212b" opacity=".2" filter="url(#softFloor)"/>
