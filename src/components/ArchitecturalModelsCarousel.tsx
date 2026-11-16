@@ -70,7 +70,7 @@ export default function ArchitecturalModelsCarousel({ onConfigure }: Props) {
         badge: "Render IA • Sob medida", line: /gold/i.test(description) ? "Gold" : "Suprema",
         model: /maxim/i.test(description) ? "Maxim-Ar" : /camarão|camarao/i.test(description) ? "Porta Camarão" : /porta/i.test(description) ? "Porta Balcão" : "Janela de Correr Suprema",
         color: /bronze/i.test(description) ? "Bronze" : /branc/i.test(description) ? "Branco" : /natural/i.test(description) ? "Natural Fosco" : "Preto Fosco",
-        panels: Math.max(1, Math.min(6, Number(description.match(/(\d)\s*folhas?/i)?.[1] || 2)),
+        panels: Math.max(1, Math.min(6, Number(description.match(/(\d)\s*folhas?/i)?.[1] || 2))),
         detail: "Render conceitual gerado por IA. Perfis, ferragens, fixações e medidas devem ser validados pela equipe técnica.",
         image: data.image, generated: true,
       };
