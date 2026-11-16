@@ -612,3 +612,30 @@ html:not(.dark) nav[aria-label="Seções da folha de pagamento"] button:focus {
   background-color: #eaf2ff !important;
   color: #294b78 !important;
 }
+
+
+/* ANACLETO · todos os botões em azul-bebê; preservar confirmações de inclusão e exclusão */
+html:not(.dark) button:not(.bg-rose-500):not(.bg-rose-600):not(.bg-red-500):not(.bg-red-600):not(.bg-emerald-500):not(.bg-emerald-600):not(.bg-green-500):not(.bg-green-600) {
+  background-color: #dceeff !important;
+  border-color: #c5def8 !important;
+  color: #28517f !important;
+}
+html:not(.dark) button:not(.bg-rose-500):not(.bg-rose-600):not(.bg-red-500):not(.bg-red-600):not(.bg-emerald-500):not(.bg-emerald-600):not(.bg-green-500):not(.bg-green-600) *,
+html:not(.dark) button:not(.bg-rose-500):not(.bg-rose-600):not(.bg-red-500):not(.bg-red-600):not(.bg-emerald-500):not(.bg-emerald-600):not(.bg-green-500):not(.bg-green-600) svg {
+  color: #28517f !important;
+}
+html:not(.dark) button:not(.bg-rose-500):not(.bg-rose-600):not(.bg-red-500):not(.bg-red-600):not(.bg-emerald-500):not(.bg-emerald-600):not(.bg-green-500):not(.bg-green-600):hover {
+  background-color: #c9e2ff !important;
+  border-color: #a9cff7 !important;
+}
+html:not(.dark) button:not(.bg-rose-500):not(.bg-rose-600):not(.bg-red-500):not(.bg-red-600):not(.bg-emerald-500):not(.bg-emerald-600):not(.bg-green-500):not(.bg-green-600):disabled {
+  background-color: #edf5fd !important;
+  color: #829bb8 !important;
+  border-color: #dce8f5 !important;
+  cursor: not-allowed;
+}
+html:not(.dark) button:active:not(.bg-rose-500):not(.bg-rose-600):not(.bg-red-500):not(.bg-red-600):not(.bg-emerald-500):not(.bg-emerald-600):not(.bg-green-500):not(.bg-green-600),
+html:not(.dark) button:focus:not(:focus-visible):not(.bg-rose-500):not(.bg-rose-600):not(.bg-red-500):not(.bg-red-600):not(.bg-emerald-500):not(.bg-emerald-600):not(.bg-green-500):not(.bg-green-600) {
+  background-color: #dceeff !important;
+  color: #28517f !important;
+}
