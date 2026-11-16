@@ -46,7 +46,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
         {
           label: "🖥️ ¿Cómo Simular un Presupuesto con IA?",
           prompt: "¿Cómo puedo usar vuestro simulador inteligente para calcular un presupuesto preliminar de vidrios y esquadrías?",
-          icon: <Sparkles className="w-4 h-4 text-purple-500" />
+          icon: <Sparkles className="w-4 h-4 text-sky-500" />
         }
       ]
     },
@@ -75,7 +75,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
         {
           label: "🖥️ Como usar o Simulador de Projeto via IA?",
           prompt: "Como funciona o simulador inteligente para obter uma estimativa de preços de esquadrias e vidros para minha casa?",
-          icon: <Sparkles className="w-4 h-4 text-purple-500" />
+          icon: <Sparkles className="w-4 h-4 text-sky-500" />
         }
       ]
     },
@@ -104,7 +104,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
         {
           label: "🖥️ Guide me through the Smart AI Estimator",
           prompt: "Guide me on how to use your interactive smart estimator tool to draft a preliminary budget.",
-          icon: <Sparkles className="w-4 h-4 text-purple-500" />
+          icon: <Sparkles className="w-4 h-4 text-sky-500" />
         }
       ]
     }
@@ -294,8 +294,8 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
       {!isOpen && (
         <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end">
           {showNudge && (
-            <div className="mb-3 mr-2 bg-slate-900 border border-luxury-gold text-white text-xs px-3.5 py-2.5 rounded-2xl shadow-2xl max-w-[260px] animate-bounce relative flex items-center gap-2">
-              <Bot className="w-4 h-4 text-luxury-gold shrink-0" />
+            <div className="mb-3 mr-2 bg-[#eaf4ff] border border-[#bfdcff] text-[#315477] text-xs px-3.5 py-2.5 rounded-2xl shadow-2xl max-w-[260px] animate-bounce relative flex items-center gap-2">
+              <Bot className="w-4 h-4 text-[#78aee8] shrink-0" />
               <p className="text-left font-medium leading-relaxed">{currentBoard.nudgeText}</p>
               <button 
                 onClick={(e) => {
@@ -306,7 +306,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
               >
                 <X className="w-3 h-3" />
               </button>
-              <div className="absolute right-6 bottom-[-6px] w-3 h-3 bg-slate-900 border-r border-b border-luxury-gold rotate-45" />
+              <div className="absolute right-6 bottom-[-6px] w-3 h-3 bg-slate-900 border-r border-b border-[#bfdcff] rotate-45" />
             </div>
           )}
           
@@ -315,7 +315,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
               setIsOpen(true);
               setShowNudge(false);
             }}
-            className="bg-luxury-gold hover:bg-luxury-gold-dark text-slate-950 p-4 rounded-full shadow-3xl flex items-center justify-center transition-all duration-300 transform hover:scale-110 active:scale-95 group focus:outline-hidden cursor-pointer relative"
+            className="bg-[#cfe5ff] hover:bg-[#a9cdf4] text-[#294765] p-4 rounded-full shadow-3xl flex items-center justify-center transition-all duration-300 transform hover:scale-110 active:scale-95 group focus:outline-hidden cursor-pointer relative"
             aria-label="Assistente comercial de inteligência artificial"
             id="chatbot-trigger-btn"
           >
@@ -324,7 +324,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
               Anacleto Seller
             </span>
             <span className="absolute -top-1 -right-1 bg-emerald-400 p-1 rounded-full border-2 border-white dark:border-slate-900">
-              <Sparkles className="w-2.5 h-2.5 text-slate-950" />
+              <Sparkles className="w-2.5 h-2.5 text-[#294765]" />
             </span>
           </button>
         </div>
@@ -337,26 +337,26 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
           id="chatbot-floating-window"
         >
           {/* Chat Header styled as a Luxury Business Vendor Interface */}
-          <div className="bg-slate-950 p-4 text-white flex items-center justify-between shadow-md border-b border-luxury-gold/30">
+          <div className="bg-[#e5f1ff] p-4 text-[#294765] flex items-center justify-between shadow-md border-b border-[#bfdcff]/30">
             <div className="flex items-center gap-2.5">
-              <div className="p-1.5 bg-white/10 rounded-lg relative">
-                <Bot className="w-5 h-5 text-luxury-gold" />
+              <div className="p-1.5 bg-white/70 rounded-lg relative">
+                <Bot className="w-5 h-5 text-[#78aee8]" />
                 <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full ring-2 ring-slate-950" />
               </div>
               <div className="text-left">
                 <div className="flex items-center gap-1.5">
-                  <h3 className="font-bold text-sm tracking-tight text-white">Anacleto Consultor IA</h3>
-                  <span className="text-[9px] bg-luxury-gold/20 text-luxury-gold px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                  <h3 className="font-bold text-sm tracking-tight text-[#294765]">Anacleto Consultor IA</h3>
+                  <span className="text-[9px] bg-[#cfe5ff] text-[#315477] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
                     Vendas
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium">Online • Respostas Instantâneas</p>
+                <p className="text-[10px] text-[#6685a6] font-medium">Online • Respostas Instantâneas</p>
               </div>
             </div>
             
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
+              className="p-1 text-white/80 hover:text-white rounded-lg hover:bg-white/70 transition cursor-pointer"
               aria-label="Fechar conversa"
             >
               <X className="w-5 h-5" />
@@ -376,7 +376,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
                       msg.role === "user" ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" : "bg-white dark:bg-slate-850 text-emerald-500 border border-slate-100 dark:border-slate-800"
                     }`}
                   >
-                    {msg.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-luxury-gold" />}
+                    {msg.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-[#78aee8]" />}
                   </div>
 
                   {/* Bubble message */}
@@ -384,7 +384,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
                     <div
                       className={`p-3 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap text-left shadow-xs ${
                         msg.role === "user"
-                          ? "bg-luxury-gold text-slate-950 font-black rounded-tr-none"
+                          ? "bg-[#dceeff] text-[#294765] font-semibold rounded-tr-none"
                           : "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-100 dark:border-slate-850"
                       }`}
                     >
@@ -398,7 +398,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
 
                 {/* PROACTIVE SALESBOARD BOARD WITH CARDS: Shown directly inside the chat body after the greeting message */}
                 {i === 0 && messages.length <= 2 && (
-                  <div className="ml-9 p-3 rounded-xl border border-luxury-gold/30 bg-white dark:bg-slate-900 space-y-3.5 shadow-sm text-left animate-in fade-in duration-500">
+                  <div className="ml-9 p-3 rounded-xl border border-[#bfdcff]/30 bg-white dark:bg-slate-900 space-y-3.5 shadow-sm text-left animate-in fade-in duration-500">
                     {/* Exclusive Promo Header */}
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5">
                       <div className="flex items-center gap-1.5 mb-1">
@@ -421,7 +421,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
                           <button
                             key={index}
                             onClick={() => sendMessageText(act.prompt)}
-                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-luxury-gold/15 hover:border-luxury-gold/50 rounded-lg border border-slate-150 dark:border-slate-800 transition text-left text-[11px] flex items-center gap-2.5 font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white cursor-pointer group"
+                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-850 hover:bg-[#b9d8fb]/15 hover:border-[#bfdcff]/50 rounded-lg border border-slate-150 dark:border-slate-800 transition text-left text-[11px] flex items-center gap-2.5 font-semibold text-slate-700 dark:text-slate-300 hover:text-[#294765] dark:hover:text-white cursor-pointer group"
                           >
                             <span className="bg-white dark:bg-slate-800 p-1 rounded-md shadow-xs group-hover:scale-110 transition-transform">
                               {act.icon}
@@ -441,7 +441,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
             {/* Loading Indicator */}
             {isLoading && (
               <div className="flex gap-2.5 justify-start">
-                <div className="w-7 h-7 rounded-lg bg-white dark:bg-slate-850 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800 text-luxury-gold">
+                <div className="w-7 h-7 rounded-lg bg-white dark:bg-slate-850 flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800 text-[#78aee8]">
                   <Bot className="w-4 h-4" />
                 </div>
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-850 shadow-xs max-w-[75%]">
@@ -464,7 +464,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
                 <button
                   key={idx}
                   onClick={() => handlePresetTrigger(query)}
-                  className="shrink-0 text-[10px] font-semibold px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-100 hover:text-luxury-gold dark:hover:text-luxury-gold rounded-full border border-slate-200 dark:border-slate-750 transition cursor-pointer whitespace-nowrap"
+                  className="shrink-0 text-[10px] font-semibold px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-100 hover:text-[#78aee8] dark:hover:text-[#78aee8] rounded-full border border-slate-200 dark:border-slate-750 transition cursor-pointer whitespace-nowrap"
                 >
                   {query}
                 </button>
@@ -487,7 +487,7 @@ export default function Chatbot({ currentLanguage, t }: ChatbotProps) {
             <button
               type="submit"
               disabled={isLoading || !inputText.trim()}
-              className="p-2 bg-luxury-gold hover:bg-luxury-gold-dark text-slate-950 font-black rounded-lg transition disabled:opacity-50 cursor-pointer"
+              className="p-2 bg-[#cfe5ff] hover:bg-[#a9cdf4] text-[#294765] font-black rounded-lg transition disabled:opacity-50 cursor-pointer"
               aria-label="Enviar mensagem"
             >
               <Send className="w-4 h-4" />
