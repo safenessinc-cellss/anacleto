@@ -38,5 +38,5 @@ export default async function handler(req:Request,res:any){
       }
       return send(res,200,{image:fallbackFor(description),fallback:true,message:"A IA não retornou uma imagem nesta tentativa. Exibindo render técnico local."});
     }catch(error){console.error("[GENERATE_3D_RENDER]",error);return send(res,200,{image:fallbackFor(description),fallback:true,message:"Geração indisponível no momento. Exibindo render técnico local."});}
-  }catch(error){console.error("[GENERATE_3D_RENDER_REQUEST]",error);return send(res,200,{image:fallbackFor(description),fallback:true,message:"Não foi possível processar o pedido. Exibindo render técnico local."});}
+  }catch(error){console.error("[GENERATE_3D_RENDER_REQUEST]",error);return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Não foi possível processar o pedido. Exibindo render técnico local."});}
 }
