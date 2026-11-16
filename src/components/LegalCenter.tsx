@@ -9,7 +9,7 @@ const documents: Record<LegalDocument, { title: string; intro: string; sections:
     title: "Política de Privacidade",
     intro: "Esta política explica como a Anacleto Esquadrias trata dados pessoais no site e nas ferramentas digitais de atendimento, orçamento e gestão.",
     sections: [
-      { heading: "1. Quem é responsável", body: "Controlador: ANACLETO ESQUADRIAS, CNPJ 40.905.676/0001-49, com endereço na Av. Caxias do Sul, 1069, bairro Rio dos Sinos, São Leopoldo, RS, Brasil. O canal de contato para assuntos de privacidade e solicitações relacionadas à LGPD é contato@anacletoesquadrias.com.br." },
+      { heading: "1. Quem é responsável", body: "Controlador / responsável: ANACLETOESQUADRIAS. Razão social: ANACLETOESQUADRIAS. CNPJ: 40.905.676/0001-49. Endereço: Av. Caxias do Sul, 1069, bairro Rio dos Sinos, São Leopoldo/RS, Brasil. E-mail de contato e atendimento LGPD: contato@anacletoesquadrias.com.br." },
       { heading: "2. Dados que podemos tratar", body: "Podemos tratar dados de identificação e contato (nome, e-mail, telefone/WhatsApp), dados de orçamento e atendimento (endereço da obra, medidas, produtos, serviços, mensagens e agendamentos), dados fiscais e de cobrança quando necessários, e dados de acesso e segurança do sistema. No CRM, a empresa também pode registrar dados de clientes, representantes, funcionários, prestadores terceirizados e fornecedores. A empresa deve limitar os campos ao mínimo necessário e não inserir dados sensíveis sem necessidade e fundamento legal." },
       { heading: "3. Finalidades e bases legais", body: "Usamos os dados para responder solicitações, preparar orçamentos, agendar medições e visitas, executar contratos, emitir documentos e cumprir obrigações legais ou regulatórias, proteger contas e prevenir fraudes, e atender solicitações dos titulares. As bases legais aplicáveis podem incluir procedimentos preliminares e execução de contrato, cumprimento de obrigação legal, exercício regular de direitos, legítimo interesse avaliado e, quando necessário, consentimento. O consentimento para publicidade ou cookies não essenciais é separado e opcional." },
       { heading: "4. Compartilhamento e operadores", body: "Os dados podem ser processados por fornecedores que apoiam hospedagem, infraestrutura, autenticação, banco de dados, comunicação e pagamentos, conforme necessário e sob obrigações de segurança e confidencialidade. A infraestrutura atualmente prevista no projeto inclui serviços Google/Firebase e Vercel; integrações como Mercado Pago e WhatsApp somente devem receber dados quando efetivamente utilizadas. Não vendemos dados pessoais. A lista real de operadores, serviços ativados e eventuais transferências internacionais deve ser confirmada pela empresa." },
@@ -111,7 +111,7 @@ export function CookieConsent() {
   );
 }
 
-export default function LegalCenter({ initialDocument = "privacy", onClose, contactEmail = "contato@anacletoesquadrias.com.br", companyName = "Anacleto Esquadrias" }: Props) {
+export default function LegalCenter({ initialDocument = "privacy", onClose, contactEmail = "contato@anacletoesquadrias.com.br", companyName = "ANACLETOESQUADRIAS" }: Props) {
   const [active, setActive] = useState<LegalDocument>(initialDocument);
   const doc = documents[active];
   const nav: { id: LegalDocument; label: string; icon: React.ReactNode }[] = [
