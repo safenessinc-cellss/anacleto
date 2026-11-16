@@ -67,6 +67,8 @@ export default function OutsourcedServicesModule() {
       if (editingId) {
         await updateDoc(doc(db, "payroll_outsourced_services", editingId), payload);
         await deleteDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}`)).catch(() => undefined);
+        const previousRecord = records.find(row => row.id === editingId);
+        for (const previousPayment of previousRecord?.adiantamentos || []) if (previousPayment.id && !payload.adiantamentos.some(payment => payment.id === previousPayment.id)) await deleteDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}-advance-${previousPayment.id}`));
         for (const payment of payload.adiantamentos) await setDoc(doc(db, "ledger_entries", `outsourced-service-${editingId}-advance-${payment.id}`), { direction: "outflow", category: "third_party_services", sourceType: "payroll_outsourced_services", sourceId: editingId, description: `Adiantamento · ${nome.trim()} · ${payment.detalhe || competencia}`, amount: payment.valor, date: payment.data, status: "posted", updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "" }, { merge: true });
       } else {
         const created = await addDoc(collection(db, "payroll_outsourced_services"), { ...payload, createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
