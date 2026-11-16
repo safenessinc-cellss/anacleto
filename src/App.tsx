@@ -473,12 +473,14 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setCurrentView("pro")}
+            <a
+              href="https://anacleto-ipvm005dt-safeness.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-lg shadow-amber-500/20"
             >
-              <Compass className="w-4 h-4" /> Panel Anacleto Pro
-            </button>
+              <Compass className="w-4 h-4" /> Acessar Dashboard
+            </a>
             <div className="flex items-center gap-2 bg-luxury-dark border px-3 py-1.5 rounded-2xl border-luxury-border/30">
               <Globe className="w-4 h-4 text-luxury-gold" />
               <select value={language} onChange={(e) => handleLanguageChange(e.target.value as LanguageCode)} className="text-xs bg-transparent text-slate-300 font-bold border-none focus:outline-none">
