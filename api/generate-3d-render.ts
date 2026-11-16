@@ -15,7 +15,7 @@ export default async function handler(req:Request,res:any){
   const ip=String(req.headers?.["x-real-ip"]||forwarded||req.socket?.remoteAddress||"unknown").split(",")[0].trim();
   const now=Date.now();let bucket=buckets.get(ip);
   if(!bucket||now>bucket.reset){bucket={count:0,reset:now+60_000};buckets.set(ip,bucket);}
-  if(bucket.count>=3)return send(res,200,{image:fallbackFor(description),fallback:true,message:"Limite de geração atingido. Exibindo a galeria local de respaldo."});
+  if(bucket.count>=3)return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Limite de geração atingido. Exibindo a galeria local de respaldo."});
   bucket.count++;
   try{
     const body=(typeof req.body==="string"?JSON.parse(req.body):req.body||{}) as {description?:unknown;modelId?:unknown};
