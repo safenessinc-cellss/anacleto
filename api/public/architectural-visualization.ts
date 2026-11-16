@@ -18,7 +18,7 @@ export default async function handler(req:any,res:any){
   if(description.length<8)return res.status(400).json({error:"Descreva o ambiente e a esquadria desejada."});
   let image:string|undefined;
   if(body.referenceImage){
-   if(typeof body.referenceImage!=="string"||body.referenceImage.length>7_000_000||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.referenceImage))return res.status(400).json({error:"Imagem inválida. Envie PNG, JPG ou WebP de até 5 MB."});
+   if(typeof body.referenceImage!=="string"||body.referenceImage.length>4_300_000||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.referenceImage))return res.status(400).json({error:"Imagem inválida. Envie PNG, JPG ou WebP de até 3 MB."});
    image=body.referenceImage;
   }
   if(!process.env.AI_GATEWAY_API_KEY&&!process.env.VERCEL_OIDC_TOKEN)return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"Provedor de imagem não configurado. Esta é uma prévia vetorial local, não um render de IA."});
