@@ -1,3 +1,4 @@
+import "./index.css";
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, setDoc, onSnapshot, collection, getDocs, getDoc, query, where } from "firebase/firestore";
