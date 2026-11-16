@@ -9,7 +9,7 @@ const documents: Record<LegalDocument, { title: string; intro: string; sections:
     title: "Política de Privacidade",
     intro: "Esta política explica como a Anacleto Esquadrias trata dados pessoais no site e nas ferramentas digitais de atendimento, orçamento e gestão.",
     sections: [
-      { heading: "1. Quem é responsável", body: "Controlador: [RAZÃO SOCIAL COMPLETA DA EMPRESA], nome fantasia Anacleto Esquadrias, CNPJ [INSERIR CNPJ], com endereço em [ENDEREÇO COMPLETO]. O contato para privacidade é [E-MAIL DO ENCARREGADO/CANAL LGPD]. Estes campos devem ser preenchidos e confirmados pela empresa antes da publicação definitiva." },
+      { heading: "1. Quem é responsável", body: "Controlador: ANACLETO ESQUADRIAS, CNPJ 40.905.676/0001-49, com endereço na Av. Caxias do Sul, 1069, bairro Rio dos Sinos, São Leopoldo, RS, Brasil. O canal de contato para assuntos de privacidade e solicitações relacionadas à LGPD é contato@anacletoesquadrias.com.br." },
       { heading: "2. Dados que podemos tratar", body: "Podemos tratar dados de identificação e contato (nome, e-mail, telefone/WhatsApp), dados de orçamento e atendimento (endereço da obra, medidas, produtos, serviços, mensagens e agendamentos), dados fiscais e de cobrança quando necessários, e dados de acesso e segurança do sistema. No CRM, a empresa também pode registrar dados de clientes, representantes, funcionários, prestadores terceirizados e fornecedores. A empresa deve limitar os campos ao mínimo necessário e não inserir dados sensíveis sem necessidade e fundamento legal." },
       { heading: "3. Finalidades e bases legais", body: "Usamos os dados para responder solicitações, preparar orçamentos, agendar medições e visitas, executar contratos, emitir documentos e cumprir obrigações legais ou regulatórias, proteger contas e prevenir fraudes, e atender solicitações dos titulares. As bases legais aplicáveis podem incluir procedimentos preliminares e execução de contrato, cumprimento de obrigação legal, exercício regular de direitos, legítimo interesse avaliado e, quando necessário, consentimento. O consentimento para publicidade ou cookies não essenciais é separado e opcional." },
       { heading: "4. Compartilhamento e operadores", body: "Os dados podem ser processados por fornecedores que apoiam hospedagem, infraestrutura, autenticação, banco de dados, comunicação e pagamentos, conforme necessário e sob obrigações de segurança e confidencialidade. A infraestrutura atualmente prevista no projeto inclui serviços Google/Firebase e Vercel; integrações como Mercado Pago e WhatsApp somente devem receber dados quando efetivamente utilizadas. Não vendemos dados pessoais. A lista real de operadores, serviços ativados e eventuais transferências internacionais deve ser confirmada pela empresa." },
@@ -59,7 +59,7 @@ const documents: Record<LegalDocument, { title: string; intro: string; sections:
     sections: [
       { heading: "Como solicitar", body: "Informe seu nome, meio de contato, a relação com a empresa e o pedido (por exemplo, acesso, correção ou eliminação). Não envie documentos excessivos. A empresa poderá solicitar confirmação proporcional de identidade para evitar divulgação indevida." },
       { heading: "Prazos e limitações", body: "As solicitações serão analisadas e respondidas nos prazos previstos na LGPD e na regulamentação da ANPD. A eliminação pode não ser possível quando a conservação for necessária para obrigação legal, regulatória, contrato ou exercício regular de direitos; nesses casos, a justificativa será informada." },
-      { heading: "Contato", body: "Canal LGPD: [PREENCHER E-MAIL DE PRIVACIDADE]. Encarregado pelo tratamento de dados, se aplicável: [NOME OU CANAL]. Substitua estes campos por informações reais antes da publicação." }
+      { heading: "Contato", body: "Canal LGPD: contato@anacletoesquadrias.com.br. As solicitações serão encaminhadas à equipe responsável pela privacidade da ANACLETO ESQUADRIAS. A empresa deverá formalizar a designação de encarregado quando exigida ou aplicável e manter este canal atualizado." }
     ]
   }
 };
@@ -137,7 +137,7 @@ export default function LegalCenter({ initialDocument = "privacy", onClose, cont
             <p className="mt-3 text-sm leading-6 text-slate-600">{doc.intro}</p>
             <p className="mt-3 text-xs text-slate-500">Última atualização: 16 de novembro de 2026</p>
             <div className="mt-7 space-y-6">{doc.sections.map(section => <section key={section.heading}><h3 className="font-bold text-slate-900">{section.heading}</h3><p className="mt-2 text-sm leading-7 text-slate-600">{section.body}</p></section>)}</div>
-            <div className="mt-8 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600"><b>Contato geral:</b> {contactEmail}<br /><span className="text-xs">Para pedidos de privacidade, utilize o canal LGPD que a empresa deverá confirmar e divulgar.</span></div>
+            <div className="mt-8 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600"><b>Contato geral:</b> {contactEmail}<br /><span className="text-xs">Para pedidos relacionados à privacidade e à LGPD, escreva para este endereço.</span></div>
           </article>
         </div>
       </div>
