@@ -552,3 +552,43 @@ html:not(.dark) .shadow-lg,
 html:not(.dark) .shadow-xl {
   --tw-shadow-color: rgb(15 23 42 / 7%) !important;
 }
+
+/* ANACLETO · estados de clique suaves: preservar leitura e contraste */
+html:not(.dark) {
+  -webkit-tap-highlight-color: transparent;
+}
+html:not(.dark) button:active,
+html:not(.dark) a:active,
+html:not(.dark) [role="button"]:active,
+html:not(.dark) [role="tab"]:active {
+  opacity: 1 !important;
+  filter: none !important;
+  color: #294b78 !important;
+  background-color: #eaf2ff !important;
+  box-shadow: inset 0 0 0 1px rgba(111, 159, 232, .18) !important;
+}
+html:not(.dark) button[aria-pressed="true"],
+html:not(.dark) [role="tab"][aria-selected="true"],
+html:not(.dark) [data-state="active"] {
+  opacity: 1 !important;
+  filter: none !important;
+  background-color: #eaf2ff !important;
+  color: #294b78 !important;
+}
+html:not(.dark) button:focus-visible,
+html:not(.dark) a:focus-visible,
+html:not(.dark) [role="button"]:focus-visible,
+html:not(.dark) [role="tab"]:focus-visible {
+  outline: 2px solid rgba(111, 159, 232, .55) !important;
+  outline-offset: 2px;
+}
+html.dark button:active,
+html.dark a:active,
+html.dark [role="button"]:active,
+html.dark [role="tab"]:active {
+  opacity: 1 !important;
+  filter: none !important;
+  background-color: #263b59 !important;
+  color: #edf4ff !important;
+}
+
