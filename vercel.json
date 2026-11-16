@@ -13,6 +13,9 @@
     },
     "api/approved-snapshot.ts": {
       "maxDuration": 30
+    },
+    "api/generate-3d-render.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
