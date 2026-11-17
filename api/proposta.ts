@@ -3,6 +3,22 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore, type DocumentData } from "firebase-admin/firestore";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
+function sameOriginMutation(req: any): boolean {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  const fetchSite = String(req.headers?.["sec-fetch-site"] || "").toLowerCase();
+  if (fetchSite === "cross-site") return false;
+  const origin = req.headers?.origin;
+  if (!origin) return true; // Native/server-to-server Bearer clients may omit Origin.
+  try {
+    const originUrl = new URL(String(origin));
+    const host = String(req.headers?.host || req.headers?.["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase();
+    return !!host && originUrl.host.toLowerCase() === host && ["https:", "http:"].includes(originUrl.protocol);
+  } catch {
+    return false;
+  }
+}
+
 type Request = {
   method?: string;
   headers?: Record<string, string | string[] | undefined>;
@@ -112,6 +128,7 @@ function publicProposal(quote: DocumentData) {
 }
 
 export default async function handler(req: Request, res: any) {
+  if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   try {
     const id = requestValue(req, "id").trim();
     if (!id || id.length > 180 || id.includes("/")) return send(res, 400, { error: "Proposta inválida." });
