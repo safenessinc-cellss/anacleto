@@ -122,8 +122,9 @@ service firebase.storage {
         && request.resource.contentType.matches('image/(jpeg|png|webp)');
       allow delete: if owner();
     }
+    // O proprietário mantém acesso integral; perfis delegados dependem das regras acima.
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if owner();
     }
   }
 }
