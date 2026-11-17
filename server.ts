@@ -696,8 +696,12 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
     const calendar = google.calendar({ version: "v3", auth });
 
     const startDateTime = `${dateValue}T${timeValue}:00`;
-    const endHour = String(parseInt(timeValue.split(":")[0], 10) + 1).padStart(2, "0");
-    const endDateTime = `${preferDate}T${endHour}:${preferTime.split(":")[1]}:00`;
+    const startHour = Number(timeValue.split(":")[0]);
+    const endDate = new Date(dateValue + "T12:00:00Z");
+    if (startHour === 23) endDate.setUTCDate(endDate.getUTCDate() + 1);
+    const endDateValue = endDate.toISOString().slice(0, 10);
+    const endHour = String((startHour + 1) % 24).padStart(2, "0");
+    const endDateTime = `${endDateValue}T${endHour}:${timeValue.split(":")[1]}:00`;
 
     const event = {
       summary: `Visita Técnica — ${safeName}`,
