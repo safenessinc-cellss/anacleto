@@ -24,7 +24,28 @@ dotenv.config();
 // Create Express app and HTTP server
 const app = express();
 const httpServer = http.createServer(app);
-app.use(express.json({ limit: "16mb" }));
+// Security baseline: JSON only, no cookie-based authentication, and no cross-site
+// browser mutations. Bearer-token APIs remain usable by trusted native clients.
+app.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  const unsafe = !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase());
+  const origin = req.get("origin");
+  const fetchSite = req.get("sec-fetch-site");
+  if (unsafe && fetchSite === "cross-site") return res.status(403).json({ error: "Solicitação de origem cruzada bloqueada." });
+  if (unsafe && origin) {
+    try {
+      const parsedOrigin = new URL(origin);
+      const requestHost = String(req.get("host") || "").toLowerCase();
+      if (parsedOrigin.host.toLowerCase() !== requestHost || !["https:", "http:"].includes(parsedOrigin.protocol)) {
+        return res.status(403).json({ error: "Origem não autorizada." });
+      }
+    } catch {
+      return res.status(403).json({ error: "Origem inválida." });
+    }
+  }
+  next();
+});
+app.use(express.json({ limit: "16mb", strict: true, type: "application/json" }));
 app.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
 app.post("/api/generate-3d-render", generate3DRenderHandler);
 
@@ -48,9 +69,11 @@ const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
       body: JSON.stringify({ idToken: token }),
     });
     if (!identityResponse.ok) return res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
-    const identity = await identityResponse.json() as { users?: Array<{ localId?: string; email?: string }> };
+    const identity = await identityResponse.json() as { users?: Array<{ localId?: string; email?: string; emailVerified?: boolean; disabled?: boolean }> };
     const user = identity.users?.[0];
-    if (!user?.localId || !user.email) return res.status(401).json({ error: "Conta autenticada inválida." });
+    if (!user?.localId || !user.email || user.disabled || user.emailVerified !== true) {
+      return res.status(403).json({ error: "Verifique seu endereço de e-mail antes de acessar o sistema." });
+    }
 
     const email = user.email.toLowerCase();
     if (email === ownerEmail) {
@@ -65,7 +88,11 @@ const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
     if (!roleResponse.ok) return res.status(403).json({ error: "Acesso pendente de aprovação ou perfil não autorizado." });
     const roleDocument = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
     const role = roleDocument.fields?.role?.stringValue;
-    if (!role) return res.status(403).json({ error: "Perfil de acesso não encontrado." });
+    const allowedRoles = new Set(["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro", "rh", "qualidade", "estoque", "producao", "usuario"]);
+    if (!role || !allowedRoles.has(role)) return res.status(403).json({ error: "Perfil de acesso não autorizado." });
+    // A conta do proprietário é resolvida exclusivamente pelo e-mail verificado;
+    // nenhum documento admins pode conceder ou substituir esse privilégio.
+    if (role === "super_admin") return res.status(403).json({ error: "O privilégio exclusivo de proprietário não pode ser delegado." });
     res.locals.firebaseUser = { uid: user.localId, email, role };
     return next();
   } catch (error) {
