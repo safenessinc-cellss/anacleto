@@ -2,16 +2,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function owner() {
+    function verifiedEmail() {
       return signedIn()
         && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+    function owner() {
+      return verifiedEmail()
         && request.auth.token.email.lower() == 'safeness.c.a@gmail.com';
     }
     function adminPath() {
       return /databases/$(database)/documents/admins/$(request.auth.token.email.lower());
     }
     function hasAdminRecord() {
-      return signedIn() && request.auth.token.email != null && exists(adminPath());
+      return verifiedEmail() && exists(adminPath());
     }
     function role() {
       return hasAdminRecord() ? get(adminPath()).data.role : 'usuario';
