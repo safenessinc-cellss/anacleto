@@ -2,7 +2,6 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Quote, Invoice, TechnicalDrawing, SenderConfig } from "../types";
 import officialAnacletoLogo from "../assets/images/anacleto-logo-premium.svg";
-import { buildArchitecturalIsometricSvg } from "./architecturalSvg";
 
 // Format helper
 const formatMoney = (amount: number, currency: string = "BRL") => {
@@ -72,72 +71,6 @@ export const exportArchitecturalSheetPdf = async (svg: string, title: string): P
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a3" });
   doc.addImage(image, "PNG", 10, 22, 277, 376);
   doc.save(`Ficha_Tecnica_${title.replace(/[^a-z0-9_-]+/gi, "_") || "Esquadria"}.pdf`);
-};
-
-
-// Miniatura vetorial isométrica: ilustração comercial do tipo de esquadria descrito.
-const drawQuoteItemMiniature3D = (doc: jsPDF, description: string, x: number, y: number, w: number, h: number) => {
-  const d = (description || "").toLowerCase();
-  const isShower = /box|banheiro|ducha|shower/.test(d);
-  const isDoor = /porta|door/.test(d);
-  const isSliding = /corredi|correr|sliding|2 folhas|duas folhas/.test(d);
-  const isCloset = /arm[aá]rio|closet|roupeiro/.test(d);
-  const isWindow = /janela|esquadria|window|frame/.test(d);
-  const isGeneric = !isShower && !isDoor && !isCloset && !isWindow && !isSliding;
-  const pad = 4;
-  const left = x + pad, top = y + 4, frontW = w - 2 * pad - 5, frontH = h - 9, depth = 4;
-  const right = left + frontW, bottom = top + frontH;
-  doc.setLineWidth(0.45);
-  doc.setDrawColor(100, 116, 139);
-  doc.setFillColor(239, 246, 255);
-  if (isGeneric) {
-    // Objeto genérico em perspectiva para itens/serviços sem tipologia de esquadria identificável.
-    doc.rect(left + 5, top + 7, frontW - 11, frontH - 13, "FD");
-    doc.line(left + 5, top + 7, left + 10, top + 3);
-    doc.line(left + frontW - 6, top + 7, left + frontW - 1, top + 3);
-    doc.line(left + 10, top + 3, left + frontW - 1, top + 3);
-    doc.line(left + frontW - 6, bottom - 6, left + frontW - 1, bottom - 10);
-    doc.line(left + frontW - 1, top + 3, left + frontW - 1, bottom - 10);
-    doc.line(left + 5, top + 7, left + 10, top + 3);
-  } else if (isShower) {
-    // Duas folhas de vidro em canto, com profundidade lateral.
-    doc.rect(left + 2, top + 2, frontW * 0.58, frontH - 3, "FD");
-    doc.line(left + 2, top + 2, left + frontW * 0.58 + depth, top - 1);
-    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58 + depth, top - 1);
-    doc.line(left + frontW * 0.58 + depth, top - 1, left + frontW * 0.58 + depth, bottom - 3);
-    doc.line(left + 2, bottom - 1, left + frontW * 0.58 + depth, bottom - 1);
-    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58, bottom - 3);
-    doc.line(left + frontW * 0.58, top + 2, left + frontW * 0.58 + depth, top - 1);
-  } else {
-    // Marco frontal de alumínio com lateral superior/direita em perspectiva.
-    doc.rect(left, top + 2, frontW, frontH - 3, "FD");
-    doc.line(left, top + 2, left + depth, top - 1);
-    doc.line(right, top + 2, right + depth, top - 1);
-    doc.line(left + depth, top - 1, right + depth, top - 1);
-    doc.line(right, top + 2, right + depth, top - 1);
-    doc.line(right + depth, top - 1, right + depth, bottom - 4);
-    doc.line(right, bottom - 1, right + depth, bottom - 4);
-    if (isDoor || isCloset) {
-      doc.line(left + frontW * 0.72, top + 4, left + frontW * 0.72, bottom - 4);
-      doc.setDrawColor(148, 163, 184);
-      doc.line(left + frontW * 0.72 - 2, top + 4, right - 3, bottom - 4);
-      doc.setDrawColor(100, 116, 139);
-    } else if (isSliding) {
-      doc.line(left + frontW / 2, top + 3, left + frontW / 2, bottom - 3);
-      doc.setDrawColor(148, 163, 184);
-      doc.line(left + 3, top + 5, left + frontW / 2 - 2, bottom - 5);
-      doc.line(left + frontW / 2 + 2, top + 5, right - 3, bottom - 5);
-      doc.setDrawColor(100, 116, 139);
-    } else {
-      doc.line(left + frontW / 2, top + 3, left + frontW / 2, bottom - 3);
-      doc.line(left + 3, top + frontH / 2, right - 3, top + frontH / 2);
-    }
-  }
-  // Sombra/base discreta para reforçar a leitura tridimensional.
-  doc.setDrawColor(203, 213, 225);
-  doc.line(left + 1, bottom + 1, right + depth + 2, bottom + 1);
-  doc.setDrawColor(100, 116, 139);
-  doc.setLineWidth(0.2);
 };
 
 
@@ -309,29 +242,22 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
   doc.text(`Endereço: ${quote.clientAddress || "Não informado"}`, pageWidth / 2 + 10, yPos + 21);
   if (quote.validUntil) doc.text(`Válido até: ${quote.validUntil}`, pageWidth / 2 + 10, yPos + 26);
 
-  // Table of Items
+  // Itens comerciais: sem desenhos automáticos por descrição.
   const tableData = quote.items.map((item, idx) => [
     idx + 1,
-    "",
     item.sku
       ? `${item.sku} · ${item.description}${Number(item.cutLengthMm) > 0 ? ` (${item.cutLengthMm} mm)` : ""}`
       : item.description,
     item.quantity,
     formatMoney(item.unitPrice, currency),
-    formatMoney(item.subtotal || item.quantity * item.unitPrice, currency),
+    formatMoney(item.subtotal ?? item.quantity * item.unitPrice, currency),
   ]);
 
   autoTable(doc, {
     startY: yPos + 35,
-    head: [["#", "Vista 3D", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
+    head: [["#", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
     body: tableData,
     theme: "striped",
-    didDrawCell: (data: any) => {
-      if (data.section === "body" && data.column.index === 1) {
-        const item = quote.items[data.row.index];
-        drawQuoteItemMiniature3D(doc, item?.description || "", data.cell.x, data.cell.y, data.cell.width, data.cell.height);
-      }
-    },
     headStyles: {
       fillColor: [15, 23, 42],
       textColor: [255, 255, 255],
@@ -339,144 +265,102 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
     },
     columnStyles: {
       0: { cellWidth: 9, halign: "center" },
-      1: { cellWidth: 29, halign: "center" },
-      2: { cellWidth: "auto" },
-      3: { cellWidth: 15, halign: "center" },
-      4: { cellWidth: 29, halign: "right" },
-      5: { cellWidth: 30, halign: "right" },
+      1: { cellWidth: "auto" },
+      2: { cellWidth: 15, halign: "center" },
+      3: { cellWidth: 31, halign: "right" },
+      4: { cellWidth: 31, halign: "right" },
     },
     styles: {
       fontSize: 8,
-      cellPadding: 3,
-      minCellHeight: 29,
+      cellPadding: 2.5,
+      overflow: "linebreak",
       valign: "middle",
     },
+    margin: { left: 14, right: 14, bottom: 20 },
   });
 
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
-
-  // Totals Box
-  const totalsX = pageWidth - 90;
+  let finalY = (doc as any).lastAutoTable.finalY + 8;
   const totalRows = [
     ["Materiais:", formatMoney(quote.subtotal, currency)],
     ...(Number(quote.labor || 0) > 0 ? [["Mão de obra:", formatMoney(quote.labor || 0, currency)]] : []),
     ...(Number(quote.margin || 0) > 0 ? [[`Margem (${quote.marginRate || 0}%):`, formatMoney(quote.margin || 0, currency)]] : []),
     ...(Number(quote.freight || 0) > 0 ? [["Frete:", formatMoney(quote.freight || 0, currency)]] : []),
     ...(Number(quote.discountAmount || 0) > 0 ? [[`Desconto (${quote.discountRate || 0}%):`, `-${formatMoney(quote.discountAmount || 0, currency)}`]] : []),
-    [`Imposto (${quote.taxRate}%):`, formatMoney(quote.taxAmount, currency)],
+    ...(Number(quote.taxAmount || 0) > 0 ? [[`Imposto (${quote.taxRate || 0}%):`, formatMoney(quote.taxAmount, currency)]] : []),
   ];
-  const totalsBoxHeight = (totalRows.length + 1) * 7 + 7;
-  doc.setFillColor(248, 250, 252);
-  doc.roundedRect(totalsX - 5, finalY - 4, 85, totalsBoxHeight, 3, 3, "F");
+  const totalsHeight = (totalRows.length + 1) * 6 + 10;
+  const notesLines = quote.notes ? doc.splitTextToSize(quote.notes, pageWidth - 28) : [];
+  const notesHeight = notesLines.length ? notesLines.length * 4 + 12 : 0;
+  const pageBottom = doc.internal.pageSize.getHeight() - 22;
 
-  doc.setFontSize(9);
+  // Se não houver espaço real para totais e condições, usa a segunda página.
+  if (finalY + Math.max(totalsHeight, notesHeight) > pageBottom && doc.getNumberOfPages() < 2) {
+    doc.addPage();
+    finalY = 22;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59);
+    doc.text("CONTINUAÇÃO DO ORÇAMENTO", 14, finalY);
+    finalY += 10;
+  }
+
+  const totalsX = pageWidth - 91;
+  const totalsBoxHeight = totalsHeight;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(totalsX - 5, finalY - 4, 82, totalsBoxHeight, 3, 3, "F");
+  doc.setFontSize(8.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(71, 85, 105);
   totalRows.forEach(([label, amount], index) => {
-    const rowY = finalY + 4 + index * 7;
+    const rowY = finalY + 3 + index * 6;
     doc.text(label, totalsX, rowY);
-    if (label.startsWith("Desconto")) doc.setTextColor(71, 85, 105);
     doc.text(amount, pageWidth - 14, rowY, { align: "right" });
-    doc.setTextColor(71, 85, 105);
   });
 
-  const dividerY = finalY + 4 + totalRows.length * 7;
+  const dividerY = finalY + 3 + totalRows.length * 6;
   doc.setDrawColor(203, 213, 225);
   doc.line(totalsX, dividerY, pageWidth - 14, dividerY);
-
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("TOTAL ORÇAMENTO:", totalsX, dividerY + 7);
+  doc.text("TOTAL GERAL:", totalsX, dividerY + 7);
   doc.setTextColor(180, 83, 9);
   doc.text(formatMoney(quote.total, currency), pageWidth - 14, dividerY + 7, { align: "right" });
 
-  // Notes and Terms
-  if (quote.notes) {
+  if (notesLines.length) {
+    const notesY = finalY + 3;
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
-    doc.text("OBSERVAÇÕES E CONDIÇÕES:", 14, finalY + 10);
+    doc.text("OBSERVAÇÕES E CONDIÇÕES:", 14, notesY);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    const splitNotes = doc.splitTextToSize(quote.notes, totalsX - 25);
-    doc.text(splitNotes, 14, finalY + 17);
+    doc.text(notesLines, 14, notesY + 6);
   }
 
-  // Desenho 2D vinculado ao produto orçado; mantém fallback ilustrativo para esquadrias.
-  const windowItem = quote.items.find((item) => /janela|porta|esquadria|window|door|box de banheiro|box banheiro/i.test(item.description || ""));
-  const technicalDrawing = quote.technicalDrawing;
-  if (technicalDrawing || windowItem) {
-    doc.addPage();
-    drawDocumentLogo(doc, sender, 14, 7, 25, 25, officialLogo);
-    const desc = technicalDrawing?.title || windowItem?.description || "Esquadria";
-    const dimensions = desc.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})/i);
-    const unitFactor = technicalDrawing?.unit === "mm" ? 1 : 10;
-    const widthMm = technicalDrawing?.overallDimensions?.width
-      ? Math.round(technicalDrawing.overallDimensions.width * unitFactor)
-      : dimensions ? Number(dimensions[1]) * (Number(dimensions[1]) < 20 ? 100 : 10) : 1200;
-    const heightMm = technicalDrawing?.overallDimensions?.height
-      ? Math.round(technicalDrawing.overallDimensions.height * unitFactor)
-      : dimensions ? Number(dimensions[2]) * (Number(dimensions[2]) < 20 ? 100 : 10) : 1000;
-    const isDoor = /porta|door/i.test(desc) || technicalDrawing?.category === "glass_door";
-    const frameX = 45, frameY = 72, frameW = 120, frameH = 105;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(15, 23, 42);
-    doc.text(technicalDrawing ? "DESENHO TÉCNICO 2D DO PRODUTO ORÇADO" : "DESENHO ILUSTRATIVO 2D DA ESQUADRIA", 14, 22);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(71, 85, 105);
-    doc.text(desc.substring(0, 90), 14, 31);
-    const architecturalDrawing = Boolean(technicalDrawing && (
-      technicalDrawing.category === "aluminum_window" ||
-      technicalDrawing.category === "glass_door" ||
-      /janela|porta|esquadria|box|maxim.?ar/i.test(`${technicalDrawing.title || ""} ${technicalDrawing.tipologia || ""}`)
-    ));
-    if (technicalDrawing && architecturalDrawing) {
-      const isoImage = await svgToPngDataUrl(buildArchitecturalIsometricSvg(technicalDrawing));
-      doc.addImage(isoImage, "PNG", 24, 43, 162, 105);
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85);
-      doc.text(`Largura: ${widthMm} mm  ·  Altura: ${heightMm} mm  ·  Profundidade: ${Math.round(Number(technicalDrawing.overallDimensions?.depth || 60))} ${technicalDrawing.unit || "mm"}`, 24, 157);
+  // Só inclui desenho quando existe projeto técnico explicitamente associado e geometria salva.
+  const linkedDrawing = quote.technicalDrawing as TechnicalDrawing | undefined;
+  const hasRealDrawing = Boolean(
+    linkedDrawing && (
+      (typeof linkedDrawing.vectorPayload?.svg === "string" && linkedDrawing.vectorPayload.svg.trim()) ||
+      (Array.isArray(linkedDrawing.visualElements) && linkedDrawing.visualElements.length >= 2)
+    )
+  );
+  if (hasRealDrawing && doc.getNumberOfPages() < 2) {
+    const svg = linkedDrawing!.vectorPayload?.svg;
+    if (svg) {
+      const drawingImage = await svgToPngDataUrl(svg, 1800, 1170);
+      doc.addPage();
+      drawDocumentLogo(doc, sender, 14, 7, 25, 25, officialLogo);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42);
+      doc.text("PROJETO TÉCNICO VINCULADO", 44, 19);
+      doc.addImage(drawingImage, "PNG", 18, 43, pageWidth - 36, 170);
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text("Perspectiva isométrica vetorial do desenho salvo · validar perfis, folgas e medidas antes da fabricação.", 14, 205);
-      doc.text(`Quantidade no orçamento: ${windowItem?.quantity || 1}`, 14, 214);
-    } else {
-    doc.setDrawColor(71, 85, 105);
-    doc.setLineWidth(2.5);
-    doc.rect(frameX, frameY, frameW, frameH);
-    doc.setLineWidth(1.2);
-    doc.rect(frameX + 4, frameY + 4, frameW - 8, frameH - 8);
-    if (/2\s*folhas|duas folhas|2 folhas|corrediça|correr|sliding/i.test(desc)) {
-      doc.line(frameX + frameW / 2, frameY + 4, frameX + frameW / 2, frameY + frameH - 4);
-      doc.setDrawColor(148, 163, 184);
-      doc.line(frameX + 9, frameY + 9, frameX + frameW / 2 - 4, frameY + frameH - 9);
-      doc.line(frameX + frameW / 2 + 4, frameY + 9, frameX + frameW - 9, frameY + frameH - 9);
-    } else if (!isDoor) {
-      doc.line(frameX + frameW / 2, frameY + 4, frameX + frameW / 2, frameY + frameH - 4);
-      doc.line(frameX + 4, frameY + frameH / 2, frameX + frameW - 4, frameY + frameH / 2);
-    } else {
-      doc.setDrawColor(148, 163, 184);
-      doc.line(frameX + 8, frameY + 8, frameX + frameW - 8, frameY + frameH - 8);
-    }
-    doc.setDrawColor(197, 168, 80);
-    doc.setLineWidth(0.6);
-    doc.line(frameX, frameY - 10, frameX + frameW, frameY - 10);
-    doc.line(frameX, frameY - 13, frameX, frameY - 7);
-    doc.line(frameX + frameW, frameY - 13, frameX + frameW, frameY - 7);
-    doc.setFontSize(10);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`Largura: ${widthMm} mm`, frameX + frameW / 2, frameY - 14, { align: "center" });
-    doc.line(frameX - 12, frameY, frameX - 12, frameY + frameH);
-    doc.line(frameX - 15, frameY, frameX - 9, frameY);
-    doc.line(frameX - 15, frameY + frameH, frameX - 9, frameY + frameH);
-    doc.text(`Altura: ${heightMm} mm`, frameX - 16, frameY + frameH / 2, { angle: 90, align: "center" });
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(technicalDrawing ? "Desenho técnico vinculado; validar medidas finais antes da fabricação." : "Representação visual ilustrativa; confirmar medidas e abertura antes da fabricação.", 14, 205);
-    doc.text(`Quantidade no orçamento: ${windowItem?.quantity || quote.items.find((item) => item.description.toLowerCase().includes(desc.toLowerCase()))?.quantity || 1}`, 14, 214);
+      doc.setTextColor(71, 85, 105);
+      doc.text(String(linkedDrawing!.title || "Projeto"), 18, 222);
     }
   }
 
