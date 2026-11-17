@@ -40,10 +40,12 @@ export default function DrawingThreePreview({ drawing }: Props) {
         </div>
         <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300">SEM WEBGL</span>
       </div>
-      <div
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 1200 780"
         role="img"
         aria-label={"Perspectiva isométrica técnica de " + (drawing.title || "esquadria de alumínio")}
-        className="w-full overflow-hidden [&>svg]:block [&>svg]:h-auto [&>svg]:max-h-[540px] [&>svg]:w-full [&>svg]:object-contain"
+        className="block h-auto max-h-[540px] w-full object-contain"
         dangerouslySetInnerHTML={{ __html: svgInnerMarkup(preview) }}
       />
     </section>
