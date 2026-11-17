@@ -3,6 +3,9 @@ import { motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight, ChevronDown, Menu, MessageCircle, Move3D, RefreshCw, Sparkles, Upload, X } from "lucide-react";
 import logo from "../assets/images/anacleto-logo-premium.svg";
 import PublicAssemblyIntro from "./PublicAssemblyIntro";
+import Chatbot from "./Chatbot";
+import WhatsAppButton from "./WhatsAppButton";
+import { translations } from "../translations";
 import ArchitecturalModelsCarousel from "./ArchitecturalModelsCarousel";
 import "./public-landing.css";
 
@@ -91,6 +94,6 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
       <section className="engineering-section" id="engenharia"><div className="section-wrap"><div className="section-heading"><div><span className="eyebrow">ENGENHARIA QUE VOCÊ SENTE</span><h2>Performance em cada detalhe.</h2></div><p>Estética limpa por fora. Engenharia e cuidado em cada componente.</p></div><div className="bento-grid"><article className="bento-card bento-dark"><span>01 / CONFORTO</span><div className="bento-icon">◌</div><h3>Isolamento acústico de alta performance.</h3><p>Composições de vidro e sistemas de vedação avaliados conforme cada ambiente.</p></article><article className="bento-card bento-image"><span>02 / PROTEÇÃO</span><h3>Vedação contra chuva e vento.</h3><p>Encaixes, escovas e instalação pensados para o desempenho do conjunto.</p></article><article className="bento-card bento-line"><span>03 / SISTEMAS</span><h3>Perfis Suprema & Gold.</h3><p>Linhas para diferentes escalas, vãos e linguagens arquitetônicas.</p></article><article className="bento-card bento-glass"><span>04 / MATERIALIDADE</span><h3>Vidros temperados e laminados.</h3><p>Especificação conforme aplicação, segurança e normas pertinentes.</p></article></div></div></section>
       <section className="lines-section section-wrap" id="linhas"><div className="lines-copy"><span className="eyebrow">DO CONCEITO À INSTALAÇÃO</span><h2>Precisão em quatro movimentos.</h2></div><div className="process-grid">{[["01","Projeto 3D","Visualização e definição da solução."],["02","Fabricação Própria","Componentes preparados sob medida."],["03","Instalação Precisa","Montagem técnica e cuidado com a obra."],["04","Pós-Venda Garantido","Orientação e suporte após a entrega."]].map(([n,t,d])=><article key={n}><span>{n}</span><h3>{t}</h3><p>{d}</p></article>)}</div></section>
       <section className="faq-section" id="contato"><div className="section-wrap faq-layout"><div><span className="eyebrow">FAQ / ANACLETO</span><h2>Boas escolhas começam com boas respostas.</h2><p>Converse com nossa equipe para transformar a referência visual em um projeto real.</p><a className="button button-primary" href={wa("Olá! Quero conversar sobre meu projeto com a Anacleto Esquadrias.")} target="_blank" rel="noreferrer">Falar com a Anacleto <ArrowUpRight size={16}/></a></div><div className="faq-list">{faqs.map(([q,a],i)=><article className={faqOpen===i?"faq-item active":"faq-item"} key={q}><button onClick={()=>setFaqOpen(faqOpen===i?null:i)} aria-expanded={faqOpen===i}><span>{q}</span><ChevronDown size={19}/></button>{faqOpen===i&&<p>{a}</p>}</article>)}</div></div></section>
-    </main><footer className="site-footer"><span>Desenvolvido por Safeness.inc</span></footer>
+    </main><Chatbot currentLanguage="pt" t={translations.pt} /><WhatsAppButton currentLanguage="pt" /><footer className="site-footer"><span>Desenvolvido por Safeness.inc</span></footer>
   </div>;
 }
