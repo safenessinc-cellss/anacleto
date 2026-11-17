@@ -128,6 +128,7 @@ function publicProposal(quote: DocumentData) {
 }
 
 export default async function handler(req: Request, res: any) {
+  res.setHeader("Cache-Control", "no-store");
   if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   try {
     const id = requestValue(req, "id").trim();
