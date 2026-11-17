@@ -41,6 +41,15 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
 
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Validate Firestore and Storage rules
+        run: npx --yes firebase-tools@latest emulators:exec --project demo-anacleto --only firestore,storage "echo Firebase rules compiled"
+
       - name: Type check
         run: npx tsc --noEmit --pretty false
 
