@@ -249,12 +249,12 @@ service cloud.firestore {
     }
     match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
     match /visits/{id} {
-      allow read: if canOperate();
+      allow read: if canManageCommercial() || canManageFinance();
       allow update: if canManageCommercial();
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
     match /deliveries/{id} {
-      allow read: if canOperate() || canManageQuality() || canManageFinance();
+      allow read: if canManageCommercial() || canManageProduction() || canManageQuality() || canManageFinance();
       allow create: if canManageProduction() || canManageCommercial();
       allow update, delete: if owner();
     }
