@@ -294,7 +294,7 @@ export function svgInnerMarkup(svg: string): string {
   ]);
   const safeValue = (name: string, value: string) => {
     const normalized = value.trim();
-    if (name === "id") return /^[A-Za-z_][\\w.-]{0,100}$/.test(normalized) ? normalized : "";
+    if (name === "id") return /^[A-Za-z_][\w.-]{0,100}$/.test(normalized) ? normalized : "";
     if (/^(?:fill|stroke|filter|marker-start|marker-mid|marker-end)$/.test(name)) {
       if (/^url\(\s*#[A-Za-z_][\w.-]*\s*\)$/i.test(normalized)) return normalized;
       if (/^(?:none|currentColor|transparent|#[\da-f]{3,8}|[a-z]{1,24})$/i.test(normalized)) return normalized;
