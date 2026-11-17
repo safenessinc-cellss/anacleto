@@ -222,8 +222,21 @@ service cloud.firestore {
     }
     match /sender_config/{id} { allow read: if canOperate(); allow create, update: if hasRole(['super_admin','super_usuario','ceo','admin']); allow delete: if owner(); }
 
+    // Collections with explicit ownership/immutability rules must not be widened by the admin fallback.
+    function isProtectedDocument() {
+      return (resource != null && resource.__name__.segments[5] in [
+        'admins', 'pending_users', 'user_profiles', 'chat_sessions',
+        'approved_snapshots', 'ai_audit_logs', 'budget_line_audit',
+        'drawing_jobs', 'sender_config'
+      ]) || (request.resource != null && request.resource.__name__.segments[5] in [
+        'admins', 'pending_users', 'user_profiles', 'chat_sessions',
+        'approved_snapshots', 'ai_audit_logs', 'budget_line_audit',
+        'drawing_jobs', 'sender_config'
+      ]);
+    }
+
     // Negação por padrão: nenhuma coleção não declarada fica acessível por estar autenticado.
     // Os perfis de administração têm acesso integral a todas as coleções do sistema.
-    match /{document=**} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    match /{document=**} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']) && !isProtectedDocument(); }
   }
 }
