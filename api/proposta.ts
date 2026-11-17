@@ -10,7 +10,7 @@ type Request = {
   body?: unknown;
 };
 
-const editableQuoteRoles = new Set(["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"]);
+const editableQuoteRoles = new Set(["super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"]);
 const db = () => {
   const existing = getApps().find((app) => app.name === "anacleto-public-proposals");
   if (existing) return getFirestore(existing, process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || "(default)");
@@ -66,15 +66,16 @@ async function authenticatedRole(req: Request) {
     signal: AbortSignal.timeout(10_000),
   });
   if (!identity.ok) return null;
-  const result = await identity.json() as { users?: Array<{ localId?: string; email?: string }> };
+  const result = await identity.json() as { users?: Array<{ localId?: string; email?: string; emailVerified?: boolean; disabled?: boolean }> };
   const user = result.users?.[0];
-  if (!user?.localId || !user.email) return null;
+  if (!user?.localId || !user.email || user.disabled || user.emailVerified !== true) return null;
 
   const email = user.email.toLowerCase();
   if (email === "safeness.c.a@gmail.com") return { uid: user.localId, role: "super_admin" };
   const admin = await db().collection("admins").doc(email).get();
   const role = admin.data()?.role;
-  return typeof role === "string" ? { uid: user.localId, role } : null;
+  const allowedRoles = new Set(["super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro", "rh", "qualidade", "estoque", "producao", "usuario"]);
+  return typeof role === "string" && allowedRoles.has(role) ? { uid: user.localId, role } : null;
 }
 
 function publicProposal(quote: DocumentData) {
