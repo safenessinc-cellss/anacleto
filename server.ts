@@ -46,6 +46,18 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: "16mb", strict: true, type: "application/json" }));
+app.use("/api", (req, res, next) => {
+  const body = req.body;
+  if (body === undefined) return next();
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return res.status(400).json({ error: "O corpo da solicitação deve ser um objeto JSON válido." });
+  }
+  const keys = Object.keys(body);
+  if (keys.length > 200 || keys.some((key) => key.length > 120)) {
+    return res.status(413).json({ error: "A solicitação excede os limites de campos permitidos." });
+  }
+  next();
+});
 app.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
 app.post("/api/generate-3d-render", generate3DRenderHandler);
 
@@ -651,9 +663,23 @@ if (!process.env.VERCEL) {
 // ============ Google Calendar Endpoint ============
 app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => {
   try {
-    const { name, email, phone, service, address, preferDate, preferTime, notes } = req.body;
-    if (!name || !preferDate || !preferTime) {
-      return res.status(400).json({ success: false, error: "Faltan datos obligatorios" });
+    const { name, email, phone, service, address, preferDate, preferTime, notes } = req.body || {};
+    const cleanText = (value: unknown, max: number) => typeof value === "string" ? value.trim().slice(0, max) : "";
+    const safeName = cleanText(name, 120);
+    const safeEmail = cleanText(email, 254);
+    const safePhone = cleanText(phone, 32);
+    const safeService = cleanText(service, 160);
+    const safeAddress = cleanText(address, 300);
+    const safeNotes = cleanText(notes, 1000);
+    const dateValue = cleanText(preferDate, 10);
+    const timeValue = cleanText(preferTime, 5);
+    const parsedDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(dateValue) ? new Date(dateValue + "T12:00:00Z") : null;
+    const validDate = !!parsedDate && !Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === dateValue;
+    if (!safeName || !validDate || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(timeValue)) {
+      return res.status(400).json({ success: false, error: "Informe nome, data e horário válidos para o agendamento." });
+    }
+    if (safeEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(safeEmail)) {
+      return res.status(400).json({ success: false, error: "Informe um e-mail válido." });
     }
 
     // Autenticación con cuenta de servicio (JSON en variable de entorno)
@@ -669,21 +695,21 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
     });
     const calendar = google.calendar({ version: "v3", auth });
 
-    const startDateTime = `${preferDate}T${preferTime}:00`;
-    const endHour = String(parseInt(preferTime.split(":")[0], 10) + 1).padStart(2, "0");
+    const startDateTime = `${dateValue}T${timeValue}:00`;
+    const endHour = String(parseInt(timeValue.split(":")[0], 10) + 1).padStart(2, "0");
     const endDateTime = `${preferDate}T${endHour}:${preferTime.split(":")[1]}:00`;
 
     const event = {
-      summary: `Visita Técnica — ${name}`,
+      summary: `Visita Técnica — ${safeName}`,
       description: [
-        `Cliente: ${name}`,
-        `Telefone: ${phone || "-"}`,
-        email ? `Email: ${email}` : null,
-        `Serviço: ${service || "-"}`,
-        `Endereço: ${address || "-"}`,
-        notes ? `Notas: ${notes}` : null,
+        `Cliente: ${safeName}`,
+        `Telefone: ${safePhone || "-"}`,
+        safeEmail ? `Email: ${safeEmail}` : null,
+        `Serviço: ${safeService || "-"}`,
+        `Endereço: ${safeAddress || "-"}`,
+        safeNotes ? `Notas: ${safeNotes}` : null,
       ].filter(Boolean).join("\n"),
-      location: address || "",
+      location: safeAddress,
       start: { dateTime: startDateTime, timeZone: "America/Sao_Paulo" },
       end: { dateTime: endDateTime, timeZone: "America/Sao_Paulo" },
     };
