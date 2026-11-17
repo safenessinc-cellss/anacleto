@@ -20,6 +20,14 @@
   },
   "rewrites": [
     {
+      "source": "/gestao",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/gestao/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/api/ai/technical-drawing",
       "destination": "/api/technical-drawing"
     },
