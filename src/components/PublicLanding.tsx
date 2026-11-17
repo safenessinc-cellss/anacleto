@@ -5,6 +5,7 @@ import logo from "../assets/images/anacleto-logo-premium.svg";
 import PublicAssemblyIntro from "./PublicAssemblyIntro";
 import ArchitecturalModelsCarousel from "./ArchitecturalModelsCarousel";
 import "./public-landing.css";
+import "./anacleto-approved-home.css";
 
 const LazyShowroom = lazy(() => import("./PublicShowroom3D"));
 const phone = "5551998193931";
