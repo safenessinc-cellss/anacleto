@@ -259,7 +259,8 @@ service cloud.firestore {
       allow update, delete: if owner();
     }
     match /fiscal_documents/{id} {
-      allow read, create, update: if canManageFinance();
+      allow read, create: if canManageFinance();
+      allow update: if hasRole(['super_admin','super_usuario','ceo','admin']);
       allow delete: if owner();
     }
 
