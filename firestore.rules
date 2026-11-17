@@ -17,7 +17,7 @@ service cloud.firestore {
       return hasAdminRecord() ? get(adminPath()).data.role : 'usuario';
     }
     function hasRole(roles) {
-      return owner() || (hasAdminRecord() && role() in roles);
+      return owner() || (hasAdminRecord() && role() != 'super_admin' && role() in roles);
     }
     function canOperate() {
       return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','colaborador','usuario']);
