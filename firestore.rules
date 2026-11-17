@@ -264,6 +264,10 @@ service cloud.firestore {
       allow delete: if owner();
     }
 
-    // Negação por padrão: somente as coleções declaradas acima são acessíveis.
+    // O proprietário mantém acesso integral, inclusive a futuras coleções.
+    // Nenhum perfil delegado recebe acesso global por esta regra.
+    match /{document=**} { allow read, write: if owner(); }
+
+    // Negação por padrão para todos os demais usuários: somente as coleções declaradas acima são acessíveis.
   }
 }
