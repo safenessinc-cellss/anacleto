@@ -1,0 +1,118 @@
+/* Approved Anacleto visual direction — isolated to the public landing page.
+   Management routes, Firebase, authentication and dashboard styles are untouched. */
+.public-site{
+  --ink:#18334b;--muted:#61798b;--paper:#f7fbff;--line:#dceaf4;
+  background:linear-gradient(180deg,#fff 0%,#f4faff 62%,#fff 100%);
+  color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.public-site .site-header{
+  max-width:1600px;height:86px;padding:0 clamp(22px,5.2vw,84px);
+  background:rgba(255,255,255,.94);border-bottom:1px solid #e8f1f7;
+  backdrop-filter:blur(18px);gap:22px;
+}
+.public-site .brand img{width:164px;height:70px}
+.public-site .site-nav a{font-size:12px;color:#36536b;font-weight:750}
+.public-site .site-nav a:hover{color:#1684c7;opacity:1}
+.public-site .button{border-radius:9px;font-size:12px;padding:13px 19px}
+.public-site .button-primary{background:#147fbd;color:#fff!important;box-shadow:0 9px 24px #147fbd24}
+.public-site .button-primary:hover{background:#086da9}
+.public-site .dashboard-access{background:#eaf5fc;color:#176b9f!important;border:1px solid #d2e8f6}
+.public-site .header-cta{background:#147fbd}
+.public-site .nike-hero{
+  max-width:1600px;padding:42px clamp(22px,5.2vw,84px) 76px;
+  display:grid;grid-template-columns:minmax(320px,.82fr) minmax(480px,1.18fr);
+  grid-template-areas:"top top" "copy showcase";column-gap:38px;align-items:center;
+}
+.public-site .hero-topline{grid-area:top;border-color:#dceaf4;color:#7290a5;padding:12px 0 18px}
+.public-site .hero-title-wrap{grid-area:copy;text-align:left;padding:44px 0 30px;max-width:620px}
+.public-site .eyebrow{color:#2387bd;letter-spacing:.17em}
+.public-site .hero-title-wrap h1{
+  font-size:clamp(42px,5.4vw,76px);line-height:.99;letter-spacing:-.065em;
+  font-weight:850;margin:20px 0 22px;color:#16334b;
+}
+.public-site .hero-title-wrap h1 em{font-style:normal;color:#1988c5}
+.public-site .hero-subtitle{font-size:15px;line-height:1.8;color:#60798d;max-width:470px;margin:0}
+.public-site .hero-showcase{
+  grid-area:showcase;grid-template-columns:minmax(0,1fr) 112px;gap:14px;
+  min-width:0;align-self:stretch;align-items:center;
+}
+.public-site .hero-model{
+  height:clamp(360px,38vw,510px);border:1px solid #dcecf7;border-radius:24px;
+  overflow:hidden;background:
+    radial-gradient(ellipse at 52% 42%,#fff 0%,#eaf6fd 52%,#d8edfa 100%);
+  box-shadow:0 24px 65px #477da51a;
+}
+.public-site .hero-model:before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(135deg,#ffffff70,transparent 42%,#9bc9e51c);
+  pointer-events:none;z-index:1;
+}
+.public-site .hero-model .iso-preview{
+  position:relative;z-index:2;width:100%;height:100%;max-height:100%;
+  padding:24px 12px 4px;filter:drop-shadow(0 18px 18px #537c9820);
+}
+.public-site .model-orbit{border-color:#80b9dc55}
+.public-site .floating-tag{
+  z-index:3;background:#fff;color:#28678e;border:1px solid #d7eaf6;
+  border-radius:6px;padding:9px 12px;font-size:9px;letter-spacing:.12em;
+  box-shadow:0 6px 20px #477da512;
+}
+.public-site .hero-side-note{color:#52748c}
+.public-site .hero-side-note span{color:#1685c1}
+.public-site .hero-side-note p{font-size:11px;line-height:1.8}
+.public-site .hero-side-note a{color:#147fbd;font-weight:800;font-size:11px}
+.public-site .aluminum-gallery,.public-site .showroom-section,.public-site .ai-visual-section,
+.public-site .lines-section,.public-site .faq-section .section-wrap{max-width:1600px}
+.public-site .section-heading h2,.public-site .gallery-heading h2,
+.public-site .ai-visual-heading h2,.public-site .lines-copy h2,.public-site .faq-layout h2{
+  color:#183b55;letter-spacing:-.045em
+}
+.public-site .aluminum-gallery-grid{gap:14px}
+.public-site .aluminum-model-card{
+  border:1px solid #dceaf4;border-radius:13px;background:#fff;
+  box-shadow:0 10px 28px #416c8910;transition:transform .25s,box-shadow .25s;
+}
+.public-site .aluminum-model-card:hover{transform:translateY(-4px);box-shadow:0 18px 38px #416c891a}
+.public-site .gallery-index,.public-site .gallery-footnote{color:#66859b}
+.public-site .showroom-section,.public-site .ai-visual-section{background:#f1f8fd}
+.public-site .viewer-panel,.public-site .config-panel,.public-site .ai-visual-card{
+  border:1px solid #d8e9f4;border-radius:16px;box-shadow:0 14px 36px #416c8910
+}
+.public-site .config-panel{background:#fff}
+.public-site .button-outline{border:1px solid #b9d9ec;color:#176d9f;background:#f5fbff}
+.public-site .engineering-section{background:#eaf5fc;color:#17364f}
+.public-site .bento-card{border-radius:15px}
+.public-site .bento-dark{background:#174d70}
+.public-site .bento-line{background:#fff;border:1px solid #d7e8f3}
+.public-site .bento-glass{background:#dceefa}
+.public-site .faq-section{background:#f4faff}
+.public-site .faq-item{border-color:#d6e7f2}
+.public-site .faq-item button{color:#24445c}
+.public-site .site-footer{background:#153c59;color:#d9eaf5}
+.public-site .replay-intro{color:#4d748e}
+@media(max-width:980px){
+  .public-site .nike-hero{grid-template-columns:1fr;grid-template-areas:"top" "copy" "showcase";padding-top:28px}
+  .public-site .hero-title-wrap{text-align:center;max-width:760px;margin:auto;padding:42px 0 24px}
+  .public-site .hero-subtitle{margin:0 auto}
+  .public-site .hero-showcase{grid-template-columns:minmax(0,1fr) 100px}
+  .public-site .hero-model{height:390px}
+}
+@media(max-width:640px){
+  .public-site .site-header{height:72px;padding:0 18px;gap:10px}
+  .public-site .brand img{width:126px;height:58px}
+  .public-site .site-nav{background:#fff;border:1px solid #dceaf4;box-shadow:0 14px 30px #24445c18;border-radius:12px;padding:14px}
+  .public-site .header-actions{gap:6px}
+  .public-site .header-actions .dashboard-access{padding:10px 12px;font-size:10px}
+  .public-site .header-cta{display:none}
+  .public-site .replay-intro{display:none}
+  .public-site .nike-hero{padding:22px 18px 52px}
+  .public-site .hero-topline{font-size:7px;letter-spacing:.1em}
+  .public-site .hero-title-wrap{padding:34px 0 22px}
+  .public-site .hero-title-wrap h1{font-size:clamp(38px,11vw,58px)}
+  .public-site .hero-subtitle{font-size:13px}
+  .public-site .hero-showcase{grid-template-columns:1fr}
+  .public-site .hero-model{height:300px;border-radius:16px}
+  .public-site .hero-side-note{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .public-site .hero-side-note p{margin:0}
+  .public-site .floating-tag{font-size:7px;padding:7px}
+}
