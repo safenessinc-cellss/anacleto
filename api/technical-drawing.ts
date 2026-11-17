@@ -10,6 +10,18 @@ import firebaseConfig from "../firebase-applet-config.json" with { type: "json" 
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
 type WindowEntry = { startedAt: number; count: number };
+function sameOriginMutation(req: any): boolean {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  if (String(req.headers?.["sec-fetch-site"] || "").toLowerCase() === "cross-site") return false;
+  const origin = req.headers?.origin;
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(String(origin));
+    const host = String(req.headers?.host || req.headers?.["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase();
+    return !!host && originUrl.host.toLowerCase() === host && ["https:", "http:"].includes(originUrl.protocol);
+  } catch { return false; }
+}
 const windows = new Map<string, WindowEntry>();
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
 
@@ -338,6 +350,7 @@ function localTechnicalFallback(prompt: string, catalog: any[]) {
 }
 
 export default async function handler(req: any, res: any) {
+  if (!sameOriginMutation(req)) return res.status(403).json({ error: "Origem não autorizada." });
   const requestId = String(req.headers?.["x-vercel-id"] || req.headers?.["x-request-id"] || "unknown");
   let prompt = "";
   let authenticated = false;
