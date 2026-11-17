@@ -222,6 +222,7 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
 }
 
 export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store");
   if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   try {
     const user = await authenticate(req);
