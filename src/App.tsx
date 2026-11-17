@@ -23,8 +23,6 @@ import {
 } from "lucide-react";
 import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
-import Chatbot from "./components/Chatbot";
-import WhatsAppButton from "./components/WhatsAppButton";
 import LegalCenter, { CookieConsent } from "./components/LegalCenter";
 import { useToast } from "./components/ToastContext";
 import AnimatedWindowLoader from "./components/AnimatedWindowLoader";
@@ -688,7 +686,8 @@ export default function App() {
       </section>
 
       <footer className="py-10 text-center border-t border-luxury-border/20 bg-luxury-darker">
-        <p className="text-xs text-slate-400">{t.footerRights}</p>
+        <p className="text-xs text-slate-500">{t.footerRights}</p>
+        <p className="mt-2 text-[11px] text-slate-400">Desenvolvimento e direitos autorais: Safeness.inc</p>
         <nav aria-label="Links legais" className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 px-4 text-xs text-slate-400">
           <button onClick={() => setLegalDocument("privacy")} className="underline hover:text-blue-500">Política de Privacidade</button>
           <button onClick={() => setLegalDocument("cookies")} className="underline hover:text-blue-500">Política de Cookies</button>
@@ -701,8 +700,17 @@ export default function App() {
 
       {legalDocument && <LegalCenter initialDocument={legalDocument} onClose={() => setLegalDocument(null)} contactEmail={senderConfig.profileEmail || "contato@anacletoesquadrias.com.br"} companyName={senderConfig.name || "Anacleto Esquadrias"} />}
       <CookieConsent />
-      <Chatbot currentLanguage={language} t={t} />
-      <WhatsAppButton currentLanguage={language} />
+      <div className="fixed bottom-6 right-6 z-40 print:hidden">
+        <details className="relative">
+          <summary className="list-none cursor-pointer rounded-full bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-xl hover:bg-blue-700">
+            Solicitar orçamento <span aria-hidden="true">⌄</span>
+          </summary>
+          <div className="absolute bottom-14 right-0 w-60 rounded-2xl border border-blue-100 bg-white p-2 shadow-2xl">
+            <a href="https://wa.me/5551998193931" target="_blank" rel="noopener noreferrer" className="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-blue-50">Solicitar pelo WhatsApp</a>
+            <a href={"mailto:" + (senderConfig.profileEmail || "contato@anacletoesquadrias.com.br") + "?subject=Solicitação%20de%20orçamento"} className="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-blue-50">Solicitar por e-mail</a>
+          </div>
+        </details>
+      </div>
     </div>
   );
 }
