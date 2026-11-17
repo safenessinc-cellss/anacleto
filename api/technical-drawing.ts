@@ -350,6 +350,7 @@ function localTechnicalFallback(prompt: string, catalog: any[]) {
 }
 
 export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store");
   if (!sameOriginMutation(req)) return res.status(403).json({ error: "Origem não autorizada." });
   const requestId = String(req.headers?.["x-vercel-id"] || req.headers?.["x-request-id"] || "unknown");
   let prompt = "";
