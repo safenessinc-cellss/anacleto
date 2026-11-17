@@ -32,6 +32,11 @@ service firebase.storage {
         && firestore.get(adminPath()).data.role != 'super_admin'
         && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','financeiro']);
     }
+    function canManageDelivery() {
+      return owner() || (hasAdminRecord()
+        && firestore.get(adminPath()).data.role != 'super_admin'
+        && firestore.get(adminPath()).data.role in ['super_usuario','ceo','admin','supervisor','colaborador','producao','qualidade','financeiro']);
+    }
     match /project-assets/{uid}/{projectId}/{fileName} {
       allow read: if canManageProjects();
       allow create, update: if canManageProjects()
@@ -111,8 +116,8 @@ service firebase.storage {
       allow delete: if owner();
     }
     match /deliveries/{deliveryId}/{fileName} {
-      allow read: if canManageQuality();
-      allow create, update: if canManageQuality()
+      allow read: if canManageDelivery();
+      allow create, update: if canManageDelivery()
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|png|webp)');
       allow delete: if owner();
