@@ -5,6 +5,22 @@ import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 
+function sameOriginMutation(req: any): boolean {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  const fetchSite = String(req.headers?.["sec-fetch-site"] || "").toLowerCase();
+  if (fetchSite === "cross-site") return false;
+  const origin = req.headers?.origin;
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(String(origin));
+    const host = String(req.headers?.host || req.headers?.["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase();
+    return !!host && originUrl.host.toLowerCase() === host && ["https:", "http:"].includes(originUrl.protocol);
+  } catch {
+    return false;
+  }
+}
+
 type AuthUser = { uid: string; email: string; role: string };
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
@@ -206,6 +222,7 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
 }
 
 export default async function handler(req: any, res: any) {
+  if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   try {
     const user = await authenticate(req);
     if (!user) return send(res, 401, { error: "Autenticação obrigatória ou sessão expirada." });
