@@ -15,14 +15,17 @@ service firebase.storage {
     }
     function canManageQuality() {
       return owner() || (hasAdminRecord()
+        && firestore.get(adminPath()).data.role != 'super_admin'
         && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','supervisor','colaborador','qualidade']);
     }
     function canManageProjects() {
       return owner() || (hasAdminRecord()
+        && firestore.get(adminPath()).data.role != 'super_admin'
         && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','supervisor','colaborador']);
     }
     function canManageFinance() {
       return owner() || (hasAdminRecord()
+        && firestore.get(adminPath()).data.role != 'super_admin'
         && firestore.get(adminPath()).data.role in ['super_admin','super_usuario','ceo','admin','financeiro']);
     }
     match /project-assets/{uid}/{projectId}/{fileName} {
