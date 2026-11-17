@@ -38,6 +38,7 @@ async function consumePublicQuota(ip: string): Promise<boolean> {
  current.count+=1;return current.count<=3;
 }
 export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store");
   if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   const requestStartedAt = Date.now();
   let auditPrompt = "";
