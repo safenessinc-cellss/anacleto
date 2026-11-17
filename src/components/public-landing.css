@@ -9,3 +9,33 @@ body{margin:0}.public-site{--ink:#111;--muted:#6c7075;--paper:#f5f5f7;--line:#de
 .dashboard-access{padding:11px 16px;border:1px solid #b99a68;background:#fff;color:#17191c!important;white-space:nowrap}.dashboard-access:hover{background:#b99a68;color:#111!important;box-shadow:0 8px 20px #b99a6830}
 @media(max-width:900px){.site-header{gap:12px}.header-actions{gap:8px}.dashboard-access{padding:10px 12px;font-size:10px}.replay-intro{display:none}}
 @media(max-width:620px){.site-header{padding:0 16px}.header-actions{margin-left:auto}.dashboard-access{padding:9px 12px;font-size:9px}.header-cta{display:none}.mobile-toggle{order:3}}
+
+/* ANACLETO PUBLIC — clean blue glass direction */
+:root{--an-blue:#1769c2;--an-blue-2:#4b9bea;--an-ink:#172332;--an-muted:#657382;--an-line:#dce5ee}
+.nike-site{background:#f7f9fc;color:var(--an-ink)}
+.site-header{background:rgba(250,252,255,.82)!important;border-bottom:1px solid rgba(29,75,120,.10)!important;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 8px 30px rgba(25,64,105,.045)}
+.site-nav a{color:#40546a!important}
+.site-nav a:hover{color:var(--an-blue)!important}
+.dashboard-access{background:rgba(23,105,194,.08)!important;border:1px solid rgba(23,105,194,.22)!important;color:#155da9!important;border-radius:999px!important;font-weight:800}
+.dashboard-access:hover{background:#1769c2!important;color:white!important;box-shadow:0 8px 24px #1769c233!important}
+.header-cta,.button-primary{background:linear-gradient(135deg,#1769c2,#398fe3)!important;border-color:transparent!important;color:white!important;border-radius:999px!important;box-shadow:0 10px 24px #1769c226}
+.nike-hero{background:radial-gradient(ellipse at 72% 42%,#dceeff 0,rgba(229,241,253,.75) 28%,transparent 58%),linear-gradient(135deg,#fbfdff,#f1f6fb)!important;color:#15283b!important;overflow:hidden}
+.nike-hero .eyebrow,.hero-topline,.hero-side-note,.floating-tag{color:#59728b!important}
+.nike-hero h1{color:#172b40!important}
+.nike-hero h1 em{color:#1769c2!important}
+.hero-subtitle{color:#637589!important}
+.hero-model{position:relative;min-height:440px;border:1px solid rgba(65,135,202,.18);border-radius:30px;background:linear-gradient(145deg,rgba(255,255,255,.92),rgba(224,239,252,.55));box-shadow:0 30px 80px rgba(38,91,145,.13);overflow:hidden}
+.hero-model:before{content:"";position:absolute;inset:12% 16%;border-radius:50%;background:radial-gradient(circle,#a8d7ff66,transparent 68%);filter:blur(18px);pointer-events:none}
+.hero-model .three-stage{height:100%;min-height:440px;background:transparent!important}
+.hero-model .three-stage canvas{width:100%;height:100%;display:block;touch-action:pan-y}
+.hero-3d-loading{min-height:440px;display:grid;place-items:center;color:#53718e;font-size:12px;letter-spacing:.08em}
+.hero-360-badge{position:absolute;right:22px;top:22px;z-index:2;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.78);border:1px solid #70b8f5;color:#1769c2;font-size:15px;font-weight:900;box-shadow:0 8px 26px #1769c21a;backdrop-filter:blur(14px)}
+.hero-explore-label{position:absolute;left:22px;bottom:20px;z-index:2;padding:10px 15px;border-radius:999px;background:rgba(255,255,255,.76);border:1px solid rgba(53,130,199,.2);color:#1769c2;font-size:11px;font-weight:800;letter-spacing:.04em;backdrop-filter:blur(14px);pointer-events:none}
+.floating-tag{background:rgba(255,255,255,.76)!important;border:1px solid rgba(53,130,199,.16);border-radius:999px;padding:9px 13px;backdrop-filter:blur(12px)}
+.benefits-float{position:relative;z-index:4;max-width:1120px;margin:-24px auto 28px;padding:17px 22px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;border:1px solid rgba(255,255,255,.9);border-radius:22px;background:rgba(255,255,255,.78);box-shadow:0 18px 50px rgba(31,74,117,.10);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+.benefit-item{display:flex;align-items:center;justify-content:center;gap:10px;min-width:0;color:#31485f;font-size:11px}
+.benefit-item strong{font-weight:800;line-height:1.35}
+.benefit-icon{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border-radius:12px;background:#eaf4ff;color:#1769c2;font-size:20px}
+.section-wrap,.engineering-section,.faq-section{color:#1b2d40}
+@media(max-width:760px){.hero-model,.hero-model .three-stage,.hero-3d-loading{min-height:310px}.benefits-float{margin:-12px 14px 24px;padding:14px 12px;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;border-radius:18px}.benefit-item{justify-content:flex-start;font-size:10px}.benefit-icon{width:30px;height:30px;flex-basis:30px}.hero-360-badge{width:48px;height:48px;right:14px;top:14px}.hero-explore-label{left:13px;bottom:13px}}
+/* Keep product finish options intact; visual palette applies to the website chrome. */
