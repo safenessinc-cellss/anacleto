@@ -38,8 +38,7 @@
 }
 .public-site .hero-model{
   height:clamp(360px,38vw,510px);border:1px solid #dcecf7;border-radius:24px;
-  overflow:hidden;background:
-    radial-gradient(ellipse at 52% 42%,#fff 0%,#eaf6fd 52%,#d8edfa 100%);
+  overflow:hidden;background:radial-gradient(ellipse at 52% 42%,#fff 0%,#eaf6fd 52%,#d8edfa 100%);
   box-shadow:0 24px 65px #477da51a;
 }
 .public-site .hero-model:before{
@@ -90,29 +89,156 @@
 .public-site .faq-item button{color:#24445c}
 .public-site .site-footer{background:#153c59;color:#d9eaf5}
 .public-site .replay-intro{color:#4d748e}
+
+/* Full public-site refinement: one consistent architectural visual language. */
+.public-site{overflow:clip}
+.public-site main>section{scroll-margin-top:92px}
+.public-site .site-header{position:sticky;top:0;z-index:30;box-shadow:0 8px 28px #244b6410}
+.public-site .brand{display:flex;align-items:center;flex:0 0 auto}
+.public-site .site-nav{gap:clamp(14px,2.1vw,32px)}
+.public-site .site-nav a{letter-spacing:.015em;transition:color .2s ease}
+.public-site .header-actions{gap:9px}
+.public-site .dashboard-access{font-weight:800}
+.public-site .replay-intro{font-size:9px}
+.public-site .nike-hero{padding-bottom:66px}
+.public-site .hero-topline{font-size:9px}
+.public-site .hero-title-wrap h1{max-width:650px}
+.public-site .hero-model{isolation:isolate}
+.public-site .hero-model:after{opacity:.35;background-size:48px 48px}
+.public-site .section-wrap{padding-top:0}
+.public-site .aluminum-gallery{padding-top:76px;padding-bottom:82px}
+.public-site .gallery-heading{margin-bottom:32px}
+.public-site .gallery-heading>p,.public-site .section-heading>p{color:#647e91}
+.public-site .aluminum-model-card{padding:19px 19px 17px;border-radius:17px;background:linear-gradient(150deg,#fff 35%,#f4faff)}
+.public-site .aluminum-model-card>svg{height:205px;margin:12px 0 8px}
+.public-site .gallery-card-copy h3{color:#183b55}
+.public-site .gallery-card-copy p{color:#71889a}
+.public-site .gallery-finish{border-color:#e1edf5;color:#7290a5}
+.public-site .showroom-section{padding-top:88px;padding-bottom:94px}
+.public-site .section-heading{margin-bottom:34px}
+.public-site .viewer-panel{background:linear-gradient(145deg,#eaf5fc,#dcecf6);overflow:hidden}
+.public-site .viewer-toolbar,.public-site .viewer-footer{background:#f8fcff;color:#55758b}
+.public-site .viewer-toolbar{border-bottom:1px solid #dceaf4}
+.public-site .viewer-footer{border-top:1px solid #dceaf4}
+.public-site .config-panel{padding:28px;gap:19px;border-radius:18px}
+.public-site .config-top{color:#3c6d8d;border-color:#e4eff6}
+.public-site .field-label{color:#52768e}
+.public-site .model-option{background:#f2f8fc;color:#35556c;border-color:#e5f0f7}
+.public-site .model-option.selected{background:#176f9f;color:#fff;border-color:#176f9f}
+.public-site .model-option.selected>span{color:#c6e5f7}
+.public-site .swatch i{outline-color:#cbdde9}
+.public-site .swatch.active i{outline-color:#147fbd}
+.public-site .config-panel select,.public-site .config-panel input{background:#f7fbfe;border-color:#dceaf4;color:#294b63}
+.public-site .config-panel select:focus,.public-site .config-panel input:focus{border-color:#55a4cf;box-shadow:0 0 0 3px #55a4cf20}
+.public-site .open-button{background:#eef7fc;color:#176d9f;border-color:#cfe4f2}
+.public-site .config-note{color:#7891a3}
+.public-site .ai-visual-section{padding-top:86px;padding-bottom:92px}
+.public-site .ai-visual-heading{margin-bottom:30px}
+.public-site .ai-mark{background:#176f9f;border-radius:17px;box-shadow:0 12px 25px #176f9f25}
+.public-site .ai-visual-card{padding:17px;background:#fff;border-radius:18px}
+.public-site .ai-visual-form{padding:24px}
+.public-site .ai-visual-form>label{color:#52768e}
+.public-site .ai-visual-form textarea{background:#f6fbfe;border-color:#dceaf4;color:#294b63}
+.public-site .ai-visual-form textarea:focus{border-color:#55a4cf;box-shadow:0 0 0 3px #55a4cf20}
+.public-site .upload-trigger{border-color:#bcd9eb;color:#416d89;background:#f8fcff}
+.public-site .ai-result{background:linear-gradient(145deg,#e5f2fa,#d5eaf7);border:1px solid #d4e7f3}
+.public-site .ai-result-empty{color:#416d89}
+.public-site .ai-window-glyph{border-color:#6d9bb8;box-shadow:16px 16px 30px #315c781c}
+.public-site .ai-window-glyph i{border-color:#9fc4dc;background:linear-gradient(135deg,#f0f9ff,#9fc6dd)}
+.public-site .engineering-section{padding:92px 0 100px;background:linear-gradient(135deg,#eaf5fc,#dceefa 70%,#eff8fd)}
+.public-site .engineering-section .section-heading h2{color:#183b55}
+.public-site .engineering-section .section-heading>p{color:#607b90}
+.public-site .engineering-section .eyebrow{color:#2387bd}
+.public-site .bento-grid{gap:14px}
+.public-site .bento-card{border-radius:17px;padding:25px;box-shadow:0 12px 30px #315c7810}
+.public-site .bento-dark{background:linear-gradient(145deg,#1c628d,#164563);color:#fff}
+.public-site .bento-image{background:linear-gradient(145deg,#d9edf8,#9ec5dc);color:#173c56}
+.public-site .bento-image:before{background:linear-gradient(130deg,#ffffff20 35%,#fff8 36%,transparent 37%),linear-gradient(0deg,#4b799333,transparent 75%)}
+.public-site .bento-line{background:#fff;color:#183b55;border:1px solid #d8e9f4}
+.public-site .bento-glass{background:linear-gradient(145deg,#e8f6fd,#b7d8ea);color:#183b55}
+.public-site .bento-card p{opacity:.82}
+.public-site .lines-section{padding-top:92px;padding-bottom:100px}
+.public-site .process-grid{border-color:#d6e7f2}
+.public-site .process-grid article:before{background:#1685c1;box-shadow:0 0 0 5px #1685c11c}
+.public-site .process-grid article>span{color:#3984ad}
+.public-site .process-grid h3{color:#214761}
+.public-site .process-grid p{color:#6b8496}
+.public-site .faq-section{padding:92px 0;background:linear-gradient(180deg,#f5faff,#eaf5fc)}
+.public-site .faq-layout>div:first-child>p{color:#627d91}
+.public-site .faq-item{border-color:#d5e6f1}
+.public-site .faq-item button{color:#244a64}
+.public-site .faq-item button svg{color:#1685c1}
+.public-site .faq-item p{color:#647f92}
+.public-site .site-footer{height:82px;background:#153c59;color:#d9eaf5;letter-spacing:.1em}
+.public-site .button:focus-visible,.public-site button:focus-visible,.public-site a:focus-visible{outline:3px solid #55a4cf;outline-offset:3px}
 @media(max-width:980px){
-  .public-site .nike-hero{grid-template-columns:1fr;grid-template-areas:"top" "copy" "showcase";padding-top:28px}
-  .public-site .hero-title-wrap{text-align:center;max-width:760px;margin:auto;padding:42px 0 24px}
-  .public-site .hero-subtitle{margin:0 auto}
-  .public-site .hero-showcase{grid-template-columns:minmax(0,1fr) 100px}
-  .public-site .hero-model{height:390px}
+ .public-site .nike-hero{grid-template-columns:1fr;grid-template-areas:"top" "copy" "showcase";padding-top:28px}
+ .public-site .hero-title-wrap{text-align:center;max-width:760px;margin:auto;padding:42px 0 24px}
+ .public-site .hero-subtitle{margin:0 auto}
+ .public-site .hero-showcase{grid-template-columns:minmax(0,1fr) 100px}
+ .public-site .hero-model{height:390px}
+ .public-site .aluminum-gallery{padding-top:62px}
 }
-@media(max-width:640px){
-  .public-site .site-header{height:72px;padding:0 18px;gap:10px}
-  .public-site .brand img{width:126px;height:58px}
-  .public-site .site-nav{background:#fff;border:1px solid #dceaf4;box-shadow:0 14px 30px #24445c18;border-radius:12px;padding:14px}
-  .public-site .header-actions{gap:6px}
-  .public-site .header-actions .dashboard-access{padding:10px 12px;font-size:10px}
-  .public-site .header-cta{display:none}
-  .public-site .replay-intro{display:none}
-  .public-site .nike-hero{padding:22px 18px 52px}
-  .public-site .hero-topline{font-size:7px;letter-spacing:.1em}
-  .public-site .hero-title-wrap{padding:34px 0 22px}
-  .public-site .hero-title-wrap h1{font-size:clamp(38px,11vw,58px)}
-  .public-site .hero-subtitle{font-size:13px}
-  .public-site .hero-showcase{grid-template-columns:1fr}
-  .public-site .hero-model{height:300px;border-radius:16px}
-  .public-site .hero-side-note{display:flex;align-items:center;justify-content:space-between;gap:12px}
-  .public-site .hero-side-note p{margin:0}
-  .public-site .floating-tag{font-size:7px;padding:7px}
+@media(max-width:760px){
+ .public-site .site-header{height:72px;padding:0 16px;gap:9px}
+ .public-site .brand img{width:126px;height:58px}
+ .public-site .site-nav{background:#fff;border:1px solid #dceaf4;box-shadow:0 14px 30px #24445c18;border-radius:12px;padding:14px}
+ .public-site .header-actions{gap:5px}
+ .public-site .header-actions .dashboard-access{padding:9px 10px;font-size:9px}
+ .public-site .header-cta,.public-site .replay-intro{display:none}
+ .public-site .nike-hero{padding:22px 18px 52px}
+ .public-site .hero-topline{font-size:7px;letter-spacing:.1em}
+ .public-site .hero-title-wrap{padding:34px 0 22px}
+ .public-site .hero-title-wrap h1{font-size:clamp(38px,11vw,58px)}
+ .public-site .hero-subtitle{font-size:13px}
+ .public-site .hero-showcase{grid-template-columns:1fr}
+ .public-site .hero-model{height:300px;border-radius:16px}
+ .public-site .hero-side-note{display:flex;align-items:center;justify-content:space-between;gap:12px}
+ .public-site .hero-side-note p{margin:0}
+ .public-site .floating-tag{font-size:7px;padding:7px}
+ .public-site .aluminum-gallery{padding:54px 18px}
+ .public-site .gallery-heading{display:block}
+ .public-site .gallery-heading>p{margin-top:13px}
+ .public-site .aluminum-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .public-site .aluminum-model-card{padding:12px;border-radius:15px}
+ .public-site .aluminum-model-card>svg{height:135px}
+ .public-site .gallery-card-copy h3{font-size:13px}
+ .public-site .gallery-card-copy p{font-size:8px}
+ .public-site .gallery-finish{font-size:6px}
+ .public-site .showroom-section,.public-site .ai-visual-section{padding:62px 18px 70px}
+ .public-site .section-heading{display:block}
+ .public-site .section-heading>p{margin-top:14px}
+ .public-site .showroom-grid{grid-template-columns:1fr}
+ .public-site .viewer-panel,.public-site .config-panel,.public-site .ai-visual-card{border-radius:16px}
+ .public-site .viewer-toolbar,.public-site .viewer-footer{padding:0 12px;font-size:7px}
+ .public-site .three-stage,.public-site .viewer-fallback{height:330px;min-height:280px}
+ .public-site .config-panel{padding:19px;gap:16px}
+ .public-site .ai-visual-heading{align-items:start;gap:14px}
+ .public-site .ai-mark{width:55px;height:55px;flex-shrink:0}
+ .public-site .ai-visual-card{grid-template-columns:1fr;padding:9px}
+ .public-site .ai-visual-form{padding:13px}
+ .public-site .ai-result{min-height:270px}
+ .public-site .ai-result>img{min-height:270px}
+ .public-site .engineering-section{padding:68px 0}
+ .public-site .engineering-section .section-wrap,.public-site .lines-section,.public-site .faq-section .section-wrap{padding-left:18px;padding-right:18px}
+ .public-site .bento-grid{grid-template-columns:1fr 1fr;grid-template-rows:230px 230px;gap:9px}
+ .public-site .bento-card{padding:15px;border-radius:15px}
+ .public-site .bento-card>span{top:15px;left:15px;font-size:7px}
+ .public-site .bento-card h3{font-size:19px}
+ .public-site .bento-card p{font-size:9px}
+ .public-site .lines-section{padding-top:68px;padding-bottom:74px}
+ .public-site .process-grid{grid-template-columns:1fr 1fr;row-gap:30px}
+ .public-site .process-grid article{padding-right:12px}
+ .public-site .process-grid h3{font-size:14px;margin-top:24px}
+ .public-site .faq-section{padding:66px 0}
+ .public-site .faq-layout{grid-template-columns:1fr;gap:30px}
+ .public-site .site-footer{height:68px}
 }
+@media(max-width:380px){
+ .public-site .header-actions .dashboard-access{font-size:8px;padding:8px}
+ .public-site .brand img{width:108px}
+ .public-site .aluminum-gallery-grid{grid-template-columns:1fr}
+ .public-site .aluminum-model-card>svg{height:175px}
+ .public-site .bento-grid{grid-template-columns:1fr;grid-template-rows:repeat(4,205px)}
+}
+@media(prefers-reduced-motion:reduce){.public-site *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
