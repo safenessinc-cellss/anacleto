@@ -20,6 +20,14 @@ import {
   Trash,
   Award,
   Compass,
+  Box,
+  Gem,
+  Settings,
+  Leaf,
+  MousePointer2,
+  RotateCw,
+  Menu,
+  ChevronDown,
 } from "lucide-react";
 import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
@@ -58,6 +66,7 @@ export default function App() {
   const [animationLoading, setAnimationLoading] = useState(true);
   const [currentView, setCurrentView] = useState<"pro" | "landing">("pro");
   const [isAdminPortal, setIsAdminPortal] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [language, setLanguage] = useState<LanguageCode>(detectInitialLanguage);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("anacleto_theme_mode") === "dark");
   const [legalDocument, setLegalDocument] = useState<"privacy" | "cookies" | "terms" | "service" | "rights" | null>(null);
@@ -474,60 +483,42 @@ export default function App() {
         </div>
       ))}
       
-      <nav className="sticky top-0 z-30 bg-luxury-darker/90 backdrop-blur-md border-b py-4 px-6 border-luxury-border/20">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-luxury-dark rounded-xl overflow-hidden border">
-              <img src={senderConfig.websiteLogoUrl || senderConfig.logoUrl || logoImg} className="w-full h-full object-contain" alt="Logo" />
-            </div>
-            <div>
-              <h1 className="text-lg font-black tracking-[0.2em] uppercase text-white">{t.title}</h1>
-              <p className="text-[9px] text-luxury-gold tracking-[0.12em] uppercase">{t.subtitle}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setCurrentView("pro")}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-lg shadow-amber-500/20"
-            >
-              <Compass className="w-4 h-4" /> Acessar Dashboard
-            </button>
-            <div className="flex items-center gap-2 bg-luxury-dark border px-3 py-1.5 rounded-2xl border-luxury-border/30">
-              <Globe className="w-4 h-4 text-luxury-gold" />
-              <select value={language} onChange={(e) => handleLanguageChange(e.target.value as LanguageCode)} className="text-xs bg-transparent text-slate-300 font-bold border-none focus:outline-none">
-                {Object.entries(languageMeta).map(([code, meta]) => (<option key={code} className="bg-luxury-dark text-white" value={code}>{meta.flag} {meta.name}</option>))}
-              </select>
-            </div>
-            <button onClick={toggleTheme} className="p-2.5 rounded-full bg-luxury-dark text-luxury-gold border border-luxury-border/30">
-              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-          </div>
+      <header className="anacleto-premium-header">
+        <a href="#inicio" className="anacleto-brand" aria-label="Anacleto Esquadrias - Início">
+          <img src={senderConfig.websiteLogoUrl || senderConfig.logoUrl || logoImg} alt="Anacleto Esquadrias" />
+          <span><strong>ANACLETO</strong><small>ESQUADRIAS</small></span>
+        </a>
+        <button className="anacleto-mobile-toggle" onClick={() => setMobileMenuOpen(v => !v)} aria-expanded={mobileMenuOpen} aria-label="Abrir menu">{mobileMenuOpen ? "Fechar" : "Menu"}</button>
+        <nav className={mobileMenuOpen ? "anacleto-main-nav is-open" : "anacleto-main-nav"} aria-label="Navegação principal">
+          <a className="is-active" href="#inicio" onClick={() => setMobileMenuOpen(false)}>Início</a>
+          <details className="anacleto-nav-dropdown"><summary>Modelos <ChevronDown size={14} /></summary><div className="anacleto-dropdown-panel"><a href="#portfolio" onClick={() => setMobileMenuOpen(false)}>Janelas e portas</a><a href="#portfolio" onClick={() => setMobileMenuOpen(false)}>Fachadas e vidros</a><a href="#portfolio" onClick={() => setMobileMenuOpen(false)}>Pergolados</a></div></details>
+          <a href="#portfolio" onClick={() => setMobileMenuOpen(false)}>Projetos</a><a href="#sobre" onClick={() => setMobileMenuOpen(false)}>Sobre Nós</a><a href="#contato" onClick={() => setMobileMenuOpen(false)}>Contato</a>
+        </nav>
+        <div className="anacleto-header-actions">
+          <a className="anacleto-3d-link" href="#portfolio"><Box size={17} /> Experiência 3D</a>
+          <button className="anacleto-dashboard-button" onClick={() => { setMobileMenuOpen(false); setCurrentView("pro"); }}><span className="anacleto-dashboard-grid">▦</span> Entrar no Dashboard <ArrowRight size={16} /></button>
+          <a className="anacleto-budget-button" href="#solicitar">Solicitar Orçamento <ArrowRight size={16} /></a>
         </div>
-      </nav>
-
-      <section className="relative overflow-hidden pt-16 pb-24 px-6 bg-gradient-to-b from-luxury-dark via-luxury-darker to-luxury-darker">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7 space-y-6">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-luxury-dark border border-luxury-gold/20 text-luxury-gold text-[10px] rounded-full">
-              <Bot className="w-4 h-4" /> SISTEMA MULTILÍNGUE
-            </span>
-            <h2 className="text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight">{t.heroTitle}</h2>
-            <p className="text-slate-300 text-base md:text-lg">{t.heroSub}</p>
-            <div className="flex flex-wrap gap-4">
-              <a href="#solicitar" className="flex items-center gap-2 px-6 py-3 bg-luxury-gold text-luxury-darker font-black uppercase tracking-wider rounded-2xl text-xs hover:bg-luxury-gold-light transition duration-200">
-                {t.ctaGetBudget} <ArrowRight className="w-4 h-4" />
-              </a>
-              <a href="#agendar" className="px-6 py-3 bg-luxury-dark border text-slate-200 rounded-2xl text-xs font-black uppercase hover:bg-luxury-dark/80 transition duration-200 border-luxury-border/30">
-                Agendar Medição Grátis
-              </a>
-            </div>
-          </div>
-          <div className="lg:col-span-5">
-            <div className="relative overflow-hidden rounded-3xl shadow-2xl border border-luxury-border/30">
-              <img src={heroImg} className="w-full h-80 object-cover" alt="Hero" />
-            </div>
-          </div>
+      </header>
+      <section id="inicio" className="anacleto-premium-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(5,22,48,.94) 0%, rgba(7,35,71,.83) 43%, rgba(7,35,71,.20) 100%), url(${heroImg})` }}>
+        <div className="anacleto-hero-glow" />
+        <div className="anacleto-hero-copy"><span className="anacleto-hero-kicker">ALUMÍNIO · VIDRO · ARQUITETURA</span><h2>Qualidade que se vê<br />em cada <em>detalhe</em></h2><p>Esquadrias de alumínio de alto padrão, com tecnologia, design e durabilidade para o seu projeto.</p>
+          <div className="anacleto-hero-actions"><a href="#portfolio" className="anacleto-explore-button"><Box size={21} /> Explore em 3D <ArrowRight size={18} /></a><span className="anacleto-hero-note">PROJETADAS PARA DURAR. FEITAS PARA VALORIZAR.</span></div>
         </div>
+        <div className="anacleto-hero-visual" aria-label="Representação técnica de uma esquadria de alumínio e vidro"><div className="anacleto-orbit anacleto-orbit-one" /><div className="anacleto-orbit anacleto-orbit-two" />
+          <svg viewBox="0 0 620 520" role="img" aria-label="Janela de alumínio em perspectiva com perfis e painéis de vidro"><defs>
+            <linearGradient id="anacleto-metal" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#f5f8fb"/><stop offset=".35" stopColor="#7f91a5"/><stop offset=".62" stopColor="#dfe8ef"/><stop offset="1" stopColor="#354a60"/></linearGradient>
+            <linearGradient id="anacleto-glass" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#9ee7ff" stopOpacity=".68"/><stop offset="1" stopColor="#1b75b7" stopOpacity=".16"/></linearGradient><filter id="anacleto-shadow"><feGaussianBlur stdDeviation="14"/></filter></defs>
+            <ellipse cx="320" cy="450" rx="210" ry="25" fill="#00aaff" opacity=".25" filter="url(#anacleto-shadow)"/>
+            <g fill="none" stroke="url(#anacleto-metal)" strokeWidth="13" strokeLinejoin="round"><path d="M118 122 424 66 530 126 223 185Z"/><path d="M118 122 223 185 223 425 118 364Z"/><path d="M223 185 530 126 530 366 223 425Z"/></g>
+            <path d="M242 202 377 176 377 397 242 423Z" fill="url(#anacleto-glass)" stroke="#d9f6ff" strokeWidth="6"/><path d="M395 172 510 150 510 369 395 392Z" fill="url(#anacleto-glass)" stroke="#d9f6ff" strokeWidth="6"/><path d="M391 170 391 397" stroke="#f6fbff" strokeWidth="11"/>
+            <g stroke="#9feaff" strokeWidth="2" opacity=".8"><path d="M80 260 520 180"/><path d="M98 300 540 220"/></g>
+            <g fill="url(#anacleto-metal)" stroke="#eef7ff" strokeWidth="3"><path d="M66 84 360 28 360 51 66 107Z"/><path d="M548 112 570 108 570 360 548 364Z"/><path d="M182 438 470 382 470 405 182 461Z"/></g>
+            <g fill="#fff" opacity=".9"><circle cx="118" cy="122" r="5"/><circle cx="530" cy="126" r="5"/><circle cx="223" cy="425" r="5"/></g>
+          </svg>
+          <div className="anacleto-360"><RotateCw size={27}/><strong>360°</strong><span><MousePointer2 size={14}/> Gire e explore</span></div><div className="anacleto-visual-caption">SISTEMAS DE ALTA PERFORMANCE <i /> DETALHES EM EVIDÊNCIA</div>
+        </div>
+        <div className="anacleto-feature-bar"><div><Gem/><span>Design Moderno</span></div><div><ShieldCheck/><span>Alta Durabilidade</span></div><div><Settings/><span>Precisão na Fabricação</span></div><div><Leaf/><span>Sustentabilidade</span></div></div>
       </section>
 
       <section className="py-20 px-6 bg-luxury-dark border-b border-luxury-border/10">
@@ -576,7 +567,7 @@ export default function App() {
         </section>
       )}
 
-      <section className="py-20 px-6 bg-luxury-darker border-b border-luxury-border/10">
+      <section id="sobre" className="py-20 px-6 bg-luxury-darker border-b border-luxury-border/10">
         <div className="max-w-5xl mx-auto text-center">
           <h2 className="text-3xl font-black text-white uppercase mb-12">{t.whyTitle}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
