@@ -289,7 +289,7 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
     ...(Number(quote.taxAmount || 0) > 0 ? [[`Imposto (${quote.taxRate || 0}%):`, formatMoney(quote.taxAmount, currency)]] : []),
   ];
   const totalsHeight = (totalRows.length + 1) * 6 + 10;
-  const notesLines = quote.notes ? doc.splitTextToSize(quote.notes, pageWidth - 28) : [];
+  const notesLines = quote.notes ? doc.splitTextToSize(quote.notes, pageWidth - 14 - 91 - 25) : [];
   const notesHeight = notesLines.length ? notesLines.length * 4 + 12 : 0;
   const pageBottom = doc.internal.pageSize.getHeight() - 22;
 
