@@ -10,7 +10,7 @@ type Request = {
   body?: unknown;
 };
 
-const editableQuoteRoles = new Set(["super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"]);
+const editableQuoteRoles = new Set(["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"]);
 const db = () => {
   const existing = getApps().find((app) => app.name === "anacleto-public-proposals");
   if (existing) return getFirestore(existing, process.env.FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId || "(default)");
