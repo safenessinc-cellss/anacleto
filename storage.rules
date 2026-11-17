@@ -2,16 +2,20 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function signedIn() { return request.auth != null; }
-    function owner() {
+    function verifiedEmail() {
       return signedIn()
         && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+    function owner() {
+      return verifiedEmail()
         && request.auth.token.email.lower() == 'safeness.c.a@gmail.com';
     }
     function adminPath() {
       return /databases/(default)/documents/admins/$(request.auth.token.email.lower());
     }
     function hasAdminRecord() {
-      return signedIn() && request.auth.token.email != null && firestore.exists(adminPath());
+      return verifiedEmail() && firestore.exists(adminPath());
     }
     function canManageQuality() {
       return owner() || (hasAdminRecord()
