@@ -133,7 +133,9 @@ export default function App() {
       if (!firebaseUser) {
         setUserRole(null);
         setAdminStatus("no-user");
-        setCurrentView("landing");
+        // /gestao é a entrada privada: usuário sem sessão deve ver o Login,
+        // nunca a landing pública. O site público é servido por PublicLanding em main.tsx.
+        setCurrentView("pro");
         return;
       }
 
@@ -219,8 +221,9 @@ export default function App() {
     try {
       await signOut(auth);
       setIsAdminPortal(false);
-      setCurrentView("landing");   // ← fuerza la vista de login/landing
-      setUser(null);               // ← limpia el usuario inmediatamente
+      // Após sair, permanecer na área privada e apresentar novamente o Login.
+      setCurrentView("pro");
+      setUser(null);               // limpa o usuário imediatamente
     } catch (err) {
       console.error(err);
     }
