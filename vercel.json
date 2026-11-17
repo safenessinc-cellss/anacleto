@@ -98,7 +98,7 @@
         },
         {
           "key": "Vary",
-          "value": "Origin"
+          "value": "Origin, Accept-Encoding"
         }
       ]
     },
