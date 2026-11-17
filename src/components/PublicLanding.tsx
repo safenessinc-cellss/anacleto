@@ -44,7 +44,7 @@ export default function PublicLanding() {
   const [opened,setOpened] = useState(false);
   const [menuOpen,setMenuOpen] = useState(false);
   const [faqOpen,setFaqOpen] = useState<number|null>(0);
-  const [show3D,setShow3D] = useState(false);
+  const [show3D,setShow3D] = useState(true);
   const viewerRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
   const finishIntro = useCallback(()=>{try{sessionStorage.setItem("anacleto-assembly-seen","1");}catch{}setIntroSeen(true);},[]);
