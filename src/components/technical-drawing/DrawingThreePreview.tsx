@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import type { TechnicalDrawing } from "../../types";
-import { buildArchitecturalIsometricSvg, resolveAluminumSpec } from "../../utils/architecturalSvg";
+import { buildArchitecturalIsometricSvg, resolveAluminumSpec, svgInnerMarkup } from "../../utils/architecturalSvg";
 
 type Props = { drawing: TechnicalDrawing };
 
@@ -44,7 +44,7 @@ export default function DrawingThreePreview({ drawing }: Props) {
         role="img"
         aria-label={"Perspectiva isométrica técnica de " + (drawing.title || "esquadria de alumínio")}
         className="w-full overflow-hidden [&>svg]:block [&>svg]:h-auto [&>svg]:max-h-[540px] [&>svg]:w-full [&>svg]:object-contain"
-        dangerouslySetInnerHTML={{ __html: preview }}
+        dangerouslySetInnerHTML={{ __html: svgInnerMarkup(preview) }}
       />
     </section>
   );
