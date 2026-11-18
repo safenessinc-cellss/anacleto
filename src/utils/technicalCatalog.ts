@@ -146,15 +146,15 @@ function offerUnitPrice(
   switch (offer.basis) {
     case "kg": {
       if (!finitePositive(item.weightKgPerMeter) || !finitePositive(line.cutLengthMm)) return undefined;
-      return offer.price * item.weightKgPerMeter * (line.cutLengthMm / 1000);
+      return offer.price * item.weightKgPerMeter * (line.cutLengthMm / 1000) * quantity;
     }
     case "m": {
       if (!finitePositive(line.cutLengthMm)) return undefined;
-      return offer.price * (line.cutLengthMm / 1000);
+      return offer.price * (line.cutLengthMm / 1000) * quantity;
     }
     case "m2": {
       if (!finitePositive(line.widthMm) || !finitePositive(line.heightMm)) return undefined;
-      return offer.price * (line.widthMm / 1000) * (line.heightMm / 1000);
+      return offer.price * (line.widthMm / 1000) * (line.heightMm / 1000) * quantity;
     }
     case "unit":
     case "set":
