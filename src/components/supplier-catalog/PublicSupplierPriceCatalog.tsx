@@ -23,6 +23,9 @@ const suppliers = [
   { name: "Grupo Alucentro", status: "Cotação necessária", detail: "Catálogos técnicos Suprema e Gold disponíveis; preço não publicado no catálogo.", url: "https://grupoalucentro.com.br/a-alucentro/catalogos/" },
   { name: "Poliformas", status: "Cotação necessária", detail: "Catálogo técnico com códigos, pesos e barras; preço não publicado.", url: "https://www.poliformas.com.br/wp-content/uploads/2026/03/Linha-Suprema.pdf" },
   { name: "Marte Alumínio", status: "Cotação necessária", detail: "Perfis e pesos kg/m publicados; produtos marcados como sob consulta.", url: "https://www.martealuminio.com.br/linhas/perfis-linha-suprema" },
+  { name: "Aluíta Alumínio", status: "Catálogo público; preço sob consulta", detail: "Catálogo online lista 1.172 perfis em 79 páginas e seção separada de acessórios. A loja online informa que está em implantação e que os itens são testes; não usar preços nem aceitar pedidos por essa loja.", url: "https://www.aluita.com.br/" },
+  { name: "Aluíta — Catálogo de perfis", status: "Referência técnica", detail: "Lista códigos e comprimentos comerciais de perfis; preços apresentados como sob consulta. Confirmar código, acabamento, estoque e peso com o fornecedor.", url: "https://www.catalogoaluita.com.br/perfil" },
+  { name: "Esquadrimax Alumínio", status: "Catálogo técnico Set/2026; preço sob consulta", detail: "Catálogo de construção civil com perfis, códigos, dimensões e pesos kg/m, além de linhas de esquadrias, box e acessórios. Não contém tabela pública de preços.", url: "https://fliphtml5.com/sacgm/mnnz/" },
 ];
 
 const brl = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
