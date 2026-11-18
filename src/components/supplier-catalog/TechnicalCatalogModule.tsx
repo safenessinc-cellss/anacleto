@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, serverTimestamp, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { AlertTriangle, CheckCircle2, Database, RefreshCw, ShieldCheck } from "lucide-react";
 import { auth, db } from "../../firebase";
 import { queueLegacyCatalogReview } from "../../utils/technicalCatalogFirestore";
 import { approveLegacyCatalogCandidate } from "../../utils/technicalCatalogApproval";
+import { createSupremaTwoLeafSlidingWindowDraft } from "../../utils/manufacturingFormulas";
 
 type ReviewRow = {
   id: string;
@@ -44,6 +45,7 @@ export default function TechnicalCatalogModule() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [formulaStatus, setFormulaStatus] = useState("Não cadastrado");
   const [selectedReview, setSelectedReview] = useState<ReviewRow | null>(null);
   const [approval, setApproval] = useState({ canonicalCode: "", category: "accessory", description: "", unit: "un", supplierId: "", supplierName: "", supplierSku: "", price: "", priceBasis: "unit", validFrom: new Date().toISOString().slice(0, 10), sourceUrl: "", sourceDocument: "", weightKgPerMeter: "", commercialLengthMm: "", glassThicknessMm: "", glassType: "", colorOrFinish: "", systemLineIds: "", compatibleTipologiaIds: "" });
 
@@ -129,6 +131,32 @@ export default function TechnicalCatalogModule() {
     finally { setBusy(false); }
   };
 
+  const createSupremaDraft = async () => {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const definition = createSupremaTwoLeafSlidingWindowDraft(new Date().toISOString());
+      const reference = doc(db, "tipologia_definitions", definition.id);
+      const existing = await getDoc(reference);
+      if (existing.exists()) {
+        setFormulaStatus(String(existing.data().status || "draft"));
+        setNotice("A fórmula Suprema de 2 folhas já existe. Nenhum dado foi sobrescrito.");
+      } else {
+        await setDoc(reference, definition);
+        setFormulaStatus(definition.status);
+        setNotice("Rascunho Suprema criado com checklist técnico. Ainda não calcula nem libera orçamento.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível criar o rascunho da tipologia.");
+    } finally { setBusy(false); }
+  };
+
+  useEffect(() => {
+    if (!authReady) return;
+    return onSnapshot(doc(db, "tipologia_definitions", "janela-correr-2-folhas-suprema"), (snapshot) => {
+      setFormulaStatus(snapshot.exists() ? String(snapshot.data().status || "draft") : "Não cadastrado");
+    }, (err) => setError("Falha ao carregar fórmula Suprema: " + err.message));
+  }, [authReady]);
+
   const importLegacy = async () => {
     setBusy(true);
     setError("");
@@ -189,6 +217,16 @@ export default function TechnicalCatalogModule() {
         <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
           <p className="text-xs text-slate-500">Registros na fila</p>
           <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{reviewRows.length}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900 dark:bg-indigo-950/30">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-slate-900 dark:text-white">Tipologia inicial: Suprema — janela de correr 2 folhas</h3>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Status da fórmula: <strong>{formulaStatus}</strong>. O rascunho contém apenas a lista de verificações; não contém medidas de corte inventadas.</p>
+          </div>
+          <button type="button" disabled={!authReady || busy} onClick={createSupremaDraft} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Criar rascunho técnico</button>
         </div>
       </div>
 
