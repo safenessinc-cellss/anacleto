@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { AlertTriangle, CheckCircle2, Database, RefreshCw, ShieldCheck } from "lucide-react";
 import { auth, db } from "../../firebase";
 import { queueLegacyCatalogReview } from "../../utils/technicalCatalogFirestore";
+import { approveLegacyCatalogCandidate } from "../../utils/technicalCatalogApproval";
 
 type ReviewRow = {
   id: string;
@@ -43,6 +44,8 @@ export default function TechnicalCatalogModule() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [selectedReview, setSelectedReview] = useState<ReviewRow | null>(null);
+  const [approval, setApproval] = useState({ canonicalCode: "", category: "accessory", description: "", unit: "un", supplierId: "", supplierName: "", supplierSku: "", price: "", priceBasis: "unit", validFrom: new Date().toISOString().slice(0, 10), sourceUrl: "", sourceDocument: "", weightKgPerMeter: "", commercialLengthMm: "", glassThicknessMm: "", glassType: "", colorOrFinish: "", systemLineIds: "", compatibleTipologiaIds: "" });
 
   useEffect(() => onAuthStateChanged(auth, (user) => setAuthReady(!!user)), []);
 
@@ -65,6 +68,66 @@ export default function TechnicalCatalogModule() {
     () => new Set(reviewRows.map((row) => row.suggestedSupplierName).filter(Boolean)).size,
     [reviewRows],
   );
+
+  const openReview = (row: ReviewRow) => {
+    setSelectedReview(row);
+    setApproval({
+      canonicalCode: row.supplierSku || "",
+      category: row.suggestedCategory || "accessory",
+      description: row.suggestedDescription || "",
+      unit: row.suggestedCategory === "aluminum_profile" ? "m" : row.suggestedCategory === "glass" ? "m2" : "un",
+      supplierId: row.suggestedSupplierName || "",
+      supplierName: row.suggestedSupplierName || "",
+      supplierSku: row.supplierSku || "",
+      price: row.suggestedPrice ? String(row.suggestedPrice) : "",
+      priceBasis: row.suggestedPriceBasis || (row.suggestedCategory === "aluminum_profile" ? "kg" : row.suggestedCategory === "glass" ? "m2" : "unit"),
+      validFrom: new Date().toISOString().slice(0, 10),
+      sourceUrl: "",
+      sourceDocument: "",
+      weightKgPerMeter: "",
+      commercialLengthMm: row.suggestedLengthMm ? String(row.suggestedLengthMm) : "",
+      glassThicknessMm: "",
+      glassType: "",
+      colorOrFinish: row.suggestedFinish || "",
+      systemLineIds: "",
+      compatibleTipologiaIds: "",
+    });
+  };
+
+  const saveApproval = async () => {
+    if (!selectedReview) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await approveLegacyCatalogCandidate(db, {
+        reviewId: selectedReview.id,
+        ...approval,
+        category: approval.category as any,
+        unit: approval.unit as any,
+        price: Number(approval.price),
+        priceBasis: approval.priceBasis as any,
+        weightKgPerMeter: approval.weightKgPerMeter ? Number(approval.weightKgPerMeter) : undefined,
+        commercialLengthMm: approval.commercialLengthMm ? Number(approval.commercialLengthMm) : undefined,
+        glassThicknessMm: approval.glassThicknessMm ? Number(approval.glassThicknessMm) : undefined,
+        systemLineIds: approval.systemLineIds.split(",").map((value) => value.trim()).filter(Boolean),
+        compatibleTipologiaIds: approval.compatibleTipologiaIds.split(",").map((value) => value.trim()).filter(Boolean),
+      });
+      setNotice("Item canônico criado (" + result.itemId + "). A oferta permanece pendente de aprovação documental e comercial.");
+      setSelectedReview(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível aprovar o cadastro.");
+    } finally { setBusy(false); }
+  };
+
+  const rejectReview = async (row: ReviewRow) => {
+    setBusy(true); setError("");
+    try {
+      await updateDoc(doc(db, "technical_catalog_review", row.id), {
+        status: "rejected",
+        reviewedAt: serverTimestamp(),
+      });
+    } catch (err) { setError(err instanceof Error ? err.message : "Falha ao rejeitar registro."); }
+    finally { setBusy(false); }
+  };
 
   const importLegacy = async () => {
     setBusy(true);
@@ -147,7 +210,7 @@ export default function TechnicalCatalogModule() {
           </div>
         ) : (
           <div className="space-y-2">
-            {reviewRows.slice(0, 8).map((row) => (
+            {reviewRows.filter((row) => row.status === "pending_review").slice(0, 30).map((row) => (
               <div key={row.id} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -165,12 +228,54 @@ export default function TechnicalCatalogModule() {
                     {row.reviewIssues.slice(0, 3).map((issue, index) => <li key={index}>{issue}</li>)}
                   </ul>
                 )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => openReview(row)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Revisar e cadastrar</button>
+                  <button type="button" disabled={busy} onClick={() => rejectReview(row)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600">Rejeitar</button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
 
+      {selectedReview && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true" aria-label="Revisar produto técnico">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900">
+            <div className="flex items-start justify-between gap-3">
+              <div><h3 className="text-lg font-bold text-slate-900 dark:text-white">Revisão técnica do produto</h3><p className="text-xs text-slate-500">O cadastro canônico é criado; a oferta comercial continua pendente de verificação.</p></div>
+              <button type="button" onClick={() => setSelectedReview(null)} className="rounded-lg border px-3 py-1 text-sm">Fechar</button>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {([
+                ["Código canônico","canonicalCode"],["Descrição","description"],["Fornecedor / ID","supplierId"],["SKU original","supplierSku"],["Preço (R$)","price"],["Data inicial","validFrom"],["Fonte URL","sourceUrl"],["Documento de origem","sourceDocument"],["Peso do perfil (kg/m)","weightKgPerMeter"],["Comprimento comercial (mm)","commercialLengthMm"],["Espessura vidro (mm)","glassThicknessMm"],["Tipo de vidro","glassType"],["Acabamento","colorOrFinish"],["Linhas compatíveis (IDs separados por vírgula)","systemLineIds"],["Tipologias compatíveis (IDs separados por vírgula)","compatibleTipologiaIds"]
+              ] as const).map(([label,key]) => (
+                <label key={key} className="grid gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">{label}
+                  <input value={approval[key]} onChange={(event) => setApproval((current) => ({...current,[key]:event.target.value}))} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                </label>
+              ))}
+              <label className="grid gap-1 text-xs font-medium text-slate-600">Categoria
+                <select value={approval.category} onChange={(event) => setApproval((current) => ({...current,category:event.target.value}))} className="rounded-lg border px-3 py-2 text-sm">
+                  {Object.entries(categoryLabel).map(([value,label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-slate-600">Unidade de estoque
+                <select value={approval.unit} onChange={(event) => setApproval((current) => ({...current,unit:event.target.value}))} className="rounded-lg border px-3 py-2 text-sm">
+                  {["kg","m","m2","un","barra","conjunto"].map((value) => <option key={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-slate-600">Base do preço
+                <select value={approval.priceBasis} onChange={(event) => setApproval((current) => ({...current,priceBasis:event.target.value}))} className="rounded-lg border px-3 py-2 text-sm">
+                  {["kg","m","m2","unit","bar","set"].map((value) => <option key={value}>{value}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setSelectedReview(null)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button>
+              <button type="button" disabled={busy} onClick={saveApproval} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Salvando..." : "Criar item técnico"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
         <CheckCircle2 className="h-4 w-4" />
         Importação não destrutiva: os registros originais permanecem nos módulos atuais.
