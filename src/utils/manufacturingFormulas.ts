@@ -55,6 +55,7 @@ export interface TipologiaDefinition {
   approvedBy?: string;
   createdAt: string;
   updatedAt: string;
+  validationChecklist?: string[];
 }
 
 export function evaluateFormula(
@@ -188,5 +189,35 @@ export function createUnconfiguredSlidingWindowTemplate(input: {
     bomRules: [],
     createdAt: input.createdAt,
     updatedAt: input.createdAt,
+  };
+}
+
+
+/**
+ * Registered draft for the first implementation target. The checklist records
+ * what must be sourced from the official Suprema technical manual; it is not
+ * a cutting list and must never be used to calculate a customer quote.
+ */
+export function createSupremaTwoLeafSlidingWindowDraft(now: string): TipologiaDefinition {
+  return {
+    id: "janela-correr-2-folhas-suprema",
+    name: "Janela de correr — 2 folhas",
+    systemLineId: "suprema",
+    category: "janela_correr",
+    formulaVersion: "0.1.0-draft",
+    status: "technical_review",
+    bomRules: [],
+    validationChecklist: [
+      "Identificar códigos oficiais dos perfis de marco, folhas e encontro.",
+      "Registrar peso kg/m e comprimento comercial de cada perfil a partir do catálogo do fabricante.",
+      "Registrar descontos de corte, usinagem, folgas e sobreposições da tabela oficial.",
+      "Definir modelo e quantidade de roldanas conforme peso máximo da folha.",
+      "Definir fecho, contra-fecho e parafusos por código e compatibilidade documentada.",
+      "Definir escovas, guarnições e metragem por canal/perímetro.",
+      "Definir tipo, espessura e dimensões de vidro com as folgas prescritas.",
+      "Anexar fonte técnica e validar uma peça piloto fabricada antes da aprovação.",
+    ],
+    createdAt: now,
+    updatedAt: now,
   };
 }
