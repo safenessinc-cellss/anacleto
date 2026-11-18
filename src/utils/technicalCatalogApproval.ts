@@ -97,6 +97,16 @@ export async function approveLegacyCatalogCandidate(db: Firestore, input: Review
     ]);
     if (!reviewSnap.exists()) throw new Error("Registro de revisão não encontrado.");
     if (reviewSnap.data().status !== "pending_review") throw new Error("Este registro já foi processado.");
+    const supplierRef = doc(db, "technical_suppliers", encodeURIComponent(input.supplierId.trim().toLowerCase()));
+    const supplierSnap = await transaction.get(supplierRef);
+    if (!supplierSnap.exists()) {
+      transaction.set(supplierRef, {
+        id: encodeURIComponent(input.supplierId.trim().toLowerCase()),
+        name: input.supplierName.trim() || input.supplierId.trim(),
+        active: true,
+        createdAt: serverTimestamp(),
+      });
+    }
     if (itemSnap.exists()) {
       const existing = itemSnap.data() as TechnicalCatalogItem;
       if (existing.category !== item.category) throw new Error("O código canônico já existe em outra categoria.");
