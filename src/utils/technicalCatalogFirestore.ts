@@ -58,7 +58,15 @@ export async function queueLegacyCatalogReview(db: Firestore): Promise<LegacyRev
       };
       const candidate = mapLegacySupplierCatalogRow(row, legacyCollection);
       const id = encodeURIComponent(legacyCollection + "__" + sourceDoc.id);
-      if (!existingIds.has(id)) pending.push({ id, candidate, sourceData });
+      // Never copy base64 images, PDF payloads, or arbitrary legacy fields into Firestore.
+      const sourceDataForReview = Object.fromEntries(
+        ["supplier", "brand", "manufacturer", "code", "sku", "reference", "name", "description",
+          "title", "category", "type", "unit", "measurementUnit", "price", "value", "lengthMm",
+          "commercialLengthMm", "color", "finish", "material", "sourceUrl", "url", "sourceDocument",
+          "fileName", "createdAt"].filter((key) => sourceData[key] !== undefined)
+          .map((key) => [key, sourceData[key]]),
+      );
+      if (!existingIds.has(id)) pending.push({ id, candidate, sourceData: sourceDataForReview });
     });
   });
 
