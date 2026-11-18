@@ -141,30 +141,58 @@ const applyDocumentWatermark = (doc: jsPDF, sender?: SenderConfig) => {
   doc.setPage(pageCount);
 };
 
-const applyQuoteWatermark = (doc: jsPDF, quote: Quote) => {
+const loadQuoteItemPhoto = async (url?: string): Promise<string | null> => {
+  if (!url) return null;
+  if (url.startsWith("data:image/")) return url;
+  try {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Não foi possível carregar a foto do item."));
+      image.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(image, 0, 0);
+    return canvas.toDataURL("image/png");
+  } catch (error) {
+    console.warn("Foto do item ignorada no PDF (URL indisponível ou sem CORS):", error);
+    return null;
+  }
+};
+
+const applyQuoteWatermark = (doc: jsPDF, quote: Quote, sender?: SenderConfig, officialLogo?: string) => {
   const pageCount = doc.getNumberOfPages();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const watermarkText = quote.status === "approved" ? "APROVADO" : "ORÇAMENTO";
+  const configuredWatermark = sender?.watermarkLogoUrl?.startsWith("data:image/")
+    ? sender.watermarkLogoUrl
+    : sender?.logoUrl?.startsWith("data:image/") ? sender.logoUrl : null;
+  const watermarkImage = configuredWatermark || officialLogo;
 
   for (let page = 1; page <= pageCount; page += 1) {
     doc.setPage(page);
-    try {
-      (doc as any).setGState(new (doc as any).GState({ opacity: 0.1 }));
-    } catch (error) {
-      console.warn("Não foi possível aplicar transparência à marca d'água do orçamento:", error);
+    if (watermarkImage) {
+      try {
+        const mime = watermarkImage.slice(5, watermarkImage.indexOf(";")).toLowerCase();
+        const format = mime.includes("jpeg") ? "JPEG" : mime.includes("webp") ? "WEBP" : "PNG";
+        (doc as any).setGState(new (doc as any).GState({ opacity: 0.075 }));
+        doc.addImage(watermarkImage, format, pageWidth / 2 - 43, pageHeight / 2 - 43, 86, 86, undefined, "FAST");
+        (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
+        continue;
+      } catch (error) {
+        console.warn("Não foi possível inserir a marca d'água gráfica do orçamento:", error);
+        try { (doc as any).setGState(new (doc as any).GState({ opacity: 1 })); } catch { /* sem suporte de transparência */ }
+      }
     }
-
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(30);
+    doc.setFontSize(25);
     doc.setTextColor(226, 232, 240);
-    doc.text(watermarkText, pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
-
-    try {
-      (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
-    } catch (error) {
-      console.warn("Não foi possível restaurar a transparência após a marca d'água do orçamento:", error);
-    }
+    doc.text(quote.status === "approved" ? "APROVADO" : "ORÇAMENTO", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
   }
   doc.setPage(pageCount);
 };
@@ -243,10 +271,15 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
   if (quote.validUntil) doc.text(`Válido até: ${quote.validUntil}`, pageWidth / 2 + 10, yPos + 26);
 
   // Itens comerciais: sem desenhos automáticos por descrição.
+  const includeItemImages = Boolean(quote.includeItemImages);
+  const itemPhotoData = includeItemImages
+    ? await Promise.all(quote.items.map((item) => loadQuoteItemPhoto(item.itemPhotoUrl || item.itemPhotoUrls?.[0])))
+    : [];
   const tableData = quote.items.map((item, idx) => [
     idx + 1,
+    ...(includeItemImages ? [""] : []),
     item.sku
-      ? `${item.sku} · ${item.description}${Number(item.cutLengthMm) > 0 ? ` (${item.cutLengthMm} mm)` : ""}`
+      ? item.sku + " · " + item.description + (Number(item.cutLengthMm) > 0 ? " (" + item.cutLengthMm + " mm)" : "")
       : item.description,
     item.quantity,
     formatMoney(item.unitPrice, currency),
@@ -255,7 +288,9 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
 
   autoTable(doc, {
     startY: yPos + 35,
-    head: [["#", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
+    head: [includeItemImages
+      ? ["#", "Imagem", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]
+      : ["#", "Descrição do Item / Serviço", "Qtd.", "Preço Unit.", "Subtotal"]],
     body: tableData,
     theme: "striped",
     headStyles: {
@@ -263,12 +298,39 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
       textColor: [255, 255, 255],
       fontStyle: "bold",
     },
-    columnStyles: {
+    columnStyles: includeItemImages ? {
+      0: { cellWidth: 8, halign: "center" },
+      1: { cellWidth: 19, halign: "center" },
+      2: { cellWidth: "auto" },
+      3: { cellWidth: 13, halign: "center" },
+      4: { cellWidth: 27, halign: "right" },
+      5: { cellWidth: 29, halign: "right" },
+    } : {
       0: { cellWidth: 9, halign: "center" },
       1: { cellWidth: "auto" },
       2: { cellWidth: 15, halign: "center" },
       3: { cellWidth: 31, halign: "right" },
       4: { cellWidth: 31, halign: "right" },
+    },
+    didParseCell: (data) => {
+      if (includeItemImages && data.section === "body" && data.column.index === 1) {
+        data.cell.styles.minCellHeight = 19;
+      }
+    },
+    didDrawCell: (data) => {
+      if (includeItemImages && data.section === "body" && data.column.index === 1) {
+        const photo = itemPhotoData[data.row.index];
+        if (photo) {
+          try {
+            const mime = photo.slice(5, photo.indexOf(";")).toLowerCase();
+            const format = mime.includes("jpeg") ? "JPEG" : mime.includes("webp") ? "WEBP" : "PNG";
+            const size = 15;
+            doc.addImage(photo, format, data.cell.x + (data.cell.width - size) / 2, data.cell.y + 2, size, size, undefined, "FAST");
+          } catch (error) {
+            console.warn("Não foi possível desenhar a foto do item no PDF:", error);
+          }
+        }
+      }
     },
     styles: {
       fontSize: 8,
@@ -375,7 +437,7 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
     { align: "center" }
   );
 
-  applyQuoteWatermark(doc, quote);
+  applyQuoteWatermark(doc, quote, sender, officialLogo);
   const fileName = `Orcamento_${quote.number || "PRE"}.pdf`;
   const dataUri = doc.output("datauristring");
   const sizeKb = Math.max(1, Math.round((dataUri.length * 0.75) / 1024));
