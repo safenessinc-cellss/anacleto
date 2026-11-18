@@ -144,7 +144,11 @@ export default function BudgetModal({
         description: String(item.description || ""),
         quantity: Number(item.qty),
         unitPrice: Number(item.price),
-        notes: item.priceSource === "pending" ? "Preço pendente de confirmação na Tabela de Preços." : "Preço validado no catálogo cadastrado.",
+        sku: String(item.sku || ""),
+        catalogItemId: String(item.catalogItemId || ""),
+        catalogSource: item.catalogItemId ? "supplier_catalog" : "",
+        priceSource: item.priceSource === "catalog" ? "catalog" : "pending",
+        notes: [String(item.notes || ""), item.priceSource === "pending" ? "Preço pendente de confirmação no catálogo." : "Preço vinculado ao registro do catálogo."].filter(Boolean).join(" "),
       }));
       if (generatedItems.some(item => !item.description || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0)) {
         throw new Error("A IA devolveu dados incompletos. Revise a descrição e tente novamente.");
