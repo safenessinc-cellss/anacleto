@@ -186,7 +186,7 @@ export function priceResolvedBom(input: {
     if (!item || !item.active) {
       return { ...line, subtotal: 0, status: "missing_item", warnings: ["Componente não cadastrado ou inativo no catálogo técnico."] };
     }
-    if (line.requiredSystemLineId && !item.systemLineIds.includes(line.requiredSystemLineId)) {
+    if (line.requiredCategory && item.category !== line.requiredCategory) {\n      return { ...line, subtotal: 0, status: "incompatible", warnings: ["A categoria técnica do item não corresponde ao componente exigido pela tipologia."] };\n    }\n    if (line.requiredSystemLineId && !item.systemLineIds.includes(line.requiredSystemLineId)) {
       return { ...line, subtotal: 0, status: "incompatible", warnings: ["O componente não está validado para a linha de esquadria selecionada."] };
     }
     if (line.requiredTipologiaId && !item.compatibleTipologiaIds.includes(line.requiredTipologiaId)) {
