@@ -53,7 +53,9 @@ export async function queueLegacyCatalogReview(db: Firestore): Promise<LegacyRev
         color: sourceData.color ?? sourceData.finish,
         material: sourceData.material,
         sourceUrl: sourceData.sourceUrl ?? sourceData.url,
-        sourceDocument: sourceData.sourceDocument ?? sourceData.fileName,
+        sourceDocument: typeof sourceData.sourceDocument === "string" && !sourceData.sourceDocument.startsWith("data:") && sourceData.sourceDocument.length <= 500
+          ? sourceData.sourceDocument
+          : sourceData.fileName,
         createdAt: sourceData.createdAt,
       };
       const candidate = mapLegacySupplierCatalogRow(row, legacyCollection);
@@ -63,8 +65,11 @@ export async function queueLegacyCatalogReview(db: Firestore): Promise<LegacyRev
         ["supplier", "brand", "manufacturer", "code", "sku", "reference", "name", "description",
           "title", "category", "type", "unit", "measurementUnit", "price", "value", "lengthMm",
           "commercialLengthMm", "color", "finish", "material", "sourceUrl", "url", "sourceDocument",
-          "fileName", "createdAt"].filter((key) => sourceData[key] !== undefined)
-          .map((key) => [key, sourceData[key]]),
+          "fileName", "createdAt"].filter((key) => {
+            const value = sourceData[key];
+            return value !== undefined
+              && !(typeof value === "string" && (value.startsWith("data:") || value.length > 2048));
+          }).map((key) => [key, sourceData[key]]),
       );
       if (!existingIds.has(id)) pending.push({ id, candidate, sourceData: sourceDataForReview });
     });
