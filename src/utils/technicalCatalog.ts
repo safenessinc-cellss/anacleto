@@ -197,9 +197,6 @@ export function priceResolvedBom(input: {
     if (line.requiredCategory && item.category !== line.requiredCategory) {
       return { ...line, subtotal: 0, status: "incompatible", warnings: ["A categoria técnica do item não corresponde ao componente exigido pela tipologia."] };
     }
-    if (line.requiredCategory && item.category !== line.requiredCategory) {
-      return { ...line, subtotal: 0, status: "incompatible", warnings: ["A categoria técnica do item não corresponde ao componente exigido pela tipologia."] };
-    }
     if (line.requiredSystemLineId && !item.systemLineIds.includes(line.requiredSystemLineId)) {
       return { ...line, subtotal: 0, status: "incompatible", warnings: ["O componente não está validado para a linha de esquadria selecionada."] };
     }
