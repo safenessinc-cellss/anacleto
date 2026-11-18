@@ -73,10 +73,9 @@ export function compactQuoteForFirestore(quote: Quote): Quote {
   const result = sanitizeFirestoreData(stripInlineImages({
     ...light,
     technicalDrawing: technicalDrawingReference(quote.technicalDrawing),
-    items: quote.items.map((item) => {
-      const { itemPhotoUrl: _photo, itemPhotoUrls: _photos, ...line } = item;
-      return line;
-    }),
+    // Keep remote catalog photo URLs so an optional PDF image column can be rendered after reload.
+    // stripInlineImages above still removes embedded data:image payloads to keep Firestore documents small.
+    items: quote.items,
   }));
   return assertUnder10Kb(result, "O orçamento");
 }
