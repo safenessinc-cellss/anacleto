@@ -1553,6 +1553,19 @@ const handleAddItem = () => {
                     ))}
                   </div>
 
+                  <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedQuote.includeItemImages)}
+                      onChange={(event) => setSelectedQuote({ ...selectedQuote, includeItemImages: event.target.checked, pdfDataUri: undefined, pdfFileName: undefined, pdfGeneratedAt: undefined })}
+                      className="mt-0.5 h-4 w-4 accent-amber-500"
+                    />
+                    <span>
+                      <strong className="block text-slate-100">Incluir imagens dos itens no PDF</strong>
+                      <span className="mt-1 block text-slate-500">Opcional. Quando ativado, as fotos disponíveis aparecem numa coluna à esquerda da descrição. Desmarque para gerar um orçamento sem fotos.</span>
+                    </span>
+                  </label>
+
                   {/* Condições comerciais opcionais: vazio por padrão e editável antes de salvar. */}
                   <div className="mt-4 rounded-2xl border border-amber-500/25 bg-slate-950 p-4">
                     <label htmlFor="quote-conditions" className="mb-2 block text-[10px] font-black uppercase tracking-wider text-amber-300">
