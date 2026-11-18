@@ -1553,6 +1553,22 @@ const handleAddItem = () => {
                     ))}
                   </div>
 
+                  {/* Condições comerciais opcionais: vazio por padrão e editável antes de salvar. */}
+                  <div className="mt-4 rounded-2xl border border-amber-500/25 bg-slate-950 p-4">
+                    <label htmlFor="quote-conditions" className="mb-2 block text-[10px] font-black uppercase tracking-wider text-amber-300">
+                      Condições do orçamento / prazo de execução (opcional)
+                    </label>
+                    <textarea
+                      id="quote-conditions"
+                      value={selectedQuote.notes || ""}
+                      onChange={(event) => setSelectedQuote({ ...selectedQuote, notes: event.target.value, pdfDataUri: undefined, pdfFileName: undefined, pdfGeneratedAt: undefined })}
+                      rows={4}
+                      placeholder={"Ex.: Entrada de 40% do valor total. Prazo estimado de execução: 90 dias. Saldo restante conforme acordado com o cliente.\nAcrescente outras condições se necessário."}
+                      className="w-full resize-y rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs leading-relaxed text-white outline-none placeholder:text-slate-500 focus:border-amber-500/60"
+                    />
+                    <p className="mt-2 text-[10px] text-slate-500">Os exemplos são apenas sugestões. Edite ou apague livremente; se ficar vazio, esta seção não será impressa no PDF.</p>
+                  </div>
+
                   {/* Totals and compact financial controls */}
                   <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-3 text-xs">
                     <div className="flex justify-between w-64 text-slate-400">
