@@ -15,6 +15,8 @@ type ReviewRow = {
   suggestedCategory?: string;
   suggestedPrice?: number;
   suggestedPriceBasis?: string;
+  suggestedLengthMm?: number;
+  suggestedFinish?: string;
   legacyCollection: string;
   reviewIssues: string[];
   status: string;
