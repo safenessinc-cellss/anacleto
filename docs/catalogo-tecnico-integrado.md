@@ -29,6 +29,27 @@ Unificar os catálogos existentes sem apagar nem duplicar os dados atuais. O or�
 8. Markup e margem bruta são modos distintos e devem ser identificados no orçamento.
 9. Na aprovação, congelar dimensões, BOM, códigos dos fornecedores, preços, validade, perdas, fórmula e versão do motor. Atualizações posteriores não alteram orçamentos aprovados.
 
+## Fontes de fornecedores pesquisadas em 18/11/2026
+
+### Aluíta Alumínio (RS)
+- Site institucional e contato: https://www.aluita.com.br/
+- Catálogo público de perfis: https://www.catalogoaluita.com.br/perfil
+- A listagem pública informa 1.172 perfis em 79 páginas; os preços aparecem como **sob consulta**.
+- O e-commerce da Aluíta declara estar em implantação e informa que os itens exibidos são testes; portanto, não tratar os valores/listagens dessa loja como oferta disponível nem gerar pedido automaticamente.
+- A empresa também mantém uma seção de acessórios no catálogo online. Cada SKU precisa ser relacionado à linha e tipologia antes de compor uma BOM.
+
+### Esquadrimax Alumínio
+- Catálogo de Construção Civil, edição setembro de 2026: https://fliphtml5.com/sacgm/mnnz/
+- O catálogo inclui códigos, dimensões e pesos kg/m para perfis, além de linhas de esquadrias, box e acessórios.
+- O catálogo consultado não publica preços comerciais gerais; registrar ofertas como **cotação necessária**, nunca com valor estimado.
+- A compatibilidade de ferragens e perfis deve ser validada por linha e tipologia, sem misturar sistemas por semelhança visual.
+
+### Política de preço
+- Preço público ausente = oferta pendente de cotação, não R$ 0,00 e não preço estimado.
+- Guardar fonte, SKU, unidade comercial, comprimento da barra, acabamento, filial/região, data da consulta e validade.
+- Preços varejistas publicados por terceiros continuam como referência comercial e não entram no cálculo automático até confirmação de estoque, unidade, impostos e compatibilidade.
+- A importação inicial destas fontes é apenas referência documental na interface; ainda exige ingestão/revisão de SKUs no Firestore para uso no motor de orçamento.
+
 ## Implementação inicial
 
 `src/utils/technicalCatalog.ts` contém o schema v1 e funções puras para:
