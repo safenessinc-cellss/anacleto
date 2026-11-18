@@ -39,7 +39,11 @@ const text = (value: unknown): string => typeof value === "string" ? value.trim(
 const numeric = (value: unknown): number | undefined => {
   if (typeof value === "number") return Number.isFinite(value) && value > 0 ? value : undefined;
   if (typeof value !== "string" || !value.trim()) return undefined;
-  const parsed = Number(value.trim().replace(/\./g, "").replace(",", "."));
+  const raw = value.trim().replace(/R\$|\s/gi, "");
+  const normalized = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw;
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 };
 
