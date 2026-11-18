@@ -6,6 +6,7 @@ import { auth, db } from "../../firebase";
 import { queueLegacyCatalogReview } from "../../utils/technicalCatalogFirestore";
 import { approveLegacyCatalogCandidate } from "../../utils/technicalCatalogApproval";
 import { createSupremaTwoLeafSlidingWindowDraft } from "../../utils/manufacturingFormulas";
+import PublicSupplierPriceCatalog from "./PublicSupplierPriceCatalog";
 
 type ReviewRow = {
   id: string;
@@ -231,6 +232,8 @@ export default function TechnicalCatalogModule() {
           <button type="button" disabled={!authReady || busy} onClick={createSupremaDraft} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Criar rascunho técnico</button>
         </div>
       </div>
+
+      <PublicSupplierPriceCatalog />
 
       <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
