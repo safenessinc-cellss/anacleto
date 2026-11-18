@@ -236,7 +236,11 @@ const QUOTE_AGENT_SCHEMA = {
 };
 const BUDGET_ITEMS_SCHEMA = {
   type:"OBJECT",
-  properties:{items:{type:"ARRAY",items:{type:"OBJECT",properties:{description:{type:"STRING"},qty:{type:"NUMBER"},price:{type:"NUMBER"},sku:{type:"STRING"},catalogItemId:{type:"STRING"},priceSource:{type:"STRING",enum:["catalog","pending"]}},required:["description","qty","price"]}},notes:{type:"STRING"}},
+  properties:{items:{type:"ARRAY",items:{type:"OBJECT",properties:{
+    description:{type:"STRING"},qty:{type:"NUMBER"},price:{type:"NUMBER"},sku:{type:"STRING"},
+    catalogItemId:{type:"STRING"},supplier:{type:"STRING"},category:{type:"STRING"},
+    variant:{type:"STRING"},side:{type:"STRING"},priceSource:{type:"STRING",enum:["catalog","pending"]}
+  },required:["description","qty","price"]}},notes:{type:"STRING"}},
   required:["items","notes"]
 };
 const FINANCIAL_ASSISTANT_SCHEMA = {
@@ -271,7 +275,43 @@ function findExactCatalogItem(item: any, catalog: any[]) {
 function hasVerifiedCatalogPrice(row: any): boolean {
   if (!row || row.price === undefined || row.price === null || String(row.price).trim() === "") return false;
   const price = Number(row.price);
-  return Number.isFinite(price) && price >= 0;
+  // Zero means missing/unverified in supplier imports; never quote it as a confirmed price.
+  return Number.isFinite(price) && price > 0 && row.priceStatus !== "pending" && row.priceStatus !== "unverified";
+}
+function selectRelevantBudgetCatalog(prompt: string, catalog: any[], limit = 450) {
+  const tokens = normalizeCatalogName(prompt).split(/\s+/).filter((token: string) => token.length >= 3);
+  const scored = catalog.map((row: any) => {
+    const searchable = normalizeCatalogName([
+      row.name, row.description, row.sku, row.code, row.category, row.supplier,
+      row.system, row.systemName, row.model, row.modelName, row.line, row.family,
+      row.variant, row.side, row.material, row.color, row.finish, row.tags,
+      row.compatibility, row.application
+    ].filter(Boolean).join(" "));
+    const score = tokens.reduce((total: number, token: string) => total + (searchable.includes(token) ? 1 : 0), 0);
+    return { row, score };
+  });
+  const relevant = scored.filter((entry: any) => entry.score > 0).sort((a: any, b: any) => b.score - a.score);
+  const selected = relevant.slice(0, limit).map((entry: any) => entry.row);
+  // Keep a representative spread of technical categories when the prompt is broad.
+  if (selected.length < limit) {
+    const seen = new Set(selected.map((row: any) => row.id));
+    for (const row of catalog) {
+      if (selected.length >= limit) break;
+      if (!seen.has(row.id)) { selected.push(row); seen.add(row.id); }
+    }
+  }
+  return selected.map((row: any) => ({
+    id: String(row.id || ""), name: String(row.name || row.description || ""),
+    sku: String(row.sku || row.code || ""), code: String(row.code || row.sku || ""),
+    category: String(row.category || ""), supplier: String(row.supplier || ""),
+    unit: String(row.unit || "un"), price: row.price ?? null,
+    priceStatus: String(row.priceStatus || (Number(row.price) > 0 ? "registered_unverified" : "pending")),
+    system: String(row.system || row.systemName || row.model || row.modelName || row.line || row.family || ""),
+    variant: String(row.variant || row.variantName || ""), side: String(row.side || row.hand || ""),
+    material: String(row.material || ""), color: String(row.color || ""),
+    compatibility: String(row.compatibility || row.application || ""),
+    source: String(row.source || "")
+  }));
 }
 
 // ----------------------------------------------------
@@ -429,11 +469,16 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
   try {
     const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
-    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 250);
+    const fullCatalog = await loadCatalogFromFirestore(req);
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
+    const catalog = selectRelevantBudgetCatalog(prompt, fullCatalog, 450);
     const parsed = await generateValidatedJson({
       capability: "budget",
-      system: `Você é especialista em orçamentos de esquadrias de alumínio, vidros e fabricação sob medida. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real: ${JSON.stringify(catalog)}. Gere linhas técnicas com materiais, serviços, quantidades e medidas somente quando informadas. Não invente medidas ausentes; registre-as em notes. Só associe item do catálogo por SKU/código, ID ou nome completo EXATO. Informe sku/catalogItemId para validação. O servidor substituirá o preço pelo preço cadastrado; se não houver correspondência exata, price=0 e priceSource="pending". Nunca invente preço, custo, imposto ou valor.`,
+      system: `Você é o engenheiro orçamentista da Anacleto Esquadrias, especialista em sistemas de janelas e portas de alumínio, vidro, ferragens, acessórios, vedação, fixação e fabricação/instalação. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","supplier":"","category":"","variant":"","side":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real relevante: ${JSON.stringify(catalog)}.
+Interprete o conceito comercial informado (por exemplo janela/porta de correr, abrir, maxim-ar, box, linha Lux, Gold ou outro nome comercial) e identifique no catálogo o sistema/linha compatível. Monte uma lista de materiais completa para fabricar e instalar o conjunto: perfis específicos do sistema, travessas/montantes, folhas/marcos, roldanas, fechos/fechaduras, puxadores, escovas, borrachas/juntas, parafusos, cantoneiras, baguetes, acessórios e vidro conforme a tipologia. Inclua somente componentes aplicáveis à tipologia; não acrescente peças genéricas sem justificativa.
+Procure primeiro no catálogo pelos campos de sistema/linha/modelo/família, compatibilidade, categoria, SKU/código e variante. Use o registro real mais específico e retorne o SKU e catalogItemId EXATOS do registro escolhido. Quando houver opções esquerda/direita, cor, acabamento, dimensão ou variante, selecione somente se o pedido ou os dados técnicos determinarem; caso contrário, crie linha pendente e explique a escolha necessária em notes. Nunca confunda peças parecidas ou lados diferentes.
+Não invente medidas, quantidade de folhas, perímetros, cortes, consumo, códigos nem compatibilidade. Se faltarem medidas ou configuração necessárias para calcular quantidades, apresente as linhas como estimativas de levantamento/pendentes e explique exatamente quais medidas/configurações o usuário precisa informar. Quantidades só podem ser calculadas quando deriváveis de medidas e regras técnicas existentes no catálogo; não presuma dimensões padrão.
+O preço será substituído pelo servidor pelo valor registrado. Só informe sku/catalogItemId de um registro real do catálogo. Se não houver correspondência inequívoca, deixe sku/catalogItemId vazios, price=0 e priceSource="pending". Preço ausente, zero ou não verificado deve permanecer pendente. Nunca invente preço, custo, imposto, margem ou valor.`,
       prompt,
       responseSchema: BUDGET_ITEMS_SCHEMA,
       onGeneration: ({ usage }) => {
@@ -460,16 +505,29 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
       if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
-      const match = findExactCatalogItem(item, catalog);
+      const match = findExactCatalogItem(item, fullCatalog);
       const catalogPrice = match ? Number(match.price) : 0;
-      const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+      const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice > 0;
+      const identity = match || null;
+      const details = [
+        item.variant ? "Variante: " + String(item.variant) : "",
+        item.side ? "Lado: " + String(item.side) : "",
+        identity?.supplier ? "Fornecedor: " + String(identity.supplier) : item.supplier ? "Fornecedor sugerido: " + String(item.supplier) : "",
+        identity?.category ? "Categoria: " + String(identity.category) : item.category ? "Categoria: " + String(item.category) : "",
+        !confirmed ? "Preço/identificação pendente de validação no catálogo." : "Referência: " + String(identity.sku || identity.code || "")
+      ].filter(Boolean).join(" · ");
       return {
         description: String(item.description).slice(0, 500),
         qty,
         price: confirmed ? catalogPrice : 0,
-        sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
-        catalogItemId: confirmed ? String(match.id || "") : "",
+        sku: confirmed ? String(identity.sku || identity.code || "") : String(item.sku || ""),
+        catalogItemId: confirmed ? String(identity.id || "") : "",
+        supplier: confirmed ? String(identity.supplier || "") : String(item.supplier || ""),
+        category: confirmed ? String(identity.category || "") : String(item.category || ""),
+        variant: String(item.variant || identity?.variant || ""),
+        side: String(item.side || identity?.side || ""),
         priceSource: confirmed ? "catalog" : "pending",
+        notes: details,
       };
     });
     return res.json({ items, notes: String(parsed.notes || "") });
