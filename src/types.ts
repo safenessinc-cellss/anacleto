@@ -78,6 +78,7 @@ export interface Quote {
   currency: string;
   status: QuoteStatus;
   notes?: string;
+  includeItemImages?: boolean;
   createdAt: string;
   updatedAt: string;
   // PDF Storage in Platform
