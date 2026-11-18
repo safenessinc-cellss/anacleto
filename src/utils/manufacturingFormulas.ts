@@ -155,6 +155,7 @@ export function buildBomFromTipologia(input: {
       wasteRate: rule.wasteRate,
       requiredSystemLineId: rule.requiredSystemLineId,
       requiredTipologiaId: rule.requiredTipologiaId,
+      requiredCategory: rule.category,
       requiredFinish: rule.requiredFinish,
       requiredGlassThicknessMm: rule.requiredGlassThicknessMm,
     };
