@@ -51,6 +51,6 @@
   },
   "overrides": {
     "@grpc/grpc-js": "^1.14.6",
-    "fast-xml-parser": "^5.12.1"
+    "fast-xml-parser": "^5.12.0"
   }
 }
