@@ -88,6 +88,8 @@ export interface ResolvedBomLine {
   wasteRate?: number;
   requiredSystemLineId?: string;
   requiredTipologiaId?: string;
+  requiredCategory?: TechnicalCategory;
+  requiredGlassThicknessMm?: number;
   requiredFinish?: string;
 }
 
@@ -133,6 +135,9 @@ export function validateCatalogItem(item: TechnicalCatalogItem): string[] {
 function offerIsUsable(offer: SupplierOffer, date: string): boolean {
   return offer.status === "verified"
     && finitePositive(offer.price)
+    && !!offer.verifiedAt
+    && !!(offer.sourceUrl || offer.sourceDocument)
+    && !!date
     && offer.validFrom <= date
     && (!offer.validUntil || offer.validUntil >= date);
 }
@@ -143,6 +148,9 @@ function offerUnitPrice(
   line: ResolvedBomLine,
 ): number | undefined {
   const quantity = line.quantity * (1 + Math.max(0, line.wasteRate || 0));
+  if (item.category === "aluminum_profile" && !["kg", "m"].includes(offer.basis)) return undefined;
+  if (item.category === "glass" && offer.basis !== "m2") return undefined;
+  if (!["aluminum_profile", "glass"].includes(item.category) && !["unit", "set", "bar"].includes(offer.basis)) return undefined;
   switch (offer.basis) {
     case "kg": {
       if (!finitePositive(item.weightKgPerMeter) || !finitePositive(line.cutLengthMm)) return undefined;
@@ -186,14 +194,23 @@ export function priceResolvedBom(input: {
     if (!item || !item.active) {
       return { ...line, subtotal: 0, status: "missing_item", warnings: ["Componente não cadastrado ou inativo no catálogo técnico."] };
     }
-    if (line.requiredCategory && item.category !== line.requiredCategory) {\n      return { ...line, subtotal: 0, status: "incompatible", warnings: ["A categoria técnica do item não corresponde ao componente exigido pela tipologia."] };\n    }\n    if (line.requiredSystemLineId && !item.systemLineIds.includes(line.requiredSystemLineId)) {
+    if (line.requiredCategory && item.category !== line.requiredCategory) {
+      return { ...line, subtotal: 0, status: "incompatible", warnings: ["A categoria técnica do item não corresponde ao componente exigido pela tipologia."] };
+    }
+    if (line.requiredCategory && item.category !== line.requiredCategory) {
+      return { ...line, subtotal: 0, status: "incompatible", warnings: ["A categoria técnica do item não corresponde ao componente exigido pela tipologia."] };
+    }
+    if (line.requiredSystemLineId && !item.systemLineIds.includes(line.requiredSystemLineId)) {
       return { ...line, subtotal: 0, status: "incompatible", warnings: ["O componente não está validado para a linha de esquadria selecionada."] };
     }
     if (line.requiredTipologiaId && !item.compatibleTipologiaIds.includes(line.requiredTipologiaId)) {
       return { ...line, subtotal: 0, status: "incompatible", warnings: ["O componente não está validado para esta tipologia."] };
     }
-    if (line.requiredFinish && item.colorOrFinish && item.colorOrFinish !== line.requiredFinish) {
-      return { ...line, subtotal: 0, status: "incompatible", warnings: ["Acabamento do componente diferente do acabamento solicitado."] };
+    if (line.requiredGlassThicknessMm && (item.category !== "glass" || item.glassThicknessMm !== line.requiredGlassThicknessMm)) {
+      return { ...line, subtotal: 0, status: "incompatible", warnings: ["Espessura do vidro não corresponde à especificação exigida."] };
+    }
+    if (line.requiredFinish && item.colorOrFinish !== line.requiredFinish) {
+      return { ...line, subtotal: 0, status: "incompatible", warnings: ["Acabamento ausente ou diferente do acabamento solicitado; exige validação técnica."] };
     }
 
     const validOffers = item.offers.filter((offer) => offerIsUsable(offer, input.quoteDate));
