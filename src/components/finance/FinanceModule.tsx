@@ -13,9 +13,10 @@ import InventoryModule from "../inventory/InventoryModule";
 import PayrollModule from "../hr/PayrollModule";
 import InvoicesModule from "../invoices/InvoicesModule";
 import DailyExpensesModule from "./DailyExpensesModule";
+import RegistryModule from "../registry/RegistryModule";
 
 type FinanceTab = "overview" | "client_advances" | "payroll" | "daily_expenses" | "payables" | "reports";
-type Subsection = "purchases" | "payables" | "suppliers" | "inventory" | "reports" | "fiscal" | "boletos" | "invoices";
+type Subsection = "purchases" | "payables" | "suppliers" | "inventory" | "payment_methods" | "reports" | "fiscal" | "boletos" | "invoices";
 
 const primaryTabs: Array<{ id: FinanceTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "overview", label: "Visão Geral & Gráficos", icon: BarChart3 },
@@ -23,7 +24,7 @@ const primaryTabs: Array<{ id: FinanceTab; label: string; icon: React.ComponentT
   { id: "payroll", label: "Folha de Pagamento", icon: FileText },
   { id: "daily_expenses", label: "Gastos Diários", icon: Receipt },
   { id: "payables", label: "Contas a Pagar & Fornecedores", icon: BriefcaseBusiness },
-  { id: "reports", label: "Relatórios & Notas Fiscais", icon: FileText },
+  { id: "reports", label: "Notas fiscais e relatórios", icon: FileText },
 ];
 
 export default function FinanceModule({ language = "pt", senderConfig, canManageFinance = false }: { language?: string; senderConfig: SenderConfig; canManageFinance?: boolean }) {
@@ -32,7 +33,7 @@ export default function FinanceModule({ language = "pt", senderConfig, canManage
   const subsections: Record<"payables" | "reports", Array<{ id: Subsection; label: string }>> = {
     payables: [
       { id: "purchases", label: "Compras de obra" }, { id: "payables", label: "Contas a pagar" },
-      { id: "suppliers", label: "Fornecedores" }, { id: "inventory", label: "Estoque" },
+      { id: "suppliers", label: "Fornecedores" }, { id: "inventory", label: "Estoque" }, { id: "payment_methods", label: "Meios de pagamento" },
     ],
     reports: [
       { id: "reports", label: "Relatórios" }, { id: "invoices", label: "Notas emitidas" },
@@ -57,6 +58,7 @@ export default function FinanceModule({ language = "pt", senderConfig, canManage
         {subsection === "payables" && tab === "payables" && <PayablesModule />}
         {subsection === "suppliers" && tab === "payables" && <SuppliersModule />}
         {subsection === "inventory" && tab === "payables" && <InventoryModule />}
+        {subsection === "payment_methods" && tab === "payables" && <RegistryModule kind="payment_methods" />}
         {subsection === "reports" && tab === "reports" && <FinancialReportsModule />}
         {subsection === "invoices" && tab === "reports" && <InvoicesModule language={language} senderConfig={senderConfig} canManageFinance={canManageFinance} />}
         {subsection === "fiscal" && tab === "reports" && <FiscalDocumentsModule />}
