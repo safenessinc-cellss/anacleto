@@ -27,7 +27,7 @@ import ProductionModule from "./production/ProductionModule";
 import InventoryModule from "./inventory/InventoryModule";
 import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "smart_quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -75,7 +75,7 @@ export default function AnacletoProApp({
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
   const isFullMenuRole = ["super_admin", "super_usuario", "ceo", "admin"].includes(effectiveRole);
-  const canSeeNavigation = (id: string) => isFullMenuRole || (userPermissions ? userPermissions.includes(id) : hasAccessToTab(effectiveRole, id as RoleNavTab));
+  const canSeeNavigation = (id: string) => isFullMenuRole || (userPermissions ? userPermissions.includes(id) || (id === "smart_quotes" && userPermissions.includes("quotes")) : hasAccessToTab(effectiveRole, (id === "smart_quotes" ? "quotes" : id) as RoleNavTab));
   // A autenticação precisa ser inicializada antes de qualquer efeito que a consulte.
   const [authReady, setAuthReady] = useState(false);
 
@@ -170,6 +170,7 @@ export default function AnacletoProApp({
     { id: "home", label: "Início", icon: LayoutDashboard, tabs: [{ id: "dashboard", label: "Painel" }] },
     { id: "commercial", label: "Comercial", icon: FileText, tabs: [
       { id: "quotes", label: "Orçamentos & Propostas" },
+      { id: "smart_quotes", label: "Orçamento Inteligente" },
       { id: "crm", label: "Clientes (CRM)" },
       { id: "contracts", label: "Contratos" },
     ] },
@@ -370,8 +371,8 @@ export default function AnacletoProApp({
             />
           )}
 
-          {activeTab === "quotes" && (
-            <QuotesModule language={language}
+          {(activeTab === "quotes" || activeTab === "smart_quotes") && (
+            <QuotesModule initialMode={activeTab === "smart_quotes" ? "smart" : "standard"} language={language}
               senderConfig={senderConfig}
               companies={companies}
               onConvertToInvoice={() => setActiveTab("invoices")}
