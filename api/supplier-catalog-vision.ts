@@ -28,18 +28,14 @@ export default async function handler(req: any,res: any){
   let result:any=null;let lastError:any=null;let usedModel=primaryModel;
   const readStatus=(error:any)=>Number(error?.status||error?.statusCode||error?.response?.status||error?.cause?.status||0);
   modelLoop: for(const candidate of models){
-   for(let attempt=0;attempt<2;attempt++){
-    try{
-     result=await client.models.generateContent({model:candidate,contents:[{role:"user",parts}],config:{responseMimeType:"application/json",responseSchema:schema,temperature:0.1,maxOutputTokens:8192}});
-     usedModel=candidate;lastError=null;break modelLoop;
-    }catch(error:any){
-     lastError=error;const status=readStatus(error);
-     console.error("Supplier catalog Gemini attempt failed",{model:candidate,attempt:attempt+1,status,message:String(error?.message||"")});
-     if(![429,500,503,504].includes(status))break;
-     // A 429 quota response is not fixed by retrying the same model; move to the next model immediately.
-     if(status===429)break;
-     if(attempt===0)await new Promise(resolve=>setTimeout(resolve,700));
-    }
+   try{
+    result=await client.models.generateContent({model:candidate,contents:[{role:"user",parts}],config:{responseMimeType:"application/json",responseSchema:schema,temperature:0.1,maxOutputTokens:8192}});
+    usedModel=candidate;lastError=null;break modelLoop;
+   }catch(error:any){
+    lastError=error;const status=readStatus(error);
+    console.error("Supplier catalog Gemini attempt failed",{model:candidate,status,message:String(error?.message||"")});
+    // Never retry the same model for quota exhaustion or temporary overload; advance immediately.
+    if(![429,500,503,504].includes(status))break;
    }
   }
   if(lastError)throw lastError;
