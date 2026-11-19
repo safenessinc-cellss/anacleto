@@ -4,7 +4,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
 const schema = { type: Type.OBJECT, properties: { products: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
  name:{type:Type.STRING}, supplier:{type:Type.STRING}, code:{type:Type.STRING}, category:{type:Type.STRING,enum:["Perfil de alumínio","Vidro","Ferragem","Acessório","Janela","Porta","Box de banheiro","Serviço","Outro"]}, material:{type:Type.STRING}, unit:{type:Type.STRING}, price:{type:Type.NUMBER,nullable:true}, lengthMm:{type:Type.NUMBER,nullable:true}, thicknessMm:{type:Type.NUMBER,nullable:true}, weightKg:{type:Type.NUMBER,nullable:true}, boundingBox:{type:Type.OBJECT,properties:{x:{type:Type.NUMBER},y:{type:Type.NUMBER},width:{type:Type.NUMBER},height:{type:Type.NUMBER}},required:["x","y","width","height"]}, side:{type:Type.STRING}, position:{type:Type.STRING}, page:{type:Type.NUMBER}, confidence:{type:Type.NUMBER}, notes:{type:Type.STRING}
- }, required:["name","supplier","code","category","material","unit","side","position","page","confidence","notes"] } } }, required:["products"] };
+ }, required:["name","supplier","code","category","material","unit","boundingBox","side","position","page","confidence","notes"] } } }, required:["products"] };
 export default async function handler(req: any,res: any){
  res.setHeader("Cache-Control","no-store");
  if(req.method!=="POST")return res.status(405).json({error:"Método não permitido."});
