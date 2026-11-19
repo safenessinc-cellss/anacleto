@@ -3,6 +3,14 @@ import { Calculator, Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 
 type CatalogProfile = { id: string; name?: string; description?: string; sku?: string; code?: string; source?: string };
 type CutRow = { id: string; profileId: string; lengthMm: number; quantity: number };
+const SQUADRIMAX_PRICES: Record<string, number> = {
+  "NATURAL": 37.16, "BRANCO": 42.82, "PRETO": 43.04,
+  "AMADEIRADO EZY COLOR": 74.35, "AMADEIRADO SUBLIMADO ESCURO": 60.88,
+  "AMADEIRADO SUBLIMADO CLARO": 62.52, "BRONZE CHAMPANHE (MOVEIS)": 47.78,
+  "JATEADO FOSCO (MOVEIS)": 47.86, "INOX POLIDO (MOVEIS)": 65.61,
+  "ANODIZADO BRONZE 1002": 47.87, "ANODIZADO FOSCO": 44.94,
+  "MARROM PINTADO": 48.19,
+};
 
 function weightPerMeter(profile: CatalogProfile): number | undefined {
   const text = `${profile.name || ""} ${profile.description || ""}`;
@@ -22,9 +30,9 @@ export default function OptionalAluminumCostCalculator({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [finish, setFinish] = useState("Natural / Bruto");
+  const [finish, setFinish] = useState("NATURAL");
   const [method, setMethod] = useState<"retalho" | "barra">("retalho");
-  const [priceKg, setPriceKg] = useState("");
+  const [priceKg, setPriceKg] = useState("37.16");
   const [actualScale, setActualScale] = useState(false);
   const [cuts, setCuts] = useState<CutRow[]>([]);
   const [glassWidth, setGlassWidth] = useState("");
@@ -34,7 +42,7 @@ export default function OptionalAluminumCostCalculator({
   const [components, setComponents] = useState("");
   const [hours, setHours] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
-  const [markup, setMarkup] = useState("2.10");
+  const [markup, setMarkup] = useState("1.00");
 
   const profiles = useMemo(() => catalogItems.map(profile => ({ ...profile, kgm: weightPerMeter(profile) })).filter(profile => profile.kgm), [catalogItems]);
   const calc = useMemo(() => {
@@ -63,7 +71,7 @@ export default function OptionalAluminumCostCalculator({
       }
       if (actualScale) aluminumKg *= 1.05;
     } else {
-      aluminumKg = expanded.reduce((sum, piece) => sum + piece.lengthMm / 1000 * piece.kgm, 0) * 1.12;
+      aluminumKg = expanded.reduce((sum, piece) => sum + piece.lengthMm / 1000 * piece.kgm, 0);
     }
     const aluminumCost = aluminumKg * pricePerKg;
     const width = round50(Number(glassWidth) || 0);
@@ -92,12 +100,12 @@ export default function OptionalAluminumCostCalculator({
         <span className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-indigo-200"><Calculator className="h-4 w-4"/> Cálculo técnico de custos (opcional)</span>
         {open ? <ChevronUp className="h-4 w-4"/> : <ChevronDown className="h-4 w-4"/>}
       </button>
-      {!open ? <p className="mt-2 text-[11px] text-slate-400">Ative somente quando quiser detalhar perfis, vidro, componentes, mão de obra e margem. O orçamento comum continua funcionando normalmente.</p> : (
+      {!open ? <p className="mt-2 text-[11px] text-slate-400">Ative para detalhar perfis, vidro, componentes, mão de obra e preço. Preços SquadriMax informados pelo responsável; confirme vigência antes de fechar a compra. O orçamento comum continua funcionando normalmente.</p> : (
         <div className="mt-4 space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="text-[11px] text-slate-300">Acabamento<select value={finish} onChange={e=>setFinish(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"><option>Natural / Bruto</option><option>Anodizado</option><option>Pintura eletrostática branca</option><option>Pintura eletrostática preta</option><option>Pintura eletrostática bronze</option></select></label>
-            <label className="text-[11px] text-slate-300">Preço do alumínio (R$/kg)<input type="number" min="0" step="0.01" value={priceKg} onChange={e=>setPriceKg(e.target.value)} placeholder="Informe o preço" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"/></label>
-            <label className="text-[11px] text-slate-300">Método de compra<select value={method} onChange={e=>setMethod(e.target.value as "retalho"|"barra")} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"><option value="retalho">Peso consumido + 12% retalho</option><option value="barra">Barras fechadas de 6.000 mm</option></select></label>
+            <label className="text-[11px] text-slate-300">Acabamento · SquadriMax<select value={finish} onChange={e=>{setFinish(e.target.value);setPriceKg(String(SQUADRIMAX_PRICES[e.target.value]));}} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"><option value="NATURAL">Natural</option><option value="BRANCO">Branco</option><option value="PRETO">Preto</option><option value="AMADEIRADO EZY COLOR">Amadeirado Ezy Color</option><option value="AMADEIRADO SUBLIMADO ESCURO">Amadeirado Sublimado Escuro</option><option value="AMADEIRADO SUBLIMADO CLARO">Amadeirado Sublimado Claro</option><option value="BRONZE CHAMPANHE (MOVEIS)">Bronze Champanhe (Móveis)</option><option value="JATEADO FOSCO (MOVEIS)">Jateado Fosco (Móveis)</option><option value="INOX POLIDO (MOVEIS)">Inox Polido (Móveis)</option><option value="ANODIZADO BRONZE 1002">Anodizado Bronze 1002</option><option value="ANODIZADO FOSCO">Anodizado Fosco</option><option value="MARROM PINTADO">Marrom Pintado</option></select></label>
+            <label className="text-[11px] text-slate-300">Preço SquadriMax (R$/kg) · editável<input type="number" min="0" step="0.01" value={priceKg} onChange={e=>setPriceKg(e.target.value)} placeholder="Preço por kg" className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"/></label>
+            <label className="text-[11px] text-slate-300">Método de compra<select value={method} onChange={e=>setMethod(e.target.value as "retalho"|"barra")} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"><option value="retalho">Peso consumido</option><option value="barra">Barras fechadas de 6.000 mm</option></select></label>
           </div>
           {method === "barra" && <label className="flex items-center gap-2 text-[11px] text-slate-300"><input type="checkbox" checked={actualScale} onChange={e=>setActualScale(e.target.checked)}/> Fornecedor cobra peso real na balança (+5% de tolerância)</label>}
           <div className="rounded-xl border border-slate-700 p-3">
@@ -109,7 +117,7 @@ export default function OptionalAluminumCostCalculator({
               <input aria-label="Quantidade de cortes" type="number" min="1" value={row.quantity} onChange={e=>updateCut(row.id,{quantity:Number(e.target.value)})} className="rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"/>
               <button type="button" aria-label="Remover corte" onClick={()=>setCuts(rows=>rows.filter(item=>item.id!==row.id))} className="text-rose-300"><Trash2 className="h-4 w-4"/></button>
             </div>)}
-            <p className="mt-2 text-[10px] text-slate-400">Plano de barras por algoritmo First-Fit Decreasing, agrupado por perfil, com 4 mm por corte. Resultado estimado; confirme o plano de fábrica antes da compra.</p>
+            <p className="mt-2 text-[10px] text-slate-400">Plano de barras estimado por First-Fit Decreasing, agrupado por perfil, com 4 mm por corte. Resultado estimado; confirme o plano de fábrica antes da compra.</p>
           </div>
           <div className="rounded-xl border border-slate-700 p-3">
             <strong className="text-xs">Vidro (cobrança comercial)</strong>
@@ -127,8 +135,8 @@ export default function OptionalAluminumCostCalculator({
             <label className="text-[10px] text-slate-300">Custo por hora (R$)<input type="number" min="0" step="0.01" value={hourlyRate} onChange={e=>setHourlyRate(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"/></label>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-[10px] text-slate-300">Fator de venda (markup)<input type="number" min="1" step="0.01" value={markup} onChange={e=>setMarkup(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"/></label>
-            <div className="text-[10px] text-slate-400">Acabamento selecionado: <strong>{finish}</strong>. Informe valores reais de fornecedores; campos vazios são considerados zero e não são inventados.</div>
+            <label className="text-[10px] text-slate-300">Multiplicador de venda (1,30 = acréscimo de 30%)<input type="number" min="1" step="0.01" value={markup} onChange={e=>setMarkup(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-xs text-white"/></label>
+            <div className="text-[10px] text-slate-400">Fornecedor: <strong>SquadriMax</strong>. Acabamento: <strong>{finish}</strong>. Preço-base informado: R$ {SQUADRIMAX_PRICES[finish]?.toFixed(2)}/kg. Pode ser editado para refletir cotação atual. Multiplicador 1,00 = sem acréscimo; margem percentual deve ser calculada separadamente.</div>
           </div>
           <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-950 p-3 text-[11px] sm:grid-cols-4">
             <div><span className="text-slate-500">Alumínio</span><strong className="block">{money(calc.aluminumCost)} · {calc.aluminumKg.toFixed(3)} kg</strong></div>
@@ -139,7 +147,7 @@ export default function OptionalAluminumCostCalculator({
           {!calc.ready && <p className="text-[11px] text-amber-300">{calc.invalidCutCount > 0 ? "Há cortes inválidos: cada peça deve ter entre 1 e 5.996 mm e perfil com peso cadastrado. " : ""}{calc.missingAluminumPrice ? "Informe o preço real do alumínio por kg. " : ""}{calc.missingGlassPrice ? "Informe o preço real do vidro por m². " : ""}{calc.missingLaborRate ? "Informe o custo por hora para as horas de mão de obra." : ""}</p>}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 pt-3">
             <div><p className="text-[10px] text-slate-400">Custo direto: {money(calc.direct)} · Margem bruta: {money(calc.margin)}</p><p className="text-lg font-black text-emerald-300">Preço de venda: {money(calc.sale)}</p></div>
-            <button type="button" disabled={disabled || !calc.ready || calc.direct <= 0 || !Number.isFinite(calc.sale)} onClick={()=>onApply(Number(calc.sale.toFixed(2)), `Cálculo técnico opcional · acabamento: ${finish}; método: ${method === "barra" ? "barras 6m" : "peso consumido +12%"}; alumínio: ${calc.aluminumKg.toFixed(3)} kg / ${money(calc.aluminumCost)}; vidro: ${calc.glassArea.toFixed(3)} m² / ${money(calc.glassCost)}; componentes: ${money(calc.componentCost)}; mão de obra: ${money(calc.laborCost)}; custo direto: ${money(calc.direct)}; markup: ${calc.factor.toFixed(2)}; margem bruta: ${money(calc.margin)}; barras: ${calc.bars}; lista de corte: ${calc.pieces} peças; plano estimado FFD com serra 4mm.`)} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 disabled:opacity-40">Adicionar ao orçamento</button>
+            <button type="button" disabled={disabled || !calc.ready || calc.direct <= 0 || !Number.isFinite(calc.sale)} onClick={()=>onApply(Number(calc.sale.toFixed(2)), `Cálculo técnico opcional · acabamento: ${finish}; método: ${method === "barra" ? "barras 6m" : "peso consumido sem merma automática"}; alumínio: ${calc.aluminumKg.toFixed(3)} kg / ${money(calc.aluminumCost)}; vidro: ${calc.glassArea.toFixed(3)} m² / ${money(calc.glassCost)}; componentes: ${money(calc.componentCost)}; mão de obra: ${money(calc.laborCost)}; custo direto: ${money(calc.direct)}; markup: ${calc.factor.toFixed(2)}; margem bruta: ${money(calc.margin)}; barras: ${calc.bars}; lista de corte: ${calc.pieces} peças; plano estimado FFD com serra 4mm.`)} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 disabled:opacity-40">Adicionar ao orçamento</button>
           </div>
         </div>
       )}
