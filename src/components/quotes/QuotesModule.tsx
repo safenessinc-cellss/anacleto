@@ -47,9 +47,10 @@ interface QuotesModuleProps {
   onConvertToInvoice?: (quote: Quote) => void;
   language?: string;
   initialMode?: "standard" | "smart";
+  onOpenSmartQuote?: () => void;
 }
 
-export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard"}: QuotesModuleProps) {
+export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote}: QuotesModuleProps) {
   const { showToast } = useToast();
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
@@ -1108,12 +1109,24 @@ const handleAddItem = () => {
           </div>
         </div>
 
-        <button
-          onClick={handleCreateNewQuote}
-          className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition"
-        >
-          <Plus className="w-4 h-4" /> Novo Orçamento
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {initialMode !== "smart" && onOpenSmartQuote && (
+            <button
+              type="button"
+              onClick={onOpenSmartQuote}
+              className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+            >
+              <Sparkles className="h-4 w-4" /> Orçamento Inteligente
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCreateNewQuote}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> Novo Orçamento
+          </button>
+        </div>
       </div>
 
       {/* Main Grid: Left = Quotes List (4 cols); Right = Active Quote Detail (8 cols) */}
