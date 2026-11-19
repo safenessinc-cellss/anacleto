@@ -28,7 +28,8 @@ export default function PublicShowroom3D({config,opened}:Props) {
  group.userData.leaves=leaves;group.userData.opened=opened;group.userData.framePart=frame;
  }
  const floorMat=new THREE.MeshStandardMaterial({color:"#d7dadd",roughness:.94});const floor=new THREE.Mesh(new THREE.CircleGeometry(4,64),floorMat);floor.rotation.x=-Math.PI/2;floor.position.y=-.11;group.add(floor);
- let dragging=false,lastX=0,lastY=0,rotY=-.18,rotX=0,velocity=0;let zoomLevel=zoom;const canvas=renderer.domElement;\n const wheel=(e:WheelEvent)=>{e.preventDefault();zoomLevel=Math.max(.68,Math.min(1.8,zoomLevel+(e.deltaY>0?-.07:.07)));camera.position.setLength(6.8/zoomLevel);};canvas.addEventListener("wheel",wheel,{passive:false});
+ let dragging=false,lastX=0,lastY=0,rotY=-.18,rotX=0,velocity=0;let zoomLevel=zoom;const canvas=renderer.domElement;
+ const wheel=(e:WheelEvent)=>{e.preventDefault();zoomLevel=Math.max(.68,Math.min(1.8,zoomLevel+(e.deltaY>0?-.07:.07)));camera.position.setLength(6.8/zoomLevel);};canvas.addEventListener("wheel",wheel,{passive:false});
  const down=(e:PointerEvent)=>{dragging=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId);};const move=(e:PointerEvent)=>{if(!dragging)return;const dx=e.clientX-lastX;rotY+=dx*.008;velocity=dx*.0008;rotX=Math.max(-.45,Math.min(.45,rotX+(e.clientY-lastY)*.004));lastX=e.clientX;lastY=e.clientY;};const up=()=>{dragging=false;};
  canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);
  const resize=()=>{if(!node||!renderer)return;camera.aspect=node.clientWidth/Math.max(node.clientHeight,1);camera.updateProjectionMatrix();renderer.setSize(node.clientWidth,node.clientHeight);};const ro=new ResizeObserver(resize);ro.observe(node);
