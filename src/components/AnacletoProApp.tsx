@@ -372,7 +372,7 @@ export default function AnacletoProApp({
           )}
 
           {(activeTab === "quotes" || activeTab === "smart_quotes") && (
-            <QuotesModule initialMode={activeTab === "smart_quotes" ? "smart" : "standard"} language={language}
+            <QuotesModule initialMode={activeTab === "smart_quotes" ? "smart" : "standard"} onOpenSmartQuote={() => setActiveTab("smart_quotes")} language={language}
               senderConfig={senderConfig}
               companies={companies}
               onConvertToInvoice={() => setActiveTab("invoices")}
