@@ -22,7 +22,7 @@ export default async function handler(req: any,res: any){
   const parts:any[]=[{text:"Você é um especialista técnico em catálogos de esquadrias de alumínio, vidro e ferragens. Analise visualmente cada página/foto. Extraia somente dados visíveis e legíveis. Identifique o nome do fornecedor impresso no logotipo, cabeçalho, rodapé ou identificação do catálogo; se não estiver visível, retorne string vazia, nunca invente. Para cada item retorne também o nome do fornecedor que o documento associa à peça. Uma peça esquerda e uma direita são produtos distintos; preserve códigos e sufixos exatamente. Identifique lado (esquerdo/direito/central/não identificado), posição/uso, espessura e comprimento em milímetros, peso e preço. Não confunda números de dimensão, quantidade, referência ou preço. Se houver várias peças na mesma página, gere um produto por peça. Categoria deve ser Perfil de alumínio, Vidro, Ferragem, Acessório, Janela, Porta, Box de banheiro, Serviço ou Outro. Preço ausente deve ser null, nunca zero. Dimensões/peso não legíveis devem ser omitidos. Não invente nem complete referências. confidence entre 0 e 1. notes descreve dúvidas e texto ilegível. page é o número da página fornecido."}];
   for(const image of images){if(typeof image.data!=="string"||image.data.length>9_000_000||!/^image\/(jpeg|png|webp)$/i.test(String(image.mimeType)))return res.status(400).json({error:"Imagem inválida ou demasiado grande."});parts.push({text:"Página "+Number(image.page||1)+":"},{inlineData:{mimeType:image.mimeType,data:image.data}});}
   const primaryModel=process.env.ANACLETO_CATALOG_VISION_MODEL||"gemini-3.8-flash";
-  const fallbackModels=(process.env.ANACLETO_CATALOG_VISION_FALLBACK_MODELS||"gemini-3.5-flash-lite").split(",").map((m:string)=>m.trim()).filter(Boolean);
+  const fallbackModels=(process.env.ANACLETO_CATALOG_VISION_FALLBACK_MODELS||"gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash").split(",").map((m:string)=>m.trim()).filter(Boolean);
   const models=[...new Set([primaryModel,...fallbackModels])];
   const client=new GoogleGenAI({apiKey:key});
   let result:any=null;let lastError:any=null;let usedModel=primaryModel;
@@ -36,6 +36,8 @@ export default async function handler(req: any,res: any){
      lastError=error;const status=readStatus(error);
      console.error("Supplier catalog Gemini attempt failed",{model:candidate,attempt:attempt+1,status,message:String(error?.message||"")});
      if(![429,500,503,504].includes(status))break;
+     // A 429 quota response is not fixed by retrying the same model; move to the next model immediately.
+     if(status===429)break;
      if(attempt===0)await new Promise(resolve=>setTimeout(resolve,700));
     }
    }
