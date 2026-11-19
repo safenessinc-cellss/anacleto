@@ -387,7 +387,7 @@ export default function AnacletoProApp({
           {activeTab === "agenda" && (<AgendaModule language={language} />)}
 
           {activeTab === "catalog" && <CatalogModule />}
-          {activeTab === "cadastro_items" && <div className="space-y-8"><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}
+          {activeTab === "cadastro_items" && <SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} />}
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
           {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
