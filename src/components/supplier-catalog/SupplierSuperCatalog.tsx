@@ -36,10 +36,7 @@ export default function SupplierSuperCatalog({ onNavigateQuotes }: { onNavigateQ
    const batch=writeBatch(db);let created=0,updated=0;
    for(const product of products){
     const normalize=(value:string)=>norm(String(value||"").trim()).replace(/[^a-z0-9]+/g," ").trim();
-    const match=existing.find(row=>normalize(row.supplier)===normalize(supplier)&&(
-      (row.code&&product.code&&normalize(row.code)===normalize(product.code))||
-      (!row.code&&normalize(row.name)===normalize(product.name))
-    ));
+    const match=existing.find(row=>normalize(row.supplier)===normalize(supplier)&&normalize(row.name)===normalize(product.name));
     if(match){batch.set(doc(db,"supplier_catalog",match.id),{...product,code:match.code||"",createdAt:(match as any).createdAt||new Date().toISOString()},{merge:true});updated++;}
     else{const ref=doc(collection(db,"supplier_catalog"));batch.set(ref,{...product,createdAt:new Date().toISOString()});created++;}
    }
