@@ -387,7 +387,9 @@ export default function PurchasesModule() {
 
   const markReceived = async (purchase: Purchase) => {
     if (purchase.status !== "approved") return;
-    if (purchase.expenseCategory !== "materiais") { setError("Somente compras classificadas como materiais podem ser incluídas no estoque. Altere a categoria ou registre como compra de materiais."); return; }
+    if (purchase.expenseCategory !== "materiais") { setError("Somente compras classificadas como materiais podem ser incluídas no estoque."); return; }
+    const fiscalType = String(purchase.documentType || "").toLowerCase();
+    if (!["nfe", "danfe"].includes(fiscalType) || !purchase.documentUrl || !purchase.documentPath) { setError("Entrada bloqueada: para incluir materiais no estoque, anexe uma Nota Fiscal Eletrônica (NF-e/DANFE) válida à compra. Se for uma exceção, use o lançamento manual em Estoque."); return; }
     try {
       const purchaseRef = doc(db, "purchase_orders", purchase.id);
       const aggregates = new Map<string, PurchaseItem>();

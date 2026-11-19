@@ -24,6 +24,7 @@ export default function InventoryModule() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [cleaning, setCleaning] = useState(false);
+  const [manualEntryConfirmed, setManualEntryConfirmed] = useState(false);
 
   useEffect(() => {
     const a = onSnapshot(collection(db, "inventory_items"), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem))), e => console.error("Inventory items:", e));
@@ -43,7 +44,9 @@ export default function InventoryModule() {
     e.preventDefault();
     const itemName = name.trim(); const qty = amount(quantity);
     if (!itemName || qty <= 0) { setMessage("Informe o material e uma quantidade maior que zero."); return; }
-    if (isNonStock(itemName)) { setMessage("Este item é um consumível e não deve ser controlado no estoque de produção."); return; }
+    if (isNonStock(itemName)) { setMessage("Este item não pertence ao estoque de produção."); return; }
+    if (type === "in" && !manualEntryConfirmed) { setMessage("Entrada permitida somente por recebimento de nota fiscal ou mediante confirmação de lançamento manual."); return; }
+    if (type === "in" && !reason.trim()) { setMessage("Informe o motivo do lançamento manual."); return; }
     setSaving(true); setMessage("");
     try {
       const key = slug(sku.trim() || itemName) || `item-${Date.now()}`;
@@ -57,7 +60,7 @@ export default function InventoryModule() {
         tx.set(itemRef, { name: itemName, sku: sku.trim(), unit, quantity: type === "in" ? current + qty : current - qty, reservedQuantity: reserved, minimumStock: amount(minimumStock), updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.uid || "" }, { merge: true });
         tx.set(movementRef, { itemId: itemRef.id, itemName, type, quantity: qty, reason: reason.trim() || "Movimentação manual", createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
       });
-      setName(""); setSku(""); setQuantity("1"); setMessage("Movimentação registrada e saldo atualizado.");
+      setName(""); setSku(""); setQuantity("1"); setManualEntryConfirmed(false); setMessage("Movimentação manual registrada e saldo atualizado.");
     } catch (err) { setMessage((err as Error).message || "Não foi possível registrar a movimentação."); }
     finally { setSaving(false); }
   };
@@ -95,6 +98,7 @@ export default function InventoryModule() {
         <select className="rounded-lg border px-3 py-2" value={type} onChange={e=>setType(e.target.value as "in"|"out")}><option value="in">Entrada</option><option value="out">Saída</option></select>
         <input className="rounded-lg border px-3 py-2" placeholder="Estoque mínimo" type="number" min="0" step="0.001" value={minimumStock} onChange={e=>setMinimumStock(e.target.value)}/>
         <input className="rounded-lg border px-3 py-2 md:col-span-2" placeholder="Motivo / referência" value={reason} onChange={e=>setReason(e.target.value)}/>
+        {type === "in" && <label className="md:col-span-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><input type="checkbox" checked={manualEntryConfirmed} onChange={e=>setManualEntryConfirmed(e.target.checked)} className="mt-1"/><span><strong>Entrada manual excepcional.</strong> Confirmo que este lançamento está sendo feito manualmente, sem nota fiscal. Entradas normais devem ser feitas em Financeiro → Compras, anexando a NF-e/DANFE e registrando o recebimento.</span></label>}
       </div>
       <div className="flex items-center justify-between gap-3"><p className="text-sm text-slate-500" role="status">{message}</p><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin"/> : "Registrar"}</button></div>
     </form>

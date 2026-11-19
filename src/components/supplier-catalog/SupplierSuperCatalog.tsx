@@ -44,29 +44,19 @@ export default function SupplierSuperCatalog({ onNavigateQuotes }: { onNavigateQ
   }catch(e){setError(e instanceof Error?e.message:"Falha ao reconciliar itens do PDF.");}finally{setSaving(false);}
  };
  const cleanupSupplierCatalog=async()=>{
-  if(!window.confirm("A limpeza analisará apenas Catálogo de Fornecedores. Serão removidos registros sem nome, sem preço válido e duplicados exatos por fornecedor + código (ou nome quando não houver código). As outras coleções e históricos não serão alterados. Continuar?"))return;
+  if(!window.confirm("Serão excluídos somente os registros do Catálogo de Fornecedores que NÃO tenham foto/imagem E também NÃO tenham preço válido. Produtos que tenham foto ou preço serão preservados. Outras coleções e históricos não serão alterados. Continuar?"))return;
   setSaving(true);setError("");
   try{
    const snapshot=await getDocs(collection(db,"supplier_catalog"));
-   const groups=new Map<string,typeof snapshot.docs>();
-   const invalid:string[]=[];
-   for(const item of snapshot.docs){
-    const data=item.data();const name=String(data.name||"").trim();const supplier=String(data.supplier||"").trim();const price=Number(data.price);
-    if(!name||!supplier||!Number.isFinite(price)||price<=0){invalid.push(item.id);continue;}
-    const normalize=(value:string)=>norm(value).replace(/[^a-z0-9]+/g," ").trim();
-    const identity=normalize(supplier)+"|"+(String(data.code||"").trim()?normalize(String(data.code)):"name:"+normalize(name));
-    groups.set(identity,[...(groups.get(identity)||[]),item]);
-   }
-   const duplicates=[...groups.values()].filter(group=>group.length>1).flatMap(group=>{
-    const ranked=[...group].sort((a,b)=>{
-     const score=(d:any)=>Number(!!d.get("thumbnailDataUrl"))+Number(!!d.get("code"))+Number(!!d.get("material"))+Number(!!d.get("category"))+Number(!!d.get("unit"));
-     return score(b)-score(a);
-    });
-    return ranked.slice(1).map(item=>item.id);
-   });
-   const removeIds=[...new Set([...invalid,...duplicates])];
+   const removeIds=snapshot.docs.filter(item=>{
+    const data=item.data();
+    const hasPhoto=Boolean(data.thumbnailDataUrl||data.photoUrl||data.imageUrl||data.image||data.photo||(Array.isArray(data.images)&&data.images.some(Boolean))||(Array.isArray(data.photos)&&data.photos.some(Boolean)));
+    const price=Number(data.price);
+    const hasPrice=Number.isFinite(price)&&price>0;
+    return !hasPhoto&&!hasPrice;
+   }).map(item=>item.id);
    for(let i=0;i<removeIds.length;i+=400){const batch=writeBatch(db);removeIds.slice(i,i+400).forEach(id=>batch.delete(doc(db,"supplier_catalog",id)));await batch.commit();}
-   setNotice(`Limpeza concluída no Catálogo de Fornecedores: ${invalid.length} registro(s) sem dados/preço válido e ${duplicates.length} duplicado(s) removido(s). Outras coleções preservadas.`);
+   setNotice(`Limpeza concluída: ${removeIds.length} registro(s) sem foto e sem preço removido(s). Todos os itens com foto OU preço foram preservados. Outras coleções e históricos não foram alterados.`);
   }catch(e){setError(e instanceof Error?e.message:"Não foi possível concluir a limpeza.");}finally{setSaving(false);}
  };
  const remove=async(id:string)=>{if(!window.confirm("Eliminar produto do catálogo?"))return;try{await deleteDoc(doc(db,"supplier_catalog",id));}catch(e){setError(e instanceof Error?e.message:"Erro ao eliminar.");}};
@@ -79,7 +69,7 @@ export default function SupplierSuperCatalog({ onNavigateQuotes }: { onNavigateQ
  {formOpen&&<div className="rounded-2xl border border-blue-200 bg-white p-4 dark:bg-slate-900"><h2 className="mb-3 font-bold">Adicionar item do fornecedor</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[{key:"supplier",label:"Fornecedor *"},{key:"name",label:"Nome do produto *"},{key:"code",label:"Código / SKU"},{key:"material",label:"Material / sistema"},{key:"price",label:"Preço unitário (R$)"},{key:"lengthMm",label:"Comprimento da barra (mm)"},{key:"unit",label:"Unidade"},{key:"color",label:"Cor / acabamento"}].map(f=><label key={f.key} className="text-xs font-semibold text-slate-500">{f.label}<input type={["price","lengthMm"].includes(f.key)?"number":"text"} value={(form as Record<string,string>)[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5 text-sm text-slate-900"/></label>)}<label className="text-xs font-semibold text-slate-500">Categoria<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5 text-sm text-slate-900">{categories.map(c=><option key={c}>{c}</option>)}</select></label></div><div className="mt-4 flex gap-2"><button disabled={saving} onClick={()=>void save()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">{saving?"Salvando...":"Salvar item"}</button><button onClick={()=>setFormOpen(false)} className="rounded-lg border px-4 py-2 text-sm font-bold">Cancelar</button></div></div>}
  <div className="flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar produto, código, fornecedor..." className="w-full rounded-xl border bg-white py-3 pl-10 pr-3 text-sm dark:border-slate-800 dark:bg-slate-900"/></div><select value={category} onChange={e=>setCategory(e.target.value)} className="rounded-xl border bg-white px-3 py-3 text-sm dark:border-slate-800 dark:bg-slate-900"><option>Todas</option>{categories.map(c=><option key={c}>{c}</option>)}</select></div>
  <div className="overflow-hidden rounded-2xl border bg-white dark:border-slate-800 dark:bg-slate-900"><div className="border-b p-4 dark:border-slate-800"><h2 className="font-bold">Itens dos fornecedores ({filtered.length})</h2></div>{filtered.length===0?<div className="p-10 text-center"><PackageSearch className="mx-auto h-10 w-10 text-slate-400"/><p className="mt-3 font-bold">Nenhum item encontrado</p><p className="mt-1 text-sm text-slate-500">Use “Importar catálogo (CSV/PDF)” ou adicione um produto.</p></div>:<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th className="p-3">Produto</th><th className="p-3">Fornecedor</th><th className="p-3">Categoria</th><th className="p-3">Material</th><th className="p-3">Unidade</th><th className="p-3">Preço</th><th className="p-3">Ações</th></tr></thead><tbody>{filtered.map(p=><tr key={p.id} className="border-t dark:border-slate-800"><td className="p-3 font-bold"><div className="flex items-center gap-2">{p.thumbnailDataUrl&&<img src={p.thumbnailDataUrl} alt="" className="h-12 w-10 rounded border bg-white object-contain"/>}<span>{p.name}<p className="text-xs font-normal text-slate-500">{p.code||"Sem código"}{p.lengthMm?" · "+p.lengthMm+" mm":""}</p></span></div></td><td className="p-3">{p.supplier}</td><td className="p-3">{p.category}</td><td className="p-3">{[p.material,p.color].filter(Boolean).join(" · ")||"—"}</td><td className="p-3">{p.unit||"un"}</td><td className="p-3">{Number(p.price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</td><td className="p-3"><button onClick={()=>void remove(p.id)} aria-label="Eliminar" className="text-rose-600"><Trash2 className="h-4 w-4"/></button></td></tr>)}</tbody></table></div>}</div>
- <button disabled={saving} onClick={()=>void cleanupSupplierCatalog()} className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-bold text-rose-700 disabled:opacity-50">Limpar duplicados e sem preço</button>
+ <button disabled={saving} onClick={()=>void cleanupSupplierCatalog()} className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-bold text-rose-700 disabled:opacity-50">Excluir itens sem foto e sem preço</button>
  <button onClick={onNavigateQuotes} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">Ir para Orçamentos →</button>
  </section>;
 }
