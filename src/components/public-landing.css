@@ -13,7 +13,7 @@ body{margin:0}.public-site{--ink:#111;--muted:#6c7075;--paper:#f5f5f7;--line:#de
 
 /* ANACLETO · HERO EXPLODIDO / REDESIGN PÚBLICO */
 .public-site.nike-site{--an-blue:#3d9cff;--an-blue-bright:#65bdff;--an-gold:#c5a36a;background:#f4f7fb;color:#142235;overflow:hidden}
-.public-site .site-header-glass{position:absolute;top:20px;left:50%;transform:translateX(-50%);width:min(1480px,calc(100% - 72px));height:76px;padding:0 24px;border:1px solid #ffffff30;border-radius:22px;background:rgba(12,24,39,.72);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 18px 55px #06111f35;z-index:30}
+.public-site .site-header-glass{position:fixed;top:20px;left:50%;transform:translateX(-50%);width:min(1480px,calc(100% - 72px));height:76px;padding:0 24px;border:1px solid #ffffff30;border-radius:22px;background:rgba(12,24,39,.72);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 18px 55px #06111f35;z-index:30}
 .public-site .site-header-glass .brand img{width:145px;height:64px;filter:drop-shadow(0 3px 8px #0005)}
 .public-site .site-header-glass .site-nav{gap:clamp(15px,2.2vw,34px)}
 .public-site .site-header-glass .site-nav a{color:#e4edf7;font-size:10px;letter-spacing:.04em;font-weight:750}
