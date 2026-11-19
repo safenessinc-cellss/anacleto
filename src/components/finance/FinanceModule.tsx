@@ -9,14 +9,13 @@ import PendingBoletosModule from "./PendingBoletosModule";
 import PayablesModule from "./PayablesModule";
 import PurchasesModule from "./PurchasesModule";
 import SuppliersModule from "./SuppliersModule";
-import InventoryModule from "../inventory/InventoryModule";
 import PayrollModule from "../hr/PayrollModule";
 import InvoicesModule from "../invoices/InvoicesModule";
 import DailyExpensesModule from "./DailyExpensesModule";
 import RegistryModule from "../registry/RegistryModule";
 
 type FinanceTab = "overview" | "client_advances" | "payroll" | "daily_expenses" | "payables" | "reports";
-type Subsection = "purchases" | "payables" | "suppliers" | "inventory" | "payment_methods" | "reports" | "fiscal" | "boletos" | "invoices";
+type Subsection = "purchases" | "payables" | "suppliers" | "payment_methods" | "reports" | "fiscal" | "boletos" | "invoices";
 
 const primaryTabs: Array<{ id: FinanceTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "overview", label: "Visão Geral & Gráficos", icon: BarChart3 },
@@ -33,7 +32,7 @@ export default function FinanceModule({ language = "pt", senderConfig, canManage
   const subsections: Record<"payables" | "reports", Array<{ id: Subsection; label: string }>> = {
     payables: [
       { id: "purchases", label: "Compras de obra" }, { id: "payables", label: "Contas a pagar" },
-      { id: "suppliers", label: "Fornecedores" }, { id: "inventory", label: "Estoque" }, { id: "payment_methods", label: "Meios de pagamento" },
+      { id: "suppliers", label: "Fornecedores" }, { id: "payment_methods", label: "Meios de pagamento" },
     ],
     reports: [
       { id: "reports", label: "Relatórios" }, { id: "invoices", label: "Notas emitidas" },
@@ -57,7 +56,6 @@ export default function FinanceModule({ language = "pt", senderConfig, canManage
         {subsection === "purchases" && tab === "payables" && <PurchasesModule />}
         {subsection === "payables" && tab === "payables" && <PayablesModule />}
         {subsection === "suppliers" && tab === "payables" && <SuppliersModule />}
-        {subsection === "inventory" && tab === "payables" && <InventoryModule />}
         {subsection === "payment_methods" && tab === "payables" && <RegistryModule kind="payment_methods" />}
         {subsection === "reports" && tab === "reports" && <FinancialReportsModule />}
         {subsection === "invoices" && tab === "reports" && <InvoicesModule language={language} senderConfig={senderConfig} canManageFinance={canManageFinance} />}
