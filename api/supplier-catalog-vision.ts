@@ -1,3 +1,4 @@
+import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 import { GoogleGenAI, Type } from "@google/genai";
 
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
@@ -9,8 +10,9 @@ export default async function handler(req: any,res: any){
  if(req.method!=="POST")return res.status(405).json({error:"Método não permitido."});
  try{
   const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
-  const apiKey=process.env.FIREBASE_API_KEY||process.env.VITE_FIREBASE_API_KEY;
-  if(!token||!apiKey)return res.status(401).json({error:"Sessão não autenticada."});
+  const apiKey=process.env.FIREBASE_API_KEY||process.env.VITE_FIREBASE_API_KEY||firebaseConfig.apiKey;
+  if(!token)return res.status(401).json({error:"Token de sessão ausente. Entre novamente na aplicação."});
+  if(!apiKey)return res.status(503).json({error:"Configuração de autenticação Firebase ausente no servidor."});
   const auth=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:token}),signal:AbortSignal.timeout(10000)});
   if(!auth.ok)return res.status(401).json({error:"Sessão inválida ou expirada."});
   const authData:any=await auth.json();const user=authData.users?.[0];if(!user?.localId)return res.status(401).json({error:"Usuário não autenticado."});
