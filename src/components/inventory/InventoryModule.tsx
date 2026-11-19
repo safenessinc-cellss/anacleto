@@ -7,7 +7,7 @@ type StockItem = { id: string; name: string; sku?: string; unit?: string; quanti
 type Movement = { id: string; itemId: string; itemName: string; type: "in" | "out"; quantity: number; reason: string; createdAt?: any };
 const slug = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 90);
 const amount = (v: string) => Math.max(0, Number(v) || 0);
-const nonStockTerms = ["gasolina", "cola", "lubrificante", "lubrificante"]; 
+const nonStockTerms = ["gasolina", "cola", "lubrificante"]; 
 const isNonStock = (name: string) => nonStockTerms.some(term => slug(name).includes(slug(term)));
 
 export default function InventoryModule() {
@@ -81,7 +81,7 @@ export default function InventoryModule() {
   return <div className="space-y-5">
     <div className="flex justify-end"><button type="button" onClick={() => void removeNonStockItems()} disabled={cleaning} className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50">{cleaning ? "Limpando..." : "Remover consumíveis do estoque"}</button></div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Materiais cadastrados</p><p className="text-2xl font-bold">{items.length}</p></div>
+      <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Materiais cadastrados</p><p className="text-2xl font-bold">{productionItems.length}</p></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Itens abaixo do mínimo</p><p className="text-2xl font-bold text-amber-600">{lowStock.length}</p></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Movimentações recentes</p><p className="text-2xl font-bold">{movements.length}</p></div>
     </div>
