@@ -5,6 +5,22 @@ import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 
+function sameOriginMutation(req: any): boolean {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  const fetchSite = String(req.headers?.["sec-fetch-site"] || "").toLowerCase();
+  if (fetchSite === "cross-site") return false;
+  const origin = req.headers?.origin;
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(String(origin));
+    const host = String(req.headers?.host || req.headers?.["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase();
+    return !!host && originUrl.host.toLowerCase() === host && ["https:", "http:"].includes(originUrl.protocol);
+  } catch {
+    return false;
+  }
+}
+
 type AuthUser = { uid: string; email: string; role: string };
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
 const requestWindows = new Map<string, { startedAt: number; count: number }>();
@@ -40,9 +56,9 @@ async function authenticate(req: any): Promise<AuthUser | null> {
     signal: AbortSignal.timeout(10000),
   });
   if (!identity.ok) return null;
-  const data = await identity.json() as { users?: Array<{ localId?: string; email?: string }> };
+  const data = await identity.json() as { users?: Array<{ localId?: string; email?: string; emailVerified?: boolean; disabled?: boolean }> };
   const account = data.users?.[0];
-  if (!account?.localId || !account.email) return null;
+  if (!account?.localId || !account.email || account.disabled || account.emailVerified !== true) return null;
   const email = account.email.toLowerCase();
   if (email === OWNER_EMAIL) return { uid: account.localId, email, role: "owner" };
   const roleResponse = await fetch(base() + "/admins/" + encodeURIComponent(email), {
@@ -51,7 +67,8 @@ async function authenticate(req: any): Promise<AuthUser | null> {
   if (!roleResponse.ok) return null;
   const roleDoc = await roleResponse.json() as any;
   const role = roleDoc.fields?.role?.stringValue;
-  return role ? { uid: account.localId, email, role } : null;
+  const allowedRoles = new Set(["super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro", "rh", "qualidade", "estoque", "producao", "usuario"]);
+  return role && allowedRoles.has(role) ? { uid: account.localId, email, role } : null;
 }
 function decodeValue(value: any): any {
   if (!value || typeof value !== "object") return value;
@@ -205,6 +222,8 @@ async function commitSnapshot(req: any, collection: string, documentId: string, 
 }
 
 export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store");
+  if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   try {
     const user = await authenticate(req);
     if (!user) return send(res, 401, { error: "Autenticação obrigatória ou sessão expirada." });

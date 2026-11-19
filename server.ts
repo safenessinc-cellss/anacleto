@@ -24,7 +24,40 @@ dotenv.config();
 // Create Express app and HTTP server
 const app = express();
 const httpServer = http.createServer(app);
-app.use(express.json({ limit: "16mb" }));
+// Security baseline: JSON only, no cookie-based authentication, and no cross-site
+// browser mutations. Bearer-token APIs remain usable by trusted native clients.
+app.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  const unsafe = !["GET", "HEAD", "OPTIONS"].includes(req.method.toUpperCase());
+  const origin = req.get("origin");
+  const fetchSite = req.get("sec-fetch-site");
+  if (unsafe && fetchSite === "cross-site") return res.status(403).json({ error: "Solicitação de origem cruzada bloqueada." });
+  if (unsafe && origin) {
+    try {
+      const parsedOrigin = new URL(origin);
+      const requestHost = String(req.get("host") || "").toLowerCase();
+      if (parsedOrigin.host.toLowerCase() !== requestHost || !["https:", "http:"].includes(parsedOrigin.protocol)) {
+        return res.status(403).json({ error: "Origem não autorizada." });
+      }
+    } catch {
+      return res.status(403).json({ error: "Origem inválida." });
+    }
+  }
+  next();
+});
+app.use(express.json({ limit: "16mb", strict: true, type: "application/json" }));
+app.use("/api", (req, res, next) => {
+  const body = req.body;
+  if (body === undefined) return next();
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return res.status(400).json({ error: "O corpo da solicitação deve ser um objeto JSON válido." });
+  }
+  const keys = Object.keys(body);
+  if (keys.length > 200 || keys.some((key) => key.length > 120)) {
+    return res.status(413).json({ error: "A solicitação excede os limites de campos permitidos." });
+  }
+  next();
+});
 app.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
 app.post("/api/generate-3d-render", generate3DRenderHandler);
 
@@ -48,9 +81,11 @@ const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
       body: JSON.stringify({ idToken: token }),
     });
     if (!identityResponse.ok) return res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
-    const identity = await identityResponse.json() as { users?: Array<{ localId?: string; email?: string }> };
+    const identity = await identityResponse.json() as { users?: Array<{ localId?: string; email?: string; emailVerified?: boolean; disabled?: boolean }> };
     const user = identity.users?.[0];
-    if (!user?.localId || !user.email) return res.status(401).json({ error: "Conta autenticada inválida." });
+    if (!user?.localId || !user.email || user.disabled || user.emailVerified !== true) {
+      return res.status(403).json({ error: "Verifique seu endereço de e-mail antes de acessar o sistema." });
+    }
 
     const email = user.email.toLowerCase();
     if (email === ownerEmail) {
@@ -65,7 +100,11 @@ const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
     if (!roleResponse.ok) return res.status(403).json({ error: "Acesso pendente de aprovação ou perfil não autorizado." });
     const roleDocument = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
     const role = roleDocument.fields?.role?.stringValue;
-    if (!role) return res.status(403).json({ error: "Perfil de acesso não encontrado." });
+    const allowedRoles = new Set(["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro", "rh", "qualidade", "estoque", "producao", "usuario"]);
+    if (!role || !allowedRoles.has(role)) return res.status(403).json({ error: "Perfil de acesso não autorizado." });
+    // A conta do proprietário é resolvida exclusivamente pelo e-mail verificado;
+    // nenhum documento admins pode conceder ou substituir esse privilégio.
+    if (role === "super_admin") return res.status(403).json({ error: "O privilégio exclusivo de proprietário não pode ser delegado." });
     res.locals.firebaseUser = { uid: user.localId, email, role };
     return next();
   } catch (error) {
@@ -682,9 +721,23 @@ if (!process.env.VERCEL) {
 // ============ Google Calendar Endpoint ============
 app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => {
   try {
-    const { name, email, phone, service, address, preferDate, preferTime, notes } = req.body;
-    if (!name || !preferDate || !preferTime) {
-      return res.status(400).json({ success: false, error: "Faltan datos obligatorios" });
+    const { name, email, phone, service, address, preferDate, preferTime, notes } = req.body || {};
+    const cleanText = (value: unknown, max: number) => typeof value === "string" ? value.trim().slice(0, max) : "";
+    const safeName = cleanText(name, 120);
+    const safeEmail = cleanText(email, 254);
+    const safePhone = cleanText(phone, 32);
+    const safeService = cleanText(service, 160);
+    const safeAddress = cleanText(address, 300);
+    const safeNotes = cleanText(notes, 1000);
+    const dateValue = cleanText(preferDate, 10);
+    const timeValue = cleanText(preferTime, 5);
+    const parsedDate = /^\\d{4}-\\d{2}-\\d{2}$/.test(dateValue) ? new Date(dateValue + "T12:00:00Z") : null;
+    const validDate = !!parsedDate && !Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === dateValue;
+    if (!safeName || !validDate || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(timeValue)) {
+      return res.status(400).json({ success: false, error: "Informe nome, data e horário válidos para o agendamento." });
+    }
+    if (safeEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(safeEmail)) {
+      return res.status(400).json({ success: false, error: "Informe um e-mail válido." });
     }
 
     // Autenticación con cuenta de servicio (JSON en variable de entorno)
@@ -700,21 +753,25 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
     });
     const calendar = google.calendar({ version: "v3", auth });
 
-    const startDateTime = `${preferDate}T${preferTime}:00`;
-    const endHour = String(parseInt(preferTime.split(":")[0], 10) + 1).padStart(2, "0");
-    const endDateTime = `${preferDate}T${endHour}:${preferTime.split(":")[1]}:00`;
+    const startDateTime = `${dateValue}T${timeValue}:00`;
+    const startHour = Number(timeValue.split(":")[0]);
+    const endDate = new Date(dateValue + "T12:00:00Z");
+    if (startHour === 23) endDate.setUTCDate(endDate.getUTCDate() + 1);
+    const endDateValue = endDate.toISOString().slice(0, 10);
+    const endHour = String((startHour + 1) % 24).padStart(2, "0");
+    const endDateTime = `${endDateValue}T${endHour}:${timeValue.split(":")[1]}:00`;
 
     const event = {
-      summary: `Visita Técnica — ${name}`,
+      summary: `Visita Técnica — ${safeName}`,
       description: [
-        `Cliente: ${name}`,
-        `Telefone: ${phone || "-"}`,
-        email ? `Email: ${email}` : null,
-        `Serviço: ${service || "-"}`,
-        `Endereço: ${address || "-"}`,
-        notes ? `Notas: ${notes}` : null,
+        `Cliente: ${safeName}`,
+        `Telefone: ${safePhone || "-"}`,
+        safeEmail ? `Email: ${safeEmail}` : null,
+        `Serviço: ${safeService || "-"}`,
+        `Endereço: ${safeAddress || "-"}`,
+        safeNotes ? `Notas: ${safeNotes}` : null,
       ].filter(Boolean).join("\n"),
-      location: address || "",
+      location: safeAddress,
       start: { dateTime: startDateTime, timeZone: "America/Sao_Paulo" },
       end: { dateTime: endDateTime, timeZone: "America/Sao_Paulo" },
     };

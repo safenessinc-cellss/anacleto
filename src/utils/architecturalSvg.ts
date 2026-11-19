@@ -260,10 +260,75 @@ export function buildArchitecturalDrawingSheetSvg(drawing: DrawingInput): string
   </svg>`;
 }
 
-/** Retorna o conteúdo interno de um SVG gerado localmente para renderização vetorial inline. */
+/**
+ * Sanitiza SVG antes de inseri-lo no DOM. Apenas elementos e atributos vetoriais
+ * necessários aos desenhos técnicos são aceitos; scripts, eventos, estilos,
+ * links externos, foreignObject e referências externas são descartados.
+ */
 export function svgInnerMarkup(svg: string): string {
-  const match = svg.match(/^\s*<svg\b[^>]*>([\s\S]*)<\/svg>\s*$/i);
-  return match?.[1] ?? svg;
+  if (typeof DOMParser === "undefined" || typeof XMLSerializer === "undefined") return "";
+  const match = String(svg || "").match(/^\s*<svg\b[^>]*>([\s\S]*)<\/svg>\s*$/i);
+  const source = match ? match[1] : String(svg || "");
+  const document = new DOMParser().parseFromString(
+    `<svg xmlns="http://www.w3.org/2000/svg">${source}</svg>`,
+    "image/svg+xml",
+  );
+  if (document.querySelector("parsererror")) return "";
+
+  const allowedElements = new Set([
+    "svg", "g", "rect", "path", "line", "circle", "ellipse", "text", "defs",
+    "lineargradient", "radialgradient", "stop", "pattern", "marker", "filter",
+    "fegaussianblur", "polygon", "polyline",
+  ]);
+  const allowedAttributes = new Set([
+    "xmlns", "id", "width", "height", "viewbox", "preserveaspectratio", "role",
+    "aria-label", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r",
+    "rx", "ry", "d", "points", "fill", "fill-opacity", "fill-rule",
+    "stroke", "stroke-width", "stroke-opacity", "stroke-linecap",
+    "stroke-linejoin", "stroke-dasharray", "opacity", "transform",
+    "font-family", "font-size", "font-weight", "text-anchor", "offset",
+    "stop-color", "stop-opacity", "gradientunits", "gradienttransform",
+    "patternunits", "patterntransform", "markerwidth", "markerheight",
+    "refx", "refy", "orient", "marker-start", "marker-mid", "marker-end",
+    "stddeviation", "filterunits", "filter",
+  ]);
+  const safeValue = (name: string, value: string) => {
+    const normalized = value.trim();
+    if (name === "id") return /^[A-Za-z_][\w.-]{0,100}$/.test(normalized) ? normalized : "";
+    if (/^(?:fill|stroke|filter|marker-start|marker-mid|marker-end)$/.test(name)) {
+      if (/^url\(\s*#[A-Za-z_][\w.-]*\s*\)$/i.test(normalized)) return normalized;
+      if (/^(?:none|currentColor|transparent|#[\da-f]{3,8}|[a-z]{1,24})$/i.test(normalized)) return normalized;
+      return "";
+    }
+    if (/url\s*\(|javascript:|data:|https?:|\/\//i.test(normalized)) return "";
+    return normalized.slice(0, 2000);
+  };
+
+  const clean = (element: Element) => {
+    for (const child of Array.from(element.children)) {
+      if (!allowedElements.has(child.localName.toLowerCase())) {
+        child.remove();
+        continue;
+      }
+      for (const attribute of Array.from(child.attributes)) {
+        const name = attribute.name.toLowerCase();
+        if (name.startsWith("on") || !allowedAttributes.has(name)) {
+          child.removeAttribute(attribute.name);
+          continue;
+        }
+        const value = safeValue(name, attribute.value);
+        if (!value && attribute.value) child.removeAttribute(attribute.name);
+        else child.setAttribute(attribute.name, value);
+      }
+      clean(child);
+    }
+  };
+
+  const root = document.documentElement;
+  clean(root);
+  return Array.from(root.childNodes)
+    .map((node) => new XMLSerializer().serializeToString(node))
+    .join("");
 }
 
 export function svgDataUri(svg: string): string {

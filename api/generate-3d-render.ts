@@ -1,4 +1,20 @@
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown; socket?: { remoteAddress?: string } };
+function sameOriginMutation(req: any): boolean {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  const fetchSite = String(req.headers?.["sec-fetch-site"] || "").toLowerCase();
+  if (fetchSite === "cross-site") return false;
+  const origin = req.headers?.origin;
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(String(origin));
+    const host = String(req.headers?.host || req.headers?.["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase();
+    return !!host && originUrl.host.toLowerCase() === host && ["https:", "http:"].includes(originUrl.protocol);
+  } catch {
+    return false;
+  }
+}
+
 const buckets = new Map<string, { count: number; reset: number }>();
 const FALLBACKS: Record<string,string> = {
   "suprema-2":"/renders-3d/suprema-2.svg","suprema-4":"/renders-3d/suprema-4.svg",
@@ -9,6 +25,8 @@ const fallbackFor = (description:string) => /camar/i.test(description) ? FALLBAC
 const MASTER_PROMPT = "Create a photorealistic premium TECHNICAL 3D product render of a Brazilian architectural aluminum window/door system. Isometric three-quarter perspective, isolated object on a pure deep black #0B0F19 studio background. Dramatic controlled studio strip lighting, precise metallic reflections, physically accurate anodized/electrostatic aluminum, realistic glass reflections and subtle transparency. Show authentic extrusion profiles, frame and sash cross-section cues, meeting stiles, corner cleats, screws, anchors/chumbadores, drainage slots, brushes/seals, roller carriages and upper/lower tracks wherever relevant. Crisp machined edges, accurate joinery, 45-degree mitred corners when visible, premium industrial design visualization, ultra-detailed, high contrast, 4K quality. No room scene, no people, no text, no labels, no logos, no watermark, no dimensions. The image must depict a plausible product concept, not claim certified structural specifications.";
 function send(res:any,status:number,body:unknown){res.setHeader?.("Cache-Control","no-store, private");return res.status(status).json(body);}
 export default async function handler(req:Request,res:any){
+  res.setHeader("Cache-Control", "no-store");
+  if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   res.setHeader?.("Cache-Control","no-store, private");
   if(req.method!=="POST"){res.setHeader?.("Allow","POST");return send(res,405,{error:"Método não permitido."});}
   const forwarded=req.headers?.["x-forwarded-for"];

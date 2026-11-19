@@ -3,6 +3,22 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore, type DocumentData } from "firebase-admin/firestore";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
+function sameOriginMutation(req: any): boolean {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  const fetchSite = String(req.headers?.["sec-fetch-site"] || "").toLowerCase();
+  if (fetchSite === "cross-site") return false;
+  const origin = req.headers?.origin;
+  if (!origin) return true; // Native/server-to-server Bearer clients may omit Origin.
+  try {
+    const originUrl = new URL(String(origin));
+    const host = String(req.headers?.host || req.headers?.["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase();
+    return !!host && originUrl.host.toLowerCase() === host && ["https:", "http:"].includes(originUrl.protocol);
+  } catch {
+    return false;
+  }
+}
+
 type Request = {
   method?: string;
   headers?: Record<string, string | string[] | undefined>;
@@ -66,15 +82,16 @@ async function authenticatedRole(req: Request) {
     signal: AbortSignal.timeout(10_000),
   });
   if (!identity.ok) return null;
-  const result = await identity.json() as { users?: Array<{ localId?: string; email?: string }> };
+  const result = await identity.json() as { users?: Array<{ localId?: string; email?: string; emailVerified?: boolean; disabled?: boolean }> };
   const user = result.users?.[0];
-  if (!user?.localId || !user.email) return null;
+  if (!user?.localId || !user.email || user.disabled || user.emailVerified !== true) return null;
 
   const email = user.email.toLowerCase();
   if (email === "safeness.c.a@gmail.com") return { uid: user.localId, role: "super_admin" };
   const admin = await db().collection("admins").doc(email).get();
   const role = admin.data()?.role;
-  return typeof role === "string" ? { uid: user.localId, role } : null;
+  const allowedRoles = new Set(["super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro", "rh", "qualidade", "estoque", "producao", "usuario"]);
+  return typeof role === "string" && allowedRoles.has(role) ? { uid: user.localId, role } : null;
 }
 
 function publicProposal(quote: DocumentData) {
@@ -111,6 +128,8 @@ function publicProposal(quote: DocumentData) {
 }
 
 export default async function handler(req: Request, res: any) {
+  res.setHeader("Cache-Control", "no-store");
+  if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   try {
     const id = requestValue(req, "id").trim();
     if (!id || id.length > 180 || id.includes("/")) return send(res, 400, { error: "Proposta inválida." });

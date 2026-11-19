@@ -4,6 +4,22 @@ import { AI_CONFIG, getAIModel } from "../../src/server/ai-config.js";
 import { parseAIJson } from "../../src/server/ai-json.js";
 import { recordAIAudit } from "../../src/server/ai-audit.js";
 
+function sameOriginMutation(req: any): boolean {
+  const method = String(req.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) return true;
+  const fetchSite = String(req.headers?.["sec-fetch-site"] || "").toLowerCase();
+  if (fetchSite === "cross-site") return false;
+  const origin = req.headers?.origin;
+  if (!origin) return true;
+  try {
+    const originUrl = new URL(String(origin));
+    const host = String(req.headers?.host || req.headers?.["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase();
+    return !!host && originUrl.host.toLowerCase() === host && ["https:", "http:"].includes(originUrl.protocol);
+  } catch {
+    return false;
+  }
+}
+
 type RateState = { count: number; resetAt: number };
 const localWindows = new Map<string, RateState>();
 function send(res: any, status: number, payload: unknown) {
@@ -22,6 +38,8 @@ async function consumePublicQuota(ip: string): Promise<boolean> {
  current.count+=1;return current.count<=3;
 }
 export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store");
+  if (!sameOriginMutation(req)) return send(res, 403, { error: "Origem não autorizada." });
   const requestStartedAt = Date.now();
   let auditPrompt = "";
   if (req.method !== "POST") {

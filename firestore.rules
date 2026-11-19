@@ -2,22 +2,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function owner() {
+    function verifiedEmail() {
       return signedIn()
         && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+    function owner() {
+      return verifiedEmail()
         && request.auth.token.email.lower() == 'safeness.c.a@gmail.com';
     }
     function adminPath() {
       return /databases/$(database)/documents/admins/$(request.auth.token.email.lower());
     }
     function hasAdminRecord() {
-      return signedIn() && request.auth.token.email != null && exists(adminPath());
+      return verifiedEmail() && exists(adminPath());
     }
     function role() {
       return hasAdminRecord() ? get(adminPath()).data.role : 'usuario';
     }
     function hasRole(roles) {
-      return owner() || (hasAdminRecord() && role() in roles);
+      return owner() || (hasAdminRecord() && role() != 'super_admin' && role() in roles);
     }
     function canOperate() {
       return hasRole(['super_admin','super_usuario','ceo','admin','supervisor','colaborador','usuario']);
@@ -218,8 +222,52 @@ service cloud.firestore {
     }
     match /sender_config/{id} { allow read: if canOperate(); allow create, update: if hasRole(['super_admin','super_usuario','ceo','admin']); allow delete: if owner(); }
 
-    // Negação por padrão: nenhuma coleção não declarada fica acessível por estar autenticado.
-    // Os perfis de administração têm acesso integral a todas as coleções do sistema.
-    match /{document=**} { allow read, write: if hasRole(['super_admin','super_usuario','ceo','admin']); }
+    // Coleções operacionais adicionais: acesso explícito por função, sem regra global permissiva.
+    match /notifications/{id} {
+      allow read: if verifiedEmail() && resource.data.targetEmail is string
+        && resource.data.targetEmail.lower() == request.auth.token.email.lower();
+      allow create: if canManageCommercial() || canManageFinance();
+      allow update: if verifiedEmail() && resource.data.targetEmail is string
+        && resource.data.targetEmail.lower() == request.auth.token.email.lower()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read','readAt']);
+      allow delete: if owner();
+    }
+    match /price_history/{id} {
+      allow read: if canManageCommercial() || canManageFinance();
+      allow create: if canManageCommercial();
+      allow update, delete: if false;
+    }
+    match /inventory_items/{id} {
+      allow read: if canManageInventory();
+      allow create, update: if canManageInventory();
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /inventory_movements/{id} {
+      allow read: if canManageInventory();
+      allow create: if canManageInventory();
+      allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /pending_boletos/{id} { allow read, write: if canManageFinance(); }
+    match /visits/{id} {
+      allow read: if canManageCommercial() || canManageFinance();
+      allow update: if canManageCommercial();
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /deliveries/{id} {
+      allow read: if canManageCommercial() || canManageProduction() || canManageQuality() || canManageFinance();
+      allow create: if canManageProduction() || canManageCommercial();
+      allow update, delete: if owner();
+    }
+    match /fiscal_documents/{id} {
+      allow read, create: if canManageFinance();
+      allow update: if hasRole(['super_admin','super_usuario','ceo','admin']);
+      allow delete: if owner();
+    }
+
+    // O proprietário mantém acesso integral, inclusive a futuras coleções.
+    // Nenhum perfil delegado recebe acesso global por esta regra.
+    match /{document=**} { allow read, write: if owner(); }
+
+    // Negação por padrão para todos os demais usuários: somente as coleções declaradas acima são acessíveis.
   }
 }
