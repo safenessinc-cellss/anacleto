@@ -46,9 +46,10 @@ interface QuotesModuleProps {
   companies: Company[];
   onConvertToInvoice?: (quote: Quote) => void;
   language?: string;
+  initialMode?: "standard" | "smart";
 }
 
-export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt"}: QuotesModuleProps) {
+export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard"}: QuotesModuleProps) {
   const { showToast } = useToast();
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
@@ -218,6 +219,11 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     setSelectedQuote(newQ);
     setIsEditing(true);
   };
+
+  // A aba inteligente inicia um orçamento novo e editável ao ser aberta.
+  useEffect(() => {
+    if (initialMode === "smart") handleCreateNewQuote();
+  }, []);
 
   const handleRejectQuote = async () => {
     if (!selectedQuote || !["draft", "pending", "pendente"].includes(String(selectedQuote.status).toLowerCase())) return;
@@ -1097,8 +1103,8 @@ const handleAddItem = () => {
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Orçamentos & Propostas</h1>
-            <span className="text-xs text-slate-500">{quotes.length} orçamentos</span>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">{initialMode === "smart" ? "Orçamento Inteligente" : "Orçamentos & Propostas"}</h1>
+            <span className="text-xs text-slate-500">{initialMode === "smart" ? "Crie um orçamento com apoio do assistente de IA" : `${quotes.length} orçamentos`}</span>
           </div>
         </div>
 
