@@ -9,6 +9,7 @@ import { generateValidatedJson, parseAIJson } from "./src/server/ai-json.js";
 import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore } from "./src/server/firestore-data.js";
 import technicalDrawingHandler from "./api/technical-drawing.js";
 import approvedSnapshotHandler from "./api/approved-snapshot.js";
+import supplierCatalogVisionHandler from "./api/supplier-catalog-vision.js";
 import publicQuoteEstimateHandler from "./api/public/quote-estimate.js";
 import publicProposalHandler from "./api/proposta.js";
 import architecturalVisualizationHandler from "./api/public/architectural-visualization.js";
@@ -25,6 +26,7 @@ dotenv.config();
 const app = express();
 const httpServer = http.createServer(app);
 app.use(express.json({ limit: "16mb" }));
+app.post("/api/supplier-catalog-vision", (req, res) => supplierCatalogVisionHandler(req, res));
 app.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
 app.post("/api/generate-3d-render", generate3DRenderHandler);
 
