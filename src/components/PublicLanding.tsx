@@ -30,6 +30,68 @@ function Preview({config,opened}:{config:Config;opened:boolean}) {
   </svg>;
 }
 
+
+function ExplodedWindow() {
+  return <svg className="exploded-window" viewBox="0 0 920 650" role="img" aria-label="Vista técnica explotada de una ventana corrediza de aluminio, con perfiles, hojas, vidrio, rieles y herrajes separados">
+    <defs>
+      <linearGradient id="expAluminium" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#f4f7fa"/><stop offset=".22" stopColor="#8795a4"/><stop offset=".48" stopColor="#e7edf2"/><stop offset=".7" stopColor="#697887"/><stop offset="1" stopColor="#dce4eb"/></linearGradient>
+      <linearGradient id="expDarkMetal" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#151e2a"/><stop offset=".45" stopColor="#5e7185"/><stop offset=".7" stopColor="#1b2a3a"/><stop offset="1" stopColor="#aebdca"/></linearGradient>
+      <linearGradient id="expGlass" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#bce9ff" stopOpacity=".12"/><stop offset=".38" stopColor="#9bd7fa" stopOpacity=".42"/><stop offset=".7" stopColor="#d9f3ff" stopOpacity=".13"/><stop offset="1" stopColor="#5eb7f0" stopOpacity=".28"/></linearGradient>
+      <linearGradient id="expBlue" x1="0" y1="0" x2="1" y2="0"><stop stopColor="#4a9fff" stopOpacity="0"/><stop offset=".5" stopColor="#68bdff"/><stop offset="1" stopColor="#4a9fff" stopOpacity="0"/></linearGradient>
+      <filter id="expGlow"><feGaussianBlur stdDeviation="13"/></filter>
+      <filter id="expShadow"><feGaussianBlur stdDeviation="9"/></filter>
+    </defs>
+    <ellipse cx="470" cy="540" rx="310" ry="34" fill="#000" opacity=".28" filter="url(#expShadow)"/>
+    <ellipse cx="470" cy="330" rx="300" ry="210" fill="#2e8edc" opacity=".11" filter="url(#expGlow)"/>
+    <path d="M110 320H820M160 170L750 480M190 520L760 190" stroke="#75bfff" strokeOpacity=".12" strokeDasharray="3 12"/>
+    <g opacity=".95">
+      <path d="M170 155 565 82 565 438 170 511Z" fill="none" stroke="url(#expAluminium)" strokeWidth="24" strokeLinejoin="round"/>
+      <path d="M170 155 565 82 565 438 170 511Z" fill="none" stroke="#f6fbff" strokeOpacity=".7" strokeWidth="2"/>
+      <path d="M193 174 544 110 544 419 193 483Z" fill="none" stroke="#6c7e8d" strokeWidth="5"/>
+      <path d="M180 146 565 75 585 90 199 164Z" fill="url(#expAluminium)" stroke="#dce5ec" strokeWidth="2"/>
+      <path d="M565 82 585 96 585 452 565 438Z" fill="url(#expDarkMetal)" stroke="#b9c7d3" strokeWidth="2"/>
+      <path d="M170 155 190 168 190 526 170 511Z" fill="url(#expDarkMetal)" stroke="#b9c7d3" strokeWidth="2"/>
+    </g>
+    <g transform="translate(55 -6)">
+      <path d="M285 170 620 108 620 414 285 476Z" fill="url(#expGlass)" stroke="#a8ddff" strokeWidth="2"/>
+      <path d="M302 186 603 130 603 398 302 454Z" fill="none" stroke="#e3f6ff" strokeOpacity=".75" strokeWidth="3"/>
+      <path d="M325 210 580 162" stroke="#fff" strokeOpacity=".5" strokeWidth="3"/>
+      <path d="M325 210 325 424" stroke="#fff" strokeOpacity=".25" strokeWidth="2"/>
+    </g>
+    <g transform="translate(112 20)">
+      <path d="M300 150 630 89 630 397 300 458Z" fill="none" stroke="url(#expAluminium)" strokeWidth="16" strokeLinejoin="round"/>
+      <path d="M316 165 614 110 614 383 316 438Z" fill="none" stroke="#eaf1f7" strokeOpacity=".7" strokeWidth="3"/>
+      <path d="M300 150 316 165M630 89 614 110M630 397 614 383M300 458 316 438" stroke="#fff" strokeOpacity=".85" strokeWidth="3"/>
+      <path d="M472 120 472 411" stroke="#d5e1e9" strokeWidth="8"/>
+    </g>
+    <g transform="translate(0 0)">
+      <path d="M230 550 670 468" stroke="url(#expAluminium)" strokeWidth="18" strokeLinecap="round"/>
+      <path d="M248 573 688 491" stroke="#9db0bf" strokeWidth="7" strokeLinecap="round"/>
+      <path d="M245 540 245 560M650 465 650 486" stroke="#e7edf2" strokeWidth="6"/>
+    </g>
+    <g transform="translate(705 245) rotate(-10)">
+      <rect x="0" y="0" width="24" height="94" rx="7" fill="url(#expDarkMetal)" stroke="#d8e3eb" strokeWidth="2"/>
+      <rect x="8" y="12" width="8" height="69" rx="4" fill="#dbe5ed"/>
+      <circle cx="12" cy="10" r="3" fill="#fff"/><circle cx="12" cy="84" r="3" fill="#fff"/>
+    </g>
+    <g fill="#d9e8f3" stroke="#7893a8" strokeWidth="2">
+      <circle cx="688" cy="170" r="7"/><circle cx="710" cy="190" r="5"/><circle cx="732" cy="210" r="4"/>
+      <circle cx="760" cy="360" r="6"/><circle cx="786" cy="382" r="4"/><circle cx="130" cy="250" r="5"/>
+      <circle cx="145" cy="275" r="4"/><circle cx="158" cy="300" r="3"/>
+    </g>
+    <g stroke="#68baff" strokeWidth="1.5" fill="none" opacity=".85">
+      <path d="M220 125 122 83 70 83"/><path d="M650 108 760 64 830 64"/><path d="M710 290 825 290 855 265"/>
+      <path d="M260 550 165 602 92 602"/><path d="M510 480 565 585 680 585"/>
+    </g>
+    <g fill="#b8dfff" fontFamily="monospace" fontSize="12" letterSpacing="2">
+      <text x="26" y="74">PERFIL EXTERNO</text><text x="735" y="54">VIDRO TÉCNICO</text>
+      <text x="800" y="252">PUXADOR</text><text x="24" y="625">TRILHO INFERIOR</text>
+      <text x="685" y="610">FOLHA MÓVEL</text>
+    </g>
+    <path d="M80 330H840" stroke="url(#expBlue)" strokeWidth="2" opacity=".55"/>
+  </svg>;
+}
+
 export default function PublicLanding() {
   const [config,setConfig] = useState<Config>(defaults);
   const [introSeen,setIntroSeen] = useState(()=>{try{return sessionStorage.getItem("anacleto-assembly-seen")==="1";}catch{return false;}});
@@ -68,73 +130,45 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
   ];
   const businessSchema={"@context":"https://schema.org","@type":"HomeAndConstructionBusiness","name":"Anacleto Esquadrias","url":"https://anacletoesquadrias.com.br/","telephone":"+55 51 99819-3931","address":{"@type":"PostalAddress","streetAddress":"Av. Caxias do Sul, 1069, Rio dos Sinos","addressLocality":"São Leopoldo","addressRegion":"RS","addressCountry":"BR"},"areaServed":{"@type":"AdministrativeArea","name":"São Leopoldo e região, Rio Grande do Sul, Brasil"},"description":"Esquadrias de alumínio, portas, janelas, coberturas de vidro e vidraçaria sob medida.","creator":{"@type":"Organization","name":"Safeness.inc"}};
   const faqSchema={"@context":"https://schema.org","@type":"FAQPage","mainEntity":faqs.map(([q,a])=>({"@type":"Question",name:q,acceptedAnswer:{"@type":"Answer",text:a}}))};
-  const nav=[["Modelos","#modelos"],["Estúdio 3D","#showroom"],["Engenharia","#engenharia"],["Contato","#contato"]];
+  const nav=[["Início","#inicio"],["Modelos","#modelos"],["Projetos","#showroom"],["Sobre Nós","#engenharia"],["Contato","#contato"]];
   return <div className="public-site nike-site">
     <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(businessSchema)}}/><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(faqSchema)}}/>
-    <header className="site-header"><a href="#inicio" className="brand" aria-label="Anacleto Esquadrias"><img src={logo} alt="Anacleto Esquadrias" width="1200" height="600"/></a><button className="mobile-toggle" onClick={()=>setMenuOpen(v=>!v)} aria-label="Abrir menu">{menuOpen?<X/>:<Menu/>}</button><nav className={menuOpen?"site-nav is-open":"site-nav"}>{nav.map(([label,href])=><a key={href} href={href} onClick={()=>setMenuOpen(false)}>{label}</a>)}</nav><div className="header-actions"><a className="button dashboard-access" href="/gestao/" aria-label="Acessar Área Restrita">Área Restrita <ArrowUpRight size={15}/></a><button className="replay-intro" onClick={replayIntro} title="Ver montagem 3D novamente"><RefreshCw size={14}/><span>Ver montagem 3D novamente</span></button><a className="button button-primary header-cta" href={wa("Olá! Gostaria de solicitar um orçamento rápido com a Anacleto Esquadrias.")} target="_blank" rel="noreferrer">Orçamento Rápido <ArrowUpRight size={16}/></a></div></header>
-    {!introSeen && <PublicAssemblyIntro key={introKey} onComplete={finishIntro} onSkip={finishIntro} />}
+    <header className="site-header site-header-glass">
+      <a href="#inicio" className="brand" aria-label="Anacleto Esquadrias"><img src={logo} alt="Anacleto Esquadrias" width="1200" height="600"/></a>
+      <nav className={menuOpen?"site-nav is-open":"site-nav"} aria-label="Navegação principal">{nav.map(([label,href])=><a key={href} href={href} onClick={()=>setMenuOpen(false)}>{label}</a>)}</nav>
+      <div className="header-actions">
+        <a className="button dashboard-access" href="/gestao/" aria-label="Acessar área restrita do Dashboard">Área Restrita <ArrowUpRight size={15}/></a>
+        <a className="button button-primary header-cta" href={wa("Olá! Gostaria de solicitar um orçamento com a Anacleto Esquadrias.")} target="_blank" rel="noreferrer">Solicitar Orçamento <ArrowUpRight size={16}/></a>
+      </div>
+      <button className="mobile-toggle" onClick={()=>setMenuOpen(v=>!v)} aria-label={menuOpen?"Fechar menu":"Abrir menu"}>{menuOpen?<X/>:<Menu/>}</button>
+    </header>
     <main id="inicio">
-      <section className="nike-hero"><div className="hero-topline"><span>ANACLETO / BY YOU</span><span>ALUMÍNIO · VIDRO · ARQUITETURA</span></div><motion.div className="hero-title-wrap" initial={reduceMotion?false:{opacity:0,y:28}} animate={{opacity:1,y:0}} transition={{duration:.7,ease:[.22,1,.36,1]}}><p className="eyebrow">ENGENHARIA DE PRECISÃO · FEITA PARA SUA ARQUITETURA</p><h1>ENGENHARIA INVISÍVEL.<br/><em>DESIGN ARQUITETÔNICO.</em></h1><p className="hero-subtitle">Anacleto By You. Personalize sua esquadria, explore materiais e imagine o próximo detalhe do seu projeto.</p></motion.div>
-        <div className="hero-showcase"><div className="hero-model"><div className="model-orbit orbit-one"/><div className="model-orbit orbit-two"/><Suspense fallback={<div className="hero-3d-loading">Preparando visualização 3D…</div>}><LazyShowroom config={config} opened={opened}/></Suspense><span className="hero-360-badge">360°</span><span className="hero-explore-label">↻ &nbsp; Gire e explore</span><span className="floating-tag tag-left">01 / DESIGN SOB MEDIDA</span><span className="floating-tag tag-right">ALUMÍNIO + VIDRO</span></div><div className="hero-side-note"><span>01—04</span><p>LINHAS PRECISAS.<br/>LUZ EM EQUILÍBRIO.</p><a href="#showroom">Personalizar agora <ArrowUpRight size={15}/></a></div></div>
-      </section>
-      <section className="exploded-feature section-wrap" id="engenharia" aria-labelledby="exploded-title">
+      <section className="exploded-hero">
+        <div className="exploded-hero-grid"/>
         <div className="exploded-copy">
-          <span className="eyebrow">ANACLETO / ENGENHARIA EM CAMADAS</span>
-          <h2 id="exploded-title">Cada peça no lugar.<br/><em>Precisão em cada detalhe.</em></h2>
-          <p>Explore a composição de uma janela de correr: marco estrutural, folhas móveis, vidros, trilhos e ferragens apresentados em vista explodida.</p>
-          <div className="exploded-parts"><span><i>01</i> Marco e perfis</span><span><i>02</i> Folhas móveis</span><span><i>03</i> Vidros e vedação</span><span><i>04</i> Trilhos e ferragens</span></div>
-          <a className="exploded-link" href="#showroom">Explorar no estúdio 3D <ArrowUpRight size={16}/></a>
+          <span className="exploded-kicker"><i/> ANACLETO ESQUADRIAS <b>·</b> ENGENHARIA DE PRECISÃO</span>
+          <h1>Qualidade que se vê em cada <em>detalhe.</em></h1>
+          <p>Esquadrias de alumínio de alto padrão, com tecnologia, design e durabilidade para o seu projeto.</p>
+          <div className="exploded-actions">
+            <a className="button button-primary" href="#showroom">Explore em 3D <Move3D size={17}/></a>
+            <a className="exploded-secondary" href={wa("Olá! Gostaria de solicitar um orçamento para meu projeto.")} target="_blank" rel="noreferrer">Solicitar orçamento <ArrowUpRight size={16}/></a>
+          </div>
+          <div className="exploded-proof"><span><b>01</b> DESIGN SOB MEDIDA</span><i/><span><b>02</b> PRECISÃO TÉCNICA</span></div>
         </div>
-        <div className="exploded-visual" role="img" aria-label="Janela de alumínio em vista explodida, com marco, folhas, vidros, trilhos e ferragens separados">
-          <div className="exploded-visual-top"><span>VISTA EXPLODIDA / JANELA 2 FOLHAS</span><span>ANACLETO · BY YOU</span></div>
-          <svg viewBox="0 0 820 570" className="exploded-svg" aria-hidden="true">
-            <defs>
-              <linearGradient id="exMetal" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#263e55"/><stop offset=".42" stopColor="#9fb4c6"/><stop offset=".7" stopColor="#e2edf5"/><stop offset="1" stopColor="#526f89"/></linearGradient>
-              <linearGradient id="exGlass" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#b9e5f8" stopOpacity=".88"/><stop offset="1" stopColor="#6eadd1" stopOpacity=".28"/></linearGradient>
-              <filter id="exShadow"><feGaussianBlur stdDeviation="8"/></filter>
-            </defs>
-            <ellipse cx="410" cy="476" rx="260" ry="28" fill="#173a58" opacity=".13" filter="url(#exShadow)"/>
-            <g className="ex-frame" fill="none" stroke="url(#exMetal)" strokeWidth="17" strokeLinejoin="round">
-              <path d="M184 144 522 91 655 165 315 226Z"/>
-              <path d="M184 144 315 226 315 443 184 365Z"/>
-              <path d="M315 226 655 165 655 384 315 443Z"/>
-            </g>
-            <g className="ex-frame-inner" fill="none" stroke="#d8e6f0" strokeWidth="4" opacity=".9">
-              <path d="M207 157 519 108 629 168 315 211Z"/><path d="M207 157 315 222 315 419 207 356Z"/><path d="M331 234 636 179 636 371 331 425Z"/>
-            </g>
-            <g className="ex-glass ex-glass-one">
-              <path d="M233 181 351 252 351 405 233 335Z" fill="url(#exGlass)" stroke="#8bb8d3" strokeWidth="5"/>
-              <path d="M248 190 340 246 340 392 248 337Z" fill="#e8f7ff" opacity=".18"/>
-            </g>
-            <g className="ex-glass ex-glass-two">
-              <path d="M378 250 601 210 601 356 378 397Z" fill="url(#exGlass)" stroke="#8bb8d3" strokeWidth="5"/>
-              <path d="M394 260 585 225 585 345 394 380Z" fill="#e8f7ff" opacity=".18"/>
-            </g>
-            <g className="ex-leaf" fill="none" stroke="url(#exMetal)" strokeWidth="12" strokeLinejoin="round">
-              <path d="M220 118 337 188 337 414 220 344Z"/><path d="M365 202 613 157 613 370 365 415Z"/>
-            </g>
-            <g fill="none" stroke="#416b8d" strokeWidth="8" strokeLinecap="round">
-              <path d="M168 112 514 58 682 151"/><path d="M168 390 300 470 682 401"/>
-            </g>
-            <g fill="#d9e9f4" stroke="#6889a4" strokeWidth="3">
-              <rect x="642" y="233" width="18" height="56" rx="5" transform="rotate(-10 642 233)"/>
-              <rect x="671" y="260" width="13" height="32" rx="4" transform="rotate(-10 671 260)"/>
-              <circle cx="696" cy="312" r="10"/><circle cx="696" cy="312" r="3" fill="#42627c"/>
-            </g>
-            <g stroke="#7398b5" strokeWidth="1.6" strokeDasharray="5 7" fill="none" opacity=".85">
-              <path d="M95 115 170 137"/><path d="M95 425 181 372"/><path d="M690 110 625 166"/><path d="M730 375 652 354"/>
-            </g>
-            <g fill="#31536f" fontFamily="Arial,sans-serif" fontSize="12" fontWeight="700" letterSpacing="1.5">
-              <text x="28" y="108">MARCO</text><text x="28" y="441">PERFIS</text><text x="693" y="99">VIDROS</text><text x="696" y="394">FERRAGENS</text>
-            </g>
-            <g fill="#fff" stroke="#6f9bb9" strokeWidth="2">
-              <circle cx="177" cy="139" r="5"/><circle cx="183" cy="371" r="5"/><circle cx="625" cy="166" r="5"/><circle cx="652" cy="354" r="5"/>
-            </g>
-          </svg>
-          <div className="exploded-visual-bottom"><span>COMPONENTES SEPARADOS PARA VISUALIZAÇÃO</span><span>01 — 04</span></div>
+        <div className="exploded-stage">
+          <div className="exploded-stage-label"><span>ANATOMIA DE UMA ESQUADRIA</span><span>01 — 04 / SISTEMA CORREDIÇO</span></div>
+          <div className="exploded-art"><ExplodedWindow/></div>
+          <div className="exploded-360"><span className="exploded-360-icon"><Move3D size={23}/></span><b>360°</b><span>Gire e explore</span><small>VISUALIZAÇÃO TÉCNICA</small></div>
+          <div className="exploded-coordinate">ALUMÍNIO <i/> VIDRO <i/> ENGENHARIA</div>
         </div>
+        <div className="exploded-scroll"><span/> ROLE PARA EXPLORAR</div>
       </section>
-      <section className="benefits-float" aria-label="Benefícios Anacleto"><div className="benefit-item"><span className="benefit-icon">◇</span><strong>Design Moderno</strong></div><div className="benefit-item"><span className="benefit-icon">⬡</span><strong>Alta Durabilidade</strong></div><div className="benefit-item"><span className="benefit-icon">⌖</span><strong>Precisão na Fabricação</strong></div><div className="benefit-item"><span className="benefit-icon">♧</span><strong>Sustentabilidade</strong></div></section>
+      <section className="benefit-strip" aria-label="Diferenciais Anacleto">
+        <article><span className="benefit-icon">◇</span><div><b>Design moderno</b><small>Linhas que valorizam a arquitetura</small></div></article>
+        <article><span className="benefit-icon">⌁</span><div><b>Alta durabilidade</b><small>Materiais e acabamentos selecionados</small></div></article>
+        <article><span className="benefit-icon">＋</span><div><b>Precisão na fabricação</b><small>Detalhes pensados sob medida</small></div></article>
+        <article><span className="benefit-icon">↗</span><div><b>Responsabilidade</b><small>Eficiência e escolhas conscientes</small></div></article>
+      </section>
       <section className="aluminum-gallery section-wrap" id="modelos"><div className="gallery-heading"><div><span className="eyebrow">COLEÇÃO ANACLETO · ALUMÍNIO</span><h2>Portas e janelas para cada arquitetura.</h2></div><p>Explore diferentes tipologias, configurações de folhas e acabamentos de alumínio. Selecione um modelo para abrir sua configuração no estúdio.</p></div><div className="aluminum-gallery-grid">{galleryModels.map((item,i)=><button className="aluminum-model-card" key={item.name} onClick={()=>{setConfig(c=>({...c,model:item.model,color:item.color,panels:item.panels,line:i===2||i===3||i===5?"Gold":"Suprema"}));document.getElementById("showroom")?.scrollIntoView({behavior:"smooth",block:"start"});}}><span className="gallery-index">0{i+1} / ALUMÍNIO</span><svg viewBox="0 0 300 220" role="img" aria-label={item.name}><defs><linearGradient id={`gallery-glass-${i}`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#dceef4"/><stop offset="1" stopColor="#8faebd"/></linearGradient><linearGradient id={`gallery-metal-${i}`}><stop stopColor={colors.find(c=>c.name===item.color)?.hex||"#222"}/><stop offset=".5" stopColor="#c5cbd0"/><stop offset="1" stopColor={colors.find(c=>c.name===item.color)?.hex||"#222"}/></linearGradient></defs><ellipse cx="150" cy="194" rx="100" ry="8" fill="#202830" opacity=".12"/><rect x="53" y="20" width="194" height="166" rx="2" fill={`url(#gallery-metal-${i})`}/><rect x="62" y="29" width="176" height="148" fill={`url(#gallery-glass-${i})`}/>{Array.from({length:item.panels},(_,j)=><g key={j}><rect x={64+j*174/item.panels} y="31" width={172/item.panels} height="144" fill={`url(#gallery-glass-${i})`} stroke={colors.find(c=>c.name===item.color)?.hex||"#222"} strokeWidth="4"/><path d={`M${70+j*174/item.panels} 38 l${45/item.panels} 0  ${-35/item.panels} 128`} stroke="#fff" strokeWidth="2" opacity=".22"/></g>)}<path d="M53 186h194" stroke="#89949b" strokeWidth="5"/></svg><div className="gallery-card-copy"><div><h3>{item.name}</h3><p>{item.detail}</p></div><span className="gallery-swatch" style={{background:colors.find(c=>c.name===item.color)?.hex}} title={item.color}/></div><span className="gallery-finish">ACABAMENTO · {item.color.toUpperCase()}</span></button>)}</div><div className="gallery-footnote">Imagens ilustrativas de sistemas em alumínio. Tipologias, perfis, dimensões, ferragens e cores disponíveis são confirmados conforme projeto e linha técnica.</div></section>
       <ArchitecturalModelsCarousel onConfigure={(item)=>{setConfig(c=>({...c,model:item.model,line:item.line,color:item.color,panels:item.panels}));document.getElementById("showroom")?.scrollIntoView({behavior:"smooth",block:"start"});}} />
       <section className="showroom-section section-wrap" id="showroom"><div className="section-heading"><div><span className="eyebrow">NIKE BY YOU · ANACLETO EDITION</span><h2>Crie sua combinação.</h2></div><p>Escolha a tipologia, defina o acabamento e visualize uma proposta inicial. A configuração será enviada à nossa equipe sem exibir preços.</p></div>
