@@ -185,8 +185,6 @@ export default function AnacletoProApp({
     ] },
     { id: "catalog", label: "Catálogo & Estoque", icon: Package, tabs: [
       { id: "cadastro_items", label: "Catálogo de Fornecedores" },
-      { id: "products", label: "Esquadrias" },
-      { id: "catalog", label: "Produtos" },
       { id: "services", label: "Serviços" },
       { id: "inventory", label: "Estoque" },
     ] },
