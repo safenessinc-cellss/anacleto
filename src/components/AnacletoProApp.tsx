@@ -189,15 +189,14 @@ export default function AnacletoProApp({
       { id: "catalog", label: "Produtos" },
       { id: "services", label: "Serviços" },
       { id: "inventory", label: "Estoque" },
-      { id: "payment_methods", label: "Meios de Pagamento" },
     ] },
     { id: "finance", label: "Financeiro & Relatórios", icon: Wallet, tabs: [
       { id: "finance", label: "Financeiro" },
+      { id: "payment_methods", label: "Meios de Pagamento" },
       { id: "reports", label: "Relatórios" },
       { id: "invoices", label: "Notas Fiscais" },
       { id: "financial_ai", label: "Assistente Financeiro" },
-    ] },
-  ];
+    ] },  ];
   const settingTabOptions: Array<{ id: NavigationTab; label: string }> = [
     { id: "settings", label: "Configurações" },
     { id: "admin", label: "Equipe & Roles" },
