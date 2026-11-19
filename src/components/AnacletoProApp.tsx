@@ -183,13 +183,9 @@ export default function AnacletoProApp({
       { id: "post_sale", label: "Qualidade & Pós-venda" },
       { id: "materials", label: "Materiais de Produção" },
     ] },
-    { id: "catalog", label: "Catálogo & Estoque", icon: Package, tabs: [
-      { id: "cadastro_items", label: "Catálogo de Fornecedores" },
-      { id: "products", label: "Esquadrias" },
-      { id: "catalog", label: "Produtos" },
-      { id: "services", label: "Serviços" },
+    { id: "catalog", label: "Catálogos & Estoque", icon: Package, tabs: [
+      { id: "cadastro_items", label: "Fornecedores e Catálogos" },
       { id: "inventory", label: "Estoque" },
-      { id: "payment_methods", label: "Meios de Pagamento" },
     ] },
     { id: "finance", label: "Financeiro & Relatórios", icon: Wallet, tabs: [
       { id: "finance", label: "Financeiro" },
@@ -387,11 +383,7 @@ export default function AnacletoProApp({
 
           {activeTab === "agenda" && (<AgendaModule language={language} />)}
 
-          {activeTab === "catalog" && <CatalogModule />}
-          {activeTab === "cadastro_items" && <div className="space-y-8"><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}
-          {activeTab === "products" && <RegistryModule kind="products" />}
-          {activeTab === "services" && <RegistryModule kind="services" />}
-          {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
+          {activeTab === "cadastro_items" && <SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} />}
           {activeTab === "contracts" && <RegistryModule kind="contracts" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
