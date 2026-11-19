@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, query, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, runTransaction, serverTimestamp, writeBatch } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { ArrowDownToLine, ArrowUpFromLine, Boxes, Loader2, PackagePlus, Search } from "lucide-react";
 
@@ -7,6 +7,8 @@ type StockItem = { id: string; name: string; sku?: string; unit?: string; quanti
 type Movement = { id: string; itemId: string; itemName: string; type: "in" | "out"; quantity: number; reason: string; createdAt?: any };
 const slug = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 90);
 const amount = (v: string) => Math.max(0, Number(v) || 0);
+const nonStockTerms = ["gasolina", "cola", "lubrificante", "lubrificante"]; 
+const isNonStock = (name: string) => nonStockTerms.some(term => slug(name).includes(slug(term)));
 
 export default function InventoryModule() {
   const [items, setItems] = useState<StockItem[]>([]);
@@ -21,6 +23,7 @@ export default function InventoryModule() {
   const [reason, setReason] = useState("Ajuste manual");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [cleaning, setCleaning] = useState(false);
 
   useEffect(() => {
     const a = onSnapshot(collection(db, "inventory_items"), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem))), e => console.error("Inventory items:", e));
@@ -32,13 +35,15 @@ export default function InventoryModule() {
     return () => { a(); b(); };
   }, []);
 
-  const filtered = useMemo(() => items.filter(i => `${i.name} ${i.sku || ""}`.toLowerCase().includes(search.toLowerCase())), [items, search]);
-  const lowStock = items.filter(i => Number(i.quantity || 0) - Number(i.reservedQuantity || 0) <= Number(i.minimumStock || 0));
+  const productionItems = useMemo(() => items.filter(i => !isNonStock(i.name)), [items]);
+  const filtered = useMemo(() => productionItems.filter(i => `${i.name} ${i.sku || ""}`.toLowerCase().includes(search.toLowerCase())), [productionItems, search]);
+  const lowStock = productionItems.filter(i => Number(i.quantity || 0) - Number(i.reservedQuantity || 0) <= Number(i.minimumStock || 0));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const itemName = name.trim(); const qty = amount(quantity);
     if (!itemName || qty <= 0) { setMessage("Informe o material e uma quantidade maior que zero."); return; }
+    if (isNonStock(itemName)) { setMessage("Este item é um consumível e não deve ser controlado no estoque de produção."); return; }
     setSaving(true); setMessage("");
     try {
       const key = slug(sku.trim() || itemName) || `item-${Date.now()}`;
@@ -57,7 +62,24 @@ export default function InventoryModule() {
     finally { setSaving(false); }
   };
 
+  const removeNonStockItems = async () => {
+    const targets = items.filter(item => isNonStock(item.name));
+    if (!targets.length) { setMessage("Não há gasolina, cola ou lubrificante cadastrados no estoque."); return; }
+    if (!window.confirm(`Remover ${targets.length} item(ns) de gasolina, cola ou lubrificante do saldo de estoque? O histórico de movimentações será preservado.`)) return;
+    setCleaning(true); setMessage("");
+    try {
+      for (let i = 0; i < targets.length; i += 400) {
+        const batch = writeBatch(db);
+        targets.slice(i, i + 400).forEach(item => batch.delete(doc(db, "inventory_items", item.id)));
+        await batch.commit();
+      }
+      setMessage(`${targets.length} item(ns) removido(s) do saldo. O histórico de movimentações foi preservado.`);
+    } catch (err) { setMessage((err as Error).message || "Não foi possível limpar esses itens."); }
+    finally { setCleaning(false); }
+  };
+
   return <div className="space-y-5">
+    <div className="flex justify-end"><button type="button" onClick={() => void removeNonStockItems()} disabled={cleaning} className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50">{cleaning ? "Limpando..." : "Remover consumíveis do estoque"}</button></div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Materiais cadastrados</p><p className="text-2xl font-bold">{items.length}</p></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Itens abaixo do mínimo</p><p className="text-2xl font-bold text-amber-600">{lowStock.length}</p></div>
