@@ -14,6 +14,10 @@
     "api/approved-snapshot.ts": {
       "maxDuration": 30
     },
+    "api/supplier/catalogo.ts": {
+      "includeFiles": "node_modules/@google/genai/**",
+      "maxDuration": 60
+    },
     "api/generate-3d-render.ts": {
       "maxDuration": 60
     }
