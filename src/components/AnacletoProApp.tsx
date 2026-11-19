@@ -16,7 +16,6 @@ import FinancialAI from "./finance/FinancialAI";
 import ThemeModule from "./settings/ThemeModule";
 import AdminModule from "./admin/AdminModule";
 import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
-import CatalogModule from "./catalog/CatalogModule";
 import RegistryModule from "./registry/RegistryModule";
 import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
 import logoImg from "../assets/images/anacleto-logo-premium.svg";
@@ -185,14 +184,11 @@ export default function AnacletoProApp({
     ] },
     { id: "catalog", label: "Catálogo & Estoque", icon: Package, tabs: [
       { id: "cadastro_items", label: "Catálogo de Fornecedores" },
-      { id: "products", label: "Esquadrias" },
-      { id: "catalog", label: "Produtos" },
-      { id: "services", label: "Serviços" },
-      { id: "inventory", label: "Estoque" },
-      { id: "payment_methods", label: "Meios de Pagamento" },
+      { id: "catalog", label: "Produtos & Estoque" },
     ] },
     { id: "finance", label: "Financeiro & Relatórios", icon: Wallet, tabs: [
       { id: "finance", label: "Financeiro" },
+      { id: "payment_methods", label: "Meios de Pagamento" },
       { id: "reports", label: "Relatórios" },
       { id: "invoices", label: "Notas Fiscais" },
       { id: "financial_ai", label: "Assistente Financeiro" },
@@ -387,16 +383,13 @@ export default function AnacletoProApp({
 
           {activeTab === "agenda" && (<AgendaModule language={language} />)}
 
-          {activeTab === "catalog" && <CatalogModule />}
-          {activeTab === "cadastro_items" && <div className="space-y-8"><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}
-          {activeTab === "products" && <RegistryModule kind="products" />}
-          {activeTab === "services" && <RegistryModule kind="services" />}
+          {activeTab === "cadastro_items" && <SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} />}
+          {activeTab === "catalog" && <div className="space-y-10"><section><RegistryModule kind="products" /></section><section className="border-t border-slate-200 pt-8 dark:border-slate-800"><RegistryModule kind="services" /></section><section className="border-t border-slate-200 pt-8 dark:border-slate-800"><InventoryModule /></section></div>}
           {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
           {activeTab === "contracts" && <RegistryModule kind="contracts" />}
           {activeTab === "materials" && <RegistryModule kind="materials" />}
 
         {activeTab === "production" && <ProductionModule onNavigateDelivery={() => setActiveTab("deliveries")} onNavigateQuality={() => setActiveTab("post_sale")} onNavigateInvoice={() => setActiveTab("invoices")} />}
-        {activeTab === "inventory" && <InventoryModule />}
         {activeTab === "deliveries" && <DeliveryModule />}
         {activeTab === "post_sale" && <PostSaleModule />}
 
