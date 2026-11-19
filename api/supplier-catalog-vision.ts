@@ -21,14 +21,27 @@ export default async function handler(req: any,res: any){
   if(!images.length||images.length>8)return res.status(400).json({error:"Envie entre 1 e 8 páginas ou imagens por importação."});
   const parts:any[]=[{text:"Você é um especialista técnico em catálogos de esquadrias de alumínio, vidro e ferragens. Analise visualmente cada página/foto. Extraia somente dados visíveis e legíveis. Identifique o nome do fornecedor impresso no logotipo, cabeçalho, rodapé ou identificação do catálogo; se não estiver visível, retorne string vazia, nunca invente. Para cada item retorne também o nome do fornecedor que o documento associa à peça. Uma peça esquerda e uma direita são produtos distintos; preserve códigos e sufixos exatamente. Identifique lado (esquerdo/direito/central/não identificado), posição/uso, espessura e comprimento em milímetros, peso e preço. Não confunda números de dimensão, quantidade, referência ou preço. Se houver várias peças na mesma página, gere um produto por peça. Categoria deve ser Perfil de alumínio, Vidro, Ferragem, Acessório, Janela, Porta, Box de banheiro, Serviço ou Outro. Preço ausente deve ser null, nunca zero. Dimensões/peso não legíveis devem ser omitidos. Não invente nem complete referências. confidence entre 0 e 1. notes descreve dúvidas e texto ilegível. page é o número da página fornecido."}];
   for(const image of images){if(typeof image.data!=="string"||image.data.length>9_000_000||!/^image\/(jpeg|png|webp)$/i.test(String(image.mimeType)))return res.status(400).json({error:"Imagem inválida ou demasiado grande."});parts.push({text:"Página "+Number(image.page||1)+":"},{inlineData:{mimeType:image.mimeType,data:image.data}});}
-  const model=process.env.ANACLETO_CATALOG_VISION_MODEL||"gemini-3.8-flash";const client=new GoogleGenAI({apiKey:key});
-  let result:any=null;let lastError:any=null;
-  for(let attempt=0;attempt<3;attempt++){
-   try{result=await client.models.generateContent({model,contents:[{role:"user",parts}],config:{responseMimeType:"application/json",responseSchema:schema,temperature:0.1,maxOutputTokens:8192}});lastError=null;break;}
-   catch(error:any){lastError=error;const status=Number(error?.status||error?.response?.status||0);if(![503,429,500].includes(status)||attempt===2)break;await new Promise(resolve=>setTimeout(resolve,1200*Math.pow(2,attempt)));}
+  const primaryModel=process.env.ANACLETO_CATALOG_VISION_MODEL||"gemini-3.8-flash";
+  const fallbackModels=(process.env.ANACLETO_CATALOG_VISION_FALLBACK_MODELS||"gemini-3.5-flash-lite").split(",").map((m:string)=>m.trim()).filter(Boolean);
+  const models=[...new Set([primaryModel,...fallbackModels])];
+  const client=new GoogleGenAI({apiKey:key});
+  let result:any=null;let lastError:any=null;let usedModel=primaryModel;
+  const readStatus=(error:any)=>Number(error?.status||error?.statusCode||error?.response?.status||error?.cause?.status||0);
+  modelLoop: for(const candidate of models){
+   for(let attempt=0;attempt<2;attempt++){
+    try{
+     result=await client.models.generateContent({model:candidate,contents:[{role:"user",parts}],config:{responseMimeType:"application/json",responseSchema:schema,temperature:0.1,maxOutputTokens:8192}});
+     usedModel=candidate;lastError=null;break modelLoop;
+    }catch(error:any){
+     lastError=error;const status=readStatus(error);
+     console.error("Supplier catalog Gemini attempt failed",{model:candidate,attempt:attempt+1,status,message:String(error?.message||"")});
+     if(![429,500,503,504].includes(status))break;
+     if(attempt===0)await new Promise(resolve=>setTimeout(resolve,700));
+    }
+   }
   }
   if(lastError)throw lastError;
   const parsed=JSON.parse(result.text||"{\"products\":[]}");const products=(Array.isArray(parsed.products)?parsed.products:[]).map((p:any)=>({...p,price:Number.isFinite(p.price)?p.price:null,confidence:Math.max(0,Math.min(1,Number(p.confidence)||0))}));
-  return res.status(200).json({products,model,reviewRequired:true});
+  return res.status(200).json({products,model:usedModel,primaryModel,usedFallback:usedModel!==primaryModel,reviewRequired:true});
  }catch(error:any){const upstreamStatus=Number(error?.status||error?.response?.status||0);const message=String(error?.message||"Falha interna na interpretação visual.");console.error("Supplier catalog visual extraction failed",{upstreamStatus,message});const modelUnavailable=upstreamStatus===404&&/model|not_found/i.test(message);const temporarilyUnavailable=upstreamStatus===503||upstreamStatus===500;const rateLimited=upstreamStatus===429;const status=modelUnavailable?502:temporarilyUnavailable?503:rateLimited?429:502;const code=modelUnavailable?"GEMINI_MODEL_UNAVAILABLE":temporarilyUnavailable?"GEMINI_TEMPORARILY_UNAVAILABLE":rateLimited?"GEMINI_RATE_LIMIT":"GEMINI_UPSTREAM_ERROR";const errorMessage=modelUnavailable?"O modelo Gemini configurado não está disponível.":temporarilyUnavailable?"O Gemini está temporariamente sobrecarregado. Aguarde alguns segundos e tente importar novamente.":rateLimited?"Limite temporário de solicitações do Gemini. Aguarde e tente novamente.":message;return res.status(status).json({error:errorMessage,code,upstreamStatus:upstreamStatus||null,retryable:temporarilyUnavailable||rateLimited});}
 }
