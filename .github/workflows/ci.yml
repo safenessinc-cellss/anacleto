@@ -21,8 +21,17 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Refresh lockfile for declared security overrides
+        run: npm install --package-lock-only --ignore-scripts
       - name: Install dependencies
         run: npm ci
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Report full dependency audit
+        run: |
+          npm audit --audit-level=moderate || {
+            echo "::warning::Full audit still reports the upstream picomatch advisory in development/build tooling. No patched picomatch release is currently available; keep it out of runtime dependencies and monitor upstream."
+          }
       - name: TypeScript validation
         run: npm run lint
       - name: Production build

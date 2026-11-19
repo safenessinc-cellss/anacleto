@@ -19,6 +19,7 @@ import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from
 import CatalogModule from "./catalog/CatalogModule";
 import RegistryModule from "./registry/RegistryModule";
 import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
+import TechnicalCatalogModule from "./supplier-catalog/TechnicalCatalogModule";
 import logoImg from "../assets/images/anacleto-logo-premium.svg";
 import BusinessWorkspace from "./workspace/BusinessWorkspace";
 import PostSaleModule from "./post-sale/PostSaleModule";
@@ -184,7 +185,7 @@ export default function AnacletoProApp({
       { id: "materials", label: "Materiais de Produção" },
     ] },
     { id: "catalog", label: "Catálogo & Estoque", icon: Package, tabs: [
-      { id: "cadastro_items", label: "Catálogo de Fornecedores" },
+      { id: "cadastro_items", label: "Catálogo Técnico e Fornecedores" },
       { id: "products", label: "Esquadrias" },
       { id: "catalog", label: "Produtos" },
       { id: "services", label: "Serviços" },
@@ -388,7 +389,7 @@ export default function AnacletoProApp({
           {activeTab === "agenda" && (<AgendaModule language={language} />)}
 
           {activeTab === "catalog" && <CatalogModule />}
-          {activeTab === "cadastro_items" && <div className="space-y-8"><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}
+          {activeTab === "cadastro_items" && <div className="space-y-8"><TechnicalCatalogModule /><RegistryModule kind="items" /><div className="border-t border-slate-200 pt-6 dark:border-slate-800"><SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} /></div></div>}
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
           {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
