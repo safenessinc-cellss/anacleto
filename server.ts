@@ -26,7 +26,7 @@ dotenv.config();
 const app = express();
 const httpServer = http.createServer(app);
 app.use(express.json({ limit: "16mb" }));
-app.post("/api/supplier-catalog-vision", (req, res) => supplierCatalogVisionHandler(req, res));
+app.post(["/api/supplier-catalog-vision", "/api/supplier/catalogo"], (req, res) => supplierCatalogVisionHandler(req, res));
 app.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
 app.post("/api/generate-3d-render", generate3DRenderHandler);
 
