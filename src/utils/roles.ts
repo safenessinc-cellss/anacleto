@@ -38,7 +38,8 @@ export type NavigationTab =
   | "post_sale"
   | "deliveries"
   | "inventory"
-  | "production";
+  | "production"
+  | "workflow";
 
 export interface RoleConfig {
   id: Role;
@@ -54,7 +55,7 @@ export interface RoleConfig {
 
 const ALL_TABS: NavigationTab[] = [
   "dashboard", "crm", "quotes", "invoices", "technical_drawing",
-  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries", "inventory", "production",
+  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries", "inventory", "production", "workflow",
 ];
 
 export const ROLES: Record<Role, RoleConfig> = {
@@ -109,7 +110,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     level: 40,
     color: "bg-blue-100 text-blue-800 border-blue-300",
     description: "Supervisa equipos y operaciones. El acceso financiero y de nómina requiere un perfil autorizado.",
-    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries", "production"],
+    tabs: ["dashboard", "crm", "quotes", "invoices", "technical_drawing", "agenda", "catalog", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries", "production", "workflow"],
     canManageUsers: false,
     canManageRolesBelow: [],
   },
@@ -142,7 +143,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     id: "qualidade", label: "Qualidade", labelPT: "Qualidade", level: 30,
     color: "bg-teal-100 text-teal-800 border-teal-300",
     description: "Inspeções, entregas, garantias e pós-venda.",
-    tabs: ["dashboard", "post_sale", "deliveries", "reports", "profile", "suggestions"],
+    tabs: ["dashboard", "post_sale", "deliveries", "workflow", "reports", "profile", "suggestions"],
     canManageUsers: false, canManageRolesBelow: [],
   },
   estoque: {
@@ -156,7 +157,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     id: "producao", label: "Produção", labelPT: "Produção", level: 25,
     color: "bg-violet-100 text-violet-800 border-violet-300",
     description: "Ordens de produção, etapas, consumo de materiais e apontamentos.",
-    tabs: ["dashboard", "production", "technical_drawing", "projects", "inventory", "profile", "suggestions"],
+    tabs: ["dashboard", "production", "workflow", "technical_drawing", "projects", "inventory", "profile", "suggestions"],
     canManageUsers: false, canManageRolesBelow: [],
   },
   usuario: {
