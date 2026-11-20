@@ -42,7 +42,8 @@ Gerar a lista de materiais (BOM) a partir de fabricante, linha, tipologia, confi
 
 ### Preços
 - fornecedor, linha, código, acabamento e unidade de venda;
-- preço unitário BRL, data, validade, frete e fonte;
+- preço unitário BRL, unidade original, data, validade, frete confirmado e fonte;
+- `shippingConfirmed=true` é obrigatório; informe zero apenas quando retirada/frete grátis estiver realmente confirmado;
 - cotação online começa pendente e só entra na comparação após revisão.
 
 ## Limites e controles
@@ -52,7 +53,7 @@ Gerar a lista de materiais (BOM) a partir de fabricante, linha, tipologia, confi
 - Conversão kg/barra usa peso linear kg/m × comprimento comercial em metros. Conversão metro/barra usa comprimento comercial em metros.
 - Cotações de busca não são preços confirmados; precisam de conferência manual e aprovação.
 - A comparação usa apenas preços aprovados, recentes (30 dias), com validade vigente, e não compara itens tecnicamente incompatíveis.
-- Frete armazenado por cotação é tratado como custo de frete da cesta, sem multiplicação por item.
+- Frete precisa estar confirmado em cada cotação selecionada; ausência de confirmação torna a cesta incompleta. O maior frete informado é aplicado uma vez à cesta para evitar multiplicação por componente.
 - O BOM é completo em relação aos registros técnicos verificados existentes; a qualidade da cobertura depende da manutenção dos catálogos e das regras.
 - Os endpoints exigem autenticação Firebase. O proprietário exclusivo `safeness.c.a@gmail.com` permanece preservado.
 
