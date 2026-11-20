@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
-import { Calculator, Plus, Save, Trash2, LockKeyhole, AlertTriangle, Copy, RefreshCw } from "lucide-react";
+import { Calculator, Plus, Save, Trash2, LockKeyhole, AlertTriangle, Copy } from "lucide-react";
 import { auth, db } from "../../firebase";
 import type { Quote } from "../../types";
 
@@ -70,7 +70,6 @@ export default function InternalQuoteCostsModule() {
 
   const selectedQuote = quotes.find(q => q.id === selectedQuoteId) || null;
   const revisionKey = selectedQuote ? revisionOf(selectedQuote) : "";
-  const activeSheet = sheets.find(s => s.quoteId === selectedQuoteId && s.revisionKey === revisionKey) || null;
   const latestSheet = sheets.find(s => s.quoteId === selectedQuoteId) || null;
   const isStale = !!latestSheet && latestSheet.revisionKey !== revisionKey;
 
