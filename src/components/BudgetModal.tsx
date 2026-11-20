@@ -41,6 +41,27 @@ export default function BudgetModal({
   const [items, setItems] = useState<BudgetLineItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const loadTechnicalOptions = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const response = await fetch("/api/supplier/technical-options", {
+          headers: { Authorization: "Bearer " + await user.getIdToken() }
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.error || "Não foi possível carregar os sistemas técnicos.");
+        if (active) setTechnicalOptions(Array.isArray(data?.systems) ? data.systems : []);
+      } catch (error) {
+        if (active) setTechnicalOptionsError(error instanceof Error ? error.message : "Falha ao carregar sistemas técnicos.");
+      }
+    };
+    void loadTechnicalOptions();
+    return () => { active = false; };
+  }, [isOpen]);
+
   // NIF search & auto-fill states
   const [isSearchingNif, setIsSearchingNif] = useState(false);
   const [nifFoundInfo, setNifFoundInfo] = useState<{ name: string; email: string; address?: string } | null>(null);
@@ -119,6 +140,8 @@ export default function BudgetModal({
   const [marketResults, setMarketResults] = useState<any[]>([]);
   const [bomForm, setBomForm] = useState({ manufacturer: "", line: "", typology: "Janela de correr 2 folhas", configuration: "2 folhas", widthMm: "1500", heightMm: "1200", quantity: "1", finish: "Branco" });
   const [bomData, setBomData] = useState<any>(null);
+  const [technicalOptions, setTechnicalOptions] = useState<any[]>([]);
+  const [technicalOptionsError, setTechnicalOptionsError] = useState("");
   const [bomError, setBomError] = useState("");
   const [isGeneratingBom, setIsGeneratingBom] = useState(false);
   const [comparisons, setComparisons] = useState<any[]>([]);
@@ -664,9 +687,15 @@ export default function BudgetModal({
                 {([
                   ["manufacturer","Fabricante"],["line","Linha / sistema"],["typology","Tipologia"],["configuration","Configuração"],["widthMm","Largura (mm)"],["heightMm","Altura (mm)"],["quantity","Quantidade"],["finish","Acabamento"]
                 ] as const).map(([key,label]) => <label key={key} className="text-xs font-semibold text-slate-600 dark:text-slate-300">{label}
-                  <input value={bomForm[key]} onChange={e=>setBomForm(v=>({...v,[key]:e.target.value}))} type={["widthMm","heightMm","quantity"].includes(key)?"number":"text"} min={["widthMm","heightMm","quantity"].includes(key)?"1":undefined} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"/>
+                  <input value={bomForm[key]} onChange={e=>setBomForm(v=>({...v,[key]:e.target.value}))} list={key==="manufacturer"?"bom-manufacturers":key==="line"?"bom-lines":key==="typology"?"bom-typologies":key==="configuration"?"bom-configurations":key==="finish"?"bom-finishes":undefined} type={["widthMm","heightMm","quantity"].includes(key)?"number":"text"} min={["widthMm","heightMm","quantity"].includes(key)?"1":undefined} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"/>
                 </label>)}
               </div>
+              <datalist id="bom-manufacturers">{[...new Set(technicalOptions.map((x:any)=>x.manufacturer))].map((x:any)=><option key={x} value={x}/>)}</datalist>
+              <datalist id="bom-lines">{[...new Set(technicalOptions.filter((x:any)=>!bomForm.manufacturer||x.manufacturer===bomForm.manufacturer).map((x:any)=>x.line))].map((x:any)=><option key={x} value={x}/>)}</datalist>
+              <datalist id="bom-typologies">{[...new Set(technicalOptions.filter((x:any)=>!bomForm.manufacturer||x.manufacturer===bomForm.manufacturer).filter((x:any)=>!bomForm.line||x.line===bomForm.line).map((x:any)=>x.typology))].map((x:any)=><option key={x} value={x}/>)}</datalist>
+              <datalist id="bom-configurations">{[...new Set(technicalOptions.filter((x:any)=>!bomForm.manufacturer||x.manufacturer===bomForm.manufacturer).filter((x:any)=>!bomForm.line||x.line===bomForm.line).filter((x:any)=>!bomForm.typology||x.typology===bomForm.typology).map((x:any)=>x.configuration))].map((x:any)=><option key={x} value={x}/>)}</datalist>
+              <datalist id="bom-finishes">{[...new Set(technicalOptions.map((x:any)=>x.finish).filter(Boolean))].map((x:any)=><option key={x} value={x}/>)}</datalist>
+              {technicalOptionsError&&<p className="text-[10px] text-amber-700">{technicalOptionsError}</p>}
               <button type="button" onClick={handleGenerateBom} disabled={isGeneratingBom} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-50">
                 {isGeneratingBom ? "Gerando despiece..." : "Gerar lista completa de materiais"}
               </button>
