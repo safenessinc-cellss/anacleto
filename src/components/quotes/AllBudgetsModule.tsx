@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { FileText, Search, Sparkles, Calculator, Pencil } from "lucide-react";
+import { FileText, Search, Pencil } from "lucide-react";
 import { db } from "../../firebase";
 
 export type BudgetWorkflow = "standard" | "smart" | "technical";
@@ -42,7 +42,6 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
   }), [rows, search, status]);
 
   const workflowLabel = (workflow: BudgetWorkflow) => workflow === "smart" ? "Inteligente · IA" : workflow === "technical" ? "Esquadrias · Técnico" : "Tradicional";
-  const WorkflowIcon = ({ workflow }: { workflow: BudgetWorkflow }) => workflow === "smart" ? <Sparkles className="h-4 w-4"/> : workflow === "technical" ? <Calculator className="h-4 w-4"/> : <FileText className="h-4 w-4"/>;
 
   return <main className="space-y-5">
     <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
