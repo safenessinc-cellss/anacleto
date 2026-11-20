@@ -164,7 +164,7 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
           </div>
           <div className="exploded-proof"><span><b>01</b> DESIGN SOB MEDIDA</span><i/><span><b>02</b> PRECISÃO TÉCNICA</span></div>
         </div>
-        <div className="exploded-stage" style={{backgroundImage:"linear-gradient(90deg,rgba(8,18,28,.18),rgba(8,18,28,.02)),url(https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1800&q=90)",backgroundSize:"cover",backgroundPosition:"center"}}>
+        <div className="exploded-stage">
           <div className="exploded-stage-label"><span>JANELA REAL · REFERÊNCIA HIPER-REALISTA</span><span>ANATOMIA / SISTEMA CORREDIÇO</span></div>
           <div className="exploded-art"><img className="exploded-window" src="/images/anacleto/janela-explodida.webp" alt="Conjunto de janela de correr em alumínio com perfis, folhas, vidro e ferragens apresentados em composição técnica" fetchPriority="high" onError={event=>{event.currentTarget.onerror=null;event.currentTarget.src="/images/anacleto/despiece-tecnico.webp";}}/></div>
           <a className="exploded-360" href="#showroom"><span className="exploded-360-icon"><Move3D size={23}/></span><b>360°</b><span>Gire e explore</span><small>MODELO INTERATIVO · 3D</small></a>
