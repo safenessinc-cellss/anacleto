@@ -73,14 +73,14 @@ export default async function handler(req: any, res: any) {
       && !!row.source?.sourceDocumentId
       && Number.isInteger(Number(row.source?.sourcePage)) && Number(row.source.sourcePage)>=1
       && !!row.reviewedBy && !!row.reviewedAt;
-    const profiles: any[]=technicalProducts.filter(row=>row.kind==="aluminum_profile"&&verified(row)).map(row=>({
+    const profiles: any[]=technicalProducts.filter(row=>row.kind==="aluminum_profile"&&verified(row)).map((row): any=>({
       ...row, code:row.manufacturerCode, description:row.description,
       commercialLengthMm:Number(row.technicalProperties?.commercialLengthMm||row.technicalProperties?.barLengthMm||0),
       weightKgM:Number(row.technicalProperties?.weightKgM||0), finish:row.finish||"",
       documentId:row.source.sourceDocumentId,page:row.source.sourcePage,
       technicalProductId:row.id
     }));
-    const hardware: any[]=technicalProducts.filter(row=>["hardware","seal","fastener","glass","consumable"].includes(row.kind)&&verified(row)).map(row=>({
+    const hardware: any[]=technicalProducts.filter(row=>["hardware","seal","fastener","glass","consumable"].includes(row.kind)&&verified(row)).map((row): any=>({
       ...row, code:row.manufacturerCode, description:row.description,
       quantity:Number(row.technicalProperties?.quantity||0),
       quantityFormula:String(row.technicalProperties?.quantityFormula||""),
