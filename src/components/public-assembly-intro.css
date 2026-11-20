@@ -7,7 +7,7 @@
 .assembly-copy h1 em{color:#9fd7ff}
 .assembly-top,.assembly-status span,.assembly-status strong{color:#e5f1fa;text-shadow:0 2px 12px #06121d80}
 .assembly-skip{background:rgba(255,255,255,.9);color:#172b40}
-.assembly-fallback{z-index:2;opacity:.15;pointer-events:none}
+.assembly-fallback{z-index:2;opacity:.68;pointer-events:none}
 .assembly-stage canvas{z-index:2}
 
 
