@@ -69,6 +69,8 @@ export default function TechnicalLibraryModule() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
+  const [importManufacturer, setImportManufacturer] = useState("");
+  const [importLine, setImportLine] = useState("");
   const pdfInputRef = React.useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -138,6 +140,7 @@ export default function TechnicalLibraryModule() {
     }
     const user = auth.currentUser;
     if (!user) { setError("Entre novamente para importar o catálogo."); return; }
+    if (!importManufacturer.trim() || !importLine.trim()) { setError("Informe o fabricante e a linha antes de importar o PDF."); return; }
     setImportingPdf(true);
     setError("");
     try {
@@ -172,7 +175,7 @@ export default function TechnicalLibraryModule() {
       }
       await pdfTask.destroy();
       const docRef = await addDoc(collection(db, "technical_documents"), {
-        manufacturer: "", line: "", title: file.name, version: "", sourceUrl: downloadUrl,
+        manufacturer: importManufacturer.trim(), line: importLine.trim(), title: file.name, version: "", sourceUrl: downloadUrl,
         storagePath: path, originalFileName: file.name, mimeType: "application/pdf",
         fileSize: file.size, pageCount: pdf.numPages, status: "pending_review",
         extractionMethod: "pdf_text_layer_regex", extractedProfileCount: candidates.length,
@@ -181,7 +184,7 @@ export default function TechnicalLibraryModule() {
       if (candidates.length) {
         for (const candidate of candidates) {
           await addDoc(collection(db, "aluminum_profiles"), {
-            manufacturer: "", line: "", code: candidate.code, description: candidate.excerpt,
+            manufacturer: importManufacturer.trim(), line: importLine.trim(), code: candidate.code, description: candidate.excerpt,
             weightKgM: candidate.weightKgM, documentId: docRef.id, page: candidate.page,
             sourceUrl: downloadUrl, status: "pending_review", extractionMethod: "pdf_text_layer_regex",
             createdBy: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
@@ -232,7 +235,7 @@ export default function TechnicalLibraryModule() {
         <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">Biblioteca Técnica</h1>
         <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">Base técnica rastreável para alimentar despiece, consumo de alumínio, ferragens e orçamentos.</p>
       </div>
-      <div className="flex flex-wrap gap-2"><input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => importTechnicalPdf(e.target.files?.[0])}/><button onClick={() => pdfInputRef.current?.click()} disabled={importingPdf} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Upload size={16}/>{importingPdf ? "Importando PDF..." : "Importar catálogo PDF"}</button><button onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><Plus size={17}/>Novo registro</button></div>
+      <div className="flex flex-wrap items-center gap-2"><input value={importManufacturer} onChange={e => setImportManufacturer(e.target.value)} placeholder="Fabricante" aria-label="Fabricante do catálogo" className="w-32 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"/><input value={importLine} onChange={e => setImportLine(e.target.value)} placeholder="Linha / sistema" aria-label="Linha do catálogo" className="w-36 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"/><input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => importTechnicalPdf(e.target.files?.[0])}/><button onClick={() => pdfInputRef.current?.click()} disabled={importingPdf} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Upload size={16}/>{importingPdf ? "Importando PDF..." : "Importar catálogo PDF"}</button><button onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><Plus size={17}/>Novo registro</button></div>
     </header>
 
     <div className="grid gap-3 md:grid-cols-3">
