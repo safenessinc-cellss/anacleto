@@ -109,7 +109,8 @@ export default async function handler(req: any, res: any) {
           unit:isProfile?"bar":unit,cutLengthsMm:cuts,
           commercialBarLengthMm:isProfile?commercialLength:undefined,kerfMm:Number(rule.kerfMm||3),
           manufacturer,system:line,finish:componentFinish,weightKgM:Number(profile?.weightKgM||0)||undefined,compatibilityKey:[manufacturer,line,code,componentFinish].join(":").toLowerCase(),
-          required:true,sourceDocumentId:rule.documentId||profile?.documentId||"",sourcePage:Number(rule.page||profile?.page||0)||undefined,
+          required:true,glassType:rule.glassType||"",glassThicknessMm:Number(rule.glassThicknessMm||0)||undefined,
+          sourceDocumentId:rule.documentId||profile?.documentId||"",sourcePage:Number(rule.page||profile?.page||0)||undefined,
           ruleId:rule.id,technicalStatus:"verified",formula:rule.formula
         });
       } catch(error:any) { errors.push("Regra "+String(rule.id)+": "+String(error?.message||"fórmula inválida")); }
