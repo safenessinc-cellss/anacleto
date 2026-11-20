@@ -176,7 +176,13 @@ export function calculateAluminumCost(input: AluminumCostInput): AluminumCostRes
     const cut = bar.cuts[0];
     return sum + cut.barLengthMm / 1000 * cut.weightKgPerM;
   }, 0);
-  const aluminumConsumptionCost = validCuts.reduce((sum, cut) => sum + cut.lengthMm / 1000 * cut.weightKgPerM * cut.pricePerKg, 0);
+  const aluminumConsumptionCost = validCuts.reduce((sum, cut) => {
+    const barWeightKg = cut.barLengthMm / 1000 * cut.weightKgPerM;
+    const effectivePricePerKg = cut.priceMode === "bar" && barWeightKg > 0
+      ? cut.pricePerBar / barWeightKg
+      : cut.pricePerKg;
+    return sum + cut.lengthMm / 1000 * cut.weightKgPerM * effectivePricePerKg;
+  }, 0);
   const aluminumPurchaseCost = bars.reduce((sum, bar) => {
     const cut = bar.cuts[0];
     return sum + (cut.priceMode === "bar" ? cut.pricePerBar : cut.barLengthMm / 1000 * cut.weightKgPerM * cut.pricePerKg);
