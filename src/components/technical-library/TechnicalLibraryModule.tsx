@@ -72,6 +72,18 @@ const OFFICIAL_SOURCES = [
     ]
   },
   {
+    manufacturer: "Perfil Alumínio",
+    country: "Brasil",
+    url: "https://cliente.perfilaluminio.com.br/material-tecnico/catalogos-tecnicos/",
+    lines: "Gradline, Wallframe, Erus, Vantor 90º, Unnion, Ecoline 2.5, Chroma, Ecostick, Fachadas e outras linhas",
+    note: "Portal técnico oficial com catálogos, materiais técnicos, laudos e arquivos BIM.",
+    catalogs: [
+      { title: "Catálogos Técnicos", line: "Geral", url: "https://cliente.perfilaluminio.com.br/material-tecnico/catalogos-tecnicos/" },
+      { title: "Catálogo de Perfis", line: "Perfis", url: "https://cliente.perfilaluminio.com.br/catalogo/" },
+      { title: "Material Técnico", line: "Documentação", url: "https://cliente.perfilaluminio.com.br/material-tecnico/" }
+    ]
+  },
+  {
     manufacturer: "Alumiconte",
     country: "Brasil · Rio Grande do Sul",
     url: "https://www.alumiconte.com.br/catalogos/",
