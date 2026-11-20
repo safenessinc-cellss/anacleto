@@ -90,7 +90,10 @@ export default async function handler(req: any, res: any) {
       technicalProductId:row.id
     }));
     const eq=(a:any,b:string)=>String(a||"").trim().toLowerCase()===b.toLowerCase();
-    const matchedRules=rules.filter(row=>verified(row)&&eq(row.manufacturer,manufacturer)&&eq(row.line,line)&&eq(row.typology,typology)&&(!row.configuration||!configuration||eq(row.configuration,configuration)));
+    const matchedRules=rules.filter(row=>row.status==="verified"&&row.reviewStatus!=="rejected"
+      &&!!row.documentId&&Number.isInteger(Number(row.page))&&Number(row.page)>=1
+      &&eq(row.manufacturer,manufacturer)&&eq(row.line,line)&&eq(row.typology,typology)
+      &&(!row.configuration||!configuration||eq(row.configuration,configuration)));
     const errors:string[]=[], bom:any[]=[];
     if(!matchedRules.length) errors.push("Nenhuma regra de corte verificada corresponde ao fabricante, linha, tipologia e configuração selecionados.");
     const profilePool=profiles.filter(row=>verified(row)&&eq(row.manufacturer,manufacturer)&&eq(row.line,line)&&(!finish||!row.finish||eq(row.finish,finish)));
