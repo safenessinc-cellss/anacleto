@@ -74,6 +74,35 @@ export interface SupplierComparison {
 }
 
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+function normalizePurchaseUnit(value: string): string {
+  const unit = value.trim().toLowerCase();
+  if (["bar", "barra", "barras"].includes(unit)) return "bar";
+  if (["piece", "un", "unidade", "unidades", "peça", "peças", "pc"].includes(unit)) return "piece";
+  if (["m", "metro", "metros", "meter"].includes(unit)) return "meter";
+  if (["m2", "m²", "metro quadrado"].includes(unit)) return "m2";
+  if (["kg", "quilo", "quilograma"].includes(unit)) return "kg";
+  return unit;
+}
+
+/** Converts a supplier's unit price into the BOM purchase unit only when the conversion basis is verified. */
+export function convertSupplierPriceToPurchaseUnit(
+  unitPrice: number,
+  sourceUnit: string,
+  targetUnit: string,
+  basis: { commercialBarLengthMm?: number; weightKgM?: number } = {}
+): number | null {
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0) return null;
+  const source = normalizePurchaseUnit(sourceUnit);
+  const target = normalizePurchaseUnit(targetUnit);
+  if (source === target) return roundMoney(unitPrice);
+  const lengthM = Number(basis.commercialBarLengthMm || 0) / 1000;
+  if (target === "bar" && source === "meter" && lengthM > 0) return roundMoney(unitPrice * lengthM);
+  if (target === "bar" && source === "kg" && lengthM > 0 && Number(basis.weightKgM) > 0) {
+    return roundMoney(unitPrice * lengthM * Number(basis.weightKgM));
+  }
+  return null;
+}
 const validDate = (value?: string) => {
   if (!value) return false;
   const time = Date.parse(value);
