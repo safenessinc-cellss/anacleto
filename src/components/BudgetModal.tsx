@@ -484,45 +484,6 @@ export default function BudgetModal({
               </div>
             </div>
 
-            {/* Online market research panel */}
-            <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <PackageSearch className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">Pesquisa de preços de mercado</h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Pesquisa ofertas online para os materiais descritos no orçamento, considerando Sapucaia do Sul/RS.</p>
-                </div>
-              </div>
-              <button type="button" onClick={handleMarketResearch} disabled={isSearchingMarket || !items.some((item) => item.description.trim())}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
-                {isSearchingMarket ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Search className="h-4 w-4" />}
-                {isSearchingMarket ? "Pesquisando fornecedores..." : "Pesquisar preços online"}
-              </button>
-              {marketError && <p className="text-xs text-rose-600">{marketError}</p>}
-              {marketSearchedAt && <p className="text-[10px] text-slate-500">Pesquisa realizada em {new Date(marketSearchedAt).toLocaleString("pt-BR")} · até 12 itens.</p>}
-              {marketResults.map((result: any) => (
-                <div key={result.item?.id || result.searchTerm} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 space-y-2">
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{result.item?.description || "Material"}</p>
-                  {!result.offers?.length && <p className="text-xs text-amber-700 dark:text-amber-400">Nenhuma oferta encontrada. Solicite cotação direta ao fornecedor.</p>}
-                  {(result.offers || []).map((offer: any, index: number) => (
-                    <div key={offer.url + index} className="border-t border-slate-100 dark:border-slate-800 pt-2 text-xs">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-800 dark:text-slate-200">{offer.title}</p>
-                          <p className="text-slate-500">{offer.domain}</p>
-                          {offer.prices?.length > 0 ? <p className="font-semibold text-indigo-700 dark:text-indigo-300">Preço candidato: {offer.prices.map((price: number) => price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })).join(" / ")}</p> : <p className="text-slate-500">Preço não identificado na pesquisa.</p>}
-                          <p className="text-[10px] text-amber-700 dark:text-amber-400">Não verificado · confirme código, acabamento, unidade, estoque, frete e validade.</p>
-                        </div>
-                        <a href={offer.url} target="_blank" rel="noreferrer" className="shrink-0 inline-flex items-center gap-1 text-indigo-600 hover:underline">
-                          Abrir <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-
             {/* Line items section */}
             <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
               <div className="flex items-center justify-between mb-4">
@@ -596,6 +557,45 @@ export default function BudgetModal({
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Online market research panel */}
+            <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <PackageSearch className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">Pesquisa de preços de mercado</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Pesquisa ofertas online para os materiais descritos no orçamento, considerando Sapucaia do Sul/RS.</p>
+                </div>
+              </div>
+              <button type="button" onClick={handleMarketResearch} disabled={isSearchingMarket || !items.some((item) => item.description.trim())}
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
+                {isSearchingMarket ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Search className="h-4 w-4" />}
+                {isSearchingMarket ? "Pesquisando fornecedores..." : "Pesquisar preços online"}
+              </button>
+              {marketError && <p className="text-xs text-rose-600">{marketError}</p>}
+              {marketSearchedAt && <p className="text-[10px] text-slate-500">Pesquisa realizada em {new Date(marketSearchedAt).toLocaleString("pt-BR")} · até 12 itens.</p>}
+              {marketResults.map((result: any) => (
+                <div key={result.item?.id || result.searchTerm} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 space-y-2">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{result.item?.description || "Material"}</p>
+                  {!result.offers?.length && <p className="text-xs text-amber-700 dark:text-amber-400">Nenhuma oferta encontrada. Solicite cotação direta ao fornecedor.</p>}
+                  {(result.offers || []).map((offer: any, index: number) => (
+                    <div key={offer.url + index} className="border-t border-slate-100 dark:border-slate-800 pt-2 text-xs">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 dark:text-slate-200">{offer.title}</p>
+                          <p className="text-slate-500">{offer.domain}</p>
+                          {offer.prices?.length > 0 ? <p className="font-semibold text-indigo-700 dark:text-indigo-300">Preço candidato: {offer.prices.map((price: number) => price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })).join(" / ")}</p> : <p className="text-slate-500">Preço não identificado na pesquisa.</p>}
+                          <p className="text-[10px] text-amber-700 dark:text-amber-400">Não verificado · confirme código, acabamento, unidade, estoque, frete e validade.</p>
+                        </div>
+                        <a href={offer.url} target="_blank" rel="noreferrer" className="shrink-0 inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                          Abrir <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
 
             {/* Datalist for autocomplete */}
