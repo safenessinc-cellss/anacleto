@@ -300,7 +300,7 @@ service cloud.firestore {
     }
     match /supplier_offers/{id} {
       allow read: if canOperate() || canManageFinance();
-      allow create: if canManageCommercial() || canManageFinance()
+      allow create: if (canManageCommercial() || canManageFinance())
         && request.resource.data.status == 'pending_review'
         && request.resource.data.priceStatus == 'pending_review'
         && request.resource.data.technicalProductId is string
