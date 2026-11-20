@@ -71,7 +71,7 @@ service cloud.firestore {
       allow update: if canManageCommercial();
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
-    match /quotes/{id} {
+    // Orçamentos técnicos de esquadrias: histórico e edição no fluxo de origem.\n    match /technical_budgets/{id} {\n      allow read: if canManageCommercial() || canManageFinance();\n      allow create, update: if canManageCommercial();\n      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);\n    }\n    match /quotes/{id} {
       allow read: if canOperate() || canManageProduction() || canManageFinance() || canManageQuality();
       allow create: if canManageCommercial();
       allow update: if (
