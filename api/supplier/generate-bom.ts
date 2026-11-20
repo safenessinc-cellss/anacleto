@@ -89,8 +89,10 @@ export default async function handler(req: any, res: any) {
     if (!user?.localId || !user?.email) return res.status(401).json({error:"Usuário não autenticado."});
     const databaseId= firebaseConfig.firestoreDatabaseId || "(default)";
     if (String(user.email).toLowerCase() !== OWNER_EMAIL) {
-      const admins=await collectionDocs(firebaseConfig.projectId,databaseId,"admins",token);
-      const admin=admins.find(row=>String(row.id).toLowerCase()===String(user.email).toLowerCase());
+      const adminUrl="https://firestore.googleapis.com/v1/projects/"+firebaseConfig.projectId+"/databases/"+encodeURIComponent(databaseId)+"/documents/admins/"+encodeURIComponent(String(user.email).toLowerCase());
+      const adminResponse=await fetch(adminUrl,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(10000)});
+      const adminData:any=adminResponse.ok?await adminResponse.json():null;
+      const admin={role:adminData?.fields?.role?.stringValue||""};
       const allowed=["super_admin","super_usuario","ceo","admin","supervisor","colaborador"];
       if (!admin || !allowed.includes(String(admin.role||""))) return res.status(403).json({error:"Perfil sem permissão para gerar despiece técnico."});
     }
@@ -118,7 +120,7 @@ export default async function handler(req: any, res: any) {
     for(const rule of matchedRules) {
       const profile=profilePool.find(row=>eq(row.code,String(rule.profileCode||"")));
       if(!profile) { errors.push("Perfil " + String(rule.profileCode||"(sem código)") + " sem cadastro verificado compatível."); continue; }
-      const vars={W:width,H:height,L:width,Q:quantity};
+      const vars={W:width,H:height,L:width,Q:1};
       try {
         const isProfile=String(rule.category||"aluminum_profile")==="aluminum_profile";
         const unit=String(rule.unit||(isProfile?"bar":"piece"));
@@ -168,8 +170,25 @@ export default async function handler(req: any, res: any) {
           sourceDocumentId:part.documentId||"",sourcePage:Number(part.page||0)||undefined,ruleId:part.id,technicalStatus:"verified"});
       } catch(error:any) { errors.push("Acessório "+String(part.code||part.description)+": "+String(error?.message||"fórmula inválida")); }
     }
-    return res.status(200).json({manufacturer,line,typology,configuration,widthMm:width,heightMm:height,quantity,finish,bom,
-      errors,complete:errors.length===0&&bom.length>0,generatedAt:new Date().toISOString(),
+    const grouped=new Map<string,any>();
+    for(const part of bom){
+      if(part.category!=="aluminum_profile"){grouped.set(part.id,part);continue;}
+      const key=part.compatibilityKey;
+      const existing=grouped.get(key);
+      if(!existing){grouped.set(key,{...part,sourceReferences:[{documentId:part.sourceDocumentId,page:part.sourcePage,ruleId:part.ruleId}]});}
+      else {
+        existing.cutLengthsMm=[...(existing.cutLengthsMm||[]),...(part.cutLengthsMm||[])];
+        existing.sourceReferences.push({documentId:part.sourceDocumentId,page:part.sourcePage,ruleId:part.ruleId});
+      }
+    }
+    const finalBom=[...grouped.values()].map(part=>{
+      if(part.category!=="aluminum_profile")return part;
+      const cuts=[...(part.cutLengthsMm||[])].sort((a:number,b:number)=>b-a),bins:number[]=[];
+      for(const cut of cuts){const kerf=Number(part.kerfMm||3);const i=bins.findIndex(used=>used+(used?kerf:0)+cut<=Number(part.commercialBarLengthMm));if(i<0)bins.push(cut);else bins[i]+=kerf+cut;}
+      return {...part,quantity:bins.length,cutLengthsMm:cuts};
+    });
+    return res.status(200).json({manufacturer,line,typology,configuration,widthMm:width,heightMm:height,quantity,finish,bom:finalBom,
+      errors,complete:errors.length===0&&finalBom.length>0,generatedAt:new Date().toISOString(),
       notice:"Somente regras, perfis e acessórios com status verified foram usados. Variáveis permitidas: W/L=largura em mm, H=altura em mm, Q=quantidade. Fórmulas aceitam apenas + - * / e parênteses."});
   } catch(error:any) {
     console.error("ANACLETO BOM generation failed",error);
