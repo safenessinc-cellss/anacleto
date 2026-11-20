@@ -32,6 +32,16 @@ const baseModels: ArchitecturalModel[] = [
   { id:"oscilobatente", title:"Janela oscilobatente", badge:"Linha Suprema • Dupla abertura", line:"Suprema", model:"Janela Oscilobatente", color:"Prata", panels:1, detail:"Abertura lateral e basculante para ventilação controlada.", image:"https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=90" },
   { id:"basculante", title:"Janela basculante", badge:"Linha Suprema • Basculante", line:"Suprema", model:"Janela Basculante", color:"Verde Oliva", panels:2, detail:"Solução compacta para ventilação superior.", image:"https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1400&q=90" },
 ];
+const doorModels: ArchitecturalModel[] = [
+  { id:"door-sliding-2", title:"Porta de correr · 2 folhas", badge:"ALUMÍNIO • CORRER", line:"Suprema", model:"Porta Balcão", color:"Preto Fosco", panels:2, detail:"Duas folhas deslizantes, trilho inferior duplo e perfis de alumínio com grandes planos de vidro.", image:"https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1400&q=90" },
+  { id:"door-sliding-4", title:"Porta de correr · 4 folhas", badge:"ALUMÍNIO • VÃO AMPLO", line:"Gold", model:"Porta Balcão", color:"Grafite", panels:4, detail:"Quatro folhas para integração entre sala, varanda e jardim, com abertura central ampla.", image:"https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1400&q=90" },
+  { id:"door-folding", title:"Porta camarão articulada", badge:"ALUMÍNIO • ARTICULADA", line:"Gold", model:"Porta Camarão", color:"Bronze", panels:3, detail:"Folhas articuladas que recolhem lateralmente, ferragens e dobradiças para otimizar a passagem.", image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1400&q=90" },
+  { id:"door-hinged", title:"Porta de giro", badge:"ALUMÍNIO • ABRIR", line:"Gold", model:"Porta de Giro", color:"Natural Fosco", panels:1, detail:"Folha de abrir com dobradiças, fechadura e puxador vertical, para acessos internos ou externos.", image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1400&q=88&sat=-15" },
+  { id:"door-pivot", title:"Porta pivotante contemporânea", badge:"ALUMÍNIO • PIVOTANTE", line:"Gold", model:"Porta Pivotante", color:"Preto Fosco", panels:1, detail:"Abertura sobre eixo vertical, desenho imponente e acabamento de alto padrão para entrada principal.", image:"https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=90" },
+  { id:"door-balcony", title:"Porta balcão panorâmica", badge:"ALUMÍNIO • PANORÂMICA", line:"Gold", model:"Porta Balcão", color:"Champagne", panels:3, detail:"Conjunto envidraçado para grandes vãos, luz natural e continuidade visual entre interior e exterior.", image:"https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1400&q=86&sat=-25" },
+  { id:"door-entry", title:"Porta de entrada com vidro", badge:"ALUMÍNIO • ENTRADA", line:"Suprema", model:"Porta de Giro", color:"Amadeirado", panels:1, detail:"Composição de entrada com perfis de alumínio, vidro e puxador de presença arquitetônica.", image:"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=90&sat=-20" },
+];
+
 const CACHE_KEY = "anacleto:architectural-models:v2";
 const suggestions = ["Janela de correr 4 folhas Linha Gold grafite com vidro reflecta", "Porta pivotante de alumínio amadeirado com puxador vertical", "Janela oscilobatente branca com vidro fumê", "Porta de giro bronze com fechadura multiponto"];
 
@@ -109,6 +119,15 @@ export default function ArchitecturalModelsCarousel({ onConfigure, onView }: Pro
         <div className="amc-card-content"><span className="amc-badge">{item.badge}</span><h3>{item.title}</h3><p>{item.detail}</p><div className="amc-meta"><span><i style={{background:item.color==="Branco"?"#f2f2ef":item.color==="Bronze"?"#9a704d":item.color==="Natural Fosco"?"#aeb6b9":"#24282e"}}/>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button className="amc-configure" type="button" onClick={()=>onConfigure(item)}>Configurar este modelo <MoveUpRight size={16}/></button></div>
       </article>)}
     </div>
+    <section className="amc-doors" aria-labelledby="amc-doors-title">
+      <div className="amc-doors-heading"><div><span className="amc-kicker">ANACLETO / LINHA PORTAS</span><h3 id="amc-doors-title">Portas de alumínio para cada projeto.</h3><p>Modelos de correr, articulados, de giro e pivotantes. Toque em uma imagem para abrir o mesmo estúdio 360° interativo.</p></div><span className="amc-doors-count">{doorModels.length} TIPologias</span></div>
+      <div className="amc-doors-track">
+        {doorModels.map(item=><article className="amc-door-card" key={item.id}>
+          <button className="amc-door-image" type="button" onClick={()=>onView(item)} aria-label={`Abrir ${item.title} no visualizador 360 graus`}><img src={item.image} alt={`Modelo arquitetônico de ${item.title}, acabamento ${item.color}`} loading="lazy"/><span>VER EM 360° ↗</span></button>
+          <div className="amc-door-copy"><small>{item.badge}</small><h4>{item.title}</h4><p>{item.detail}</p><div><span>{item.line}</span><span>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button type="button" onClick={()=>onConfigure(item)}>Configurar modelo <MoveUpRight size={15}/></button></div>
+        </article>)}
+      </div>
+    </section>
     <div className="amc-mobile-hint"><span>DESLIZE PARA EXPLORAR</span><span>{items.length} MODELOS</span></div>
     <p className="amc-disclaimer">Renders conceituais para referência visual. Perfis, componentes, ferragens, dimensões e desempenho dependem de especificação e validação técnica.</p>
 
