@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { compareSupplierOffers, optimizeProfileBars, validateBom, type MarketOffer, type TechnicalBomItem } from "./technical-bom.ts";
+import { evaluateTechnicalFormula } from "./cut-formula.ts";
 
 const profile: TechnicalBomItem = {
   id: "p1", category: "aluminum_profile", code: "P-001", description: "Perfil montante Linha 25",
@@ -51,4 +52,15 @@ test("comparison selects current verified compatible basket", () => {
   const result = compareSupplierOffers([profile], [offer]);
   assert.equal(result[0].complete, true);
   assert.equal(result[0].total, 200);
+});
+
+test("safe technical formula evaluates dimensions and precedence", () => {
+  assert.equal(evaluateTechnicalFormula("(W - 40) / 2", { W: 1500, H: 1200, L: 1500, Q: 1 }), 730);
+  assert.equal(evaluateTechnicalFormula("H - 2 * 35", { W: 1500, H: 1200, L: 1500, Q: 1 }), 1130);
+});
+
+test("safe technical formula rejects code injection and invalid arithmetic", () => {
+  assert.throws(() => evaluateTechnicalFormula("W; process.exit()", { W: 1500, H: 1200, L: 1500, Q: 1 }));
+  assert.throws(() => evaluateTechnicalFormula("W / 0", { W: 1500, H: 1200, L: 1500, Q: 1 }));
+  assert.throws(() => evaluateTechnicalFormula("UNKNOWN + 1", { W: 1500, H: 1200, L: 1500, Q: 1 }));
 });
