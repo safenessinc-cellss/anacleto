@@ -60,17 +60,25 @@ export default async function handler(req:any,res:any){
      return supplier===basket.supplier&&row.status==="verified"&&row.priceStatus==="verified"&&
       String(row.code||"").trim().toLowerCase()===String(item.code||"").trim().toLowerCase()&&
       String(row.line||"").trim().toLowerCase()===String(item.system||"").trim().toLowerCase()&&
-      normalizeUnit(row.unit)===normalizeUnit(item.unit)&&
       String(row.finish||"").trim().toLowerCase()===String(item.finish||"").trim().toLowerCase()&&
       Number(row.unitPrice)>0&&Date.parse(String(row.priceDate||""))>=now-30*86400000&&(!row.validUntil||Date.parse(String(row.validUntil))>=now);
-    }).sort((a:any,b:any)=>Number(a.unitPrice)-Number(b.unitPrice));
-    const offer=candidates[0];
+    }).map((row:any)=>{
+      const sourceUnit=normalizeUnit(row.unit),targetUnit=normalizeUnit(item.unit);
+      let convertedPrice:number|null=null;
+      if(sourceUnit===targetUnit) convertedPrice=Number(row.unitPrice);
+      else if(targetUnit==="bar"&&sourceUnit==="meter"&&Number(item.commercialBarLengthMm)>0)
+        convertedPrice=Number(row.unitPrice)*Number(item.commercialBarLengthMm)/1000;
+      else if(targetUnit==="bar"&&sourceUnit==="kg"&&Number(item.commercialBarLengthMm)>0&&Number(item.weightKgM)>0)
+        convertedPrice=Number(row.unitPrice)*Number(item.commercialBarLengthMm)/1000*Number(item.weightKgM);
+      return convertedPrice!==null?{...row,convertedPrice,sourceUnit}:null;
+    }).filter(Boolean).sort((a:any,b:any)=>Number(a.convertedPrice)-Number(b.convertedPrice));
+    const offer:any=candidates[0];
     if(!offer){
      basket.lines.push({itemId:item.id,description:item.description,quantityToBuy:qty,unit:item.unit,unitPrice:null,subtotal:null,status:"missing_price"});
      basket.complete=false;basket.verified=false;basket.missingItems.push(item.description);continue;
     }
-    const subtotal=money(qty*Number(offer.unitPrice));
-    basket.lines.push({itemId:item.id,description:item.description,quantityToBuy:qty,unit:item.unit,unitPrice:Number(offer.unitPrice),subtotal,status:"priced",sourceUrl:offer.sourceUrl||"",priceDate:offer.priceDate,validUntil:offer.validUntil||null});
+    const subtotal=money(qty*Number(offer.convertedPrice));
+    basket.lines.push({itemId:item.id,description:item.description,quantityToBuy:qty,unit:item.unit,unitPrice:Number(offer.convertedPrice),sourceUnit:offer.sourceUnit,sourceUnitPrice:Number(offer.unitPrice),subtotal,status:"priced",sourceUrl:offer.sourceUrl||"",priceDate:offer.priceDate,validUntil:offer.validUntil||null});
     basket.materialSubtotal+=subtotal;
     basket.shippingCost=Math.max(basket.shippingCost,Number(offer.shippingCost||0));
    }
