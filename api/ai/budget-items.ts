@@ -54,7 +54,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Método não permitido." });
   try {
-    const token = String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "");
+    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (!token) return res.status(401).json({ error: "Autenticação obrigatória." });
     await authenticate(token);
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
