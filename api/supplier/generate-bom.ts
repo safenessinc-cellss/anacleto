@@ -108,7 +108,7 @@ export default async function handler(req: any, res: any) {
           id:String(rule.id),category,code,description,quantity:count,
           unit:isProfile?"bar":unit,cutLengthsMm:cuts,
           commercialBarLengthMm:isProfile?commercialLength:undefined,kerfMm:Number(rule.kerfMm||3),
-          manufacturer,system:line,finish:componentFinish,compatibilityKey:[manufacturer,line,code,componentFinish].join(":").toLowerCase(),
+          manufacturer,system:line,finish:componentFinish,weightKgM:Number(profile?.weightKgM||0)||undefined,compatibilityKey:[manufacturer,line,code,componentFinish].join(":").toLowerCase(),
           required:true,sourceDocumentId:rule.documentId||profile?.documentId||"",sourcePage:Number(rule.page||profile?.page||0)||undefined,
           ruleId:rule.id,technicalStatus:"verified",formula:rule.formula
         });
