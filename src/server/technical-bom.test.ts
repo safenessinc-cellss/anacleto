@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { compareSupplierOffers, optimizeProfileBars, validateBom, type MarketOffer, type TechnicalBomItem } from "./technical-bom.ts";
+import { compareSupplierOffers, convertSupplierPriceToPurchaseUnit, optimizeProfileBars, validateBom, type MarketOffer, type TechnicalBomItem } from "./technical-bom.ts";
 import { evaluateTechnicalFormula } from "./cut-formula.ts";
 
 const profile: TechnicalBomItem = {
@@ -63,4 +63,11 @@ test("safe technical formula rejects code injection and invalid arithmetic", () 
   assert.throws(() => evaluateTechnicalFormula("W; process.exit()", { W: 1500, H: 1200, L: 1500, Q: 1 }));
   assert.throws(() => evaluateTechnicalFormula("W / 0", { W: 1500, H: 1200, L: 1500, Q: 1 }));
   assert.throws(() => evaluateTechnicalFormula("UNKNOWN + 1", { W: 1500, H: 1200, L: 1500, Q: 1 }));
+});
+
+test("supplier unit conversion uses verified bar length and linear weight", () => {
+  assert.equal(convertSupplierPriceToPurchaseUnit(10, "metro", "bar", { commercialBarLengthMm: 6000 }), 60);
+  assert.equal(convertSupplierPriceToPurchaseUnit(8, "kg", "bar", { commercialBarLengthMm: 6000, weightKgM: 1.25 }), 60);
+  assert.equal(convertSupplierPriceToPurchaseUnit(12, "kg", "bar", { commercialBarLengthMm: 6000 }), null);
+  assert.equal(convertSupplierPriceToPurchaseUnit(9, "piece", "bar", { commercialBarLengthMm: 6000 }), null);
 });
