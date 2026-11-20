@@ -50,6 +50,7 @@ const OFFICIAL_SOURCES = [
     note: "Portal oficial de perfis e sistemas, com páginas específicas por linha.",
     catalogs: [
       { title: "Catálogo Geral de Perfis", line: "Geral", url: "https://www.aluita.com.br/perfisaluminio" },
+      { title: "Produtos e consulta de preços", line: "Consulta comercial", url: "https://www.catalogoaluita.com.br/perfil" },
       { title: "Linha 25/30", line: "25/30", url: "https://www.aluita.com.br/linhamega2530" },
       { title: "Linha Mega 25", line: "Mega 25", url: "https://www.aluita.com.br/linhamega25" },
       { title: "Linha Mega 32", line: "Mega 32", url: "https://www.aluita.com.br/linhamega32" },
