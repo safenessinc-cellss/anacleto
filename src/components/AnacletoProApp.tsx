@@ -18,8 +18,7 @@ import AdminModule from "./admin/AdminModule";
 import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
 import CatalogModule from "./catalog/CatalogModule";
 import RegistryModule from "./registry/RegistryModule";
-import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
-import TechnicalLibraryModule from "./technical-library/TechnicalLibraryModule";
+import CentralMaterialsModule from "./materials/CentralMaterialsModule";
 import logoImg from "../assets/images/anacleto-logo-premium.svg";
 import BusinessWorkspace from "./workspace/BusinessWorkspace";
 import PostSaleModule from "./post-sale/PostSaleModule";
@@ -185,9 +184,8 @@ export default function AnacletoProApp({
       { id: "post_sale", label: "Qualidade & Pós-venda" },
       { id: "materials", label: "Materiais de Produção" },
     ] },
-    { id: "catalog", label: "Catálogo & Estoque", icon: Package, tabs: [
-      { id: "cadastro_items", label: "Catálogo de Fornecedores" },
-      { id: "technical_library", label: "Biblioteca Técnica" },
+    { id: "catalog", label: "Materiais & Estoque", icon: Package, tabs: [
+      { id: "technical_library", label: "Central de Materiais" },
       { id: "services", label: "Serviços" },
       { id: "inventory", label: "Estoque" },
     ] },
@@ -388,8 +386,7 @@ export default function AnacletoProApp({
           {activeTab === "agenda" && (<AgendaModule language={language} />)}
 
           {activeTab === "catalog" && <CatalogModule />}
-          {activeTab === "cadastro_items" && <SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} />}
-          {activeTab === "technical_library" && <TechnicalLibraryModule />}
+          {activeTab === "technical_library" && <CentralMaterialsModule onNavigateQuotes={() => setActiveTab("quotes")} />}
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
           {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
