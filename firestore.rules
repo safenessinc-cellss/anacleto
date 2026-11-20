@@ -241,6 +241,12 @@ service cloud.firestore {
       allow update: if canManageCommercial() && (request.resource.data.status == resource.data.status || hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']));
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
+    match /supplier_prices/{id} {
+      allow read: if canOperate() || canManageFinance();
+      allow create: if canManageCommercial() || canManageFinance();
+      allow update: if (canManageCommercial() || canManageFinance()) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','priceStatus','reviewedAt','updatedAt','validUntil','unitPrice','quoteReference']);
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
     match /catalog_import_jobs/{id} {
       allow read, create: if canManageCommercial();
       allow update: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']);
