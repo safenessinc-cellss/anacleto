@@ -114,8 +114,8 @@ export default async function handler(req: any, res: any) {
         });
       } catch(error:any) { errors.push("Regra "+String(rule.id)+": "+String(error?.message||"fórmula inválida")); }
     }
-    const matchingHardware=hardware.filter(row=>verified(row)&&eq(row.manufacturer,manufacturer)&&eq(row.line,line)&&(!row.typology||eq(row.typology,typology))&&(!row.finish||!finish||eq(row.finish,finish)));
-    if(!matchingHardware.length) errors.push("Nenhum acessório verificado cadastrado para este fabricante, linha e tipologia.");
+    const matchingHardware=hardware.filter(row=>verified(row)&&eq(row.manufacturer,manufacturer)&&eq(row.line,line)&&(eq(row.typology,typology)||String(row.typology||"")==="*"||eq(row.typology,"Todas"))&&(!row.finish||!finish||eq(row.finish,finish)));
+    if(!matchingHardware.length) errors.push("Nenhum acessório verificado com tipologia compatível cadastrado para este fabricante e linha. Cadastre roldanas, fechos, puxadores, escovas, borrachas e fixadores aplicáveis.");
     for(const part of matchingHardware) {
       if(!part.quantityFormula && !Number.isFinite(Number(part.quantity))) {
         errors.push("Acessório "+String(part.code||part.description)+" sem quantidade ou fórmula de consumo verificada.");
