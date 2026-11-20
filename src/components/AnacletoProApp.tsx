@@ -196,6 +196,7 @@ export default function AnacletoProApp({
       { id: "reports", label: "Relatórios" },
       { id: "invoices", label: "Notas Fiscais" },
       { id: "financial_ai", label: "Assistente Financeiro" },
+      { id: "internal_costs", label: "Orçamentos Internos (Custos)" },
     ] },  ];
   const settingTabOptions: Array<{ id: NavigationTab; label: string }> = [
     { id: "settings", label: "Configurações" },
