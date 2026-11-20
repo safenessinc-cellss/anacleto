@@ -1,4 +1,5 @@
 import firebaseConfig from "../../firebase-applet-config.json" with { type: "json" };
+import { evaluateTechnicalFormula } from "../../src/server/cut-formula";
 
 type FirestoreDoc = Record<string, any>;
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
@@ -27,51 +28,6 @@ async function collectionDocs(projectId: string, databaseId: string, collection:
   return (data.documents || []).map(decodeDoc) as FirestoreDoc[];
 }
 
-/** Small arithmetic parser. No eval, property access, calls, or arbitrary JavaScript. */
-function evaluateFormula(source: string, vars: Record<string, number>): number {
-  const tokens = source.match(/[A-Za-z_][A-Za-z0-9_]*|(?:\d+(?:\.\d*)?|\.\d+)|[()+\-*/]/g) || [];
-  if (!tokens.length || tokens.join("") !== source.replace(/\s+/g, "")) throw new Error("Fórmula contém caracteres não permitidos.");
-  let index = 0;
-  const expression = (): number => {
-    let value = term();
-    while (tokens[index] === "+" || tokens[index] === "-") {
-      const op = tokens[index++];
-      const rhs = term();
-      value = op === "+" ? value + rhs : value - rhs;
-    }
-    return value;
-  };
-  const term = (): number => {
-    let value = factor();
-    while (tokens[index] === "*" || tokens[index] === "/") {
-      const op = tokens[index++];
-      const rhs = factor();
-      if (op === "/" && rhs === 0) throw new Error("Divisão por zero na fórmula.");
-      value = op === "*" ? value * rhs : value / rhs;
-    }
-    return value;
-  };
-  const factor = (): number => {
-    const token = tokens[index++];
-    if (token === "+" || token === "-") {
-      const value = factor();
-      return token === "-" ? -value : value;
-    }
-    if (token === "(") {
-      const value = expression();
-      if (tokens[index++] !== ")") throw new Error("Parênteses não fechados na fórmula.");
-      return value;
-    }
-    if (!token) throw new Error("Fórmula incompleta.");
-    if (/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(token)) return Number(token);
-    const key = token.toUpperCase();
-    if (!(key in vars)) throw new Error("Variável não permitida na fórmula: " + token);
-    return vars[key];
-  };
-  const result = expression();
-  if (index !== tokens.length || !Number.isFinite(result) || result <= 0) throw new Error("Resultado inválido na fórmula.");
-  return result;
-}
 const roundQty = (value: number, unit: string) => ["piece","un","unidade","unidades","peça","peças"].includes(unit.toLowerCase()) ? Math.ceil(value) : Number(value.toFixed(3));
 
 export default async function handler(req: any, res: any) {
@@ -125,9 +81,9 @@ export default async function handler(req: any, res: any) {
       const vars={W:width,H:height,L:width,Q:1};
       try {
         const unit=String(rule.unit||(isProfile?"bar":"piece"));
-        const calculated=evaluateFormula(String(rule.formula||""),vars);
+        const calculated=evaluateTechnicalFormula(String(rule.formula||""),vars);
         const commercialLength=Number(profile?.commercialLengthMm||0);
-        const perProduct=rule.quantityFormula?evaluateFormula(String(rule.quantityFormula),vars):Number(rule.cutCount||1);
+        const perProduct=rule.quantityFormula?evaluateTechnicalFormula(String(rule.quantityFormula),vars):Number(rule.cutCount||1);
         if(!Number.isFinite(perProduct)||perProduct<=0||perProduct>1000) throw new Error("Quantidade de cortes/consumo inválida.");
         let cuts:number[]|undefined;
         let count:number;
@@ -166,7 +122,7 @@ export default async function handler(req: any, res: any) {
         continue;
       }
       try {
-        const raw=part.quantityFormula?evaluateFormula(String(part.quantityFormula),{W:width,H:height,L:width,Q:quantity}):Number(part.quantity);
+        const raw=part.quantityFormula?evaluateTechnicalFormula(String(part.quantityFormula),{W:width,H:height,L:width,Q:1}):Number(part.quantity);
         bom.push({id:String(part.id),category:"hardware",code:String(part.code||""),description:String(part.description||part.code||"Acessório"),
           quantity:roundQty(raw*quantity,String(part.unit||"piece")),unit:String(part.unit||"piece"),manufacturer,system:line,finish,
           compatibilityKey:[manufacturer,line,part.code||part.description,finish].join(":").toLowerCase(),required:true,
