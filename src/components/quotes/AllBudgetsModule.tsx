@@ -109,7 +109,7 @@ export default function AllBudgetsModule({ onEdit }: AllBudgetsModuleProps) {
           <article key={record.sourceCollection + ":" + record.id} className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-4 last:border-0 dark:border-slate-800">
             <div className="min-w-0 flex-1"><p className="truncate font-semibold text-slate-900 dark:text-white">{record.clientName}</p>
               <p className="mt-1 text-xs text-slate-500">{record.number || record.id} · {workflowLabel(record.workflow)} · {statusLabel(record.status)}</p></div>
-            <strong className="text-sm tabular-nums text-slate-800 dark:text-slate-100">{record.total.toLocaleString("pt-BR", { style: "currency", currency: record.currency || "BRL" })}</strong>
+            <strong className="text-sm tabular-nums text-slate-800 dark:text-slate-100">{record.workflow === "technical" ? "Pré-cálculo" : record.total.toLocaleString("pt-BR", { style: "currency", currency: record.currency || "BRL" })}</strong>
             <button type="button" onClick={() => onEdit(record)} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:text-blue-300 dark:hover:bg-blue-950/40"><Pencil className="h-4 w-4" />Editar</button>
           </article>
         ))}
