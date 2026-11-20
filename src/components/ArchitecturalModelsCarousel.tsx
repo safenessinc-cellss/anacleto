@@ -6,8 +6,8 @@ export type ArchitecturalModel = {
   id: string;
   title: string;
   badge: string;
-  line: "Suprema" | "Gold";
-  model: "Janela de Correr Suprema" | "Porta Balcão" | "Maxim-Ar" | "Porta Camarão" | "Porta de Giro" | "Porta Pivotante" | "Janela Oscilobatente" | "Janela Basculante";
+  line: "Suprema" | "Gold" | "Box";
+  model: "Janela de Correr Suprema" | "Porta Balcão" | "Maxim-Ar" | "Porta Camarão" | "Porta de Giro" | "Porta Pivotante" | "Janela Oscilobatente" | "Janela Basculante" | "Box de Banho" | "Porta Lambril" | "Janela Veneziana" | "Painel Fixo";
   color: string;
   panels: number;
   detail: string;
@@ -40,6 +40,28 @@ const doorModels: ArchitecturalModel[] = [
   { id:"door-pivot", title:"Porta pivotante contemporânea", badge:"ALUMÍNIO • PIVOTANTE", line:"Gold", model:"Porta Pivotante", color:"Preto Fosco", panels:1, detail:"Abertura sobre eixo vertical, desenho imponente e acabamento de alto padrão para entrada principal.", image:"https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=90" },
   { id:"door-balcony", title:"Porta balcão panorâmica", badge:"ALUMÍNIO • PANORÂMICA", line:"Gold", model:"Porta Balcão", color:"Champagne", panels:3, detail:"Conjunto envidraçado para grandes vãos, luz natural e continuidade visual entre interior e exterior.", image:"https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1400&q=86&sat=-25" },
   { id:"door-entry", title:"Porta de entrada com vidro", badge:"ALUMÍNIO • ENTRADA", line:"Suprema", model:"Porta de Giro", color:"Amadeirado", panels:1, detail:"Composição de entrada com perfis de alumínio, vidro e puxador de presença arquitetônica.", image:"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=90&sat=-20" },
+];
+
+
+const allAluminumModels: ArchitecturalModel[] = [
+  { id:"alu-porta-lambril", title:"Porta de alumínio tipo lambril", badge:"LINHA ALUMÍNIO • LAMBRIL", line:"Gold", model:"Porta Lambril", color:"Amadeirado", panels:1, detail:"Folha de alumínio com réguas tipo lambril, estrutura reforçada e opção de ventilação conforme projeto.", image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1400&q=88" },
+  { id:"alu-porta-veneziana", title:"Porta veneziana de alumínio", badge:"LINHA ALUMÍNIO • VENEZIANA", line:"Suprema", model:"Porta Lambril", color:"Branco", panels:1, detail:"Porta com painéis venezianados para ventilação e privacidade, sob medida.", image:"https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1400&q=88" },
+  { id:"alu-janela-veneziana", title:"Janela veneziana", badge:"LINHA ALUMÍNIO • VENEZIANA", line:"Suprema", model:"Janela Veneziana", color:"Branco", panels:3, detail:"Conjunto de folhas venezianadas e opção de vidro, conforme composição e ambiente.", image:"https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=88" },
+  { id:"alu-painel-fixo", title:"Painel fixo de alumínio", badge:"LINHA ALUMÍNIO • FIXO", line:"Gold", model:"Painel Fixo", color:"Preto Fosco", panels:1, detail:"Painel fixo para fechamento, integração de fachadas e composição com portas e janelas.", image:"https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=88" },
+  ...baseModels.map(item=>({...item,id:`alu-${item.id}`,badge:`LINHA ALUMÍNIO • ${item.badge.replace(/^Linha (Suprema|Gold) • /,"")}`})),
+];
+const showerBoxModels: ArchitecturalModel[] = [
+  { id:"box-frontal-2", title:"Box frontal de correr · 2 folhas", badge:"BOX DE BANHO • FRONTAL", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Box frontal com duas folhas deslizantes, roldanas e perfis de alumínio.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=88" },
+  { id:"box-frontal-3", title:"Box frontal de correr · 3 folhas", badge:"BOX DE BANHO • VÃO AMPLO", line:"Box", model:"Box de Banho", color:"Natural Fosco", panels:3, detail:"Composição de três folhas para vãos maiores, com trilhos e guias em alumínio.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=85" },
+  { id:"box-canto-l", title:"Box de canto em L", badge:"BOX DE BANHO • CANTO", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Fechamento em duas faces para área de banho de canto, com encontro em esquadro.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=82" },
+  { id:"box-ate-teto", title:"Box até o teto", badge:"BOX DE BANHO • PÉ-DIREITO", line:"Box", model:"Box de Banho", color:"Champagne", panels:2, detail:"Fechamento alto para projetos específicos, sujeito à avaliação de ventilação e ferragens.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=90" },
+  { id:"box-elegance", title:"Box com roldanas aparentes", badge:"BOX DE BANHO • ELEGANCE", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Sistema com roldanas aparentes e estética contemporânea.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=86" },
+  { id:"box-articulado", title:"Box articulado", badge:"BOX DE BANHO • ARTICULADO", line:"Box", model:"Box de Banho", color:"Prata", panels:2, detail:"Folhas articuladas para espaços compactos, conforme ferragens compatíveis.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=84" },
+];
+const productCollections = [
+  { id:"vidro-aluminio", title:"Linha vidro + alumínio", description:"Portas, janelas e painéis envidraçados com perfis de alumínio. Reúne os modelos já existentes das linhas Suprema e Gold.", items:[...baseModels,...doorModels] },
+  { id:"somente-aluminio", title:"Linha somente alumínio", description:"Portas lambril, venezianas, painéis e as tipologias existentes em composições sem vidro, conforme especificação.", items:allAluminumModels },
+  { id:"box-banho", title:"Linha box de banho", description:"Modelos frontais, de canto, articulados e de correr, com opções de perfis e acabamentos.", items:showerBoxModels },
 ];
 
 const CACHE_KEY = "anacleto:architectural-models:v2";
@@ -128,6 +150,19 @@ export default function ArchitecturalModelsCarousel({ onConfigure, onView }: Pro
         </article>)}
       </div>
     </section>
+
+    <div className="amc-product-lines" aria-label="Linhas completas de produtos Anacleto">
+      {productCollections.map(collection=><section className="amc-product-line" key={collection.id} aria-labelledby={`line-${collection.id}`}>
+        <div className="amc-product-line-heading"><div><span className="amc-kicker">ANACLETO / CATÁLOGO DE PRODUTOS</span><h3 id={`line-${collection.id}`}>{collection.title}</h3><p>{collection.description}</p></div><span className="amc-product-line-count">{collection.items.length} MODELOS</span></div>
+        <div className="amc-product-line-grid">
+          {collection.items.map(item=><article className="amc-line-card" key={item.id}>
+            <button className="amc-line-image" type="button" onClick={()=>onView(item)} aria-label={`Abrir ${item.title} no visualizador 360 graus`}><img src={item.image} alt={item.title} loading="lazy"/><span>VER EM 360° ↗</span></button>
+            <div className="amc-line-copy"><small>{item.badge}</small><h4>{item.title}</h4><p>{item.detail}</p><div><span>{item.line}</span><span>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button type="button" onClick={()=>onConfigure(item)}>Configurar modelo <MoveUpRight size={15}/></button></div>
+          </article>)}
+        </div>
+      </section>)}
+    </div>
+
     <div className="amc-mobile-hint"><span>DESLIZE PARA EXPLORAR</span><span>{items.length} MODELOS</span></div>
     <p className="amc-disclaimer">Renders conceituais para referência visual. Perfis, componentes, ferragens, dimensões e desempenho dependem de especificação e validação técnica.</p>
 
