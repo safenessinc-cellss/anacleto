@@ -14,8 +14,7 @@ export type Role =
   | "rh"
   | "qualidade"
   | "estoque"
-  | "producao"
-  | "internal_costs";
+  | "producao";
 
 export type NavigationTab =
   | "dashboard"
@@ -39,7 +38,8 @@ export type NavigationTab =
   | "post_sale"
   | "deliveries"
   | "inventory"
-  | "production";
+  | "production"
+  | "internal_costs";
 
 export interface RoleConfig {
   id: Role;
