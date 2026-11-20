@@ -105,3 +105,6 @@ body{margin:0}.public-site{--ink:#111;--muted:#6c7075;--paper:#f5f5f7;--line:#de
 .gallery-3d-panel .three-stage{flex:1;min-height:0;height:auto!important;}
 .gallery-3d-loading{flex:1;display:grid;place-items:center;color:#d7e8f5;font-size:14px;}
 @media(max-width:650px){.gallery-3d-modal{padding:0;}.gallery-3d-panel{width:100%;height:100dvh;max-height:100dvh;min-height:0;border-radius:0;border:0;}.gallery-3d-heading{padding:0 14px;height:58px;flex-basis:58px;}.gallery-3d-heading strong{font-size:12px;}}
+
+.exploded-art[role="button"]{cursor:pointer;}
+.exploded-art[role="button"]:focus-visible{outline:3px solid #3b91df;outline-offset:6px;border-radius:16px;}
