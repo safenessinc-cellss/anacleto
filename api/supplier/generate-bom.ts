@@ -118,45 +118,48 @@ export default async function handler(req: any, res: any) {
     if(!matchedRules.length) errors.push("Nenhuma regra de corte verificada corresponde ao fabricante, linha, tipologia e configuração selecionados.");
     const profilePool=profiles.filter(row=>verified(row)&&eq(row.manufacturer,manufacturer)&&eq(row.line,line)&&(!finish||!row.finish||eq(row.finish,finish)));
     for(const rule of matchedRules) {
-      const profile=profilePool.find(row=>eq(row.code,String(rule.profileCode||"")));
-      if(!profile) { errors.push("Perfil " + String(rule.profileCode||"(sem código)") + " sem cadastro verificado compatível."); continue; }
+      const category=String(rule.category||"aluminum_profile");
+      const isProfile=category==="aluminum_profile";
+      const profile=isProfile?profilePool.find(row=>eq(row.code,String(rule.profileCode||""))):null;
+      if(isProfile&&!profile) { errors.push("Perfil " + String(rule.profileCode||"(sem código)") + " sem cadastro verificado compatível."); continue; }
       const vars={W:width,H:height,L:width,Q:1};
       try {
-        const isProfile=String(rule.category||"aluminum_profile")==="aluminum_profile";
         const unit=String(rule.unit||(isProfile?"bar":"piece"));
         const calculated=evaluateFormula(String(rule.formula||""),vars);
-        const commercialLength=Number(profile.commercialLengthMm||0);
+        const commercialLength=Number(profile?.commercialLengthMm||0);
         const perProduct=rule.quantityFormula?evaluateFormula(String(rule.quantityFormula),vars):Number(rule.cutCount||1);
         if(!Number.isFinite(perProduct)||perProduct<=0||perProduct>1000) throw new Error("Quantidade de cortes/consumo inválida.");
         let cuts:number[]|undefined;
         let count:number;
         if(isProfile) {
-          if(!commercialLength) { errors.push("Perfil "+profile.code+": comprimento comercial não verificado."); continue; }
-          const cutLength=calculated;
-          if(cutLength>commercialLength) throw new Error("Corte maior que a barra comercial.");
-          cuts=Array.from({length:Math.ceil(perProduct*quantity)},()=>cutLength);
+          if(!commercialLength) { errors.push("Perfil "+String(profile?.code)+": comprimento comercial não verificado."); continue; }
+          if(calculated>commercialLength) throw new Error("Corte maior que a barra comercial.");
+          cuts=Array.from({length:Math.ceil(perProduct*quantity)},()=>calculated);
           const bars:number[][]=[];
           for(const cut of [...cuts].sort((a,b)=>b-a)) {
-            let target=bars.find(bar=>bar.reduce((sum,n)=>sum+n,0)+bar.length*Number(rule.kerfMm||3)+cut<=commercialLength);
-            if(!target){target=[];bars.push(target);}
-            target.push(cut);
+            const kerf=Number(rule.kerfMm||3);
+            const target=bars.find(bar=>bar.reduce((sum,n)=>sum+n,0)+bar.length*kerf+cut<=commercialLength);
+            if(!target)bars.push([cut]);else target.push(cut);
           }
           count=bars.length;
         } else {
           count=roundQty(calculated*perProduct*quantity,unit);
         }
+        const code=String(profile?.code||rule.profileCode||rule.code||"");
+        const description=String(profile?.description||rule.description||code);
+        const componentFinish=finish||profile?.finish||rule.finish||"";
         bom.push({
-          id:String(rule.id),category:rule.category||"aluminum_profile",code:String(profile.code),
-          description:String(profile.description||rule.description||profile.code),quantity:count,
+          id:String(rule.id),category,code,description,quantity:count,
           unit:isProfile?"bar":unit,cutLengthsMm:cuts,
           commercialBarLengthMm:isProfile?commercialLength:undefined,kerfMm:Number(rule.kerfMm||3),
-          manufacturer,system:line,finish:finish||profile.finish||"",compatibilityKey:[manufacturer,line,profile.code,finish||profile.finish||""].join(":").toLowerCase(),
-          required:true,sourceDocumentId:rule.documentId||profile.documentId||"",sourcePage:Number(rule.page||profile.page||0)||undefined,
+          manufacturer,system:line,finish:componentFinish,compatibilityKey:[manufacturer,line,code,componentFinish].join(":").toLowerCase(),
+          required:true,sourceDocumentId:rule.documentId||profile?.documentId||"",sourcePage:Number(rule.page||profile?.page||0)||undefined,
           ruleId:rule.id,technicalStatus:"verified",formula:rule.formula
         });
       } catch(error:any) { errors.push("Regra "+String(rule.id)+": "+String(error?.message||"fórmula inválida")); }
     }
     const matchingHardware=hardware.filter(row=>verified(row)&&eq(row.manufacturer,manufacturer)&&eq(row.line,line)&&(!row.typology||eq(row.typology,typology))&&(!row.finish||!finish||eq(row.finish,finish)));
+    if(!matchingHardware.length) errors.push("Nenhum acessório verificado cadastrado para este fabricante, linha e tipologia.");
     for(const part of matchingHardware) {
       if(!part.quantityFormula && !Number.isFinite(Number(part.quantity))) {
         errors.push("Acessório "+String(part.code||part.description)+" sem quantidade ou fórmula de consumo verificada.");
