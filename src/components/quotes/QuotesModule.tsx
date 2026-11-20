@@ -54,13 +54,13 @@ interface QuotesModuleProps {
 
 export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote, initialQuoteId, hideHistory = false}: QuotesModuleProps) {
   const { showToast } = useToast();
-  // Catálogo de productos
-  const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [debouncedCatalogSearch, setDebouncedCatalogSearch] = useState("");
   const [showCatalog, setShowCatalog] = useState(false);
   const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
+  // Catálogo de productos
+  const [catalogItems, setCatalogItems] = useState<any[]>([]);
 
   // Carregar desenhos técnicos para vincular o desenho 2D ao orçamento
   useEffect(() => {
