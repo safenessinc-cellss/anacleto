@@ -26,7 +26,7 @@ function extractBrlPrices(value: string): number[] {
 async function search(query: string) {
   const response = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; AnacletoMarketResearch/1.0)", "Accept": "text/html" },
-    signal: AbortSignal.timeout(12000)
+    signal: AbortSignal.timeout(6000)
   });
   if (!response.ok) throw new Error("Busca externa indisponível.");
   const html = await response.text();
@@ -67,7 +67,7 @@ export default async function handler(req: any, res: any) {
     if (!apiKey) return res.status(503).json({ error: "Configuração Firebase ausente no servidor." });
     const authResponse = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + apiKey, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: token }),
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(3000)
     });
     if (!authResponse.ok) return res.status(401).json({ error: "Sessão inválida ou expirada." });
     const identity: any = await authResponse.json();
@@ -77,7 +77,7 @@ export default async function handler(req: any, res: any) {
       const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
       const roleUrl = "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId +
         "/databases/" + databaseId + "/documents/admins/" + encodeURIComponent(String(user.email).toLowerCase());
-      const roleResponse = await fetch(roleUrl, { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(10000) });
+      const roleResponse = await fetch(roleUrl, { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(3000) });
       if (!roleResponse.ok) return res.status(403).json({ error: "Acesso pendente de aprovação ou perfil não autorizado." });
       const roleDoc: any = await roleResponse.json();
       const role = String(roleDoc.fields?.role?.stringValue || "");
