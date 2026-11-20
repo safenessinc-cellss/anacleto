@@ -56,6 +56,7 @@ export default async function handler(req:any,res:any){
    const product=productById.get(String(row.technicalProductId||"")) as any;
    return !!product&&row.status==="verified"&&row.priceStatus==="verified"&&row.reviewedBy&&row.reviewedAt
     &&row.shippingConfirmed===true&&row.availability==="in_stock"
+    &&!!row.source?.sourceDocumentId&&Number.isInteger(Number(row.source?.sourcePage))&&Number(row.source.sourcePage)>=1
     &&Number(row.unitPrice)>0&&String(row.currency||"")==="BRL"&&isCurrentQuote(row,now);
   });
   for(const row of eligible){
