@@ -49,7 +49,7 @@ interface QuotesModuleProps {
   initialMode?: "standard" | "smart";
   onOpenSmartQuote?: () => void;
   initialQuoteId?: string;
-  hideHistory?: boolean;\n  initialQuoteId?: string;\n  hideHistory?: boolean;
+  hideHistory?: boolean;
 }
 
 export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote, initialQuoteId, hideHistory = false}: QuotesModuleProps) {
