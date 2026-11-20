@@ -167,7 +167,7 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
         </div>
         <div className="exploded-stage">
           <div className="exploded-stage-label"><span>JANELA REAL · REFERÊNCIA HIPER-REALISTA</span><span>ANATOMIA / SISTEMA CORREDIÇO</span></div>
-          <div className="exploded-art"><img className="exploded-window" src="/images/anacleto/janela-explodida.webp" alt="Conjunto de janela de correr em alumínio com perfis, folhas, vidro e ferragens apresentados em composição técnica" fetchPriority="high" onError={event=>{event.currentTarget.onerror=null;event.currentTarget.src="/images/anacleto/despiece-tecnico.webp";}}/></div>
+          <div className="exploded-art" role="button" tabIndex={0} aria-label="Abrir janela no visualizador 360 graus" onClick={()=>openGalleryViewer({model:"Janela de Correr Suprema",color:"Preto Fosco",panels:2})} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openGalleryViewer({model:"Janela de Correr Suprema",color:"Preto Fosco",panels:2});}}}><img className="exploded-window" src="/images/anacleto/janela-explodida.webp" alt="Conjunto de janela de correr em alumínio com perfis, folhas, vidro e ferragens apresentados em composição técnica" fetchPriority="high" onError={event=>{event.currentTarget.onerror=null;event.currentTarget.src="/images/anacleto/despiece-tecnico.webp";}}/></div>
           <a className="exploded-360" href="#showroom"><span className="exploded-360-icon"><Move3D size={23}/></span><b>360°</b><span>Gire e explore</span><small>MODELO INTERATIVO · 3D</small></a>
           <div className="exploded-coordinate">ALUMÍNIO <i/> VIDRO <i/> ENGENHARIA</div>
         </div>
