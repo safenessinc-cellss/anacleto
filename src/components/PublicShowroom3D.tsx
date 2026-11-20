@@ -57,7 +57,7 @@ export default function PublicShowroom3D({config,opened}:Props){
     const leafWidth=(width-.22)/count;
     const leaves:any[]=[],leafRoots:any[]=[];
     const accessories:any[]=[];
-    const isSliding=config.model==="Janela de Correr Suprema"||config.model==="Porta Balcão";
+    const isSliding=config.model==="Janela de Correr Suprema"||config.model==="Porta Balcão"||config.model==="Box de Banho"||config.model==="Janela Veneziana"||config.model==="Painel Fixo"||config.model==="Porta Lambril";
     const isFolding=config.model==="Porta Camarão";
     const isTilt=config.model==="Maxim-Ar"||config.model==="Janela Basculante";
     const isOscillo=config.model==="Janela Oscilobatente";

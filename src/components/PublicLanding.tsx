@@ -8,8 +8,8 @@ import "./public-landing.css";
 
 const LazyShowroom = lazy(() => import("./PublicShowroom3D"));
 const phone = "5551998193931";
-type Model = "Janela de Correr Suprema" | "Porta Balcão" | "Maxim-Ar" | "Porta Camarão" | "Porta de Giro" | "Porta Pivotante" | "Janela Oscilobatente" | "Janela Basculante";
-type Config = { model: Model; line: "Suprema" | "Gold"; color: string; glass: string; width: number; height: number; panels: number };
+type Model = "Janela de Correr Suprema" | "Porta Balcão" | "Maxim-Ar" | "Porta Camarão" | "Porta de Giro" | "Porta Pivotante" | "Janela Oscilobatente" | "Janela Basculante" | "Box de Banho" | "Porta Lambril" | "Janela Veneziana" | "Painel Fixo";
+type Config = { model: Model; line: "Suprema" | "Gold" | "Box"; color: string; glass: string; width: number; height: number; panels: number };
 const defaults: Config = { model: "Janela de Correr Suprema", line: "Suprema", color: "Preto Fosco", glass: "Incolor", width: 1600, height: 1200, panels: 2 };
 const colors = [{name:"Preto Fosco",hex:"#202328"},{name:"Branco",hex:"#f2f3f3"},{name:"Bronze",hex:"#94704e"},{name:"Anodizado",hex:"#aeb8c1"},{name:"Champagne",hex:"#c6a77b"},{name:"Natural Fosco",hex:"#aeb6b9"},{name:"Amadeirado",hex:"#76543d"},{name:"Grafite",hex:"#454b52"},{name:"Prata",hex:"#c4c9ce"},{name:"Verde Oliva",hex:"#596653"},{name:"Corten",hex:"#8b4d36"}];
 const galleryModels = [
@@ -29,7 +29,7 @@ const galleryModels = [
 {name:"Porta de abrir",detail:"Abertura lateral · linhas limpas",model:"Porta de Giro" as Model,color:"Bronze",panels:1,image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1400&q=90&sat=-24"}
 ];
 const glasses = ["Incolor","Fumê","Reflecta"];
-const models: Model[] = ["Janela de Correr Suprema","Porta Balcão","Maxim-Ar","Porta Camarão","Porta de Giro","Porta Pivotante","Janela Oscilobatente","Janela Basculante"];
+const models: Model[] = ["Janela de Correr Suprema","Porta Balcão","Maxim-Ar","Porta Camarão","Porta de Giro","Porta Pivotante","Janela Oscilobatente","Janela Basculante","Box de Banho","Porta Lambril","Janela Veneziana","Painel Fixo"];
 const wa = (message: string) => `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
 function Preview({config,opened}:{config:Config;opened:boolean}) {
@@ -186,7 +186,7 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
         <div className="showroom-grid"><div className="viewer-panel" ref={viewerRef}><div className="viewer-toolbar"><span><i/> ESTÚDIO 3D / AO VIVO</span><span>ARRASTE PARA GIRAR 360°</span></div>{show3D?<Suspense fallback={<div className="viewer-fallback"><Preview config={config} opened={opened}/><span>Preparando o estúdio 3D…</span></div>}><LazyShowroom config={config} opened={opened}/></Suspense>:<div className="viewer-fallback"><Preview config={config} opened={opened}/><span>Prévia instantânea · 3D sob demanda</span></div>}<div className="viewer-footer"><span>{config.model}</span><span>{config.color} / {config.glass}</span></div></div>
           <aside className="config-panel"><div className="config-top"><span>PERSONALIZAÇÃO DO PRODUTO</span><Move3D size={18}/></div><label className="field-label">01 / ESCOLHA PORTA OU JANELA</label><div className="model-options">{models.map((m,i)=><button key={m} className={config.model===m?"model-option selected":"model-option"} onClick={()=>update("model",m)}><span>0{i+1}</span>{m}<ArrowUpRight size={14}/></button>)}</div>
             <label className="field-label">02 / CORES E ACABAMENTOS DO ALUMÍNIO</label><div className="swatch-row">{colors.map(c=><button key={c.name} className={config.color===c.name?"swatch active":"swatch"} onClick={()=>update("color",c.name)} aria-label={c.name} title={c.name}><i style={{background:c.hex}}/><span>{c.name}</span></button>)}</div>
-            <div className="config-two"><label>LINHA DE PERFIL<select value={config.line} onChange={e=>update("line",e.target.value as Config["line"])}><option>Suprema</option><option>Gold</option></select></label><label>TIPO DE VIDRO<select value={config.glass} onChange={e=>update("glass",e.target.value)}>{glasses.map(g=><option key={g}>{g}</option>)}</select></label></div>
+            <div className="config-two"><label>LINHA DE PERFIL<select value={config.line} onChange={e=>update("line",e.target.value as Config["line"])}><option>Suprema</option><option>Gold</option><option>Box</option></select></label><label>TIPO DE VIDRO<select value={config.glass} onChange={e=>update("glass",e.target.value)}>{glasses.map(g=><option key={g}>{g}</option>)}</select></label></div>
             <div className="config-two"><label>LARGURA (MM)<input type="number" min="300" max="8000" step="50" value={config.width} onChange={e=>update("width",Math.max(300,Math.min(8000,Number(e.target.value)||300)))}/></label><label>ALTURA (MM)<input type="number" min="300" max="6000" step="50" value={config.height} onChange={e=>update("height",Math.max(300,Math.min(6000,Number(e.target.value)||300)))}/></label></div>
             <button className="button button-outline open-button" onClick={()=>setOpened(v=>!v)}><Move3D size={16}/>{opened?"Fechar esquadria":"Testar Abertura"}</button><small className="config-note">Teste a abertura no modelo 3D: correr, bascular, projetar ou articular, conforme a tipologia selecionada.</small><a className="button button-primary full-button" href={wa(message)} target="_blank" rel="noreferrer"><MessageCircle size={17}/> Solicitar Orçamento deste Projeto no WhatsApp <ArrowUpRight size={16}/></a><small className="config-note">Configuração conceitual, sujeita à validação de medidas e especificação técnica. Sem preços online.</small>
           </aside></div>
