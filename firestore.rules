@@ -266,6 +266,78 @@ service cloud.firestore {
       allow update: if (canManageCommercial() || canManageFinance()) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','priceStatus','reviewedAt','updatedAt','validUntil','unitPrice','quoteReference']);
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
+    // Canonical engineering identity, independent of reseller/SKU.
+    match /technical_products/{id} {
+      allow read: if canOperate();
+      allow create: if canManageCommercial()
+        && request.resource.data.status == 'pending_review'
+        && request.resource.data.identityKey is string
+        && request.resource.data.source.sourceDocumentId is string
+        && request.resource.data.source.sourcePage is int;
+      allow update: if canManageCommercial()
+        && request.resource.data.status == resource.data.status
+        || (hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade'])
+          && request.resource.data.status in ['pending_review','verified','rejected']
+          && request.resource.data.source.sourceDocumentId is string
+          && request.resource.data.source.sourcePage is int
+          && (request.resource.data.status != 'verified'
+            || (request.resource.data.reviewedBy is string && request.resource.data.reviewedAt is string)));
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /technical_product_assets/{id} {
+      allow read: if canOperate();
+      allow create: if canManageCommercial()
+        && request.resource.data.status == 'pending_review'
+        && request.resource.data.technicalProductId is string
+        && request.resource.data.storagePath is string
+        && request.resource.data.source.sourceDocumentId is string
+        && request.resource.data.source.sourcePage is int;
+      allow update: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade'])
+        && request.resource.data.status in ['pending_review','verified','rejected']
+        && request.resource.data.source.sourceDocumentId is string
+        && request.resource.data.source.sourcePage is int;
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /supplier_offers/{id} {
+      allow read: if canOperate() || canManageFinance();
+      allow create: if (canManageCommercial() || canManageFinance())
+        && request.resource.data.status == 'pending_review'
+        && request.resource.data.priceStatus == 'pending_review'
+        && request.resource.data.technicalProductId is string
+        && request.resource.data.supplierId is string
+        && request.resource.data.unitPrice is number
+        && request.resource.data.currency is string
+        && request.resource.data.unit is string
+        && request.resource.data.priceDate is string
+        && request.resource.data.source.sourceDocumentId is string
+        && request.resource.data.source.sourcePage is int;
+      allow update: if (canManageCommercial() || canManageFinance())
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.priceStatus == resource.data.priceStatus
+        || (hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade','financeiro'])
+          && request.resource.data.status in ['pending_review','verified','rejected']
+          && request.resource.data.priceStatus in ['pending_review','verified','rejected']
+          && request.resource.data.source.sourceDocumentId is string
+          && request.resource.data.source.sourcePage is int
+          && ((request.resource.data.status != 'verified' && request.resource.data.priceStatus != 'verified')
+            || (request.resource.data.status == 'verified' && request.resource.data.priceStatus == 'verified'
+              && request.resource.data.reviewedBy is string && request.resource.data.reviewedAt is string)));
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /supplier_offer_price_history/{id} {
+      allow read: if canOperate() || canManageFinance();
+      allow create: if (canManageCommercial() || canManageFinance())
+        && request.resource.data.supplierOfferId is string
+        && request.resource.data.technicalProductId is string
+        && request.resource.data.unitPrice is number
+        && request.resource.data.currency is string
+        && request.resource.data.unit is string
+        && request.resource.data.priceDate is string
+        && request.resource.data.source.sourceDocumentId is string
+        && request.resource.data.source.sourcePage is int
+        && request.resource.data.status == 'pending_review';
+      allow update, delete: if false;
+    }
     match /catalog_import_jobs/{id} {
       allow read, create: if canManageCommercial();
       allow update: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']);

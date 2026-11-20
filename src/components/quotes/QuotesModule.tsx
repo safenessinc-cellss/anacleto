@@ -57,7 +57,6 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
-  const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
 
   // Cargar catálogo
   useEffect(() => {
@@ -1034,8 +1033,6 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       unit: item.unit || "UN",
     };
     setQuoteItems([...quoteItems, newItem]);
-    setShowCatalog(false);
-    setCatalogSearch("");
   };
 
 const handleAddItem = () => {
