@@ -48,25 +48,27 @@ export default async function handler(req:any,res:any){
   const body=typeof req.body==="string"?JSON.parse(req.body):req.body;
   const items=Array.isArray(body?.items)?body.items.slice(0,100):[];
   if(!items.length)return res.status(400).json({error:"Informe a lista técnica de materiais."});
-  const records=await docs("supplier_prices",token),now=Date.now(),group=new Map<string,any>();
-  for(const row of records){
-   if(row.status!=="verified"||row.priceStatus!=="verified")continue;
-   if(!row.unitPrice||Number(row.unitPrice)<=0||String(row.currency||"BRL")!=="BRL")continue;
-   if(!isCurrentQuote(row,now))continue;
-   const supplier=String(row.supplier||row.manufacturer||"").trim();
+  const [records,technicalProducts]=await Promise.all([docs("supplier_offers",token),docs("technical_products",token)]);
+  const productById=new Map(technicalProducts.filter((product:any)=>product.status==="verified"&&product.reviewedBy&&product.reviewedAt&&product.source?.sourceDocumentId&&Number(product.source?.sourcePage)>=1).map((product:any)=>[product.id,product]));
+  const now=Date.now(),group=new Map<string,any>();
+  // Only offers linked to a verified canonical product and independently approved price are eligible.
+  const eligible=records.filter((row:any)=>{
+   const product=productById.get(String(row.technicalProductId||"")) as any;
+   return !!product&&row.status==="verified"&&row.priceStatus==="verified"&&row.reviewedBy&&row.reviewedAt
+    &&row.shippingConfirmed===true&&row.availability==="in_stock"
+    &&Number(row.unitPrice)>0&&String(row.currency||"")==="BRL"&&isCurrentQuote(row,now);
+  });
+  for(const row of eligible){
+   const supplier=String(row.supplierName||row.supplierId||"").trim();
    if(!supplier)continue;
-   if(!group.has(supplier))group.set(supplier,{supplier,supplierUrl:String(row.supplierUrl||row.sourceUrl||""),lines:[],materialSubtotal:0,shippingCost:0,total:0,complete:true,verified:true,missingItems:[]});
+   if(!group.has(supplier))group.set(supplier,{supplier,supplierUrl:String(row.supplierUrl||row.source?.sourceUrl||""),lines:[],materialSubtotal:0,shippingCost:0,total:0,complete:true,verified:true,missingItems:[]});
   }
   for(const basket of group.values()){
    for(const item of items){
     const qty=barsFor(item);
-    const candidates=records.filter((row:any)=>{
-     const supplier=String(row.supplier||row.manufacturer||"").trim();
-     return supplier===basket.supplier&&row.status==="verified"&&row.priceStatus==="verified"&&row.shippingConfirmed===true&&
-      String(row.code||"").trim().toLowerCase()===String(item.code||"").trim().toLowerCase()&&
-      String(row.line||"").trim().toLowerCase()===String(item.system||"").trim().toLowerCase()&&
-      String(row.finish||"").trim().toLowerCase()===String(item.finish||"").trim().toLowerCase()&&
-      Number(row.unitPrice)>0&&isCurrentQuote(row,now);
+    const candidates=eligible.filter((row:any)=>{
+     const supplier=String(row.supplierName||row.supplierId||"").trim();
+     return supplier===basket.supplier&&String(row.technicalProductId||"")===String(item.technicalProductId||"");
     }).map((row:any)=>{
       const sourceUnit=normalizeUnit(row.unit);
       const convertedPrice=convertSupplierPriceToPurchaseUnit(Number(row.unitPrice),sourceUnit,String(item.unit||""),{
@@ -80,7 +82,7 @@ export default async function handler(req:any,res:any){
      basket.complete=false;basket.verified=false;basket.missingItems.push(item.description);continue;
     }
     const subtotal=money(qty*Number(offer.convertedPrice));
-    basket.lines.push({itemId:item.id,description:item.description,quantityToBuy:qty,unit:item.unit,unitPrice:Number(offer.convertedPrice),sourceUnit:offer.sourceUnit,sourceUnitPrice:Number(offer.unitPrice),subtotal,status:"priced",sourceUrl:offer.sourceUrl||"",priceDate:offer.priceDate,validUntil:offer.validUntil||null});
+    basket.lines.push({itemId:item.id,description:item.description,quantityToBuy:qty,unit:item.unit,unitPrice:Number(offer.convertedPrice),sourceUnit:offer.sourceUnit,sourceUnitPrice:Number(offer.unitPrice),subtotal,status:"priced",sourceUrl:offer.source?.sourceUrl||"",offerId:offer.id,technicalProductId:offer.technicalProductId,priceDate:offer.priceDate,validUntil:offer.validUntil||null});
     basket.materialSubtotal+=subtotal;
     basket.shippingCost=Math.max(basket.shippingCost,Number(offer.shippingCost||0));
    }
@@ -88,6 +90,6 @@ export default async function handler(req:any,res:any){
   }
   const comparisons=[...group.values()].sort((a,b)=>a.complete!==b.complete?(a.complete?-1:1):a.total-b.total);
   const best=comparisons.find(x=>x.complete&&x.verified);
-  return res.status(200).json({comparisons,bestSupplier:best?.supplier||null,allPricesVerified:true,comparedAt:new Date().toISOString(),notice:"Somente preços aprovados, em BRL e com cotação dos últimos 30 dias foram considerados. Cestas incompletas não recebem recomendação de compra."});
+  return res.status(200).json({comparisons,bestSupplier:best?.supplier||null,allPricesVerified:true,comparedAt:new Date().toISOString(),notice:"Somente ofertas vinculadas a produtos técnicos canônicos verificados, com oferta e preço aprovados separadamente, disponibilidade em estoque, frete confirmado e cotação BRL vigente dos últimos 30 dias foram consideradas. Cestas incompletas não recebem recomendação de compra."});
  }catch(error:any){console.error("ANACLETO supplier comparison failed",error);return res.status(502).json({error:String(error?.message||"Falha ao comparar fornecedores.")});}
 }
