@@ -236,6 +236,9 @@ export default function BudgetModal({
     const supplier = window.prompt("Confirme o nome do fornecedor:", defaultSupplier);
     if (!supplier?.trim()) return;
     const suggested = Array.isArray(offer.prices) && offer.prices.length ? String(offer.prices[0]).replace(".", ",") : "";
+    const defaultUnit = String(result.item?.unit || "un");
+    const priceUnit = window.prompt("Informe a unidade exata do preço confirmado (bar, metro, kg, peça, m2):", defaultUnit);
+    if (!priceUnit?.trim()) return;
     const entered = window.prompt("Informe o preço unitário confirmado na página do fornecedor (R$):", suggested);
     if (!entered?.trim()) return;
     const unitPrice = Number(entered.replace(/\./g, "").replace(",", "."));
@@ -255,7 +258,7 @@ export default function BudgetModal({
         code: item.code || "",
         description: item.description || offer.title || "",
         finish: item.finish || bomForm.finish || "",
-        unit: item.unit || "un",
+        unit: priceUnit.trim(),
         unitPrice,
         currency: "BRL",
         priceDate: new Date().toISOString().slice(0, 10),
@@ -717,7 +720,7 @@ export default function BudgetModal({
                 {comparisons.map((basket:any)=><div key={basket.supplier} className={`rounded-lg border p-3 dark:border-slate-700 ${bestSupplier===basket.supplier?"border-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/20":"border-slate-200"}`}>
                   <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-bold">{basket.supplier}{bestSupplier===basket.supplier?" · MENOR CUSTO TOTAL":""}</p><p className="text-xs font-bold">{basket.complete?basket.total.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Cesta incompleta"}</p></div>
                   <p className="text-[10px] text-slate-500">{basket.complete?"Todos os itens têm preço aprovado.":"Faltam preços: "+(basket.missingItems||[]).join(", ")}</p>
-                  {basket.lines?.map((line:any,i:number)=><p key={i} className="mt-1 text-[10px] text-slate-600">{line.description}: {line.subtotal==null?"Sem preço aprovado":line.subtotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p>)}
+                  {basket.lines?.map((line:any,i:number)=><p key={i} className="mt-1 text-[10px] text-slate-600">{line.description}: {line.subtotal==null?"Sem preço aprovado":line.subtotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}{line.sourceUnit&&line.sourceUnit!==line.unit?" · convertido de "+line.sourceUnit:""}</p>)}
                 </div>)}
               </div>}
             </div>
