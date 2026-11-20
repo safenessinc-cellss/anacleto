@@ -38,7 +38,8 @@ export type NavigationTab =
   | "post_sale"
   | "deliveries"
   | "inventory"
-  | "production";
+  | "production"
+  | "internal_costs";
 
 export interface RoleConfig {
   id: Role;
@@ -54,7 +55,7 @@ export interface RoleConfig {
 
 const ALL_TABS: NavigationTab[] = [
   "dashboard", "crm", "quotes", "invoices", "technical_drawing",
-  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries", "inventory", "production",
+  "agenda", "catalog", "finance", "financial_ai", "admin", "settings", "theme", "reports", "tipologias", "projects", "profile", "suggestions", "post_sale", "deliveries", "inventory", "production", "internal_costs",
 ];
 
 export const ROLES: Record<Role, RoleConfig> = {
@@ -128,7 +129,7 @@ export const ROLES: Record<Role, RoleConfig> = {
     id: "financeiro", label: "Financeiro", labelPT: "Financeiro", level: 35,
     color: "bg-cyan-100 text-cyan-800 border-cyan-300",
     description: "Contas a pagar e receber, compras, fornecedores, pagamentos e relatórios financeiros.",
-    tabs: ["dashboard", "finance", "financial_ai", "reports", "profile", "suggestions"],
+    tabs: ["dashboard", "finance", "financial_ai", "internal_costs", "reports", "profile", "suggestions"],
     canManageUsers: false, canManageRolesBelow: [],
   },
   rh: {

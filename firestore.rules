@@ -64,6 +64,13 @@ service cloud.firestore {
  allow update: if canManageCommercial();
  allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
 }
+    // Orçamentos inteligentes possuem coleção e histórico independentes.
+    match /smart_budgets/{id} {
+      allow read: if canManageCommercial() || canManageFinance();
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial();
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
     match /quotes/{id} {
       allow read: if canOperate() || canManageProduction() || canManageFinance() || canManageQuality();
       allow create: if canManageCommercial();
@@ -104,6 +111,11 @@ service cloud.firestore {
     match /daily_expenses/{id} { allow read, write: if canManageFinance(); }
     match /client_advances/{id} { allow read, write: if canManageFinance(); }
     match /purchase_orders/{id} { allow read, write: if canManageFinance(); }
+    // Custos internos nunca são acessíveis ao cliente nem a perfis comerciais comuns.
+    match /internal_quote_costs/{id} {
+      allow read, create, update: if canManageFinance();
+      allow delete: if owner();
+    }
     match /payables/{id} { allow read, write: if canManageFinance(); }
     match /payments/{id} {
       allow read, update, delete: if canManageFinance();

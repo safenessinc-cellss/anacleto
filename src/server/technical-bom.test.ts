@@ -1,0 +1,73 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { compareSupplierOffers, convertSupplierPriceToPurchaseUnit, optimizeProfileBars, validateBom, type MarketOffer, type TechnicalBomItem } from "./technical-bom.ts";
+import { evaluateTechnicalFormula } from "./cut-formula.ts";
+
+const profile: TechnicalBomItem = {
+  id: "p1", category: "aluminum_profile", code: "P-001", description: "Perfil montante Linha 25",
+  quantity: 2, unit: "bar", cutLengthsMm: [3000, 3000], commercialBarLengthMm: 6000,
+  kerfMm: 3, manufacturer: "Fabricante A", system: "Linha 25", finish: "Branco",
+  compatibilityKey: "fab-a:linha25:p-001:branco", required: true, technicalStatus: "verified"
+};
+
+test("optimizer accepts an exact-fit single cut without charging kerf before first cut", () => {
+  const result = optimizeProfileBars([6000], 6000, 3);
+  assert.equal(result.bars.length, 1);
+  assert.equal(result.bars[0].wasteMm, 0);
+});
+
+test("optimizer accounts for kerf between cuts and minimizes simple bar count", () => {
+  const result = optimizeProfileBars([3000, 3000], 6000, 3);
+  assert.equal(result.bars.length, 2);
+  assert.equal(result.totalWasteMm, 6000);
+});
+
+test("BOM validation blocks unverified technical rules", () => {
+  assert.ok(validateBom([profile]).length === 0);
+  assert.ok(validateBom([{ ...profile, technicalStatus: "pending_review" }]).some(message => message.includes("pendente")));
+});
+
+test("comparison never mixes compatibility keys and marks incomplete baskets", () => {
+  const now = new Date().toISOString();
+  const offer: MarketOffer = {
+    id: "o1", itemCompatibilityKey: "other-system:profile", supplier: "Fornecedor A",
+    supplierUrl: "https://supplier.example", productUrl: "https://supplier.example/p",
+    unit: "bar", unitPrice: 100, currency: "BRL", observedAt: now,
+    availability: "in_stock", evidence: "supplier_page", verification: "verified"
+  };
+  const result = compareSupplierOffers([profile], [offer]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].complete, false);
+  assert.equal(result[0].lines[0].status, "missing_price");
+});
+
+test("comparison selects current verified compatible basket", () => {
+  const now = new Date().toISOString();
+  const offer: MarketOffer = {
+    id: "o2", itemCompatibilityKey: profile.compatibilityKey, supplier: "Fornecedor B",
+    supplierUrl: "https://supplier.example", productUrl: "https://supplier.example/p",
+    unit: "bar", unitPrice: 100, currency: "BRL", observedAt: now,
+    availability: "in_stock", evidence: "supplier_page", verification: "verified"
+  };
+  const result = compareSupplierOffers([profile], [offer]);
+  assert.equal(result[0].complete, true);
+  assert.equal(result[0].total, 200);
+});
+
+test("safe technical formula evaluates dimensions and precedence", () => {
+  assert.equal(evaluateTechnicalFormula("(W - 40) / 2", { W: 1500, H: 1200, L: 1500, Q: 1 }), 730);
+  assert.equal(evaluateTechnicalFormula("H - 2 * 35", { W: 1500, H: 1200, L: 1500, Q: 1 }), 1130);
+});
+
+test("safe technical formula rejects code injection and invalid arithmetic", () => {
+  assert.throws(() => evaluateTechnicalFormula("W; process.exit()", { W: 1500, H: 1200, L: 1500, Q: 1 }));
+  assert.throws(() => evaluateTechnicalFormula("W / 0", { W: 1500, H: 1200, L: 1500, Q: 1 }));
+  assert.throws(() => evaluateTechnicalFormula("UNKNOWN + 1", { W: 1500, H: 1200, L: 1500, Q: 1 }));
+});
+
+test("supplier unit conversion uses verified bar length and linear weight", () => {
+  assert.equal(convertSupplierPriceToPurchaseUnit(10, "metro", "bar", { commercialBarLengthMm: 6000 }), 60);
+  assert.equal(convertSupplierPriceToPurchaseUnit(8, "kg", "bar", { commercialBarLengthMm: 6000, weightKgM: 1.25 }), 60);
+  assert.equal(convertSupplierPriceToPurchaseUnit(12, "kg", "bar", { commercialBarLengthMm: 6000 }), null);
+  assert.equal(convertSupplierPriceToPurchaseUnit(9, "piece", "bar", { commercialBarLengthMm: 6000 }), null);
+});
