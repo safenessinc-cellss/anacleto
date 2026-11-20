@@ -10,6 +10,7 @@ async function docs(collectionName:string,token:string){
  return(data.documents||[]).map((d:any)=>({id:d.name.split("/").pop(),...Object.fromEntries(Object.entries(d.fields||{}).map(([k,v])=>[k,decode(v)]))}));
 }
 const money=(n:number)=>Math.round((n+Number.EPSILON)*100)/100;
+const normalizeUnit=(value:any)=>{const v=String(value||"").trim().toLowerCase();if(["bar","barra","barras"].includes(v))return "bar";if(["piece","un","unidade","unidades","peça","peças","pc"].includes(v))return "piece";if(["m","metro","metros","meter"].includes(v))return "meter";if(["m2","m²","metro quadrado"].includes(v))return "m2";if(["kg","quilo","quilograma"].includes(v))return "kg";return v;};
 function barsFor(item:any){
  if(item.unit!=="bar"||!Array.isArray(item.cutLengthsMm)||!item.commercialBarLengthMm)return Number(item.quantity||0);
  const length=Number(item.commercialBarLengthMm),kerf=Number(item.kerfMm||3),bins:number[]=[];
@@ -59,7 +60,7 @@ export default async function handler(req:any,res:any){
      return supplier===basket.supplier&&row.status==="verified"&&row.priceStatus==="verified"&&
       String(row.code||"").trim().toLowerCase()===String(item.code||"").trim().toLowerCase()&&
       String(row.line||"").trim().toLowerCase()===String(item.system||"").trim().toLowerCase()&&
-      String(row.unit||"").trim().toLowerCase()===String(item.unit||"").trim().toLowerCase()&&
+      normalizeUnit(row.unit)===normalizeUnit(item.unit)&&
       String(row.finish||"").trim().toLowerCase()===String(item.finish||"").trim().toLowerCase()&&
       Number(row.unitPrice)>0&&Date.parse(String(row.priceDate||""))>=now-30*86400000&&(!row.validUntil||Date.parse(String(row.validUntil))>=now);
     }).sort((a:any,b:any)=>Number(a.unitPrice)-Number(b.unitPrice));
