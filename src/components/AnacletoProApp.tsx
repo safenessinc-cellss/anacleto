@@ -170,7 +170,7 @@ export default function AnacletoProApp({
   }> = [
     { id: "home", label: "Início", icon: LayoutDashboard, tabs: [{ id: "dashboard", label: "Painel" }] },
     { id: "commercial", label: "Comercial", icon: FileText, tabs: [
-      { id: "quotes", label: "Orçamento" },
+      { id: "quotes", label: "Orçamentos" },
       { id: "crm", label: "Clientes (CRM)" },
       { id: "contracts", label: "Contratos" },
     ] },
