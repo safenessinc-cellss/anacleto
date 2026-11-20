@@ -7,9 +7,7 @@ import { db } from "../firebase";
 import { Quote, Invoice, Company, TechnicalDrawing, SenderConfig } from "../types";
 import DashboardOverview from "./dashboard/DashboardOverview";
 import CrmModule from "./crm/CrmModule";
-import QuotesModule from "./quotes/QuotesModule";
-import TechnicalCalculatorModule from "./TechnicalCalculatorModule";
-import SmartBudgetModule from "./quotes/SmartBudgetModule";
+import QuotesWorkspace from "./quotes/QuotesWorkspace";
 import InvoicesModule from "./invoices/InvoicesModule";
 import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
@@ -30,7 +28,7 @@ import ProductionModule from "./production/ProductionModule";
 import InventoryModule from "./inventory/InventoryModule";
 import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "smart_quotes" | "technical_quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory" | "technical_library" | "internal_costs";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory" | "technical_library" | "internal_costs";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -78,7 +76,7 @@ export default function AnacletoProApp({
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
   const isFullMenuRole = ["super_admin", "super_usuario", "ceo", "admin"].includes(effectiveRole);
-  const canSeeNavigation = (id: string) => { const permissionId = (id === "smart_quotes" || id === "technical_quotes") ? "quotes" : id === "technical_library" ? "catalog" : id; return isFullMenuRole || (userPermissions ? userPermissions.includes(permissionId) || (id === "technical_library" && userPermissions.includes("cadastro_items")) : hasAccessToTab(effectiveRole, permissionId as RoleNavTab)); };
+  const canSeeNavigation = (id: string) => { const permissionId = id === "technical_library" ? "catalog" : id; return isFullMenuRole || (userPermissions ? userPermissions.includes(permissionId) || (id === "technical_library" && userPermissions.includes("cadastro_items")) : hasAccessToTab(effectiveRole, permissionId as RoleNavTab)); };
   // A autenticação precisa ser inicializada antes de qualquer efeito que a consulte.
   const [authReady, setAuthReady] = useState(false);
 
@@ -172,9 +170,7 @@ export default function AnacletoProApp({
   }> = [
     { id: "home", label: "Início", icon: LayoutDashboard, tabs: [{ id: "dashboard", label: "Painel" }] },
     { id: "commercial", label: "Comercial", icon: FileText, tabs: [
-      { id: "quotes", label: "Orçamento" },
-      { id: "smart_quotes", label: "Orçamento Inteligente" },
-      { id: "technical_quotes", label: "Orçamento de Esquadrias" },
+      { id: "quotes", label: "Orçamentos" },
       { id: "crm", label: "Clientes (CRM)" },
       { id: "contracts", label: "Contratos" },
     ] },
@@ -377,14 +373,12 @@ export default function AnacletoProApp({
           )}
 
           {activeTab === "quotes" && (
-            <QuotesModule language={language}
+            <QuotesWorkspace language={language}
               senderConfig={senderConfig}
               companies={companies}
               onConvertToInvoice={() => setActiveTab("invoices")}
             />
           )}
-          {activeTab === "smart_quotes" && <SmartBudgetModule />}
-          {activeTab === "technical_quotes" && <TechnicalCalculatorModule />}
 
           {activeTab === "invoices" && (
             <InvoicesModule language={language} senderConfig={senderConfig} canManageFinance={["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(effectiveRole)} />
