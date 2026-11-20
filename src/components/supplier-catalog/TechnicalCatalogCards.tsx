@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
-import { BookOpen, Boxes, FileText, Image as ImageIcon, Layers, Ruler, Search, Wrench } from "lucide-react";
+import { Boxes, Image as ImageIcon, Search } from "lucide-react";
 
 type TechnicalRecord = { id: string; [key: string]: any };
 type CatalogKind = "all" | "documents" | "profiles" | "hardware" | "rules" | "prices";
