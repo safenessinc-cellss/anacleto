@@ -160,7 +160,12 @@ export function calculateAluminumCost(input: AluminumCostInput): AluminumCostRes
       trimMm: rule.trimMm,
     });
   }
-  const validCuts = cuts.filter((cut) => {\n    const fits = cut.lengthMm + cut.kerfMm <= cut.barLengthMm - cut.trimMm;\n    if (!fits) errors.push("O corte de " + cut.profileName + " excede o comprimento útil da barra.");\n    return fits;\n  });\n  const bars = optimizeProfileCuts(validCuts);
+  const validCuts = cuts.filter((cut) => {
+    const fits = cut.lengthMm + cut.kerfMm <= cut.barLengthMm - cut.trimMm;
+    if (!fits) errors.push("O corte de " + cut.profileName + " excede o comprimento útil da barra.");
+    return fits;
+  });
+  const bars = optimizeProfileCuts(validCuts);
   for (const cut of cuts) {
     if (!(cut.weightKgPerM > 0)) errors.push(`Informe o peso linear (kg/m) de ${cut.profileName}.`);
     if (cut.priceMode === "kg" && !(cut.pricePerKg > 0)) errors.push(`Informe o preço por kg de ${cut.profileName}.`);
