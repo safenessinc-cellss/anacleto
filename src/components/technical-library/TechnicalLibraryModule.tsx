@@ -38,7 +38,7 @@ const OFFICIAL_SOURCES = [
     note: "Portal oficial de catálogos de perfis e acessórios; o catálogo técnico de perfis PDF também está publicado.",
     catalogs: [
       { title: "Catálogos oficiais", line: "Geral", url: "https://www.alusupra.com.br/catalogos" },
-      { title: "Catálogo de Perfis PDF", line: "Perfis", url: "https://www.alusupra.com.br/pdf/cat%C3%A1logo-perfil.pdf" },
+      { title: "Catálogo de Perfis PDF", line: "Perfis · edição publicada em 2023", url: "https://www.alusupra.com.br/pdf/cat%C3%A1logo-perfil.pdf" },
       { title: "Perfis para Vidro Temperado", line: "Vidro Temperado", url: "https://www.alusupra.com.br/perfis-aluminio-vidro" }
     ]
   },
@@ -50,6 +50,7 @@ const OFFICIAL_SOURCES = [
     note: "Portal oficial de perfis e sistemas, com páginas específicas por linha.",
     catalogs: [
       { title: "Catálogo Geral de Perfis", line: "Geral", url: "https://www.aluita.com.br/perfisaluminio" },
+      { title: "Catálogo de Perfis PDF 2019/2020", line: "Geral · edição 2019/2020", url: "https://www.aluita.com.br/_files/ugd/944141_83c94e1a3d1b403596ccabca6879df08.pdf" },
       { title: "Produtos e consulta de preços", line: "Consulta comercial", url: "https://www.catalogoaluita.com.br/perfil" },
       { title: "Linha 25/30", line: "25/30", url: "https://www.aluita.com.br/linhamega2530" },
       { title: "Linha Mega 25", line: "Mega 25", url: "https://www.aluita.com.br/linhamega25" },
@@ -92,8 +93,8 @@ const OFFICIAL_SOURCES = [
     note: "Portal oficial de downloads com catálogos, folders por sistema e materiais técnicos.",
     catalogs: [
       { title: "Catálogos oficiais", line: "Geral", url: "https://www.alumiconte.com.br/catalogos/" },
-      { title: "Catálogo Geral da Construção Civil", line: "Construção Civil", url: "https://www.alumiconte.com.br/catalogos/" },
-      { title: "Catálogo Técnico de Componentes", line: "Componentes", url: "https://www.alumiconte.com.br/catalogos/" },
+      { title: "Catálogo Geral da Construção Civil · REV25", line: "Construção Civil", url: "https://www.alumiconte.com.br/wp-content/uploads/2026/10/Catalogo-Construcao-Civil_REV25_WEB_.pdf" },
+      { title: "Catálogo Técnico de Componentes · REV26", line: "Componentes", url: "https://www.alumiconte.com.br/wp-content/uploads/2026/10/CATALOGO-TECNICO_COMPONENTES-REV-26_WEB-2.pdf" },
       { title: "Catálogo de Componentes para Esquadrias", line: "Esquadrias", url: "https://www.alumiconte.com.br/catalogos/" },
       { title: "Folders por Sistema", line: "Sistemas", url: "https://www.alumiconte.com.br/catalogos/" }
     ]
@@ -296,6 +297,40 @@ export default function TechnicalLibraryModule() {
     }
   };
 
+  const registerAllOfficialCatalogs = async () => {
+    setError("");
+    setNotice("");
+    try {
+      let added = 0;
+      let skipped = 0;
+      for (const source of OFFICIAL_SOURCES) {
+        for (const catalog of source.catalogs) {
+          const exists = documents.some(row => row.sourceUrl === catalog.url && row.manufacturer === source.manufacturer);
+          if (exists) { skipped++; continue; }
+          await addDoc(collection(db, "technical_documents"), {
+            manufacturer: source.manufacturer,
+            line: catalog.line,
+            title: catalog.title,
+            version: source.manufacturer === "Esquadrimax" ? "Edição setembro/2026" : "",
+            sourceUrl: catalog.url,
+            sourcePortal: source.url,
+            sourceCountry: "Brasil",
+            status: "pending_review",
+            extractionMethod: "official_catalog_link",
+            createdBy: auth.currentUser?.uid || null,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          added++;
+        }
+      }
+      setSection("documents");
+      setNotice(`Registro concluído: ${added} fontes adicionadas e ${skipped} já existentes ignoradas. Os PDFs e catálogos externos permanecem vinculados à fonte oficial; importe os arquivos para extração estruturada quando disponíveis.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível registrar os catálogos oficiais.");
+    }
+  };
+
   const registerOfficialCatalog = async (source: typeof OFFICIAL_SOURCES[number], catalog: typeof OFFICIAL_SOURCES[number]["catalogs"][number]) => {
     setError("");
     setNotice("");
@@ -354,7 +389,7 @@ export default function TechnicalLibraryModule() {
         <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">Biblioteca Técnica</h1>
         <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">Base técnica rastreável para alimentar despiece, consumo de alumínio, ferragens e orçamentos.</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2"><input value={importManufacturer} onChange={e => setImportManufacturer(e.target.value)} placeholder="Fabricante" aria-label="Fabricante do catálogo" className="w-32 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"/><input value={importLine} onChange={e => setImportLine(e.target.value)} placeholder="Linha / sistema" aria-label="Linha do catálogo" className="w-36 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"/><input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => importTechnicalPdf(e.target.files?.[0])}/><button onClick={() => pdfInputRef.current?.click()} disabled={importingPdf} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Upload size={16}/>{importingPdf ? "Importando PDF..." : "Importar catálogo PDF"}</button><button onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><Plus size={17}/>Novo registro</button></div>
+      <div className="flex flex-wrap items-center gap-2"><button onClick={registerAllOfficialCatalogs} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100"><BookOpen size={16}/>Registrar todos os catálogos</button><input value={importManufacturer} onChange={e => setImportManufacturer(e.target.value)} placeholder="Fabricante" aria-label="Fabricante do catálogo" className="w-32 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"/><input value={importLine} onChange={e => setImportLine(e.target.value)} placeholder="Linha / sistema" aria-label="Linha do catálogo" className="w-36 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"/><input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => importTechnicalPdf(e.target.files?.[0])}/><button onClick={() => pdfInputRef.current?.click()} disabled={importingPdf} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Upload size={16}/>{importingPdf ? "Importando PDF..." : "Importar catálogo PDF"}</button><button onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><Plus size={17}/>Novo registro</button></div>
     </header>
 
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
