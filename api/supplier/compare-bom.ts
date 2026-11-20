@@ -5,7 +5,7 @@ const OWNER_EMAIL="safeness.c.a@gmail.com";
 const decode=(v:any):any=>!v||typeof v!=="object"?v:"stringValue"in v?v.stringValue:"integerValue"in v?Number(v.integerValue):"doubleValue"in v?Number(v.doubleValue):"booleanValue"in v?v.booleanValue:"timestampValue"in v?v.timestampValue:"nullValue"in v?null:"mapValue"in v?Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,decode(x)])):v;
 async function docs(collectionName:string,token:string){
  const url="https://firestore.googleapis.com/v1/projects/"+firebaseConfig.projectId+"/databases/"+encodeURIComponent(firebaseConfig.firestoreDatabaseId||"(default)")+"/documents/"+collectionName+"?pageSize=1000";
- const r=await fetch(url,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(12000)});
+ const r=await fetch(url,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(6000)});
  if(!r.ok)throw new Error("Não foi possível consultar "+collectionName+".");
  const data:any=await r.json();
  return(data.documents||[]).map((d:any)=>({id:d.name.split("/").pop(),...Object.fromEntries(Object.entries(d.fields||{}).map(([k,v])=>[k,decode(v)]))}));
@@ -34,13 +34,13 @@ export default async function handler(req:any,res:any){
   const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
   if(!token)return res.status(401).json({error:"Autenticação obrigatória."});
   const apiKey=process.env.FIREBASE_API_KEY||process.env.VITE_FIREBASE_API_KEY||firebaseConfig.apiKey;
-  const auth=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:token}),signal:AbortSignal.timeout(10000)});
+  const auth=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:token}),signal:AbortSignal.timeout(3000)});
   if(!auth.ok)return res.status(401).json({error:"Sessão inválida."});
   const identity:any=await auth.json(),user=identity.users?.[0];
   if(!user?.email)return res.status(401).json({error:"Usuário não autenticado."});
   if(String(user.email).toLowerCase()!==OWNER_EMAIL){
    const adminUrl="https://firestore.googleapis.com/v1/projects/"+firebaseConfig.projectId+"/databases/"+encodeURIComponent(firebaseConfig.firestoreDatabaseId||"(default)")+"/documents/admins/"+encodeURIComponent(String(user.email).toLowerCase());
-   const adminResponse=await fetch(adminUrl,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(10000)});
+   const adminResponse=await fetch(adminUrl,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(3000)});
    const adminData:any=adminResponse.ok?await adminResponse.json():null;
    const admin={role:adminData?.fields?.role?.stringValue||""};
    if(!admin||!["super_admin","super_usuario","ceo","admin","supervisor","colaborador"].includes(String(admin.role||"")))return res.status(403).json({error:"Perfil sem permissão para comparar preços."});
