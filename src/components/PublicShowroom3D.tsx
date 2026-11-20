@@ -26,7 +26,7 @@ export default function PublicShowroom3D({config,opened}:Props){
     const THREE=await import("three");if(disposed)return;
     const scene=new THREE.Scene();scene.background=null;
     const camera=new THREE.PerspectiveCamera(32,node.clientWidth/Math.max(node.clientHeight,1),.1,100);
-    camera.position.set(4.3/zoom,2.9/zoom,7.2/zoom);camera.lookAt(0,1.12,0);
+    camera.position.set(4.3/zoom,2.9/zoom,7.2/zoom);camera.lookAt(0,0,0);
     renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:"high-performance"});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));renderer.setSize(node.clientWidth,node.clientHeight);renderer.setClearColor(0x000000,0);
     renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.22;
@@ -63,7 +63,7 @@ export default function PublicShowroom3D({config,opened}:Props){
     const isOscillo=config.model==="Janela Oscilobatente";
     const isHinged=config.model==="Porta de Giro"||config.model==="Porta Pivotante";
     for(let i=0;i<count;i++){
-      const root=new THREE.Group();frame.add(root);root.position.set(-width/2+.055+i*leafWidth,0,.045);leafRoots.push(root);
+      const root=new THREE.Group();frame.add(root);root.position.set(-width/2+.055+i*leafWidth,-height/2,.045);leafRoots.push(root);
       const leaf=new THREE.Group();root.add(leaf);leaves.push(leaf);
       const x=leafWidth/2;
       makeBox(leaf,x,height/2,0,.075,height-.15,.105,metal);
