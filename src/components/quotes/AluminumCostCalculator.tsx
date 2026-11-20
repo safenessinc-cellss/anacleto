@@ -11,12 +11,15 @@ const initialProfiles: AluminumProfileRule[] = [
 ];
 
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
-const fieldClass = "mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-900";\nconst PROFILE_RULES_KEY = "anacleto.aluminum-profile-rules.v1";
+const fieldClass = "mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-900";
+const PROFILE_RULES_KEY = "anacleto.aluminum-profile-rules.v1";
 
 export default function AluminumCostCalculator({ onApply }: { onApply: (items: QuoteItem[]) => void }) {
   const [width, setWidth] = useState(1500);
   const [height, setHeight] = useState(1200);
-  const [profiles, setProfiles] = useState<AluminumProfileRule[]>(() => {\n    try { const saved = typeof window !== "undefined" ? window.localStorage.getItem(PROFILE_RULES_KEY) : null; return saved ? JSON.parse(saved) as AluminumProfileRule[] : initialProfiles; } catch { return initialProfiles; }\n  });
+  const [profiles, setProfiles] = useState<AluminumProfileRule[]>(() => {
+    try { const saved = typeof window !== "undefined" ? window.localStorage.getItem(PROFILE_RULES_KEY) : null; return saved ? JSON.parse(saved) as AluminumProfileRule[] : initialProfiles; } catch { return initialProfiles; }
+  });
   const [glassWidthDeduction, setGlassWidthDeduction] = useState(100);
   const [glassHeightDeduction, setGlassHeightDeduction] = useState(80);
   const [panes, setPanes] = useState(2);
@@ -30,7 +33,9 @@ export default function AluminumCostCalculator({ onApply }: { onApply: (items: Q
   const [margin, setMargin] = useState(30);
   const [showResult, setShowResult] = useState(false);
 
-  useEffect(() => { try { window.localStorage.setItem(PROFILE_RULES_KEY, JSON.stringify(profiles)); } catch { /* local persistence is best-effort */ } }, [profiles]);\n\n  const result = useMemo(() => calculateAluminumCost({
+  useEffect(() => { try { window.localStorage.setItem(PROFILE_RULES_KEY, JSON.stringify(profiles)); } catch { /* local persistence is best-effort */ } }, [profiles]);
+
+  const result = useMemo(() => calculateAluminumCost({
     widthMm: width, heightMm: height, profiles,
     glass: { widthDeductionMm: glassWidthDeduction, heightDeductionMm: glassHeightDeduction, panes, minimumAreaM2: minimumGlassArea, pricePerM2: glassPrice },
     accessories, labor, marginPercent: margin,
