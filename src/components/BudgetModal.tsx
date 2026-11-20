@@ -249,6 +249,13 @@ export default function BudgetModal({
     const entered = window.prompt("Informe o preço unitário confirmado na página do fornecedor (R$):", suggested);
     if (!entered?.trim()) return;
     const unitPrice = Number(entered.replace(/\./g, "").replace(",", "."));
+    const freightInput = window.prompt("Informe o frete total confirmado para esta cotação (R$). Use 0 somente se retirada/frete grátis estiver confirmado:", "");
+    if (freightInput === null || !freightInput.trim()) return;
+    const shippingCost = Number(freightInput.replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(shippingCost) || shippingCost < 0) {
+      setMarketError("Informe um frete válido. Use zero apenas quando confirmado.");
+      return;
+    }
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
       setMarketError("Preço inválido. Informe o valor unitário em reais.");
       return;
@@ -267,6 +274,8 @@ export default function BudgetModal({
         finish: item.finish || bomForm.finish || "",
         unit: priceUnit.trim(),
         unitPrice,
+        shippingCost,
+        shippingConfirmed: true,
         currency: "BRL",
         priceDate: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
         validUntil: null,
