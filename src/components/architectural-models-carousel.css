@@ -26,3 +26,26 @@
 .amc-door-copy>button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:40px;border:0;border-radius:8px;background:#c5aa7a;color:#10141c;font-size:10px;font-weight:800;cursor:pointer}
 @media(max-width:900px){.amc-doors-track{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.amc-doors{margin-top:42px;padding-top:28px}.amc-doors-heading{align-items:flex-start;flex-direction:column}.amc-doors-count{align-self:flex-start}.amc-doors-track{grid-template-columns:1fr;gap:13px}.amc-door-image{height:245px}.amc-door-copy p{min-height:0}}
+
+/* Unified catalog: glass + aluminium, aluminium-only and shower enclosures */
+.amc-product-lines{display:grid;gap:54px;margin-top:56px}
+.amc-product-line{padding-top:34px;border-top:1px solid #d5dde5}
+.amc-product-line-heading{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:22px}
+.amc-product-line-heading h3{margin:10px 0 8px;color:#182230;font-size:clamp(25px,3vw,38px);letter-spacing:-.04em}
+.amc-product-line-heading p{max-width:720px;margin:0;color:#596779;font-size:13px;line-height:1.7}
+.amc-product-line-count{flex-shrink:0;border:1px solid #d7c8ae;border-radius:99px;padding:8px 12px;color:#79613b;font:800 9px ui-monospace,monospace;letter-spacing:.12em}
+.amc-product-line-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.amc-line-card{min-width:0;overflow:hidden;border:1px solid #dce2e8;border-radius:14px;background:#fff;box-shadow:0 8px 26px rgba(20,38,55,.045)}
+.amc-line-image{position:relative;display:block;width:100%;height:220px;padding:0;border:0;overflow:hidden;background:#e2e8ed;cursor:pointer}
+.amc-line-image img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .55s ease}
+.amc-line-image:hover img{transform:scale(1.045)}
+.amc-line-image span{position:absolute;right:12px;bottom:12px;padding:8px 11px;border:1px solid #ffffff55;border-radius:99px;background:#0a1420e8;color:#fff;font:800 9px ui-monospace,monospace;letter-spacing:.12em}
+.amc-line-copy{padding:15px}
+.amc-line-copy small{color:#8b7048;font:800 9px ui-monospace,monospace;letter-spacing:.1em}
+.amc-line-copy h4{margin:9px 0 6px;color:#182230;font-size:16px}
+.amc-line-copy p{min-height:54px;margin:0;color:#596779;font-size:11px;line-height:1.6}
+.amc-line-copy>div{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0;padding-top:10px;border-top:1px solid #e4e9ee}
+.amc-line-copy>div span{padding:5px 8px;border-radius:99px;background:#f2f5f7;color:#566577;font-size:9px}
+.amc-line-copy>button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:40px;border:0;border-radius:8px;background:#c5aa7a;color:#10141c;font-size:10px;font-weight:800;cursor:pointer}
+@media(max-width:900px){.amc-product-line-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.amc-product-lines{gap:38px;margin-top:40px}.amc-product-line-heading{align-items:flex-start;flex-direction:column}.amc-product-line-count{align-self:flex-start}.amc-product-line-grid{grid-template-columns:1fr;gap:13px}.amc-line-image{height:245px}.amc-line-copy p{min-height:0}}
