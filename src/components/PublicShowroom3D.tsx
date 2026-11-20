@@ -57,7 +57,8 @@ export default function PublicShowroom3D({config,opened}:Props){
     const leafWidth=(width-.22)/count;
     const leaves:any[]=[],leafRoots:any[]=[];
     const accessories:any[]=[];
-    const isSliding=config.model==="Janela de Correr Suprema"||config.model==="Porta Balcão"||config.model==="Box de Banho"||config.model==="Janela Veneziana"||config.model==="Painel Fixo"||config.model==="Porta Lambril";
+    const isShowerBox=config.model==="Box de Banho";
+    const isSliding=config.model==="Janela de Correr Suprema"||config.model==="Porta Balcão"||isShowerBox||config.model==="Janela Veneziana"||config.model==="Painel Fixo"||config.model==="Porta Lambril";
     const isFolding=config.model==="Porta Camarão";
     const isTilt=config.model==="Maxim-Ar"||config.model==="Janela Basculante";
     const isOscillo=config.model==="Janela Oscilobatente";
@@ -94,6 +95,17 @@ export default function PublicShowroom3D({config,opened}:Props){
       if(isTilt)root.userData.tilt=-.48;
       if(isOscillo)root.userData.tilt=-.28;
       if(isHinged)root.userData.swing=(i===0?1:-1)*.9;
+    }
+    // Shower enclosure return: build a perpendicular fixed glass panel and low floor channel,
+    // so the 360 model reads as a shower box rather than a window frame.
+    if(isShowerBox){
+      const returnDepth=width*.42;
+      makeBox(group,-width/2+.04,height/2,-returnDepth/2,.025,height-.12,returnDepth,pane);
+      makeBox(group,-width/2+.04,height/2,-returnDepth,.055,height,.055,metal);
+      makeBox(group,-width/2+.04,height/2,0,.045,height,.045,metal);
+      makeBox(group,0,-height/2-.11,-returnDepth/2,width,.055,returnDepth+.12,innerMetal);
+      makeBox(group,0,height/2+.12,0,width,.035,.035,chrome);
+      makeBox(group,-width/2+.04,height/2,-returnDepth/2,.035,.035,returnDepth,chrome);
     }
     // Separate insect screen / accessory track, weather seals and fasteners.
     const explodedParts:any[]=[];
@@ -133,7 +145,7 @@ export default function PublicShowroom3D({config,opened}:Props){
   };
   start();return()=>{disposed=true;cleanup?.();};
  },[config.model,config.line,config.color,config.glass,config.width,config.height,config.panels,opened,exploded,zoom]);
- const image=photoByModel[config.model]||"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1600&q=90";
+ const image=config.model==="Box de Banho"?"https://www.dmanbathroom.com/dmanbathroom/2024/02/22/5w8a6484-2.jpg":photoByModel[config.model]||"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1600&q=90";
  const partLabels=["Marco estrutural","Folhas móveis","Vidro e baguetes","Roldanas e ferragens","Trilhos e guias","Borrachas de vedação"];
  return <div className="three-stage" ref={host} style={{position:"relative",touchAction:"pan-y",overflow:"hidden",backgroundImage:`linear-gradient(135deg,rgba(8,20,33,.18),rgba(8,20,33,.02)),url(${image})`,backgroundSize:"cover",backgroundPosition:"center"}} aria-label="Modelo 3D interativo de porta ou janela. Arraste para girar 360 graus.">
   <div className="three-controls" style={{position:"absolute",right:14,top:14,zIndex:5,display:"flex",gap:7,flexWrap:"wrap",justifyContent:"flex-end"}}>
