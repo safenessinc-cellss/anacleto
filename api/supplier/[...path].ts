@@ -1,7 +1,7 @@
-import compareBomHandler from "./compare-bom.js";
-import generateBomHandler from "./generate-bom.js";
-import marketResearchHandler from "./market-research.js";
-import technicalOptionsHandler from "./technical-options.js";
+import compareBomHandler from "../../src/server/supplier-api/compare-bom.js";
+import generateBomHandler from "../../src/server/supplier-api/generate-bom.js";
+import marketResearchHandler from "../../src/server/supplier-api/market-research.js";
+import technicalOptionsHandler from "../../src/server/supplier-api/technical-options.js";
 
 /**
  * Consolidated supplier API routes.
