@@ -40,7 +40,6 @@ import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg 
 import { compactApprovalSenderSnapshot, compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 import ManufacturingRoute from "../production/ManufacturingRoute";
-import AluminumCostCalculator from "./AluminumCostCalculator";
 
 interface QuotesModuleProps {
   senderConfig: SenderConfig;
@@ -1097,17 +1096,6 @@ const handleAddItem = () => {
   });
   const latestAiReply = [...aiChatHistory].reverse().find((message) => message.role === "assistant")?.text;
 
-  const applyAluminumCosting = (items: QuoteItem[]) => {
-    if (!selectedQuote) {
-      showToast("Crie ou selecione um orçamento antes de adicionar os materiais calculados.", "warning");
-      return;
-    }
-    const updated = recalculateQuote({ ...selectedQuote, items: [...selectedQuote.items, ...items] });
-    setSelectedQuote(updated);
-    setIsEditing(true);
-    showToast("Componentes calculados adicionados ao orçamento. Revise os valores e salve.", "success");
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-2xl">
@@ -1131,8 +1119,6 @@ const handleAddItem = () => {
           </button>
         </div>
       </div>
-
-      <AluminumCostCalculator onApply={applyAluminumCosting} />
 
       {/* Main Grid: Left = Quotes List (4 cols); Right = Active Quote Detail (8 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
