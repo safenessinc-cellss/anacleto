@@ -2,7 +2,7 @@ import firebaseConfig from "../../firebase-applet-config.json" with { type: "jso
 const decode=(v:any):any=>!v||typeof v!=="object"?v:"stringValue"in v?v.stringValue:"integerValue"in v?Number(v.integerValue):"doubleValue"in v?v.doubleValue:"booleanValue"in v?v.booleanValue:"timestampValue"in v?v.timestampValue:"nullValue"in v?null:"mapValue"in v?Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,decode(x)])):v;
 async function readCollection(name:string,token:string){
  const url="https://firestore.googleapis.com/v1/projects/"+firebaseConfig.projectId+"/databases/"+encodeURIComponent(firebaseConfig.firestoreDatabaseId||"(default)")+"/documents/"+name+"?pageSize=1000";
- const response=await fetch(url,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(10000)});
+ const response=await fetch(url,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(3000)});
  if(!response.ok)throw new Error("Não foi possível ler "+name+".");
  const data:any=await response.json();
  return(data.documents||[]).map((d:any)=>({id:d.name.split("/").pop(),...Object.fromEntries(Object.entries(d.fields||{}).map(([k,v])=>[k,decode(v)]))}));
@@ -14,7 +14,7 @@ export default async function handler(req:any,res:any){
   const token=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
   if(!token)return res.status(401).json({error:"Autenticação obrigatória."});
   const apiKey=process.env.FIREBASE_API_KEY||process.env.VITE_FIREBASE_API_KEY||firebaseConfig.apiKey;
-  const auth=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:token}),signal:AbortSignal.timeout(10000)});
+  const auth=await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key="+apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:token}),signal:AbortSignal.timeout(3000)});
   if(!auth.ok)return res.status(401).json({error:"Sessão inválida."});
   const [profiles,rules]=await Promise.all([readCollection("aluminum_profiles",token),readCollection("cutting_rules",token)]);
   const verified=(x:any)=>x.status==="verified";
