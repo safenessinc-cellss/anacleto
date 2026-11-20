@@ -78,6 +78,8 @@ export default function QuotesWorkspace({
         </nav>
       </header>
 
+      {activeTab === "all" && <AllBudgetsModule onOpen={openBudget} />}
+
       <div
         id="budget-panel-standard"
         role="tabpanel"
@@ -89,6 +91,8 @@ export default function QuotesWorkspace({
           senderConfig={senderConfig}
           companies={companies}
           onConvertToInvoice={onConvertToInvoice}
+          initialQuoteId={editingIds.standard}
+          hideHistory
         />
       </div>
 
