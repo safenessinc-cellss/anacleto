@@ -11,6 +11,12 @@ async function docs(collectionName:string,token:string){
  return(data.documents||[]).map((d:any)=>({id:d.name.split("/").pop(),...Object.fromEntries(Object.entries(d.fields||{}).map(([k,v])=>[k,decode(v)]))}));
 }
 const money=(n:number)=>Math.round((n+Number.EPSILON)*100)/100;
+const isCurrentQuote=(row:any,now:number)=>{
+ const date=Date.parse(String(row.priceDate||""));
+ if(!Number.isFinite(date)||date<now-30*86400000||date>now+300000)return false;
+ if(row.validUntil){const valid=Date.parse(String(row.validUntil));if(!Number.isFinite(valid)||valid<now)return false;}
+ return true;
+};
 const normalizeUnit=(value:any)=>{const v=String(value||"").trim().toLowerCase();if(["bar","barra","barras"].includes(v))return "bar";if(["piece","un","unidade","unidades","peça","peças","pc"].includes(v))return "piece";if(["m","metro","metros","meter"].includes(v))return "meter";if(["m2","m²","metro quadrado"].includes(v))return "m2";if(["kg","quilo","quilograma"].includes(v))return "kg";return v;};
 function barsFor(item:any){
  if(item.unit!=="bar"||!Array.isArray(item.cutLengthsMm)||!item.commercialBarLengthMm)return Number(item.quantity||0);
@@ -46,9 +52,7 @@ export default async function handler(req:any,res:any){
   for(const row of records){
    if(row.status!=="verified"||row.priceStatus!=="verified")continue;
    if(!row.unitPrice||Number(row.unitPrice)<=0||String(row.currency||"BRL")!=="BRL")continue;
-   const date=Date.parse(String(row.priceDate||""));
-   if(!Number.isFinite(date)||now-date>30*86400000||date>now+300000)continue;
-   if(row.validUntil&&Date.parse(String(row.validUntil))<now)continue;
+   if(!isCurrentQuote(row,now))continue;
    const supplier=String(row.supplier||row.manufacturer||"").trim();
    if(!supplier)continue;
    if(!group.has(supplier))group.set(supplier,{supplier,supplierUrl:String(row.supplierUrl||row.sourceUrl||""),lines:[],materialSubtotal:0,shippingCost:0,total:0,complete:true,verified:true,missingItems:[]});
@@ -62,7 +66,7 @@ export default async function handler(req:any,res:any){
       String(row.code||"").trim().toLowerCase()===String(item.code||"").trim().toLowerCase()&&
       String(row.line||"").trim().toLowerCase()===String(item.system||"").trim().toLowerCase()&&
       String(row.finish||"").trim().toLowerCase()===String(item.finish||"").trim().toLowerCase()&&
-      Number(row.unitPrice)>0&&Date.parse(String(row.priceDate||""))>=now-30*86400000&&(!row.validUntil||Date.parse(String(row.validUntil))>=now);
+      Number(row.unitPrice)>0&&isCurrentQuote(row,now);
     }).map((row:any)=>{
       const sourceUnit=normalizeUnit(row.unit);
       const convertedPrice=convertSupplierPriceToPurchaseUnit(Number(row.unitPrice),sourceUnit,String(item.unit||""),{
