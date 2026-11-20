@@ -117,12 +117,56 @@ export default function BudgetModal({
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [aiError, setAiError] = useState("");
   const [marketResults, setMarketResults] = useState<any[]>([]);
+  const [bomForm, setBomForm] = useState({ manufacturer: "", line: "", typology: "Janela de correr 2 folhas", configuration: "2 folhas", widthMm: "1500", heightMm: "1200", quantity: "1", finish: "Branco" });
+  const [bomData, setBomData] = useState<any>(null);
+  const [bomError, setBomError] = useState("");
+  const [isGeneratingBom, setIsGeneratingBom] = useState(false);
+  const [comparisons, setComparisons] = useState<any[]>([]);
+  const [comparisonNotice, setComparisonNotice] = useState("");
+  const [isComparing, setIsComparing] = useState(false);
   const [marketSearchedAt, setMarketSearchedAt] = useState("");
   const [marketError, setMarketError] = useState("");
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
 
+  const handleGenerateBom = async () => {
+    setIsGeneratingBom(true); setBomError(""); setBomData(null); setComparisons([]);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre na sua conta para gerar o despiece.");
+      const response = await fetch("/api/supplier/generate-bom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + await user.getIdToken() },
+        body: JSON.stringify({ ...bomForm, widthMm: Number(bomForm.widthMm), heightMm: Number(bomForm.heightMm), quantity: Number(bomForm.quantity) })
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "Falha ao gerar o despiece.");
+      setBomData(data);
+      if (!data.complete) setBomError("Despiece parcial: corrija os itens técnicos pendentes antes de usar como lista final de fabricação.");
+    } catch (error) { setBomError(error instanceof Error ? error.message : "Não foi possível gerar o despiece."); }
+    finally { setIsGeneratingBom(false); }
+  };
+
+  const handleCompareBom = async () => {
+    if (!bomData?.bom?.length) return;
+    setIsComparing(true); setComparisonNotice(""); setComparisons([]);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre na sua conta para comparar fornecedores.");
+      const response = await fetch("/api/supplier/compare-bom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + await user.getIdToken() },
+        body: JSON.stringify({ items: bomData.bom })
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "Falha ao comparar fornecedores.");
+      setComparisons(Array.isArray(data?.comparisons) ? data.comparisons : []);
+      setComparisonNotice(data?.notice || "Comparação concluída.");
+    } catch (error) { setComparisonNotice(error instanceof Error ? error.message : "Não foi possível comparar fornecedores."); }
+    finally { setIsComparing(false); }
+  };
+
   const handleMarketResearch = async () => {
-    const validItems = items.filter((item) => item.description.trim());
+    const validItems = (bomData?.bom?.length ? bomData.bom : items.filter((item) => item.description.trim())).map((item: any) => ({...item, description: item.description}));
     if (!validItems.length) {
       setMarketError("Adicione materiais ao orçamento antes de pesquisar preços.");
       return;
@@ -139,9 +183,10 @@ export default function BudgetModal({
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken },
         body: JSON.stringify({
           location: "Sapucaia do Sul, Rio Grande do Sul, Brasil",
-          items: validItems.slice(0, 12).map((item) => ({
-            id: item.id, code: item.sku || "", description: item.description,
-            manufacturer: "", line: "", finish: "", unit: "un"
+          items: validItems.slice(0, 12).map((item: any) => ({
+            id: item.id, code: item.code || item.sku || "", description: item.description,
+            manufacturer: item.manufacturer || bomForm.manufacturer,
+            line: item.system || bomForm.line, finish: item.finish || bomForm.finish, unit: item.unit || "un"
           }))
         })
       });
@@ -557,6 +602,46 @@ export default function BudgetModal({
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Technical BOM generation and supplier comparison */}
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-5 space-y-4 dark:border-blue-900 dark:bg-blue-950/20">
+              <div className="flex items-center gap-2">
+                <PackageSearch className="h-5 w-5 text-blue-700 dark:text-blue-300"/>
+                <div><h4 className="text-sm font-bold text-slate-900 dark:text-white">Despiece técnico automático</h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400">Gera materiais usando somente perfis, regras e acessórios aprovados na Biblioteca Técnica.</p></div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {([
+                  ["manufacturer","Fabricante"],["line","Linha / sistema"],["typology","Tipologia"],["configuration","Configuração"],["widthMm","Largura (mm)"],["heightMm","Altura (mm)"],["quantity","Quantidade"],["finish","Acabamento"]
+                ] as const).map(([key,label]) => <label key={key} className="text-xs font-semibold text-slate-600 dark:text-slate-300">{label}
+                  <input value={bomForm[key]} onChange={e=>setBomForm(v=>({...v,[key]:e.target.value}))} type={["widthMm","heightMm","quantity"].includes(key)?"number":"text"} min={["widthMm","heightMm","quantity"].includes(key)?"1":undefined} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"/>
+                </label>)}
+              </div>
+              <button type="button" onClick={handleGenerateBom} disabled={isGeneratingBom} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-50">
+                {isGeneratingBom ? "Gerando despiece..." : "Gerar lista completa de materiais"}
+              </button>
+              {bomError && <p className="text-xs text-amber-700 dark:text-amber-300">{bomError}</p>}
+              {bomData && <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold text-slate-900 dark:text-white">Materiais gerados · {bomData.bom?.length || 0} itens</p><span className={bomData.complete?"text-xs font-semibold text-emerald-700":"text-xs font-semibold text-amber-700"}>{bomData.complete?"Despiece completo":"Despiece incompleto"}</span></div>
+                {(bomData.bom||[]).map((part:any)=><div key={part.id} className="flex flex-wrap justify-between gap-2 border-t border-slate-100 py-2 text-xs dark:border-slate-800">
+                  <div><p className="font-semibold text-slate-800 dark:text-slate-100">{part.code} · {part.description}</p><p className="text-slate-500">{part.manufacturer} · {part.system} · {part.finish} · {part.unit}</p>
+                  {part.cutLengthsMm?.length>0&&<p className="text-slate-500">Cortes: {part.cutLengthsMm.map((v:number)=>Math.round(v)+" mm").join(", ")} · Barra {part.commercialBarLengthMm} mm</p>}
+                  {part.sourceDocumentId&&<p className="text-slate-500">Documento: {part.sourceDocumentId}{part.sourcePage? " · pág. "+part.sourcePage:""}</p>}</div>
+                  <p className="font-bold tabular-nums">{part.quantity} {part.unit}</p>
+                </div>)}
+                {(bomData.errors||[]).map((error:string,i:number)=><p key={i} className="text-xs text-amber-700 dark:text-amber-300">• {error}</p>)}
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <button type="button" onClick={handleMarketResearch} disabled={isSearchingMarket||!bomData.bom?.length} className="rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50">Pesquisar preços online</button>
+                  <button type="button" onClick={handleCompareBom} disabled={isComparing||!bomData.bom?.length} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{isComparing?"Comparando...":"Comparar fornecedores aprovados"}</button>
+                </div>
+                {comparisonNotice&&<p className="text-xs text-slate-600 dark:text-slate-300">{comparisonNotice}</p>}
+                {comparisons.map((basket:any)=><div key={basket.supplier} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-bold">{basket.supplier}</p><p className="text-xs font-bold">{basket.complete?basket.total.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Cesta incompleta"}</p></div>
+                  <p className="text-[10px] text-slate-500">{basket.complete?"Todos os itens têm preço aprovado.":"Faltam preços: "+(basket.missingItems||[]).join(", ")}</p>
+                  {basket.lines?.map((line:any,i:number)=><p key={i} className="mt-1 text-[10px] text-slate-600">{line.description}: {line.subtotal==null?"Sem preço aprovado":line.subtotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p>)}
+                </div>)}
+              </div>}
             </div>
 
             {/* Online market research panel */}
