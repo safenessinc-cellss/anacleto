@@ -66,6 +66,15 @@ service firebase.storage {
       allow delete: if canManageProjects();
     }
 
+    // PDFs de catálogos técnicos oficiais importados para a biblioteca de engenharia.
+    match /technical-catalogs/{uid}/{fileName} {
+      allow read: if canManageProjects();
+      allow create, update: if canManageProjects()
+        && request.auth.uid == uid
+        && request.resource.size <= 25 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow delete: if canManageProjects() && request.auth.uid == uid;
+    }
     match /technical-drawings/{uid}/{fileName} {
       allow read: if canManageProjects();
       allow create, update: if canManageProjects()
