@@ -722,7 +722,7 @@ export default function BudgetModal({
               {bomData && <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold text-slate-900 dark:text-white">Materiais gerados · {bomData.bom?.length || 0} itens</p><span className={bomData.complete?"text-xs font-semibold text-emerald-700":"text-xs font-semibold text-amber-700"}>{bomData.complete?"Despiece completo":"Despiece incompleto"}</span></div>
                 {(bomData.bom||[]).map((part:any)=><div key={part.id} className="flex flex-wrap justify-between gap-2 border-t border-slate-100 py-2 text-xs dark:border-slate-800">
-                  <div><p className="font-semibold text-slate-800 dark:text-slate-100">{part.code} · {part.description}</p><p className="text-slate-500">{part.manufacturer} · {part.system} · {part.finish} · {part.unit}</p>
+                  <div><p className="font-semibold text-slate-800 dark:text-slate-100">{part.code} · {part.description}</p><p className="text-slate-500">{part.manufacturer} · {part.system} · {part.finish} · {part.unit}{part.glassType?" · "+part.glassType:""}{part.glassThicknessMm?" · "+part.glassThicknessMm+" mm":""}</p>
                   {part.cutLengthsMm?.length>0&&<p className="text-slate-500">Cortes: {part.cutLengthsMm.map((v:number)=>Math.round(v)+" mm").join(", ")} · Barra {part.commercialBarLengthMm} mm</p>}
                   {part.sourceDocumentId&&<p className="text-slate-500">Documento: {part.sourceDocumentId}{part.sourcePage? " · pág. "+part.sourcePage:""}</p>}</div>
                   <p className="font-bold tabular-nums">{part.quantity} {part.unit}</p>
