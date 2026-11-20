@@ -120,20 +120,33 @@ export default async function handler(req: any, res: any) {
       if(!profile) { errors.push("Perfil " + String(rule.profileCode||"(sem código)") + " sem cadastro verificado compatível."); continue; }
       const vars={W:width,H:height,L:width,Q:quantity};
       try {
-        const calculated=evaluateFormula(String(rule.formula||""),vars);
-        const unit=String(rule.unit||"piece");
-        const count=roundQty(calculated*quantity,unit);
         const isProfile=String(rule.category||"aluminum_profile")==="aluminum_profile";
-        const cuts=Array.isArray(rule.cutLengthsMm)?rule.cutLengthsMm.map(Number):undefined;
+        const unit=String(rule.unit||(isProfile?"bar":"piece"));
+        const calculated=evaluateFormula(String(rule.formula||""),vars);
         const commercialLength=Number(profile.commercialLengthMm||0);
-        if(isProfile && (!commercialLength || !cuts?.length)) {
-          errors.push("Perfil "+profile.code+": informe cortes individuais e comprimento comercial verificado; fórmula isolada não basta para otimizar barras.");
-          continue;
+        const perProduct=rule.quantityFormula?evaluateFormula(String(rule.quantityFormula),vars):Number(rule.cutCount||1);
+        if(!Number.isFinite(perProduct)||perProduct<=0||perProduct>1000) throw new Error("Quantidade de cortes/consumo inválida.");
+        let cuts:number[]|undefined;
+        let count:number;
+        if(isProfile) {
+          if(!commercialLength) { errors.push("Perfil "+profile.code+": comprimento comercial não verificado."); continue; }
+          const cutLength=calculated;
+          if(cutLength>commercialLength) throw new Error("Corte maior que a barra comercial.");
+          cuts=Array.from({length:Math.ceil(perProduct*quantity)},()=>cutLength);
+          const bars:number[][]=[];
+          for(const cut of [...cuts].sort((a,b)=>b-a)) {
+            let target=bars.find(bar=>bar.reduce((sum,n)=>sum+n,0)+bar.length*Number(rule.kerfMm||3)+cut<=commercialLength);
+            if(!target){target=[];bars.push(target);}
+            target.push(cut);
+          }
+          count=bars.length;
+        } else {
+          count=roundQty(calculated*perProduct*quantity,unit);
         }
         bom.push({
           id:String(rule.id),category:rule.category||"aluminum_profile",code:String(profile.code),
           description:String(profile.description||rule.description||profile.code),quantity:count,
-          unit:isProfile?"bar":unit,cutLengthsMm:cuts?.flatMap((cut:number)=>Array.from({length:quantity},()=>cut)),
+          unit:isProfile?"bar":unit,cutLengthsMm:cuts,
           commercialBarLengthMm:isProfile?commercialLength:undefined,kerfMm:Number(rule.kerfMm||3),
           manufacturer,system:line,finish:finish||profile.finish||"",compatibilityKey:[manufacturer,line,profile.code,finish||profile.finish||""].join(":").toLowerCase(),
           required:true,sourceDocumentId:rule.documentId||profile.documentId||"",sourcePage:Number(rule.page||profile.page||0)||undefined,
