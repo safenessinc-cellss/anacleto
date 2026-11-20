@@ -12,6 +12,7 @@ import InvoicesModule from "./invoices/InvoicesModule";
 import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
 import FinanceModule from "./finance/FinanceModule";
+import InternalQuoteCostsModule from "./finance/InternalQuoteCostsModule";
 import FinancialAI from "./finance/FinancialAI";
 import ThemeModule from "./settings/ThemeModule";
 import AdminModule from "./admin/AdminModule";
@@ -27,7 +28,7 @@ import ProductionModule from "./production/ProductionModule";
 import InventoryModule from "./inventory/InventoryModule";
 import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "smart_quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory" | "technical_library";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "smart_quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory" | "technical_library" | "internal_costs";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -399,6 +400,7 @@ export default function AnacletoProApp({
         {activeTab === "post_sale" && <PostSaleModule />}
 
          {activeTab === "finance" && (<FinanceModule language={language} senderConfig={senderConfig} canManageFinance={["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(effectiveRole)} />)}
+          {activeTab === "internal_costs" && ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(effectiveRole) && <InternalQuoteCostsModule />}
 
         {activeTab === "admin" && roleConfig.canManageUsers && (<AdminModule currentPerfile={effectiveRole} />)}
         {activeTab === "financial_ai" && (<FinancialAI language={language} />)}
