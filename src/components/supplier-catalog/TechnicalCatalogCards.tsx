@@ -59,7 +59,7 @@ export default function TechnicalCatalogCards() {
   }, []);
 
   const cards = useMemo<CatalogCard[]>(() => [
-    ...documents.map(row => ({
+    ...documents.map((row): CatalogCard => ({
       id: "doc:" + row.id, kind: "documents" as const,
       title: text(row.title) || "Catálogo técnico",
       subtitle: text(row.version) || "Documento do fabricante",
@@ -71,7 +71,7 @@ export default function TechnicalCatalogCards() {
       status: text(row.status) || "pending_review",
       details: [["Tipo", "Documento técnico"], ["Versão", text(row.version) || "Não informada"], ["Páginas", text(row.pageCount) || "Não informado"], ["Arquivo", text(row.originalFileName || row.title)], ["Método de importação", text(row.extractionMethod) || "Registro de fonte"], ["ID do documento", row.id]],
     })),
-    ...profiles.map(row => ({
+    ...profiles.map((row): CatalogCard => ({
       id: "profile:" + row.id, kind: "profiles" as const,
       title: text(row.description) || "Perfil de alumínio",
       subtitle: text(row.code) || "Código não informado",
@@ -83,7 +83,7 @@ export default function TechnicalCatalogCards() {
       status: text(row.status) || "pending_review",
       details: [["Código", text(row.code) || "Não informado"], ["Peso linear", text(row.weightKgM) ? text(row.weightKgM) + " kg/m" : "Não informado"], ["Peso por barra", text(row.weightKgBar) ? text(row.weightKgBar) + " kg" : "Não informado"], ["Comprimento comercial", text(row.commercialLengthMm) ? text(row.commercialLengthMm) + " mm" : "Não informado"], ["Acabamento", text(row.finish) || "Não informado"], ["Documento de origem", text(row.documentId) || "Não vinculado"], ["Página", text(row.page) || "Não informada"]],
     })),
-    ...hardware.map(row => ({
+    ...hardware.map((row): CatalogCard => ({
       id: "hardware:" + row.id, kind: "hardware" as const,
       title: text(row.description) || "Acessório / ferragem",
       subtitle: text(row.code) || "Código não informado",
@@ -95,7 +95,7 @@ export default function TechnicalCatalogCards() {
       status: text(row.status) || "pending_review",
       details: [["Código", text(row.code) || "Não informado"], ["Tipologia", text(row.typology) || "Todas / não especificada"], ["Acabamento", text(row.finish) || "Não informado"], ["Unidade", text(row.unit) || "Não informada"], ["Quantidade por esquadria", text(row.quantity) || text(row.quantityFormula) || "Não definida"], ["Documento de origem", text(row.documentId) || "Não vinculado"], ["Página", text(row.page) || "Não informada"]],
     })),
-    ...rules.map(row => ({
+    ...rules.map((row): CatalogCard => ({
       id: "rule:" + row.id, kind: "rules" as const,
       title: text(row.description) || text(row.profileCode) || "Regra técnica",
       subtitle: text(row.typology) || "Tipologia não informada",
@@ -107,7 +107,7 @@ export default function TechnicalCatalogCards() {
       status: text(row.status) || "pending_review",
       details: [["Configuração", text(row.configuration) || "Não informada"], ["Código do componente", text(row.profileCode) || "Não informado"], ["Categoria", text(row.category) || "Não informada"], ["Fórmula de corte / consumo", text(row.formula) || "Não informada"], ["Quantidade por esquadria", text(row.quantityFormula) || text(row.cutCount) || "Não informada"], ["Kerf", text(row.kerfMm) ? text(row.kerfMm) + " mm" : "Não informado"], ["Vidro", [text(row.glassType), text(row.glassThicknessMm) ? text(row.glassThicknessMm) + " mm" : ""].filter(Boolean).join(" · ") || "Não aplicável"], ["Documento de origem", text(row.documentId) || "Não vinculado"], ["Página", text(row.page) || "Não informada"]],
     })),
-    ...prices.map(row => ({
+    ...prices.map((row): CatalogCard => ({
       id: "price:" + row.id, kind: "prices" as const,
       title: text(row.description) || text(row.code) || "Cotação de fornecedor",
       subtitle: money(row.unitPrice) + " / " + (text(row.unit) || "unidade"),
