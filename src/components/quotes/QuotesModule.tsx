@@ -1116,21 +1116,12 @@ const handleAddItem = () => {
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">{initialMode === "smart" ? "Orçamento Inteligente" : "Orçamentos & Propostas"}</h1>
-            <span className="text-xs text-slate-500">{initialMode === "smart" ? "Crie um orçamento com apoio do assistente de IA" : `${quotes.length} orçamentos`}</span>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">"Orçamento"</h1>
+            <span className="text-xs text-slate-500">`${quotes.length} orçamentos`</span>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {initialMode !== "smart" && onOpenSmartQuote && (
-            <button
-              type="button"
-              onClick={onOpenSmartQuote}
-              className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
-            >
-              <Sparkles className="h-4 w-4" /> Orçamento Inteligente
-            </button>
-          )}
           <button
             type="button"
             onClick={handleCreateNewQuote}
@@ -1358,29 +1349,6 @@ const handleAddItem = () => {
                 </div>
 
                 <fieldset disabled={!isEditing || Boolean(selectedQuote.invoiceId || selectedQuote.status === "invoiced")} className="contents">
-                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-2.5">
-                  <form onSubmit={handleSendAiMessage} className="flex items-center gap-2">
-                    <Sparkles className="ml-1 h-4 w-4 shrink-0 text-amber-400" />
-                    <input
-                      type="text"
-                      value={aiMessage}
-                      onChange={(event) => setAiMessage(event.target.value)}
-                      placeholder="Peça à IA: ex. 'adicione 2 janelas 150x120' ou 'mude imposto para 10%'"
-                      aria-label="Instrução para o agente de IA"
-                      className="min-w-0 flex-1 bg-transparent px-2 py-2 text-xs text-white placeholder-slate-500 outline-none"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isAiLoading || !aiMessage.trim()}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-40"
-                    >
-                      {isAiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                      {isAiLoading ? "Processando" : "Enviar"}
-                    </button>
-                  </form>
-                  {latestAiReply && <p aria-live="polite" className="truncate px-8 pt-1 text-[10px] text-slate-400" title={latestAiReply}>{latestAiReply}</p>}
-                </div>
-
                 {/* Client */}
                 <div className="grid grid-cols-1 gap-4 pt-4">
                   <div>
