@@ -42,7 +42,11 @@ const CATEGORY_LABELS: Record<CostCategory, string> = {
 };
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number.isFinite(value) ? value : 0);
 const newId = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : "cost_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-const revisionOf = (quote: Quote) => {\n  const raw: any = quote.approvedSnapshotId || quote.snapshotContentHash || quote.updatedAt || quote.createdAt || "draft";\n  const value = raw && typeof raw === "object" && typeof raw.toMillis === "function" ? String(raw.toMillis()) : raw instanceof Date ? String(raw.getTime()) : String(raw);\n  return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 90);\n};
+const revisionOf = (quote: Quote) => {
+  const raw: any = quote.approvedSnapshotId || quote.snapshotContentHash || quote.updatedAt || quote.createdAt || "draft";
+  const value = raw && typeof raw === "object" && typeof raw.toMillis === "function" ? String(raw.toMillis()) : raw instanceof Date ? String(raw.getTime()) : String(raw);
+  return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 90);
+};
 const quoteDate = (value: any) => value?.toDate ? value.toDate().toLocaleString("pt-BR") : value ? new Date(value).toLocaleString("pt-BR") : "—";
 
 export default function InternalQuoteCostsModule() {
