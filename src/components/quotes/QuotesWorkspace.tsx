@@ -4,7 +4,7 @@ import type { Company, SenderConfig } from "../../types";
 import QuotesModule from "./QuotesModule";
 import SmartBudgetModule from "./SmartBudgetModule";
 import TechnicalCalculatorModule from "../TechnicalCalculatorModule";
-import AllBudgetsModule, { BudgetWorkflow } from "./AllBudgetsModule";
+import AllBudgetsModule, { type BudgetWorkflow } from "./AllBudgetsModule";
 
 type BudgetTab = "all" | "standard" | "smart" | "technical";
 
