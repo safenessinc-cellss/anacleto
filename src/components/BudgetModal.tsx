@@ -5,7 +5,7 @@ import { Translation } from "../translations";
 import { generateBudgetTranslations, languageMeta } from "../utils";
 import { useToast } from "./ToastContext";
 import { db, auth } from "../firebase";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { collection, query, where, getDocs, limit, addDoc, serverTimestamp } from "firebase/firestore";
 
 interface BudgetModalProps {
   isOpen: boolean;
@@ -199,6 +199,49 @@ export default function BudgetModal({
       setMarketError(error instanceof Error ? error.message : "Não foi possível pesquisar preços.");
     } finally {
       setIsSearchingMarket(false);
+    }
+  };
+
+  const handleSaveMarketCandidate = async (result: any, offer: any) => {
+    const defaultSupplier = String(offer.domain || "Fornecedor").replace(/^www\./, "");
+    const supplier = window.prompt("Confirme o nome do fornecedor:", defaultSupplier);
+    if (!supplier?.trim()) return;
+    const suggested = Array.isArray(offer.prices) && offer.prices.length ? String(offer.prices[0]).replace(".", ",") : "";
+    const entered = window.prompt("Informe o preço unitário confirmado na página do fornecedor (R$):", suggested);
+    if (!entered?.trim()) return;
+    const unitPrice = Number(entered.replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      setMarketError("Preço inválido. Informe o valor unitário em reais.");
+      return;
+    }
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre na sua conta para registrar a cotação.");
+      const item = result.item || {};
+      await addDoc(collection(db, "supplier_prices"), {
+        manufacturer: supplier.trim(),
+        supplier: supplier.trim(),
+        supplierUrl: "https://" + defaultSupplier,
+        line: item.line || bomForm.line || "",
+        code: item.code || "",
+        description: item.description || offer.title || "",
+        finish: item.finish || bomForm.finish || "",
+        unit: item.unit || "un",
+        unitPrice,
+        currency: "BRL",
+        priceDate: new Date().toISOString().slice(0, 10),
+        validUntil: null,
+        sourceUrl: offer.url,
+        quoteReference: "Preço conferido manualmente pelo usuário a partir da página online",
+        status: "pending_review",
+        priceStatus: "pending_review",
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      showToast("Cotação registrada como pendente de validação na Biblioteca Técnica.", "success");
+    } catch (error) {
+      setMarketError(error instanceof Error ? error.message : "Não foi possível registrar a cotação.");
     }
   };
 
@@ -673,9 +716,12 @@ export default function BudgetModal({
                           {offer.prices?.length > 0 ? <p className="font-semibold text-indigo-700 dark:text-indigo-300">Preço candidato: {offer.prices.map((price: number) => price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })).join(" / ")}</p> : <p className="text-slate-500">Preço não identificado na pesquisa.</p>}
                           <p className="text-[10px] text-amber-700 dark:text-amber-400">Não verificado · confirme código, acabamento, unidade, estoque, frete e validade.</p>
                         </div>
-                        <a href={offer.url} target="_blank" rel="noreferrer" className="shrink-0 inline-flex items-center gap-1 text-indigo-600 hover:underline">
-                          Abrir <ExternalLink className="h-3 w-3" />
-                        </a>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <a href={offer.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-indigo-600 hover:underline">
+                            Abrir <ExternalLink className="h-3 w-3" />
+                          </a>
+                          <button type="button" onClick={() => handleSaveMarketCandidate(result, offer)} className="rounded-md border border-indigo-200 px-2 py-1 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-50">Registrar cotação</button>
+                        </div>
                       </div>
                     </div>
                   ))}
