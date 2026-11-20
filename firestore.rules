@@ -71,6 +71,12 @@ service cloud.firestore {
       allow update: if canManageCommercial();
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
+    // Orçamentos técnicos de esquadrias: coleção própria, editável apenas pelo Comercial/Financeiro.
+    match /technical_budgets/{id} {
+      allow read: if canManageCommercial() || canManageFinance();
+      allow create, update: if canManageCommercial();
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
     match /quotes/{id} {
       allow read: if canOperate() || canManageProduction() || canManageFinance() || canManageQuality();
       allow create: if canManageCommercial();
