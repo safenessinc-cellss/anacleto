@@ -28,7 +28,7 @@ import {
   Trash2,
   Save
 } from "lucide-react";
-import { Quote, QuoteItem, Company, SenderConfig, Invoice, TechnicalDrawing } from "../../types";
+import { Quote, QuoteItem, Company, SenderConfig, Invoice } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
 import { collection, deleteField, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../firebase";
@@ -36,7 +36,7 @@ import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
 import ImageLightbox from "../common/ImageLightbox";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
-import { estimatedCatalogPrice, readAluminumPricePerKg, writeAluminumPricePerKg } from "../../utils/catalogPricing";
+import { estimatedCatalogPrice, readAluminumPricePerKg } from "../../utils/catalogPricing";
 import { compactApprovalSenderSnapshot, compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 import ManufacturingRoute from "../production/ManufacturingRoute";
@@ -54,23 +54,10 @@ interface QuotesModuleProps {
 
 export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote, initialQuoteId, hideHistory = false}: QuotesModuleProps) {
   const { showToast } = useToast();
-  const [savedDrawings, setSavedDrawings] = useState<TechnicalDrawing[]>([]);
-  const [catalogSearch, setCatalogSearch] = useState("");
-  const [debouncedCatalogSearch, setDebouncedCatalogSearch] = useState("");
-  const [showCatalog, setShowCatalog] = useState(false);
-  const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
-
-  // Carregar desenhos técnicos para vincular o desenho 2D ao orçamento
-  useEffect(() => {
-    return onSnapshot(collection(db, "technical_drawings"), (snap) => {
-      setSavedDrawings(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TechnicalDrawing)));
-    }, (err) => {
-      console.error("Technical drawings listener (quotes):", err);
-      showToast("Não foi possível carregar os desenhos técnicos.", "error");
-    });
-  }, []);
+  const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
+  const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
 
   // Cargar catálogo
   useEffect(() => {
@@ -160,11 +147,6 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   useEffect(() => {
     setActionsMenuOpen(false);
   }, [selectedQuote?.id]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedCatalogSearch(catalogSearch.trim().toLowerCase()), 250);
-    return () => window.clearTimeout(timer);
-  }, [catalogSearch]);
 
   // AI Chat Agent States
   const [aiMessage, setAiMessage] = useState("");
@@ -1363,113 +1345,14 @@ const handleAddItem = () => {
                   </div>
                 </div>
 
-                {/* Vincular desenho técnico 2D ao orçamento */}
-                <div className="mt-5 p-4 rounded-2xl border border-amber-500/30 bg-amber-500/5">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-amber-300 mb-2">
-                    Desenho 2D do produto orçado
-                  </label>
-                  <select
-                    value={selectedQuote.technicalDrawing?.id || ""}
-                    onChange={(e) => {
-                      const drawing = savedDrawings.find((d) => d.id === e.target.value);
-                      const updated = { ...selectedQuote, technicalDrawing: drawing || undefined, pdfDataUri: undefined, pdfFileName: undefined, pdfGeneratedAt: undefined };
-                      setSelectedQuote(updated);
-                    }}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-amber-500/50"
-                  >
-                    <option value="">Selecionar desenho técnico salvo (opcional)</option>
-                    {savedDrawings.map((drawing) => (
-                      <option key={drawing.id} value={drawing.id}>
-                        {drawing.title} — {drawing.overallDimensions?.width} × {drawing.overallDimensions?.height} {drawing.unit}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedQuote.technicalDrawing && (
-                    <p className="text-[11px] text-slate-300 mt-2">
-                      Desenho vinculado: <strong>{selectedQuote.technicalDrawing.title}</strong>. O PDF incluirá uma página 2D com as medidas do desenho selecionado.
-                    </p>
-                  )}
-                  {savedDrawings.length === 0 && (
-                    <p className="text-[11px] text-slate-500 mt-2">Nenhum desenho salvo encontrado. Crie e salve o produto no módulo Desenho Técnico.</p>
-                  )}
-                </div>
-                {/* Table of Items */}
+                {/* Itens do orçamento: inclusão manual de linhas */}
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-black uppercase tracking-wider text-amber-400">
-                      Itens e conceitos do trabalho
+                      Itens do orçamento
                     </h3>
-                    
-        {/* Botón para abrir catálogo */}
-        <div className="mb-4">
-          <label className="mb-3 block text-[10px] font-semibold text-slate-500">Valor de referência do alumínio (R$/kg)
-            <input type="number" min="0.01" step="0.01" value={aluminumPricePerKg} onChange={(event) => setAluminumPricePerKg(writeAluminumPricePerKg(Number(event.target.value)))} className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-900" />
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowCatalog(!showCatalog)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-100"
-          >
-            🛒 {showCatalog ? "Fechar catálogo" : "Buscar no catálogo"}
-          </button>
-          
-          {showCatalog && (
-            <div className="mt-3 p-4 bg-slate-50 rounded-lg border">
-              <input
-                placeholder="Buscar por código ou nome..."
-                value={catalogSearch}
-                onChange={(e) => setCatalogSearch(e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-lg mb-3"
-              />
-              <div className="max-h-60 overflow-y-auto space-y-1">
-                {catalogItems
-                  .filter((i) => 
-                    i.name?.toLowerCase().includes(debouncedCatalogSearch) ||
-                    i.sku?.toLowerCase().includes(debouncedCatalogSearch) || i.category?.toLowerCase().includes(debouncedCatalogSearch) || [i.width, i.height, i.depth].join(" ").includes(debouncedCatalogSearch)
-                  )
-                  .slice(0, 20)
-                  .map((item) => (
                     <button
-                      key={item.id}
                       type="button"
-                      onClick={() => {
-                        // Adicionar o produto ao orçamento
-                        const newItem: QuoteItem = {
-                          id: Math.random().toString(36).substring(2),
-                          description: item.name + (item.sku ? " (" + item.sku + ")" : "") + (item.width || item.height || item.depth ? " · " + [item.width,item.height,item.depth].filter(Boolean).join(" × ") + " mm" : ""),
-                          quantity: 1,
-                          unitPrice: estimatedCatalogPrice(item, aluminumPricePerKg) || 0,
-                          itemId: item.itemId || (item.source === "registry_items" ? item.id : undefined),
-                          catalogSource: item.source,
-                          catalogItemId: item.id,
-                          sku: item.sku || item.code || "",
-                          itemPhotoUrl: item.itemPhotoUrls?.[0],
-                          itemPhotoUrls: item.itemPhotoUrls || [],
-                          itemCategory: item.category,
-                          itemDimensions: [item.width,item.height,item.depth].filter(Boolean).join(" × "),
-                          priceSource: Number(item.price || 0) > 0 ? "catalog" : estimatedCatalogPrice(item, aluminumPricePerKg) ? "estimated" : "pending",
-                          notes: Number(item.price || 0) > 0 ? undefined : estimatedCatalogPrice(item, aluminumPricePerKg) ? "Preço estimado pelo peso do perfil e valor configurado do alumínio por kg." : "Preço pendente de confirmação no catálogo.",
-                        };
-                        if (selectedQuote) {
-                          setSelectedQuote(recalculateQuote({ ...selectedQuote, items: [...selectedQuote.items, newItem] }));
-                        }
-                        setShowCatalog(false);
-                        setCatalogSearch("");
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 rounded flex justify-between"
-                    >
-                      <span className="flex min-w-0 items-center gap-2">{item.itemPhotoUrls?.[0] && <img src={item.itemPhotoUrls[0]} alt="" className="h-10 w-10 rounded object-cover"/>}<span><strong>{item.sku || "Sem código"}</strong> — {item.name}{item.supplier ? " · " + item.supplier : ""}{item.width || item.height || item.depth ? <small className="block text-slate-500">{[item.width,item.height,item.depth].filter(Boolean).join(" × ")} mm</small> : null}</span></span>
-                      <span className="text-right font-bold text-indigo-600">R$ {(estimatedCatalogPrice(item, aluminumPricePerKg) || 0).toFixed(2)}{Number(item.price || 0) <= 0 && estimatedCatalogPrice(item, aluminumPricePerKg) ? <small className="block text-[9px] font-medium">estimado</small> : null}</span>
-                    </button>
-                  ))}
-                {catalogItems.filter((i) => i.name?.toLowerCase().includes(debouncedCatalogSearch) || i.sku?.toLowerCase().includes(debouncedCatalogSearch) || i.category?.toLowerCase().includes(debouncedCatalogSearch) || [i.width, i.height, i.depth].join(" ").includes(debouncedCatalogSearch)).length === 0 && (
-                  <p className="text-xs text-slate-400 text-center py-4">Nenhum item encontrado. Ajuste a busca ou cadastre o item em Itens.</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-<button
                       onClick={handleAddItem}
                       className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
                     >
