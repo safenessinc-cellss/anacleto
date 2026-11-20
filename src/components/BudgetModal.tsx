@@ -122,6 +122,7 @@ export default function BudgetModal({
   const [bomError, setBomError] = useState("");
   const [isGeneratingBom, setIsGeneratingBom] = useState(false);
   const [comparisons, setComparisons] = useState<any[]>([]);
+  const [bestSupplier, setBestSupplier] = useState<string | null>(null);
   const [comparisonNotice, setComparisonNotice] = useState("");
   const [isComparing, setIsComparing] = useState(false);
   const [marketSearchedAt, setMarketSearchedAt] = useState("");
@@ -148,7 +149,11 @@ export default function BudgetModal({
 
   const handleCompareBom = async () => {
     if (!bomData?.bom?.length) return;
-    setIsComparing(true); setComparisonNotice(""); setComparisons([]);
+    if (!bomData.complete) {
+      setComparisonNotice("A comparação final está bloqueada: complete as regras de corte e os acessórios pendentes na Biblioteca Técnica.");
+      return;
+    }
+    setIsComparing(true); setComparisonNotice(""); setComparisons([]); setBestSupplier(null);
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Entre na sua conta para comparar fornecedores.");
@@ -160,7 +165,8 @@ export default function BudgetModal({
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error || "Falha ao comparar fornecedores.");
       setComparisons(Array.isArray(data?.comparisons) ? data.comparisons : []);
-      setComparisonNotice(data?.notice || "Comparação concluída.");
+      setBestSupplier(data?.bestSupplier || null);
+      setComparisonNotice(data?.bestSupplier ? "Menor custo total verificado: " + data.bestSupplier : data?.notice || "Não há cesta completa com preços aprovados.");
     } catch (error) { setComparisonNotice(error instanceof Error ? error.message : "Não foi possível comparar fornecedores."); }
     finally { setIsComparing(false); }
   };
@@ -679,8 +685,8 @@ export default function BudgetModal({
                   <button type="button" onClick={handleCompareBom} disabled={isComparing||!bomData.bom?.length} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{isComparing?"Comparando...":"Comparar fornecedores aprovados"}</button>
                 </div>
                 {comparisonNotice&&<p className="text-xs text-slate-600 dark:text-slate-300">{comparisonNotice}</p>}
-                {comparisons.map((basket:any)=><div key={basket.supplier} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-                  <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-bold">{basket.supplier}</p><p className="text-xs font-bold">{basket.complete?basket.total.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Cesta incompleta"}</p></div>
+                {comparisons.map((basket:any)=><div key={basket.supplier} className={`rounded-lg border p-3 dark:border-slate-700 ${bestSupplier===basket.supplier?"border-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/20":"border-slate-200"}`}>
+                  <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-bold">{basket.supplier}{bestSupplier===basket.supplier?" · MENOR CUSTO TOTAL":""}</p><p className="text-xs font-bold">{basket.complete?basket.total.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Cesta incompleta"}</p></div>
                   <p className="text-[10px] text-slate-500">{basket.complete?"Todos os itens têm preço aprovado.":"Faltam preços: "+(basket.missingItems||[]).join(", ")}</p>
                   {basket.lines?.map((line:any,i:number)=><p key={i} className="mt-1 text-[10px] text-slate-600">{line.description}: {line.subtotal==null?"Sem preço aprovado":line.subtotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p>)}
                 </div>)}
