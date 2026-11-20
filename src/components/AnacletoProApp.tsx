@@ -75,7 +75,7 @@ export default function AnacletoProApp({
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
   const isFullMenuRole = ["super_admin", "super_usuario", "ceo", "admin"].includes(effectiveRole);
-  const canSeeNavigation = (id: string) => { const permissionId = id === "smart_quotes" ? "quotes" : id === "technical_library" ? "cadastro_items" : id; return isFullMenuRole || (userPermissions ? userPermissions.includes(permissionId) : hasAccessToTab(effectiveRole, permissionId as RoleNavTab)); };
+  const canSeeNavigation = (id: string) => { const permissionId = id === "smart_quotes" ? "quotes" : id === "technical_library" ? "catalog" : id; return isFullMenuRole || (userPermissions ? userPermissions.includes(permissionId) || (id === "technical_library" && userPermissions.includes("cadastro_items")) : hasAccessToTab(effectiveRole, permissionId as RoleNavTab)); };
   // A autenticação precisa ser inicializada antes de qualquer efeito que a consulte.
   const [authReady, setAuthReady] = useState(false);
 
