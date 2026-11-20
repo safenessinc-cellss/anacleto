@@ -141,7 +141,7 @@ export default function TechnicalLibraryModule() {
     setImportingPdf(true);
     setError("");
     try {
-      const safeName = file.name.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "-");
+      const safeName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "-");
       const path = `technical-catalogs/${user.uid}/${Date.now()}-${safeName}`;
       const fileRef = storageRef(storage, path);
       await uploadBytes(fileRef, file, { contentType: "application/pdf" });
@@ -162,8 +162,8 @@ export default function TechnicalLibraryModule() {
         }
         const lines = [...lineMap.entries()].sort((a, b) => b[0] - a[0]).map(([, parts]) => parts.sort((a, b) => a.x - b.x).map(p => p.text).join(" "));
         for (const line of lines) {
-          const weightMatch = line.match(/(\\d{1,2}[,.]\\d{2,4})\\s*(?:kg\\s*\\/\\s*m|kg\\/m|kg\\s*por\\s*metro)/i);
-          const codeMatch = line.match(/\\b([A-Z]{1,5}[-.]?\\d{3,6}[A-Z0-9-]*)\\b/i);
+          const weightMatch = line.match(/(\d{1,2}[,.]\d{2,4})\s*(?:kg\s*\/\s*m|kg\/m|kg\s*por\s*metro)/i);
+          const codeMatch = line.match(/\b([A-Z]{1,5}[-.]?\d{3,6}[A-Z0-9-]*)\b/i);
           if (!weightMatch || !codeMatch) continue;
           const weight = Number(weightMatch[1].replace(",", "."));
           if (!Number.isFinite(weight) || weight <= 0 || weight > 100) continue;
