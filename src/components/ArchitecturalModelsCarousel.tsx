@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Expand, LoaderCircle, MoveUpRight, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Expand, LoaderCircle, MoveUpRight, Sparkles } from "lucide-react";
 import "./architectural-models-carousel.css";
 
 export type ArchitecturalModel = {
@@ -14,7 +14,7 @@ export type ArchitecturalModel = {
   image: string;
   generated?: boolean;
 };
-type Props = { onConfigure: (model: ArchitecturalModel) => void };
+type Props = { onConfigure: (model: ArchitecturalModel) => void; onView: (model: ArchitecturalModel) => void };
 
 const baseModels: ArchitecturalModel[] = [
   { id:"suprema-2", title:"Janela de correr · 2 folhas", badge:"Linha Suprema • 2 Folhas", line:"Suprema", model:"Janela de Correr Suprema", color:"Branco", panels:2, detail:"Marco perimetral, folhas móveis, escovas de vedação e trilho inferior duplo.", image:"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=85" },
@@ -32,6 +32,16 @@ const baseModels: ArchitecturalModel[] = [
   { id:"oscilobatente", title:"Janela oscilobatente", badge:"Linha Suprema • Dupla abertura", line:"Suprema", model:"Janela Oscilobatente", color:"Prata", panels:1, detail:"Abertura lateral e basculante para ventilação controlada.", image:"https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=90" },
   { id:"basculante", title:"Janela basculante", badge:"Linha Suprema • Basculante", line:"Suprema", model:"Janela Basculante", color:"Verde Oliva", panels:2, detail:"Solução compacta para ventilação superior.", image:"https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1400&q=90" },
 ];
+const doorModels: ArchitecturalModel[] = [
+  { id:"door-sliding-2", title:"Porta de correr · 2 folhas", badge:"ALUMÍNIO • CORRER", line:"Suprema", model:"Porta Balcão", color:"Preto Fosco", panels:2, detail:"Duas folhas deslizantes, trilho inferior duplo e perfis de alumínio com grandes planos de vidro.", image:"https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1400&q=90" },
+  { id:"door-sliding-4", title:"Porta de correr · 4 folhas", badge:"ALUMÍNIO • VÃO AMPLO", line:"Gold", model:"Porta Balcão", color:"Grafite", panels:4, detail:"Quatro folhas para integração entre sala, varanda e jardim, com abertura central ampla.", image:"https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1400&q=90" },
+  { id:"door-folding", title:"Porta camarão articulada", badge:"ALUMÍNIO • ARTICULADA", line:"Gold", model:"Porta Camarão", color:"Bronze", panels:3, detail:"Folhas articuladas que recolhem lateralmente, ferragens e dobradiças para otimizar a passagem.", image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1400&q=90" },
+  { id:"door-hinged", title:"Porta de giro", badge:"ALUMÍNIO • ABRIR", line:"Gold", model:"Porta de Giro", color:"Natural Fosco", panels:1, detail:"Folha de abrir com dobradiças, fechadura e puxador vertical, para acessos internos ou externos.", image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1400&q=88&sat=-15" },
+  { id:"door-pivot", title:"Porta pivotante contemporânea", badge:"ALUMÍNIO • PIVOTANTE", line:"Gold", model:"Porta Pivotante", color:"Preto Fosco", panels:1, detail:"Abertura sobre eixo vertical, desenho imponente e acabamento de alto padrão para entrada principal.", image:"https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=90" },
+  { id:"door-balcony", title:"Porta balcão panorâmica", badge:"ALUMÍNIO • PANORÂMICA", line:"Gold", model:"Porta Balcão", color:"Champagne", panels:3, detail:"Conjunto envidraçado para grandes vãos, luz natural e continuidade visual entre interior e exterior.", image:"https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1400&q=86&sat=-25" },
+  { id:"door-entry", title:"Porta de entrada com vidro", badge:"ALUMÍNIO • ENTRADA", line:"Suprema", model:"Porta de Giro", color:"Amadeirado", panels:1, detail:"Composição de entrada com perfis de alumínio, vidro e puxador de presença arquitetônica.", image:"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=90&sat=-20" },
+];
+
 const CACHE_KEY = "anacleto:architectural-models:v2";
 const suggestions = ["Janela de correr 4 folhas Linha Gold grafite com vidro reflecta", "Porta pivotante de alumínio amadeirado com puxador vertical", "Janela oscilobatente branca com vidro fumê", "Porta de giro bronze com fechadura multiponto"];
 
@@ -42,12 +52,11 @@ function saveCache(items: ArchitecturalModel[]) {
   try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(items.slice(0, 12))); } catch { /* storage can be unavailable */ }
 }
 
-export default function ArchitecturalModelsCarousel({ onConfigure }: Props) {
+export default function ArchitecturalModelsCarousel({ onConfigure, onView }: Props) {
   const [generated, setGenerated] = useState<ArchitecturalModel[]>([]);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
-  const [active, setActive] = useState<ArchitecturalModel | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const track = useRef<HTMLDivElement>(null);
   const items = useMemo(() => [...generated, ...baseModels], [generated]);
@@ -106,12 +115,21 @@ export default function ArchitecturalModelsCarousel({ onConfigure }: Props) {
     </div>
     <div className="amc-track" ref={track} aria-label="Carrossel de modelos arquitetônicos" tabIndex={0} onScroll={e=>{const node=e.currentTarget;const card=node.querySelector<HTMLElement>(".amc-card");if(card)setActiveIndex(Math.max(0,Math.min(items.length-1,Math.round(node.scrollLeft/(card.offsetWidth+18)))));}}>
       {items.map(item=><article className="amc-card" key={item.id}>
-        <button className="amc-image-button" type="button" onClick={()=>setActive(item)} aria-label={`Ampliar ${item.title}`}><img src={item.image} alt={`Render técnico de ${item.title}, acabamento ${item.color}`} loading={item.generated?"eager":"lazy"}/><span className="amc-watermark" aria-hidden="true">ANACLETO ESQUADRIAS</span><span className="amc-zoom"><Expand size={15}/> VER DETALHES</span></button>
+        <button className="amc-image-button" type="button" onClick={()=>onView(item)} aria-label={`Abrir ${item.title} no visualizador 360 graus`}><img src={item.image} alt={`Render técnico de ${item.title}, acabamento ${item.color}`} loading={item.generated?"eager":"lazy"}/><span className="amc-watermark" aria-hidden="true">ANACLETO ESQUADRIAS</span><span className="amc-zoom"><Expand size={15}/> VER DETALHES</span></button>
         <div className="amc-card-content"><span className="amc-badge">{item.badge}</span><h3>{item.title}</h3><p>{item.detail}</p><div className="amc-meta"><span><i style={{background:item.color==="Branco"?"#f2f2ef":item.color==="Bronze"?"#9a704d":item.color==="Natural Fosco"?"#aeb6b9":"#24282e"}}/>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button className="amc-configure" type="button" onClick={()=>onConfigure(item)}>Configurar este modelo <MoveUpRight size={16}/></button></div>
       </article>)}
     </div>
+    <section className="amc-doors" aria-labelledby="amc-doors-title">
+      <div className="amc-doors-heading"><div><span className="amc-kicker">ANACLETO / LINHA PORTAS</span><h3 id="amc-doors-title">Portas de alumínio para cada projeto.</h3><p>Modelos de correr, articulados, de giro e pivotantes. Toque em uma imagem para abrir o mesmo estúdio 360° interativo.</p></div><span className="amc-doors-count">{doorModels.length} TIPologias</span></div>
+      <div className="amc-doors-track">
+        {doorModels.map(item=><article className="amc-door-card" key={item.id}>
+          <button className="amc-door-image" type="button" onClick={()=>onView(item)} aria-label={`Abrir ${item.title} no visualizador 360 graus`}><img src={item.image} alt={`Modelo arquitetônico de ${item.title}, acabamento ${item.color}`} loading="lazy"/><span>VER EM 360° ↗</span></button>
+          <div className="amc-door-copy"><small>{item.badge}</small><h4>{item.title}</h4><p>{item.detail}</p><div><span>{item.line}</span><span>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button type="button" onClick={()=>onConfigure(item)}>Configurar modelo <MoveUpRight size={15}/></button></div>
+        </article>)}
+      </div>
+    </section>
     <div className="amc-mobile-hint"><span>DESLIZE PARA EXPLORAR</span><span>{items.length} MODELOS</span></div>
     <p className="amc-disclaimer">Renders conceituais para referência visual. Perfis, componentes, ferragens, dimensões e desempenho dependem de especificação e validação técnica.</p>
-    {active&&<div className="amc-lightbox" role="dialog" aria-modal="true" aria-label={`Detalhes de ${active.title}`} onMouseDown={e=>{if(e.target===e.currentTarget)setActive(null);}}><div className="amc-lightbox-panel"><button className="amc-close" type="button" onClick={()=>setActive(null)} aria-label="Fechar"><X size={22}/></button><div className="amc-lightbox-image"><img src={active.image} alt={`Detalhe ampliado de ${active.title}`}/><span className="amc-watermark amc-watermark-large" aria-hidden="true">ANACLETO ESQUADRIAS</span></div><div className="amc-lightbox-copy"><span className="amc-badge">{active.badge}</span><h3>{active.title}</h3><p>{active.detail}</p><ul><li><Check size={15}/> Perfis e encontros de alumínio</li><li><Check size={15}/> Trilhos, guias e pontos de fixação</li><li><Check size={15}/> Vidro e vedação perimetral</li><li><Check size={15}/> Esquadro, parafusos e união dos marcos</li></ul><button className="amc-configure" type="button" onClick={()=>{onConfigure(active);setActive(null);}}>Cotizar a medida <MoveUpRight size={16}/></button></div></div></div>}
+
   </section>;
 }

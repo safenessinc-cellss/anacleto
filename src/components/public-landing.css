@@ -91,3 +91,20 @@ body{margin:0}.public-site{--ink:#111;--muted:#6c7075;--paper:#f5f5f7;--line:#de
 .aluminum-model-card:hover{transform:translateY(-5px);box-shadow:0 18px 42px #17233116}
 @media(max-width:900px){.aluminum-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.aluminum-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.three-controls{left:8px;right:8px!important;top:8px!important;justify-content:flex-start!important}.three-controls button{font-size:8px;padding:8px 9px}.three-part-labels{top:54px;max-width:145px}.three-hint{font-size:8px;max-width:calc(100% - 28px)}}
+
+
+/* Consistent click-to-360 behavior for every product and technical gallery image. */
+.real-photo-grid article[role="button"]{cursor:pointer;position:relative;transition:transform .22s ease,box-shadow .22s ease;}
+.real-photo-grid article[role="button"]:hover{transform:translateY(-4px);}
+.real-photo-grid article[role="button"]:focus-visible{outline:3px solid #3b91df;outline-offset:4px;border-radius:14px;}
+.real-photo-360{display:inline-flex;margin-top:10px;font-size:10px;font-weight:800;letter-spacing:.12em;color:#2879bd;}
+.gallery-3d-modal{position:fixed;inset:0;z-index:1200;background:rgba(5,13,22,.82);backdrop-filter:blur(14px);display:grid;place-items:center;padding:clamp(10px,3vw,34px);}
+.gallery-3d-panel{width:min(1180px,100%);height:min(820px,92dvh);min-height:440px;background:#101a24;border:1px solid rgba(190,220,245,.2);border-radius:22px;overflow:hidden;box-shadow:0 28px 90px rgba(0,0,0,.45);display:flex;flex-direction:column;}
+.gallery-3d-heading{height:64px;flex:0 0 64px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;color:#f1f7fc;background:#152535;border-bottom:1px solid rgba(190,220,245,.14);}
+.gallery-3d-heading>div{display:flex;flex-direction:column;gap:5px;}.gallery-3d-heading span{font:800 9px monospace;letter-spacing:.16em;color:#91b8d8;}.gallery-3d-heading strong{font-size:14px;}.gallery-3d-heading button{width:38px;height:38px;border:1px solid #7896ad66;border-radius:50%;background:#ffffff12;color:#fff;font-size:20px;cursor:pointer;}
+.gallery-3d-panel .three-stage{flex:1;min-height:0;height:auto!important;}
+.gallery-3d-loading{flex:1;display:grid;place-items:center;color:#d7e8f5;font-size:14px;}
+@media(max-width:650px){.gallery-3d-modal{padding:0;}.gallery-3d-panel{width:100%;height:100dvh;max-height:100dvh;min-height:0;border-radius:0;border:0;}.gallery-3d-heading{padding:0 14px;height:58px;flex-basis:58px;}.gallery-3d-heading strong{font-size:12px;}}
+
+.exploded-art[role="button"]{cursor:pointer;}
+.exploded-art[role="button"]:focus-visible{outline:3px solid #3b91df;outline-offset:6px;border-radius:16px;}
