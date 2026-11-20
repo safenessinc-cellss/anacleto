@@ -7,7 +7,7 @@ export type ArchitecturalModel = {
   title: string;
   badge: string;
   line: "Suprema" | "Gold";
-  model: "Janela de Correr Suprema" | "Porta Balcão" | "Maxim-Ar" | "Porta Camarão";
+  model: "Janela de Correr Suprema" | "Porta Balcão" | "Maxim-Ar" | "Porta Camarão" | "Porta de Giro" | "Porta Pivotante" | "Janela Oscilobatente" | "Janela Basculante";
   color: string;
   panels: number;
   detail: string;
@@ -27,9 +27,13 @@ const baseModels: ArchitecturalModel[] = [
   { id:"vista", title:"Janela com vista panorâmica", badge:"Linha Suprema • Panorâmica", line:"Suprema", model:"Janela de Correr Suprema", color:"Natural Fosco", panels:3, detail:"Abertura ampla para integração entre ambiente interno e paisagem.", image:"https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=1400&q=85" },
   { id:"entrada", title:"Porta de entrada contemporânea", badge:"Linha Gold • Entrada", line:"Gold", model:"Porta Balcão", color:"Bronze", panels:1, detail:"Composição de acesso com perfis de alumínio e acabamento arquitetônico.", image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1400&q=85&sat=-15" },
   { id:"varanda", title:"Fechamento de varanda", badge:"Linha Suprema • Varanda", line:"Suprema", model:"Janela de Correr Suprema", color:"Champagne", panels:4, detail:"Solução visual para proteção e integração de varandas e sacadas.", image:"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=85&sat=-20" },
+  { id:"porta-giro", title:"Porta de giro", badge:"Linha Gold • Abrir", line:"Gold", model:"Porta de Giro", color:"Corten", panels:1, detail:"Porta de abrir com dobradiças, fechadura e perfis reforçados.", image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1400&q=90" },
+  { id:"pivotante", title:"Porta pivotante", badge:"Linha Gold • Pivotante", line:"Gold", model:"Porta Pivotante", color:"Preto Fosco", panels:1, detail:"Abertura sobre eixo vertical e presença arquitetônica.", image:"https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1400&q=90" },
+  { id:"oscilobatente", title:"Janela oscilobatente", badge:"Linha Suprema • Dupla abertura", line:"Suprema", model:"Janela Oscilobatente", color:"Prata", panels:1, detail:"Abertura lateral e basculante para ventilação controlada.", image:"https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=90" },
+  { id:"basculante", title:"Janela basculante", badge:"Linha Suprema • Basculante", line:"Suprema", model:"Janela Basculante", color:"Verde Oliva", panels:2, detail:"Solução compacta para ventilação superior.", image:"https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1400&q=90" },
 ];
-const CACHE_KEY = "anacleto:architectural-models:v1";
-const suggestions = ["Janela de correr 4 folhas Linha Gold preta com vidro reflecta", "Porta camarão Linha Gold bronze com 3 folhas", "Maxim-Ar Linha Suprema branca com vidro duplo"];
+const CACHE_KEY = "anacleto:architectural-models:v2";
+const suggestions = ["Janela de correr 4 folhas Linha Gold grafite com vidro reflecta", "Porta pivotante de alumínio amadeirado com puxador vertical", "Janela oscilobatente branca com vidro fumê", "Porta de giro bronze com fechadura multiponto"];
 
 function loadCache(): ArchitecturalModel[] {
   try { const raw = sessionStorage.getItem(CACHE_KEY); return raw ? JSON.parse(raw) as ArchitecturalModel[] : []; } catch { return []; }
