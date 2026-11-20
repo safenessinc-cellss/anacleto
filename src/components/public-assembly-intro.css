@@ -9,3 +9,81 @@
 .assembly-skip{background:rgba(255,255,255,.9);color:#172b40}
 .assembly-fallback{z-index:2;opacity:.15;pointer-events:none}
 .assembly-stage canvas{z-index:2}
+
+
+/* Splash layout correction: keep the hero image, 3D assembly and copy in separate layers. */
+.assembly-intro {
+  isolation: isolate;
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+.assembly-top {
+  position: relative;
+  z-index: 6;
+  flex: 0 0 62px;
+}
+.assembly-stage {
+  inset: 62px 0 104px;
+  z-index: 1;
+  overflow: hidden;
+  background: #101a24;
+}
+.assembly-hero-photo {
+  z-index: 0;
+  object-position: center 54%;
+}
+.assembly-stage:after {
+  z-index: 1;
+}
+.assembly-fallback {
+  z-index: 2;
+}
+.assembly-stage canvas {
+  z-index: 3 !important;
+  pointer-events: none;
+}
+.assembly-copy {
+  z-index: 5;
+  max-width: min(680px, 84vw);
+}
+.assembly-bottom {
+  z-index: 7;
+}
+.assembly-skip {
+  position: relative;
+  z-index: 8;
+  pointer-events: auto;
+}
+@media (max-width: 650px) {
+  .assembly-top {
+    height: 52px;
+    flex-basis: 52px;
+  }
+  .assembly-stage {
+    inset: 52px 0 104px;
+  }
+  .assembly-copy {
+    top: 15%;
+    left: 6%;
+    max-width: 88vw;
+  }
+  .assembly-copy h1 {
+    font-size: clamp(39px, 10.5vw, 62px);
+  }
+  .assembly-bottom {
+    bottom: max(18px, env(safe-area-inset-bottom));
+    align-items: center;
+    gap: 12px;
+  }
+  .assembly-status {
+    width: min(58%, 300px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .assembly-intro *,
+  .assembly-intro *::before,
+  .assembly-intro *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
