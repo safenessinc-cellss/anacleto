@@ -176,10 +176,9 @@ export function compareSupplierOffers(
         offer.unit === item.unit &&
         offer.availability === "in_stock" &&
         offer.verification === "verified" &&
-        offer.evidence !== "marketplace" &&
         offer.unitPrice > 0 &&
         Number.isFinite(offer.unitPrice) &&
-        offer.minimumQuantity !== undefined ? quantity >= offer.minimumQuantity : true
+        (offer.minimumQuantity === undefined || quantity >= offer.minimumQuantity)
       );
       const current = candidates.filter(offer => offerIsCurrent(offer, now, maxAgeDays));
       const selected = current.sort((a, b) => a.unitPrice - b.unitPrice)[0];
