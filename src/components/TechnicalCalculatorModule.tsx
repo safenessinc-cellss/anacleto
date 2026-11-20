@@ -61,7 +61,7 @@ export default function TechnicalCalculatorModule() {
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error || "Não foi possível pesquisar o preço por kg.");
       const offers = (data?.results || []).flatMap((row: any) => row.offers || []);
-      const candidate = offers.find((offer: any) => Array.isArray(offer.prices) && offer.prices.length > 0);
+      const candidate = offers.find((offer: any) => Array.isArray(offer.prices) && offer.prices.length > 0 && /\\b(kg|quilo|quilograma)\\b/i.test(String(offer.title || "") + " " + String(offer.snippet || "")));
       if (!candidate) throw new Error("A pesquisa não encontrou um preço por kg explícito. Informe o valor manualmente após cotação.");
       const value = Number(candidate.prices[0]);
       setAluminumPricePerKg(value.toFixed(2));
