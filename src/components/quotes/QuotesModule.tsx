@@ -48,9 +48,10 @@ interface QuotesModuleProps {
   language?: string;
   initialMode?: "standard" | "smart";
   onOpenSmartQuote?: () => void;
+  initialQuoteId?: string;
 }
 
-export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote}: QuotesModuleProps) {
+export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote, initialQuoteId}: QuotesModuleProps) {
   const { showToast } = useToast();
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
@@ -176,7 +177,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         const selectedId = selectedQuoteIdRef.current;
         const refreshedSelection = selectedId ? loaded.find((quote) => quote.id === selectedId) : undefined;
         if (refreshedSelection) setSelectedQuote(refreshedSelection);
-        else if (!selectedId && loaded.length > 0) setSelectedQuote(loaded[0]);
+
       },
       (err) => {
         console.error("Firestore quotes load failed:", err);
@@ -186,7 +187,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     return () => unsub();
   }, []);
 
-  // Criar orçamento vazio; nenhum cliente, produto, imposto ou valor fictício.
+  useEffect(() => {\n    if (!initialQuoteId || !quotes.length) return;\n    const match = quotes.find((quote) => quote.id === initialQuoteId);\n    if (match) { setSelectedQuote(match); setIsEditing(true); }\n  }, [initialQuoteId, quotes]);\n\n  // Criar orçamento vazio; nenhum cliente, produto, imposto ou valor fictício.
   const handleCreateNewQuote = () => {
     const now = new Date().toISOString();
     const quoteId = "quote_" + crypto.randomUUID();
@@ -1104,8 +1105,8 @@ const handleAddItem = () => {
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">"Orçamento"</h1>
-            <span className="text-xs text-slate-500">`${quotes.length} orçamentos`</span>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Novo Orçamento</h1>
+            <span className="text-xs text-slate-500">Criação de orçamento comercial tradicional</span>
           </div>
         </div>
 
@@ -1123,7 +1124,7 @@ const handleAddItem = () => {
       {/* Main Grid: Left = Quotes List (4 cols); Right = Active Quote Detail (8 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: List & Search Filter */}
-        <div className="lg:col-span-4 space-y-4">
+        <div className="hidden lg:col-span-4 space-y-4">
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
@@ -1243,7 +1244,7 @@ const handleAddItem = () => {
         </div>
 
         {/* RIGHT COLUMN: Active Quote Form */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className="lg:col-span-12 space-y-6">
           {selectedQuote ? (
             <div className="space-y-6">
               {/* Document Header & Actions */}
