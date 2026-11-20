@@ -49,3 +49,19 @@
 .amc-line-copy>button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:40px;border:0;border-radius:8px;background:#c5aa7a;color:#10141c;font-size:10px;font-weight:800;cursor:pointer}
 @media(max-width:900px){.amc-product-line-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.amc-product-lines{gap:38px;margin-top:40px}.amc-product-line-heading{align-items:flex-start;flex-direction:column}.amc-product-line-count{align-self:flex-start}.amc-product-line-grid{grid-template-columns:1fr;gap:13px}.amc-line-image{height:245px}.amc-line-copy p{min-height:0}}
+
+/* Catalog navigation: separate tabs for product lines and model types. */
+.amc-catalog-tabs,.amc-model-tabs{display:flex;gap:9px;overflow-x:auto;padding:4px 2px 12px;scrollbar-width:thin}
+.amc-catalog-tabs{margin-top:26px;border-bottom:1px solid #d5dde5}
+.amc-catalog-tabs button,.amc-model-tabs button{flex:0 0 auto;border:1px solid #d5dde5;border-radius:999px;background:#fff;color:#435266;padding:11px 17px;font-size:11px;font-weight:800;cursor:pointer}
+.amc-catalog-tabs button.is-active{background:#172638;color:#fff;border-color:#172638}
+.amc-model-tabs{padding-top:14px}
+.amc-model-tabs button{padding:8px 14px;font-size:10px}
+.amc-model-tabs button.is-active{background:#c5aa7a;border-color:#c5aa7a;color:#111a25}
+.amc-selected-line{display:flex;justify-content:space-between;align-items:end;gap:20px;margin:12px 0 22px}
+.amc-selected-line h3{margin:8px 0;color:#182230;font-size:clamp(24px,3vw,36px)}
+.amc-selected-line p{margin:0;color:#596779;font-size:12px;line-height:1.6;max-width:700px}
+.amc-selected-line>span{flex-shrink:0;color:#79613b;font:800 9px ui-monospace,monospace;letter-spacing:.12em}
+.amc-tabbed-grid{margin-top:0}
+.amc-empty-state{color:#596779;padding:22px}
+@media(max-width:620px){.amc-selected-line{align-items:flex-start;flex-direction:column}.amc-catalog-tabs button{padding:10px 13px}}
