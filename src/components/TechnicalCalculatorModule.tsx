@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ExternalLink, PackageSearch, Search } from "lucide-react";
 import { auth, db } from "../firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useToast } from "./ToastContext";
 
 type TechnicalOption = {
@@ -12,7 +12,7 @@ type TechnicalOption = {
   finish?: string;
 };
 
-export default function TechnicalCalculatorModule() {
+export default function TechnicalCalculatorModule({ initialBudgetId }: { initialBudgetId?: string }) {
   const { showToast } = useToast();
   const [bomForm, setBomForm] = useState({
     manufacturer: "",
@@ -25,6 +25,9 @@ export default function TechnicalCalculatorModule() {
     finish: "Branco",
   });
   const [bomData, setBomData] = useState<any>(null);
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [budgetClientName, setBudgetClientName] = useState("");
+  const [isSavingBudget, setIsSavingBudget] = useState(false);
   const [technicalOptions, setTechnicalOptions] = useState<TechnicalOption[]>([]);
   const [technicalOptionsError, setTechnicalOptionsError] = useState("");
   const [bomError, setBomError] = useState("");
@@ -72,6 +75,39 @@ export default function TechnicalCalculatorModule() {
     } finally {
       setIsSearchingAluminumPrice(false);
     }
+  };
+
+  useEffect(() => {
+    if (!initialBudgetId) return;
+    let active = true;
+    void getDoc(doc(db, "technical_budgets", initialBudgetId)).then((snap) => {
+      if (!active || !snap.exists()) return;
+      const data = snap.data() as any;
+      setBomForm(data.bomForm || bomForm);
+      setBomData(data.bomData || null);
+      setAluminumPricePerKg(data.aluminumPricePerKg || "");
+      setBudgetClientName(data.clientName || "");
+      setEditingBudgetId(snap.id);
+      setComparisons(Array.isArray(data.comparisons) ? data.comparisons : []);
+      setBestSupplier(data.bestSupplier || null);
+    }).catch((error) => setBomError("Não foi possível abrir o orçamento técnico: " + (error instanceof Error ? error.message : "erro desconhecido")));
+    return () => { active = false; };
+  }, [initialBudgetId]);
+
+  const handleSaveTechnicalBudget = async () => {
+    if (!bomData?.bom?.length) { setBomError("Gere a lista técnica antes de salvar o orçamento."); return; }
+    setIsSavingBudget(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre na sua conta para salvar o orçamento.");
+      const selectedBasket = comparisons.find((basket: any) => basket.supplier === bestSupplier && basket.complete);
+      const payload = { clientName: budgetClientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, comparisons, bestSupplier, total: selectedBasket ? Number(selectedBasket.total) : null, currency: "BRL", status: "draft", workflow: "technical_esquadrias", updatedAt: serverTimestamp() };
+      if (editingBudgetId) await updateDoc(doc(db, "technical_budgets", editingBudgetId), payload);
+      else await addDoc(collection(db, "technical_budgets"), { ...payload, createdBy: user.uid, createdAt: serverTimestamp() });
+      showToast(editingBudgetId ? "Orçamento de esquadrias atualizado." : "Orçamento de esquadrias salvo.", "success");
+    } catch (error) {
+      setBomError(error instanceof Error ? error.message : "Não foi possível salvar o orçamento técnico.");
+    } finally { setIsSavingBudget(false); }
   };
 
   useEffect(() => {
@@ -333,6 +369,9 @@ export default function TechnicalCalculatorModule() {
         <datalist id="calc-typologies">{filteredTypologies.map((value) => <option key={value} value={value} />)}</datalist>
         <datalist id="calc-configurations">{filteredConfigurations.map((value) => <option key={value} value={value} />)}</datalist>
         <datalist id="calc-finishes">{finishes.map((value) => <option key={value} value={value} />)}</datalist>
+        <label className="mt-3 block text-xs font-semibold text-slate-700 dark:text-slate-200">Cliente (opcional)
+          <input value={budgetClientName} onChange={(event) => setBudgetClientName(event.target.value)} placeholder="Nome do cliente" className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950" />
+        </label>
         {technicalOptionsError && <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">{technicalOptionsError}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button type="button" onClick={handleGenerateBom} disabled={isGeneratingBom} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50">
@@ -374,6 +413,7 @@ export default function TechnicalCalculatorModule() {
             {aluminumPurchasedKg === 0 && <p className="mt-2 text-xs text-slate-500">O peso e o comprimento comercial verificados dos perfis são necessários para calcular o custo estimado.</p>}
           </div>
           <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <button type="button" onClick={handleSaveTechnicalBudget} disabled={isSavingBudget} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSavingBudget ? "Salvando..." : editingBudgetId ? "Atualizar orçamento" : "Salvar orçamento"}</button>
             <button type="button" onClick={handleMarketResearch} disabled={isSearchingMarket || !bomData.bom?.length} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50"><Search className="h-4 w-4" />{isSearchingMarket ? "Pesquisando..." : "Pesquisar preços de mercado"}</button>
             <button type="button" onClick={handleCompareBom} disabled={isComparing || !bomData.bom?.length} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{isComparing ? "Comparando..." : "Comparar fornecedores aprovados"}</button>
           </div>

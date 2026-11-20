@@ -48,9 +48,11 @@ interface QuotesModuleProps {
   language?: string;
   initialMode?: "standard" | "smart";
   onOpenSmartQuote?: () => void;
+  initialQuoteId?: string;
+  hideHistory?: boolean;
 }
 
-export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote}: QuotesModuleProps) {
+export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote, initialQuoteId, hideHistory = false}: QuotesModuleProps) {
   const { showToast } = useToast();
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
@@ -148,6 +150,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   useEffect(() => {
     selectedQuoteIdRef.current = selectedQuote?.id || null;
   }, [selectedQuote?.id]);
+
+  useEffect(() => {
+    if (!initialQuoteId || !quotes.length) return;
+    const target = quotes.find((quote) => quote.id === initialQuoteId);
+    if (target) { setSelectedQuote(target); setIsEditing(true); }
+  }, [initialQuoteId, quotes]);
 
   useEffect(() => {
     setActionsMenuOpen(false);
@@ -1123,7 +1131,7 @@ const handleAddItem = () => {
       {/* Main Grid: Left = Quotes List (4 cols); Right = Active Quote Detail (8 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT COLUMN: List & Search Filter */}
-        <div className="lg:col-span-4 space-y-4">
+        <div hidden={hideHistory} className="lg:col-span-4 space-y-4">
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
@@ -1243,7 +1251,7 @@ const handleAddItem = () => {
         </div>
 
         {/* RIGHT COLUMN: Active Quote Form */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className={hideHistory ? "lg:col-span-12 space-y-6" : "lg:col-span-8 space-y-6"}>
           {selectedQuote ? (
             <div className="space-y-6">
               {/* Document Header & Actions */}

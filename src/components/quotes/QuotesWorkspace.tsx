@@ -4,8 +4,9 @@ import type { Company, SenderConfig } from "../../types";
 import QuotesModule from "./QuotesModule";
 import SmartBudgetModule from "./SmartBudgetModule";
 import TechnicalCalculatorModule from "../TechnicalCalculatorModule";
+import AllBudgetsModule, { type BudgetWorkflow } from "./AllBudgetsModule";
 
-type BudgetTab = "standard" | "smart" | "technical";
+type BudgetTab = "all" | "standard" | "smart" | "technical";
 
 interface QuotesWorkspaceProps {
   senderConfig: SenderConfig;
@@ -15,6 +16,7 @@ interface QuotesWorkspaceProps {
 }
 
 const tabs: Array<{ id: BudgetTab; label: string; description: string; Icon: React.ComponentType<{ className?: string }> }> = [
+  { id: "all", label: "Todos os Orçamentos", description: "Histórico geral e edição por modalidade", Icon: FileText },
   { id: "standard", label: "Orçamento", description: "Orçamento comercial tradicional", Icon: FileText },
   { id: "smart", label: "Orçamento Inteligente", description: "Elaboração assistida por IA", Icon: Sparkles },
   { id: "technical", label: "Orçamento de Esquadrias", description: "Dimensionamento e composição técnica", Icon: Calculator },
@@ -31,7 +33,9 @@ export default function QuotesWorkspace({
   onConvertToInvoice,
   language = "pt",
 }: QuotesWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<BudgetTab>("standard");
+  const [activeTab, setActiveTab] = useState<BudgetTab>("all");
+  const [editingIds, setEditingIds] = useState<{ standard?: string; smart?: string; technical?: string }>({});
+  const openBudget = (workflow: BudgetWorkflow, id: string) => { setEditingIds((current) => ({ ...current, [workflow]: id })); setActiveTab(workflow); };
 
   return (
     <section className="space-y-5">
@@ -47,7 +51,7 @@ export default function QuotesWorkspace({
             Área comercial
           </span>
         </div>
-        <nav className="mt-5 grid grid-cols-1 gap-2 border-b border-slate-200 pb-3 sm:grid-cols-3 dark:border-slate-700" role="tablist" aria-label="Modalidades de orçamento">
+        <nav className="mt-5 grid grid-cols-1 gap-2 border-b border-slate-200 pb-3 sm:grid-cols-4 dark:border-slate-700" role="tablist" aria-label="Modalidades de orçamento">
           {tabs.map(({ id, label, description, Icon }) => {
             const selected = activeTab === id;
             return (
@@ -74,6 +78,8 @@ export default function QuotesWorkspace({
         </nav>
       </header>
 
+      {activeTab === "all" && <AllBudgetsModule onOpen={openBudget} />}
+
       <div
         id="budget-panel-standard"
         role="tabpanel"
@@ -85,6 +91,8 @@ export default function QuotesWorkspace({
           senderConfig={senderConfig}
           companies={companies}
           onConvertToInvoice={onConvertToInvoice}
+          initialQuoteId={editingIds.standard}
+          hideHistory
         />
       </div>
 
@@ -94,7 +102,7 @@ export default function QuotesWorkspace({
         aria-labelledby="budget-tab-smart"
         hidden={activeTab !== "smart"}
       >
-        <SmartBudgetModule />
+        <SmartBudgetModule initialBudgetId={editingIds.smart} hideHistory />
       </div>
 
       <div
@@ -103,7 +111,7 @@ export default function QuotesWorkspace({
         aria-labelledby="budget-tab-technical"
         hidden={activeTab !== "technical"}
       >
-        <TechnicalCalculatorModule />
+        <TechnicalCalculatorModule initialBudgetId={editingIds.technical} />
       </div>
     </section>
   );
