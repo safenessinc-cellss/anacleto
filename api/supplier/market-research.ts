@@ -93,7 +93,7 @@ export default async function handler(req: any, res: any) {
     else entry.count++;
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const items = Array.isArray(body?.items) ? body.items.slice(0, 50) : [];
+    const items = Array.isArray(body?.items) ? body.items.slice(0, 12) : [];
     const location = String(body?.location || "Sapucaia do Sul, Rio Grande do Sul").slice(0, 100);
     if (!items.length) return res.status(400).json({ error: "Informe os componentes do despiece para pesquisar." });
 
