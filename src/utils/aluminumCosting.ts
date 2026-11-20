@@ -92,7 +92,7 @@ const money = (value: number) => Number(value.toFixed(2));
 
 export function optimizeProfileCuts(cuts: CutPiece[]): OptimizedBar[] {
   const groups = new Map<string, CutPiece[]>();
-  for (const cut of cuts) {
+  for (const cut of validCuts) {
     const key = [cut.profileCode, cut.barLengthMm, cut.trimMm, cut.kerfMm, cut.weightKgPerM, cut.priceMode, cut.pricePerKg, cut.pricePerBar].join("|");
     groups.set(key, [...(groups.get(key) || []), cut]);
   }
