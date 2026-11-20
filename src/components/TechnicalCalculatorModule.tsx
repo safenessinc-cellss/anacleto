@@ -24,7 +24,10 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
     quantity: "1",
     finish: "Branco",
   });
-  const [bomData, setBomData] = useState<any>(null);\n  const [editingId, setEditingId] = useState<string | null>(null);\n  const [clientName, setClientName] = useState("");\n  const [isSavingBudget, setIsSavingBudget] = useState(false);
+  const [bomData, setBomData] = useState<any>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [clientName, setClientName] = useState("");
+  const [isSavingBudget, setIsSavingBudget] = useState(false);
   const [technicalOptions, setTechnicalOptions] = useState<TechnicalOption[]>([]);
   const [technicalOptionsError, setTechnicalOptionsError] = useState("");
   const [bomError, setBomError] = useState("");
@@ -40,11 +43,42 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
   const [aluminumPricePerKg, setAluminumPricePerKg] = useState("");
   const [aluminumPriceSource, setAluminumPriceSource] = useState<any>(null);
   const [isSearchingAluminumPrice, setIsSearchingAluminumPrice] = useState(false);
-  useEffect(() => {\n    if (!initialBudgetId) return;\n    let active = true;\n    void getDoc(doc(db, "technical_budgets", initialBudgetId)).then((snapshot) => {\n      if (!active || !snapshot.exists()) return;\n      const saved = snapshot.data();\n      setEditingId(snapshot.id);\n      setClientName(String(saved.clientName || ""));\n      if (saved.bomForm) setBomForm((current) => ({ ...current, ...saved.bomForm }));\n      if (saved.bomData) setBomData(saved.bomData);\n      if (saved.aluminumPricePerKg != null) setAluminumPricePerKg(String(saved.aluminumPricePerKg));\n    }).catch((error) => setBomError(error instanceof Error ? error.message : "Não foi possível abrir o orçamento técnico."));\n    return () => { active = false; };\n  }, [initialBudgetId]);\n\n  const aluminumPurchasedKg = (bomData?.bom || []).filter((item: any) => item.category === "aluminum_profile" && Number(item.weightKgM) > 0 && Number(item.commercialBarLengthMm) > 0)
+  useEffect(() => {
+    if (!initialBudgetId) return;
+    let active = true;
+    void getDoc(doc(db, "technical_budgets", initialBudgetId)).then((snapshot) => {
+      if (!active || !snapshot.exists()) return;
+      const saved = snapshot.data();
+      setEditingId(snapshot.id);
+      setClientName(String(saved.clientName || ""));
+      if (saved.bomForm) setBomForm((current) => ({ ...current, ...saved.bomForm }));
+      if (saved.bomData) setBomData(saved.bomData);
+      if (saved.aluminumPricePerKg != null) setAluminumPricePerKg(String(saved.aluminumPricePerKg));
+    }).catch((error) => setBomError(error instanceof Error ? error.message : "Não foi possível abrir o orçamento técnico."));
+    return () => { active = false; };
+  }, [initialBudgetId]);
+
+  const aluminumPurchasedKg = (bomData?.bom || []).filter((item: any) => item.category === "aluminum_profile" && Number(item.weightKgM) > 0 && Number(item.commercialBarLengthMm) > 0)
     .reduce((sum: number, item: any) => sum + Number(item.quantity || 0) * Number(item.commercialBarLengthMm) / 1000 * Number(item.weightKgM), 0);
   const aluminumEstimatedCost = aluminumPurchasedKg * Math.max(0, Number(aluminumPricePerKg.replace(",", ".")) || 0);
 
-  const handleSaveTechnicalBudget = async () => {\n    if (!bomData?.bom?.length) return;\n    setIsSavingBudget(true);\n    try {\n      const user = auth.currentUser;\n      if (!user) throw new Error("Entre na sua conta para salvar o orçamento.");\n      const payload = { workflow: "technical", clientName: clientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, status: "draft", total: 0, estimatedAluminumCost: aluminumEstimatedCost, currency: "BRL", createdBy: user.uid, updatedAt: serverTimestamp() };\n      const id = editingId || "technical_" + crypto.randomUUID();\n      await setDoc(doc(db, "technical_budgets", id), { ...payload, ...(editingId ? {} : { createdAt: serverTimestamp() }) }, { merge: true });\n      setEditingId(id);\n      showToast(editingId ? "Orçamento de esquadrias atualizado." : "Orçamento de esquadrias salvo.", "success");\n    } catch (error) {\n      setBomError(error instanceof Error ? error.message : "Não foi possível salvar o orçamento técnico.");\n    } finally { setIsSavingBudget(false); }\n  };\n\n  const handleSearchAluminumPrice = async () => {
+  const handleSaveTechnicalBudget = async () => {
+    if (!bomData?.bom?.length) return;
+    setIsSavingBudget(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre na sua conta para salvar o orçamento.");
+      const payload = { workflow: "technical", clientName: clientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, status: "draft", total: 0, estimatedAluminumCost: aluminumEstimatedCost, currency: "BRL", createdBy: user.uid, updatedAt: serverTimestamp() };
+      const id = editingId || "technical_" + crypto.randomUUID();
+      await setDoc(doc(db, "technical_budgets", id), { ...payload, ...(editingId ? {} : { createdAt: serverTimestamp() }) }, { merge: true });
+      setEditingId(id);
+      showToast(editingId ? "Orçamento de esquadrias atualizado." : "Orçamento de esquadrias salvo.", "success");
+    } catch (error) {
+      setBomError(error instanceof Error ? error.message : "Não foi possível salvar o orçamento técnico.");
+    } finally { setIsSavingBudget(false); }
+  };
+
+  const handleSearchAluminumPrice = async () => {
     setIsSearchingAluminumPrice(true);
     setMarketError("");
     try {
@@ -373,7 +407,8 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
             {aluminumPurchasedKg > 0 && <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Peso estimado das barras compradas: {aluminumPurchasedKg.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} kg · Referência de custo: {aluminumEstimatedCost.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>}
             {aluminumPurchasedKg === 0 && <p className="mt-2 text-xs text-slate-500">O peso e o comprimento comercial verificados dos perfis são necessários para calcular o custo estimado.</p>}
           </div>
-          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800"><button type="button" onClick={handleSaveTechnicalBudget} disabled={isSavingBudget || !bomData.bom?.length} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{isSavingBudget ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar orçamento de esquadrias"}</button><p className="mt-2 text-xs text-slate-500">Registro técnico independente. Pré-cálculo sujeito à validação das regras e tabelas do fabricante.</p></div>\n          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800"><button type="button" onClick={handleSaveTechnicalBudget} disabled={isSavingBudget || !bomData.bom?.length} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{isSavingBudget ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar orçamento de esquadrias"}</button><p className="mt-2 text-xs text-slate-500">Registro técnico independente. Pré-cálculo sujeito à validação das regras e tabelas do fabricante.</p></div>
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button type="button" onClick={handleMarketResearch} disabled={isSearchingMarket || !bomData.bom?.length} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50"><Search className="h-4 w-4" />{isSearchingMarket ? "Pesquisando..." : "Pesquisar preços de mercado"}</button>
             <button type="button" onClick={handleCompareBom} disabled={isComparing || !bomData.bom?.length} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{isComparing ? "Comparando..." : "Comparar fornecedores aprovados"}</button>
           </div>
