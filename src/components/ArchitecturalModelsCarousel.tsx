@@ -17,12 +17,12 @@ export type ArchitecturalModel = {
 type Props = { onConfigure: (model: ArchitecturalModel) => void };
 
 const baseModels: ArchitecturalModel[] = [
-  { id:"suprema-2", title:"Janela de correr · 2 folhas", badge:"Linha Suprema • 2 Folhas", line:"Suprema", model:"Janela de Correr Suprema", color:"Branco", panels:2, detail:"Marco perimetral, folhas móveis, escovas de vedação e trilho inferior duplo.", image:"/renders-3d/suprema-2.svg" },
-  { id:"suprema-4", title:"Janela de correr · 4 folhas", badge:"Linha Suprema • 4 Folhas", line:"Suprema", model:"Janela de Correr Suprema", color:"Preto Fosco", panels:4, detail:"Composição de quatro folhas, encontro central e distribuição para vãos amplos.", image:"/renders-3d/suprema-4.svg" },
-  { id:"gold-3", title:"Porta balcão panorâmica", badge:"Linha Gold • Contramarco", line:"Gold", model:"Porta Balcão", color:"Bronze", panels:3, detail:"Contramarco, trilhos de deslizamento, escovas e perfis reforçados.", image:"/renders-3d/gold-3.svg" },
-  { id:"gold-fold", title:"Porta camarão", badge:"Linha Gold • Articulada", line:"Gold", model:"Porta Camarão", color:"Natural Fosco", panels:3, detail:"Folhas articuladas, dobradiças, pivôs e pontos de fechamento.", image:"/renders-3d/gold-fold.svg" },
-  { id:"suprema-maxim", title:"Janela Maxim-Ar", badge:"Linha Suprema • Maxim-Ar", line:"Suprema", model:"Maxim-Ar", color:"Branco", panels:1, detail:"Braços de projeção, limitadores, articulações e vedação perimetral.", image:"/renders-3d/suprema-maxim.svg" },
-  { id:"gold-4", title:"Porta de correr ampla", badge:"Linha Gold • 4 Folhas", line:"Gold", model:"Porta Balcão", color:"Preto Fosco", panels:4, detail:"Conjunto para grandes vãos, roldanas, guia superior e trilho inferior.", image:"/renders-3d/gold-4.svg" },
+  { id:"suprema-2", title:"Janela de correr · 2 folhas", badge:"Linha Suprema • 2 Folhas", line:"Suprema", model:"Janela de Correr Suprema", color:"Branco", panels:2, detail:"Marco perimetral, folhas móveis, escovas de vedação e trilho inferior duplo.", image:"/images/anacleto/janela-explodida.webp" },
+  { id:"suprema-4", title:"Janela de correr · 4 folhas", badge:"Linha Suprema • 4 Folhas", line:"Suprema", model:"Janela de Correr Suprema", color:"Preto Fosco", panels:4, detail:"Composição de quatro folhas, encontro central e distribuição para vãos amplos.", image:"/images/anacleto/colecao-esquadrias.webp" },
+  { id:"gold-3", title:"Porta balcão panorâmica", badge:"Linha Gold • Contramarco", line:"Gold", model:"Porta Balcão", color:"Bronze", panels:3, detail:"Contramarco, trilhos de deslizamento, escovas e perfis reforçados.", image:"/images/anacleto/porta-explodida.webp" },
+  { id:"gold-fold", title:"Porta camarão", badge:"Linha Gold • Articulada", line:"Gold", model:"Porta Camarão", color:"Natural Fosco", panels:3, detail:"Folhas articuladas, dobradiças, pivôs e pontos de fechamento.", image:"/images/anacleto/porta-explodida.webp" },
+  { id:"suprema-maxim", title:"Janela Maxim-Ar", badge:"Linha Suprema • Maxim-Ar", line:"Suprema", model:"Maxim-Ar", color:"Branco", panels:1, detail:"Braços de projeção, limitadores, articulações e vedação perimetral.", image:"/images/anacleto/despiece-tecnico.webp" },
+  { id:"gold-4", title:"Porta de correr ampla", badge:"Linha Gold • 4 Folhas", line:"Gold", model:"Porta Balcão", color:"Preto Fosco", panels:4, detail:"Conjunto para grandes vãos, roldanas, guia superior e trilho inferior.", image:"/images/anacleto/colecao-esquadrias.webp" },
 ];
 const CACHE_KEY = "anacleto:architectural-models:v1";
 const suggestions = ["Janela de correr 4 folhas Linha Gold preta com vidro reflecta", "Porta camarão Linha Gold bronze com 3 folhas", "Maxim-Ar Linha Suprema branca com vidro duplo"];
