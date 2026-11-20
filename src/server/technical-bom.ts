@@ -114,7 +114,7 @@ export function optimizeProfileBars(
   }
   const bars: Array<{ cutsMm: number[]; usedMm: number; wasteMm: number }> = [];
   for (const cut of cuts) {
-    let target = bars.find(bar => bar.usedMm + kerfMm + cut <= barLengthMm);
+    let target = bars.find(bar => bar.usedMm + (bar.cutsMm.length ? kerfMm : 0) + cut <= barLengthMm);
     if (!target) {
       target = { cutsMm: [], usedMm: 0, wasteMm: 0 };
       bars.push(target);
