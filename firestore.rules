@@ -216,6 +216,37 @@ service cloud.firestore {
       allow create: if canManageCommercial() || canManageFinance() || canManageQuality() || canManageProduction();
       allow update, delete: if false;
     }
+    // Biblioteca técnica: dados de engenharia com origem documental e validação.
+    match /technical_documents/{id} {
+      allow read: if canOperate();
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial() && (request.resource.data.status == resource.data.status || hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']));
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /aluminum_profiles/{id} {
+      allow read: if canOperate();
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial() && (request.resource.data.status == resource.data.status || hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']));
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /cutting_rules/{id} {
+      allow read: if canOperate();
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial() && (request.resource.data.status == resource.data.status || hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']));
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /hardware_catalog/{id} {
+      allow read: if canOperate();
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial() && (request.resource.data.status == resource.data.status || hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']));
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+    match /catalog_import_jobs/{id} {
+      allow read, create: if canManageCommercial();
+      allow update: if hasRole(['super_admin','super_usuario','ceo','admin','supervisor','qualidade']);
+      allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
+
     match /sender_config/{id} { allow read: if canOperate(); allow create, update: if hasRole(['super_admin','super_usuario','ceo','admin']); allow delete: if owner(); }
 
     // Negação por padrão: nenhuma coleção não declarada fica acessível por estar autenticado.
