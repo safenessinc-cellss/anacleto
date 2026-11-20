@@ -34,6 +34,9 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=moderate
 
+      - name: Technical BOM unit tests
+        run: npm test
+
       - name: Type check
         run: npx tsc --noEmit --pretty false
 
