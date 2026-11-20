@@ -11,6 +11,8 @@ export type PurchaseUnit = "bar" | "meter" | "piece" | "m2" | "kg";
 
 export interface TechnicalBomItem {
   id: string;
+  /** Canonical Firestore technical_products document ID. */
+  technicalProductId?: string;
   category: BomCategory;
   code: string;
   description: string;
