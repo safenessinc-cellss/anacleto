@@ -207,23 +207,30 @@ export default function BudgetModal({
       const user = auth.currentUser;
       if (!user) throw new Error("Entre na sua conta para pesquisar preços.");
       const idToken = await user.getIdToken();
-      const response = await fetch("/api/supplier/market-research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken },
-        body: JSON.stringify({
-          location: "Sapucaia do Sul, Rio Grande do Sul, Brasil",
-          items: validItems.slice(0, 12).map((item: any) => ({
-            id: item.id, code: item.code || item.sku || "", description: item.description,
-            manufacturer: item.manufacturer || bomForm.manufacturer,
-            line: item.system || bomForm.line, finish: item.finish || bomForm.finish, unit: item.unit || "un"
-          }))
-        })
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(data?.error || "Falha na pesquisa de mercado.");
-      setMarketResults(Array.isArray(data?.results) ? data.results : []);
-      setMarketSearchedAt(data?.searchedAt || new Date().toISOString());
-      showToast("Pesquisa concluída. Confirme os preços nas fontes antes de utilizá-los.", "success");
+      if (validItems.length > 60) throw new Error("A pesquisa suporta até 60 componentes por orçamento. Divida a lista técnica em etapas.");
+      const collected: any[] = [];
+      let searchedAt = new Date().toISOString();
+      for (let offset = 0; offset < validItems.length; offset += 12) {
+        const response = await fetch("/api/supplier/market-research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken },
+          body: JSON.stringify({
+            location: "Sapucaia do Sul, Rio Grande do Sul, Brasil",
+            items: validItems.slice(offset, offset + 12).map((item: any) => ({
+              id: item.id, code: item.code || item.sku || "", description: item.description,
+              manufacturer: item.manufacturer || bomForm.manufacturer,
+              line: item.system || bomForm.line, finish: item.finish || bomForm.finish, unit: item.unit || "un"
+            }))
+          })
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.error || "Falha na pesquisa de mercado.");
+        collected.push(...(Array.isArray(data?.results) ? data.results : []));
+        searchedAt = data?.searchedAt || searchedAt;
+      }
+      setMarketResults(collected);
+      setMarketSearchedAt(searchedAt);
+      showToast("Pesquisa concluída para " + collected.length + " componentes. Confirme os preços nas fontes antes de utilizá-los.", "success");
     } catch (error) {
       setMarketError(error instanceof Error ? error.message : "Não foi possível pesquisar preços.");
     } finally {
@@ -740,7 +747,7 @@ export default function BudgetModal({
                 {isSearchingMarket ? "Pesquisando fornecedores..." : "Pesquisar preços online"}
               </button>
               {marketError && <p className="text-xs text-rose-600">{marketError}</p>}
-              {marketSearchedAt && <p className="text-[10px] text-slate-500">Pesquisa realizada em {new Date(marketSearchedAt).toLocaleString("pt-BR")} · até 12 itens.</p>}
+              {marketSearchedAt && <p className="text-[10px] text-slate-500">Pesquisa realizada em {new Date(marketSearchedAt).toLocaleString("pt-BR")} · até 60 componentes por execução.</p>}
               {marketResults.map((result: any) => (
                 <div key={result.item?.id || result.searchTerm} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 space-y-2">
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{result.item?.description || "Material"}</p>
