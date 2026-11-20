@@ -19,25 +19,59 @@ type Row = { id: string; [key: string]: any };
 
 const OFFICIAL_SOURCES = [
   {
-    manufacturer: "Hydro",
-    country: "Brasil",
-    url: "https://www.hydro.com/br/br/aluminio/produtos/sistemas-de-construcao/sistemas-hydro-no-brasil2/materiais-tecnicos/",
-    lines: "Única, Única Minimalist, Nova Gold, Gold IV, Gold Slim, Inova, Produtiva 25 e Master",
-    note: "Portal oficial de materiais técnicos e boletins."
+    manufacturer: "Alusul",
+    country: "Brasil · Porto Alegre/RS",
+    url: "https://www.alusul.ind.br/",
+    lines: "Perfis de alumínio e acessórios",
+    note: "Portal oficial com Catálogo Acessórios, Catálogo Completo e Catálogo Perfis. Os PDFs são abertos no portal do fornecedor.",
+    catalogs: [
+      { title: "Catálogo de Perfis", line: "Perfis", url: "https://www.alusul.ind.br/" },
+      { title: "Catálogo Completo", line: "Geral", url: "https://www.alusul.ind.br/" },
+      { title: "Catálogo de Acessórios", line: "Acessórios", url: "https://www.alusul.ind.br/" }
+    ]
   },
   {
-    manufacturer: "Belmetal",
-    country: "Brasil",
-    url: "https://belmetal.com.br/catalogos/",
-    lines: "Atlanta, Imperial 2.5, Imperial 3.5, Superia, Grid Sky e Stilo Grad",
-    note: "Página oficial de catálogos e portfólio de perfis."
+    manufacturer: "Aluita",
+    country: "Brasil · Rio Grande do Sul",
+    url: "https://www.aluita.com.br/perfisaluminio",
+    lines: "Catálogo Geral, Linha 25/30, Mega 25, Mega 32, Vidro Temperado e Módulo Prático",
+    note: "Portal oficial de perfis e sistemas, com páginas específicas por linha.",
+    catalogs: [
+      { title: "Catálogo Geral de Perfis", line: "Geral", url: "https://www.aluita.com.br/perfisaluminio" },
+      { title: "Linha 25/30", line: "25/30", url: "https://www.aluita.com.br/linhamega2530" },
+      { title: "Linha Mega 25", line: "Mega 25", url: "https://www.aluita.com.br/linhamega25" },
+      { title: "Linha Mega 32", line: "Mega 32", url: "https://www.aluita.com.br/linhamega32" },
+      { title: "Perfis para Vidro Temperado", line: "Vidro Temperado", url: "https://www.aluita.com.br/perfisvidrotemperado" },
+      { title: "Módulo Prático", line: "Módulo Prático", url: "https://www.aluita.com.br/m%C3%B3dulopratico" }
+    ]
   },
   {
-    manufacturer: "Perfil Alumínio",
-    country: "Brasil",
-    url: "https://www.perfilaluminio.com.br/",
-    lines: "Consultar linhas e documentos técnicos disponíveis",
-    note: "Fonte institucional; confirmar o catálogo específico antes da importação."
+    manufacturer: "Perfil Sul",
+    country: "Brasil · Santa Catarina",
+    url: "https://www.perfilsulaluminio.com.br/catalogo",
+    lines: "Linha 25, Box Temperado, Módulo Prático II, Linha Ouro, Integrada e demais famílias do catálogo online",
+    note: "Catálogo online pesquisável, catálogo completo e PDF de perfis novos.",
+    catalogs: [
+      { title: "Catálogo Online", line: "Geral", url: "https://www.perfilsulaluminio.com.br/catalogo" },
+      { title: "Catálogo Completo PDF", line: "Geral", url: "https://www.perfilsulaluminio.com.br/arquivos/catalogo/2022/Catalogo_Perfil_Sul_2022.pdf" },
+      { title: "Perfis Novos 2024 PDF", line: "Novos 2024", url: "https://www.perfilsulaluminio.com.br/arquivos/catalogo/2022/Catalogo_Perfis_Sul_Novos_2024.pdf" },
+      { title: "Linha 25", line: "Linha 25", url: "https://www.perfilsulaluminio.com.br/perfil/pesquisa/linha_25" },
+      { title: "Box Temperado", line: "Box Temperado", url: "https://www.perfilsulaluminio.com.br/perfil/pesquisa/box_temperado" }
+    ]
+  },
+  {
+    manufacturer: "Esquadrimax",
+    country: "Brasil · Santa Catarina · atendimento Sul",
+    url: "https://www.esquadrimaxsc.com.br/",
+    lines: "Linha 16, Linha 20, Módulo Prático, Slim 20, Infinity Class, Versatic 25, Deluxe 32, Box Temperado, fachadas, brises e portões",
+    note: "Catálogo Construção Civil, edição setembro de 2026, hospedado no visualizador FlipHTML5.",
+    catalogs: [
+      { title: "Catálogo Construção Civil · Set/2026", line: "Geral", url: "https://fliphtml5.com/sacgm/mnnz/" },
+      { title: "Catálogo · Perfis tabelados", line: "Tabelados", url: "https://fliphtml5.com/sacgm/mnnz/7/" },
+      { title: "Catálogo · Box Temperado", line: "Box Temperado", url: "https://fliphtml5.com/sacgm/mnnz/197/" },
+      { title: "Catálogo · Temperados 8 mm", line: "Temperados 8 mm", url: "https://fliphtml5.com/sacgm/mnnz/200/" },
+      { title: "Catálogo · Temperados 10 mm", line: "Temperados 10 mm", url: "https://fliphtml5.com/sacgm/mnnz/205/" }
+    ]
   }
 ];
 
@@ -209,6 +243,37 @@ export default function TechnicalLibraryModule() {
     }
   };
 
+  const registerOfficialCatalog = async (source: typeof OFFICIAL_SOURCES[number], catalog: typeof OFFICIAL_SOURCES[number]["catalogs"][number]) => {
+    setError("");
+    setNotice("");
+    try {
+      const existing = documents.find(row => row.sourceUrl === catalog.url && row.manufacturer === source.manufacturer);
+      if (existing) {
+        setNotice(`A fonte ${catalog.title} já está registrada na Biblioteca Técnica.`);
+        setSection("documents");
+        return;
+      }
+      await addDoc(collection(db, "technical_documents"), {
+        manufacturer: source.manufacturer,
+        line: catalog.line,
+        title: catalog.title,
+        version: source.manufacturer === "Esquadrimax" ? "Edição setembro/2026" : "",
+        sourceUrl: catalog.url,
+        sourcePortal: source.url,
+        sourceCountry: "Brasil",
+        status: "pending_review",
+        extractionMethod: "official_catalog_link",
+        createdBy: auth.currentUser?.uid || null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      setSection("documents");
+      setNotice(`Fonte registrada: ${source.manufacturer} · ${catalog.title}. Importe o PDF quando disponível para extrair os dados técnicos.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível registrar a fonte oficial.");
+    }
+  };
+
   const changeStatus = async (row: Row, status: ReviewStatus) => {
     try {
       await updateDoc(doc(db, current.collection, row.id), { status, updatedAt: serverTimestamp(), reviewedAt: status === "verified" ? serverTimestamp() : null });
@@ -238,12 +303,18 @@ export default function TechnicalLibraryModule() {
       <div className="flex flex-wrap items-center gap-2"><input value={importManufacturer} onChange={e => setImportManufacturer(e.target.value)} placeholder="Fabricante" aria-label="Fabricante do catálogo" className="w-32 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"/><input value={importLine} onChange={e => setImportLine(e.target.value)} placeholder="Linha / sistema" aria-label="Linha do catálogo" className="w-36 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900"/><input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => importTechnicalPdf(e.target.files?.[0])}/><button onClick={() => pdfInputRef.current?.click()} disabled={importingPdf} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Upload size={16}/>{importingPdf ? "Importando PDF..." : "Importar catálogo PDF"}</button><button onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><Plus size={17}/>Novo registro</button></div>
     </header>
 
-    <div className="grid gap-3 md:grid-cols-3">
-      {OFFICIAL_SOURCES.map(source => <article key={source.manufacturer} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <div className="flex items-start justify-between gap-2"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Fonte oficial · {source.country}</p><h3 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{source.manufacturer}</h3></div><ShieldCheck className="text-blue-600" size={20}/></div>
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {OFFICIAL_SOURCES.map(source => <article key={source.manufacturer} className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-start justify-between gap-2"><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Fonte oficial · {source.country}</p><h3 className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{source.manufacturer}</h3></div><ShieldCheck className="shrink-0 text-blue-600" size={20}/></div>
         <p className="mt-2 text-xs leading-5 text-slate-500">{source.note}</p>
         <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300"><b>Linhas:</b> {source.lines}</p>
-        <a href={source.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:underline">Abrir catálogo oficial <ExternalLink size={14}/></a>
+        <div className="mt-3 flex flex-1 flex-col gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+          {source.catalogs.map(catalog => <div key={catalog.title} className="flex items-center justify-between gap-2">
+            <a href={catalog.url} target="_blank" rel="noreferrer" className="min-w-0 text-xs font-semibold text-blue-700 hover:underline">{catalog.title} <ExternalLink className="inline" size={11}/></a>
+            <button onClick={() => registerOfficialCatalog(source, catalog)} className="shrink-0 rounded-lg border border-blue-200 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50">Registrar</button>
+          </div>)}
+        </div>
+        <a href={source.url} target="_blank" rel="noreferrer" className="mt-3 text-xs font-semibold text-slate-500 hover:underline">Portal do fornecedor</a>
       </article>)}
     </div>
 
