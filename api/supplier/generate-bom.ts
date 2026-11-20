@@ -22,7 +22,7 @@ const decodeDoc = (doc: any): FirestoreDoc => ({
 async function collectionDocs(projectId: string, databaseId: string, collection: string, token: string) {
   const url = "https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/" +
     encodeURIComponent(databaseId) + "/documents/" + collection + "?pageSize=1000";
-  const response = await fetch(url, { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(12000) });
+  const response = await fetch(url, { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(6000) });
   if (!response.ok) throw new Error("Não foi possível consultar " + collection + " na Ficha Técnica.");
   const data: any = await response.json();
   return (data.documents || []).map(decodeDoc) as FirestoreDoc[];
@@ -38,7 +38,7 @@ export default async function handler(req: any, res: any) {
     if (!token) return res.status(401).json({ error: "Autenticação obrigatória." });
     const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
     const auth = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + apiKey, {
-      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:token}),signal:AbortSignal.timeout(10000)
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:token}),signal:AbortSignal.timeout(3000)
     });
     if (!auth.ok) return res.status(401).json({error:"Sessão inválida."});
     const identity:any=await auth.json(), user=identity.users?.[0];
@@ -46,7 +46,7 @@ export default async function handler(req: any, res: any) {
     const databaseId= firebaseConfig.firestoreDatabaseId || "(default)";
     if (String(user.email).toLowerCase() !== OWNER_EMAIL) {
       const adminUrl="https://firestore.googleapis.com/v1/projects/"+firebaseConfig.projectId+"/databases/"+encodeURIComponent(databaseId)+"/documents/admins/"+encodeURIComponent(String(user.email).toLowerCase());
-      const adminResponse=await fetch(adminUrl,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(10000)});
+      const adminResponse=await fetch(adminUrl,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(3000)});
       const adminData:any=adminResponse.ok?await adminResponse.json():null;
       const admin={role:adminData?.fields?.role?.stringValue||""};
       const allowed=["super_admin","super_usuario","ceo","admin","supervisor","colaborador"];
