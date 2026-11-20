@@ -132,18 +132,18 @@ export default function TechnicalCatalogCards() {
       image: text(row.photoUrl || row.imageUrl || row.thumbnailDataUrl),
       sourceUrl: text(row.sourceUrl), sourcePage: Number(row.sourcePage || row.page) || undefined,
       status: text(row.status) || "pending_review",
-      details: [["Código", text(row.code || row.supplierCode) || "Não informado"], ["Categoria", text(row.category) || "Não informada"], ["Material", text(row.material) || "Não informado"], ["Unidade", text(row.unit) || "Não informada"], ["Comprimento", text(row.lengthMm) ? text(row.lengthMm) + " mm" : "Não informado"], ["Espessura", text(row.thicknessMm) ? text(row.thicknessMm) + " mm" : "Não informado"], ["Peso", text(row.weightKg) ? text(row.weightKg) + " kg" : "Não informado"], ["Acabamento / cor", text(row.color) || "Não informado"], ["Preço importado", money(row.price)], ["Arquivo de origem", text(row.sourceFileName || row.sourceFileType) || "Não informado"], ["Página", text(row.sourcePage || row.page) || "Não informada"], ["Confiança da extração IA", text(row.aiConfidence) || "Não informada"], ["Observações IA", text(row.aiNotes) || "Nenhuma"]],
+      details: [["Código", text(row.code || row.supplierCode) || "Não informado"], ["Categoria", text(row.category) || "Não informada"], ["Material", text(row.material) || "Não informado"], ["Unidade", text(row.unit) || "Não informada"], ["Comprimento", text(row.lengthMm) ? text(row.lengthMm) + " mm" : "Não informado"], ["Espessura", text(row.thicknessMm) ? text(row.thicknessMm) + " mm" : "Não informado"], ["Peso", text(row.weightKg) ? text(row.weightKg) + " kg" : "Não informado"], ["Acabamento / cor", text(row.color) || "Não informado"], ["Preço importado (pendente)", money(row.importedPrice ?? row.price)], ["Arquivo de origem", text(row.sourceFileName || row.sourceFileType) || "Não informado"], ["Página", text(row.sourcePage || row.page) || "Não informada"], ["Confiança da extração IA", text(row.aiConfidence) || "Não informada"], ["Observações IA", text(row.aiNotes) || "Nenhuma"]],
     })),
   ], [documents, profiles, hardware, rules, prices, supplierProducts]);
 
   const consolidatedCards = useMemo(() => {
     const result: CatalogCard[] = [];
-    const productKinds: CatalogKind[] = ["profiles", "hardware", "supplier_products"];
+    const productKinds: CatalogKind[] = ["profiles", "supplier_products"];
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, "");
     for (const card of cards) {
       if (!productKinds.includes(card.kind)) { result.push(card); continue; }
-      const identity = normalize(card.manufacturer) + "::" + normalize(card.code || card.title);
-      const existing = result.find(item => productKinds.includes(item.kind) && normalize(item.manufacturer) + "::" + normalize(item.code || item.title) === identity);
+      const identity = normalize(card.manufacturer) + "::" + normalize(card.line) + "::" + normalize(card.code || card.title);
+      const existing = result.find(item => productKinds.includes(item.kind) && normalize(item.manufacturer) + "::" + normalize(item.line) + "::" + normalize(item.code || item.title) === identity);
       if (!existing) { result.push(card); continue; }
       if (!existing.image && card.image) existing.image = card.image;
       if (!existing.sourceUrl && card.sourceUrl) existing.sourceUrl = card.sourceUrl;
