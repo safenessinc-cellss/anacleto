@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash, X, Globe, Save, Brain, Sparkles, Wand2 } from "lucide-react";
+import { Plus, Trash, X, Globe, Save, Brain, Sparkles, Wand2, Search } from "lucide-react";
 import { Budget, BudgetLineItem } from "../types";
 import { Translation } from "../translations";
 import { generateBudgetTranslations, languageMeta } from "../utils";
