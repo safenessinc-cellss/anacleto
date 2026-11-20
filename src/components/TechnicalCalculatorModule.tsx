@@ -37,6 +37,42 @@ export default function TechnicalCalculatorModule() {
   const [marketSearchedAt, setMarketSearchedAt] = useState("");
   const [marketError, setMarketError] = useState("");
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
+  const [aluminumPricePerKg, setAluminumPricePerKg] = useState("");
+  const [aluminumPriceSource, setAluminumPriceSource] = useState<any>(null);
+  const [isSearchingAluminumPrice, setIsSearchingAluminumPrice] = useState(false);
+  const aluminumPurchasedKg = (bomData?.bom || []).filter((item: any) => item.category === "aluminum_profile" && Number(item.weightKgM) > 0 && Number(item.commercialBarLengthMm) > 0)
+    .reduce((sum: number, item: any) => sum + Number(item.quantity || 0) * Number(item.commercialBarLengthMm) / 1000 * Number(item.weightKgM), 0);
+  const aluminumEstimatedCost = aluminumPurchasedKg * Math.max(0, Number(aluminumPricePerKg.replace(",", ".")) || 0);
+
+  const handleSearchAluminumPrice = async () => {
+    setIsSearchingAluminumPrice(true);
+    setMarketError("");
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Entre na sua conta para pesquisar o preço de referência.");
+      const response = await fetch("/api/supplier/market-research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + await user.getIdToken() },
+        body: JSON.stringify({
+          location: "Rio Grande do Sul, Brasil",
+          items: [{ id: "aluminum-price-per-kg", code: "", description: "perfil de alumínio extrudado preço por kg", manufacturer: bomForm.manufacturer, line: bomForm.line, finish: bomForm.finish, unit: "kg" }],
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || "Não foi possível pesquisar o preço por kg.");
+      const offers = (data?.results || []).flatMap((row: any) => row.offers || []);
+      const candidate = offers.find((offer: any) => Array.isArray(offer.prices) && offer.prices.length > 0);
+      if (!candidate) throw new Error("A pesquisa não encontrou um preço por kg explícito. Informe o valor manualmente após cotação.");
+      const value = Number(candidate.prices[0]);
+      setAluminumPricePerKg(value.toFixed(2));
+      setAluminumPriceSource({ url: candidate.url, title: candidate.title, domain: candidate.domain, observedAt: data.searchedAt || new Date().toISOString() });
+      showToast("Preço encontrado como referência não verificada. Revise e edite antes de calcular.", "success");
+    } catch (error) {
+      setMarketError(error instanceof Error ? error.message : "Falha ao pesquisar preço por kg.");
+    } finally {
+      setIsSearchingAluminumPrice(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -325,6 +361,18 @@ export default function TechnicalCalculatorModule() {
             </div>
           ))}
           {(bomData.errors || []).map((error: string, index: number) => <p key={index} className="text-xs text-amber-700 dark:text-amber-300">• {error}</p>)}
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/20">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="min-w-[180px] flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200">Preço de referência do alumínio (R$/kg)
+                <input type="number" min="0" step="0.01" value={aluminumPricePerKg} onChange={(event) => { setAluminumPricePerKg(event.target.value); setAluminumPriceSource(null); }} placeholder="Informe ou pesquise" className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal dark:border-slate-700 dark:bg-slate-950" />
+              </label>
+              <button type="button" onClick={handleSearchAluminumPrice} disabled={isSearchingAluminumPrice} className="rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-900 disabled:opacity-50 dark:text-amber-200">{isSearchingAluminumPrice ? "Pesquisando..." : "Buscar referência na internet"}</button>
+            </div>
+            <p className="mt-2 text-xs text-amber-900 dark:text-amber-200">Valor apenas sugestivo; pode ser editado neste cálculo. Não é cotação confirmada e não atualiza a tabela oficial nem outros orçamentos.</p>
+            {aluminumPriceSource && <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Fonte: <a href={aluminumPriceSource.url} target="_blank" rel="noreferrer" className="underline">{aluminumPriceSource.domain || aluminumPriceSource.title}</a> · pesquisado em {new Date(aluminumPriceSource.observedAt).toLocaleString("pt-BR")} · não verificado</p>}
+            {aluminumPurchasedKg > 0 && <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Peso estimado das barras compradas: {aluminumPurchasedKg.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} kg · Referência de custo: {aluminumEstimatedCost.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>}
+            {aluminumPurchasedKg === 0 && <p className="mt-2 text-xs text-slate-500">O peso e o comprimento comercial verificados dos perfis são necessários para calcular o custo estimado.</p>}
+          </div>
           <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button type="button" onClick={handleMarketResearch} disabled={isSearchingMarket || !bomData.bom?.length} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50"><Search className="h-4 w-4" />{isSearchingMarket ? "Pesquisando..." : "Pesquisar preços de mercado"}</button>
             <button type="button" onClick={handleCompareBom} disabled={isComparing || !bomData.bom?.length} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{isComparing ? "Comparando..." : "Comparar fornecedores aprovados"}</button>
