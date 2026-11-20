@@ -2,11 +2,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc
 } from "firebase/firestore";
-import { db } from "../../firebase";
+import { auth, db, storage } from "../../firebase";
+import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
-  BookOpen, FileText, Plus, Search, Layers, Ruler, Wrench, ExternalLink,
+  BookOpen, FileText, Plus, Search, Layers, Ruler, Wrench, ExternalLink, Upload,
   CheckCircle2, Clock3, AlertTriangle, Trash2, X, Save, ShieldCheck
 } from "lucide-react";
+
+GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 type Section = "documents" | "profiles" | "rules" | "hardware";
 type ReviewStatus = "pending_review" | "verified" | "rejected";
@@ -63,7 +68,10 @@ export default function TechnicalLibraryModule() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importingPdf, setImportingPdf] = useState(false);
+  const pdfInputRef = React.useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [form, setForm] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -118,6 +126,86 @@ export default function TechnicalLibraryModule() {
     }
   };
 
+  const importTechnicalPdf = async (file?: File) => {
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Envie um arquivo PDF de catálogo técnico.");
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      setError("O PDF deve ter no máximo 25 MB.");
+      return;
+    }
+    const user = auth.currentUser;
+    if (!user) { setError("Entre novamente para importar o catálogo."); return; }
+    setImportingPdf(true);
+    setError("");
+    try {
+      const safeName = file.name.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "-");
+      const path = `technical-catalogs/${user.uid}/${Date.now()}-${safeName}`;
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file, { contentType: "application/pdf" });
+      const downloadUrl = await getDownloadURL(fileRef);
+      const pdfTask = getDocument({ data: await file.arrayBuffer() });
+      const pdf = await pdfTask.promise;
+      const candidates: Array<{ code: string; weightKgM: number; page: number; excerpt: string }> = [];
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const lineMap = new Map<number, Array<{ x: number; text: string }>>();
+        for (const item of content.items as any[]) {
+          if (!item.str || !item.str.trim() || !Array.isArray(item.transform)) continue;
+          const y = Math.round(Number(item.transform[5]) / 2) * 2;
+          const line = lineMap.get(y) || [];
+          line.push({ x: Number(item.transform[4]) || 0, text: item.str.trim() });
+          lineMap.set(y, line);
+        }
+        const lines = [...lineMap.entries()].sort((a, b) => b[0] - a[0]).map(([, parts]) => parts.sort((a, b) => a.x - b.x).map(p => p.text).join(" "));
+        for (const line of lines) {
+          const weightMatch = line.match(/(\\d{1,2}[,.]\\d{2,4})\\s*(?:kg\\s*\\/\\s*m|kg\\/m|kg\\s*por\\s*metro)/i);
+          const codeMatch = line.match(/\\b([A-Z]{1,5}[-.]?\\d{3,6}[A-Z0-9-]*)\\b/i);
+          if (!weightMatch || !codeMatch) continue;
+          const weight = Number(weightMatch[1].replace(",", "."));
+          if (!Number.isFinite(weight) || weight <= 0 || weight > 100) continue;
+          candidates.push({ code: codeMatch[1].toUpperCase(), weightKgM: weight, page: pageNumber, excerpt: line.slice(0, 280) });
+        }
+      }
+      await pdfTask.destroy();
+      const docRef = await addDoc(collection(db, "technical_documents"), {
+        manufacturer: "", line: "", title: file.name, version: "", sourceUrl: downloadUrl,
+        storagePath: path, originalFileName: file.name, mimeType: "application/pdf",
+        fileSize: file.size, pageCount: pdf.numPages, status: "pending_review",
+        extractionMethod: "pdf_text_layer_regex", extractedProfileCount: candidates.length,
+        createdBy: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+      });
+      if (candidates.length) {
+        for (const candidate of candidates) {
+          await addDoc(collection(db, "aluminum_profiles"), {
+            manufacturer: "", line: "", code: candidate.code, description: candidate.excerpt,
+            weightKgM: candidate.weightKgM, documentId: docRef.id, page: candidate.page,
+            sourceUrl: downloadUrl, status: "pending_review", extractionMethod: "pdf_text_layer_regex",
+            createdBy: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+          });
+        }
+      }
+      await addDoc(collection(db, "catalog_import_jobs"), {
+        documentId: docRef.id, fileName: file.name, pageCount: pdf.numPages,
+        extractedProfileCount: candidates.length, status: "pending_review",
+        extractionMethod: "pdf_text_layer_regex", createdBy: user.uid, createdAt: serverTimestamp()
+      });
+      setSection("profiles");
+      setNotice(candidates.length ? `${candidates.length} candidato(s) extraído(s), aguardando validação.` : "PDF salvo; a extração automática não encontrou dados em texto.");
+      window.alert(candidates.length
+        ? `PDF importado. ${candidates.length} candidato(s) de perfil e peso extraídos. Todos permanecem pendentes de validação.`
+        : "PDF armazenado. Não foram encontrados pares código + kg/m na camada de texto. Se o catálogo for digitalizado como imagem, será necessária a etapa OCR.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao importar o PDF técnico.");
+    } finally {
+      setImportingPdf(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = "";
+    }
+  };
+
   const changeStatus = async (row: Row, status: ReviewStatus) => {
     try {
       await updateDoc(doc(db, current.collection, row.id), { status, updatedAt: serverTimestamp(), reviewedAt: status === "verified" ? serverTimestamp() : null });
@@ -144,7 +232,7 @@ export default function TechnicalLibraryModule() {
         <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">Biblioteca Técnica</h1>
         <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">Base técnica rastreável para alimentar despiece, consumo de alumínio, ferragens e orçamentos.</p>
       </div>
-      <button onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><Plus size={17}/>Novo registro</button>
+      <div className="flex flex-wrap gap-2"><input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => importTechnicalPdf(e.target.files?.[0])}/><button onClick={() => pdfInputRef.current?.click()} disabled={importingPdf} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"><Upload size={16}/>{importingPdf ? "Importando PDF..." : "Importar catálogo PDF"}</button><button onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><Plus size={17}/>Novo registro</button></div>
     </header>
 
     <div className="grid gap-3 md:grid-cols-3">
@@ -164,7 +252,7 @@ export default function TechnicalLibraryModule() {
         <div><h2 className="font-bold text-slate-900 dark:text-white">{current.title}</h2><p className="text-xs text-slate-500">{current.subtitle}</p></div>
         <label className="relative block w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por código, linha ou fabricante..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-800"/></label>
       </div>
-      {error && <div className="mx-4 mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
+      {notice && <div className="mx-4 mb-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">{notice}</div>}{error && <div className="mx-4 mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
       {filtered.length === 0 ? <div className="px-6 py-14 text-center"><BookOpen className="mx-auto text-slate-300" size={34}/><p className="mt-3 font-semibold text-slate-700 dark:text-slate-200">Nenhum registro nesta seção</p><p className="mt-1 text-sm text-slate-500">Cadastre os dados extraídos de um documento oficial. Eles começarão como pendentes de validação.</p></div> :
         <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-800"><tr><th className="px-4 py-3">Identificação</th><th className="px-4 py-3">Sistema / detalhe</th><th className="px-4 py-3">Origem</th><th className="px-4 py-3">Validação</th><th className="px-4 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{filtered.map(row => <tr key={row.id} className="align-top hover:bg-slate-50/70 dark:hover:bg-slate-800/40"><td className="px-4 py-3"><p className="font-semibold text-slate-900 dark:text-white">{row.code || row.title || row.typology || row.manufacturer || "Registro técnico"}</p><p className="mt-1 text-xs text-slate-500">{row.manufacturer || "Fabricante não informado"} · {row.line || "Linha não informada"}</p></td><td className="px-4 py-3 text-slate-600 dark:text-slate-300">{section === "profiles" ? <>{row.description || "Perfil"}<p className="mt-1 font-semibold">{row.weightKgM != null ? `${row.weightKgM} kg/m` : "Peso não informado"}</p></> : section === "rules" ? <>{row.configuration || "Configuração não informada"}<p className="mt-1 max-w-sm truncate font-mono text-xs">{row.formula}</p></> : section === "hardware" ? row.description || row.code : <>{row.title}<p className="mt-1 text-xs">{row.version || "Versão não informada"}</p></>}</td><td className="px-4 py-3 text-xs text-slate-500">{row.documentId ? `Doc. ${row.documentId}` : row.sourceUrl ? <a className="text-blue-700 hover:underline" href={row.sourceUrl} target="_blank" rel="noreferrer">Abrir fonte</a> : "Fonte não vinculada"}{row.page ? <p>Página {row.page}</p> : null}</td><td className="px-4 py-3"><Status value={row.status}/></td><td className="px-4 py-3"><div className="flex justify-end gap-1"><button title="Marcar como verificado" onClick={() => changeStatus(row, "verified")} className="rounded-lg p-2 text-emerald-700 hover:bg-emerald-50"><CheckCircle2 size={16}/></button><button title="Rejeitar" onClick={() => changeStatus(row, "rejected")} className="rounded-lg p-2 text-amber-700 hover:bg-amber-50"><AlertTriangle size={16}/></button><button title="Excluir" onClick={() => remove(row)} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div>}
     </section>
