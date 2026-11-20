@@ -4,7 +4,7 @@ import { db } from "../../firebase";
 import { Boxes, Image as ImageIcon, Search } from "lucide-react";
 
 type TechnicalRecord = { id: string; [key: string]: any };
-type CatalogKind = "all" | "documents" | "profiles" | "hardware" | "rules" | "prices";
+type CatalogKind = "all" | "documents" | "profiles" | "hardware" | "rules" | "prices" | "supplier_products";
 type CatalogCard = {
   id: string;
   kind: Exclude<CatalogKind, "all">;
@@ -27,6 +27,7 @@ const tabs: Array<{ id: CatalogKind; label: string }> = [
   { id: "hardware", label: "Acessórios" },
   { id: "rules", label: "Regras e tipologias" },
   { id: "prices", label: "Preços" },
+  { id: "supplier_products", label: "Produtos importados" },
 ];
 const text = (value: unknown) => value === undefined || value === null || value === "" ? "" : String(value);
 const money = (value: unknown) => Number.isFinite(Number(value)) && Number(value) > 0
@@ -43,6 +44,7 @@ export default function TechnicalCatalogCards() {
   const [hardware, setHardware] = useState<TechnicalRecord[]>([]);
   const [rules, setRules] = useState<TechnicalRecord[]>([]);
   const [prices, setPrices] = useState<TechnicalRecord[]>([]);
+  const [supplierProducts, setSupplierProducts] = useState<TechnicalRecord[]>([]);
   const [kind, setKind] = useState<CatalogKind>("all");
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
@@ -54,6 +56,7 @@ export default function TechnicalCatalogCards() {
       onSnapshot(collection(db, "hardware_catalog"), snap => setHardware(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
       onSnapshot(collection(db, "cutting_rules"), snap => setRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
       onSnapshot(collection(db, "supplier_prices"), snap => setPrices(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
+      onSnapshot(collection(db, "supplier_catalog"), snap => setSupplierProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
     ];
     return () => subscriptions.forEach(unsubscribe => unsubscribe());
   }, []);
@@ -119,21 +122,52 @@ export default function TechnicalCatalogCards() {
       status: text(row.status || row.priceStatus) || "pending_review",
       details: [["Código", text(row.code) || "Não informado"], ["Unidade", text(row.unit) || "Não informada"], ["Preço unitário", money(row.unitPrice)], ["Frete confirmado", row.shippingCost == null ? "Não informado" : money(row.shippingCost)], ["Data da cotação", text(row.priceDate) || "Não informada"], ["Validade", text(row.validUntil) || "Não informada"], ["Referência", text(row.quoteReference) || "Não informada"]],
     })),
-  ], [documents, profiles, hardware, rules, prices]);
+    ...supplierProducts.map((row): CatalogCard => ({
+      id: "supplier-product:" + row.id, kind: "supplier_products" as const,
+      title: text(row.name) || "Produto de fornecedor",
+      subtitle: text(row.code || row.supplierCode) || "Código não informado",
+      manufacturer: text(row.supplier || row.manufacturer) || "Fornecedor não informado",
+      line: text(row.line || row.material) || "Linha / material não informado",
+      code: text(row.code || row.supplierCode),
+      image: text(row.photoUrl || row.imageUrl || row.thumbnailDataUrl),
+      sourceUrl: text(row.sourceUrl), sourcePage: Number(row.sourcePage || row.page) || undefined,
+      status: text(row.status) || "pending_review",
+      details: [["Código", text(row.code || row.supplierCode) || "Não informado"], ["Categoria", text(row.category) || "Não informada"], ["Material", text(row.material) || "Não informado"], ["Unidade", text(row.unit) || "Não informada"], ["Comprimento", text(row.lengthMm) ? text(row.lengthMm) + " mm" : "Não informado"], ["Espessura", text(row.thicknessMm) ? text(row.thicknessMm) + " mm" : "Não informado"], ["Peso", text(row.weightKg) ? text(row.weightKg) + " kg" : "Não informado"], ["Acabamento / cor", text(row.color) || "Não informado"], ["Preço importado", money(row.price)], ["Arquivo de origem", text(row.sourceFileName || row.sourceFileType) || "Não informado"], ["Página", text(row.sourcePage || row.page) || "Não informada"], ["Confiança da extração IA", text(row.aiConfidence) || "Não informada"], ["Observações IA", text(row.aiNotes) || "Nenhuma"]],
+    })),
+  ], [documents, profiles, hardware, rules, prices, supplierProducts]);
 
-  const filtered = useMemo(() => cards.filter(card =>
+  const consolidatedCards = useMemo(() => {
+    const result: CatalogCard[] = [];
+    const productKinds: CatalogKind[] = ["profiles", "hardware", "supplier_products"];
+    const normalize = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, "");
+    for (const card of cards) {
+      if (!productKinds.includes(card.kind)) { result.push(card); continue; }
+      const identity = normalize(card.manufacturer) + "::" + normalize(card.code || card.title);
+      const existing = result.find(item => productKinds.includes(item.kind) && normalize(item.manufacturer) + "::" + normalize(item.code || item.title) === identity);
+      if (!existing) { result.push(card); continue; }
+      if (!existing.image && card.image) existing.image = card.image;
+      if (!existing.sourceUrl && card.sourceUrl) existing.sourceUrl = card.sourceUrl;
+      if (!existing.sourcePage && card.sourcePage) existing.sourcePage = card.sourcePage;
+      if (card.status === "verified") existing.status = "verified";
+      const labels = new Set(existing.details.map(([label]) => label));
+      for (const detail of card.details) if (!labels.has(detail[0]) && detail[1] && detail[1] !== "Não informado") existing.details.push(detail);
+    }
+    return result;
+  }, [cards]);
+
+  const filtered = useMemo(() => consolidatedCards.filter(card =>
     (kind === "all" || card.kind === kind) &&
     [card.title, card.subtitle, card.manufacturer, card.line, card.code, ...card.details.flatMap(pair => pair)].join(" ").toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR"))
-  ), [cards, kind, search]);
+  ), [consolidatedCards, kind, search]);
 
   const counts = useMemo(() => ({
-    documents: documents.length, profiles: profiles.length, hardware: hardware.length, rules: rules.length, prices: prices.length,
-  }), [documents, profiles, hardware, rules, prices]);
+    documents: documents.length, profiles: profiles.length, hardware: hardware.length, rules: rules.length, prices: prices.length, supplier_products: supplierProducts.length,
+  }), [documents, profiles, hardware, rules, prices, supplierProducts]);
 
   return <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
     <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-wider text-blue-600">Biblioteca técnica conectada</p><h2 className="text-xl font-bold text-slate-900 dark:text-white">Catálogo visual de produtos e componentes</h2><p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">Consulta os mesmos registros da Biblioteca Técnica, sem copiar nem duplicar dados. Cada ficha mantém fabricante, linha, código, especificações, origem e estado de validação.</p></div>
-      <div className="text-xs text-slate-500">{cards.length} registros técnicos</div>
+      <div className="text-xs text-slate-500">{consolidatedCards.length} fichas consolidadas</div>
     </header>
     {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     <div className="flex flex-col gap-3 sm:flex-row">
