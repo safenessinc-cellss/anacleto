@@ -202,7 +202,12 @@ export default function TechnicalLibraryModule() {
       }
       if (section === "hardware") {
         if (!form.quantityFormula?.trim() && !form.quantity) throw new Error("Informe a quantidade ou fórmula de consumo do acessório.");
+        if (form.quantity && (!Number.isFinite(Number(form.quantity)) || Number(form.quantity) <= 0)) throw new Error("A quantidade do acessório deve ser maior que zero.");
         if (form.quantity) payload.quantity = Number(form.quantity);
+      }
+      if (section === "rules") {
+        if (!Number.isFinite(payload.cutCount) || payload.cutCount <= 0) throw new Error("O número de cortes deve ser maior que zero.");
+        if (!Number.isFinite(payload.kerfMm) || payload.kerfMm < 0) throw new Error("O kerf deve ser zero ou maior.");
       }
       if (section === "prices") {
         const unitPrice = Number((form.unitPrice || "").replace(",", "."));
