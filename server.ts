@@ -277,8 +277,13 @@ function findExactCatalogItem(item: any, catalog: any[]) {
 function hasVerifiedCatalogPrice(row: any): boolean {
   if (!row || row.price === undefined || row.price === null || String(row.price).trim() === "") return false;
   const price = Number(row.price);
-  // Zero means missing/unverified in supplier imports; never quote it as a confirmed price.
-  return Number.isFinite(price) && price > 0 && row.priceStatus !== "pending" && row.priceStatus !== "unverified";
+  // Legacy master-catalog rows without review fields retain their historical behaviour.
+  // Once either review field exists, every supplied state must be explicitly verified.
+  const reviewStates = [row.status, row.priceStatus]
+    .filter((value: unknown) => value !== undefined && value !== null && String(value).trim() !== "")
+    .map((value: unknown) => String(value).trim().toLowerCase());
+  const reviewApproved = reviewStates.every((state: string) => state === "verified");
+  return Number.isFinite(price) && price > 0 && reviewApproved;
 }
 function selectRelevantBudgetCatalog(prompt: string, catalog: any[], limit = 450) {
   const tokens = normalizeCatalogName(prompt).split(/\s+/).filter((token: string) => token.length >= 3);
