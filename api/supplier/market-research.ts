@@ -108,7 +108,7 @@ export default async function handler(req: any, res: any) {
         unit: String(raw?.unit || "").slice(0, 20)
       };
       if (!item.description && !item.code) return { item, offers: [], error: "Componente sem código ou descrição." };
-      const searchTerm = [item.manufacturer, item.line, item.code, item.description, item.finish, location, "preço comprar"].filter(Boolean).join(" ");
+      const searchTerm = [item.manufacturer, item.line, item.code, item.description, item.finish, item.unit, location, "preço comprar"].filter(Boolean).join(" ");
       try {
         const offers = await search(searchTerm);
         return { item, searchTerm, offers: offers.slice(0, 5) };
