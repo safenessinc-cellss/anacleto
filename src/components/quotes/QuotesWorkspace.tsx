@@ -90,6 +90,7 @@ export default function QuotesWorkspace({
       >
         <QuotesModule
           language={language}
+          initialQuoteId={recordToEdit?.workflow === "standard" ? recordToEdit.id : undefined}
           senderConfig={senderConfig}
           companies={companies}
           onConvertToInvoice={onConvertToInvoice}
