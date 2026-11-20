@@ -160,18 +160,18 @@ export function calculateAluminumCost(input: AluminumCostInput): AluminumCostRes
       trimMm: rule.trimMm,
     });
   }
-  const bars = optimizeProfileCuts(cuts);
+  const validCuts = cuts.filter((cut) => {\n    const fits = cut.lengthMm + cut.kerfMm <= cut.barLengthMm - cut.trimMm;\n    if (!fits) errors.push("O corte de " + cut.profileName + " excede o comprimento útil da barra.");\n    return fits;\n  });\n  const bars = optimizeProfileCuts(validCuts);
   for (const cut of cuts) {
     if (!(cut.weightKgPerM > 0)) errors.push(`Informe o peso linear (kg/m) de ${cut.profileName}.`);
     if (cut.priceMode === "kg" && !(cut.pricePerKg > 0)) errors.push(`Informe o preço por kg de ${cut.profileName}.`);
     if (cut.priceMode === "bar" && !(cut.pricePerBar > 0)) errors.push(`Informe o preço por barra de ${cut.profileName}.`);
   }
-  const aluminumConsumptionKg = cuts.reduce((sum, cut) => sum + cut.lengthMm / 1000 * cut.weightKgPerM, 0);
+  const aluminumConsumptionKg = validCuts.reduce((sum, cut) => sum + cut.lengthMm / 1000 * cut.weightKgPerM, 0);
   const aluminumPurchaseKg = bars.reduce((sum, bar) => {
     const cut = bar.cuts[0];
     return sum + cut.barLengthMm / 1000 * cut.weightKgPerM;
   }, 0);
-  const aluminumConsumptionCost = cuts.reduce((sum, cut) => sum + cut.lengthMm / 1000 * cut.weightKgPerM * cut.pricePerKg, 0);
+  const aluminumConsumptionCost = validCuts.reduce((sum, cut) => sum + cut.lengthMm / 1000 * cut.weightKgPerM * cut.pricePerKg, 0);
   const aluminumPurchaseCost = bars.reduce((sum, bar) => {
     const cut = bar.cuts[0];
     return sum + (cut.priceMode === "bar" ? cut.pricePerBar : cut.barLengthMm / 1000 * cut.weightKgPerM * cut.pricePerKg);
