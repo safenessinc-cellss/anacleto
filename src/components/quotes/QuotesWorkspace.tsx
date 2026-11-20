@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Calculator, FileText, Sparkles } from "lucide-react";
+import { Calculator, FileText, Sparkles, Layers } from "lucide-react";
+import AllBudgetsModule, { type BudgetRecord } from "./AllBudgetsModule";
 import type { Company, SenderConfig } from "../../types";
 import QuotesModule from "./QuotesModule";
 import SmartBudgetModule from "./SmartBudgetModule";
 import TechnicalCalculatorModule from "../TechnicalCalculatorModule";
 
-type BudgetTab = "standard" | "smart" | "technical";
+type BudgetTab = "all" | "standard" | "smart" | "technical";
 
 interface QuotesWorkspaceProps {
   senderConfig: SenderConfig;
@@ -15,6 +16,7 @@ interface QuotesWorkspaceProps {
 }
 
 const tabs: Array<{ id: BudgetTab; label: string; description: string; Icon: React.ComponentType<{ className?: string }> }> = [
+  { id: "all", label: "Todos os Orçamentos", description: "Histórico geral e edição por modalidade", Icon: Layers },
   { id: "standard", label: "Orçamento", description: "Orçamento comercial tradicional", Icon: FileText },
   { id: "smart", label: "Orçamento Inteligente", description: "Elaboração assistida por IA", Icon: Sparkles },
   { id: "technical", label: "Orçamento de Esquadrias", description: "Dimensionamento e composição técnica", Icon: Calculator },
@@ -31,7 +33,13 @@ export default function QuotesWorkspace({
   onConvertToInvoice,
   language = "pt",
 }: QuotesWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<BudgetTab>("standard");
+  const [activeTab, setActiveTab] = useState<BudgetTab>("all");
+  const [recordToEdit, setRecordToEdit] = useState<BudgetRecord | null>(null);
+
+  const openRecord = (record: BudgetRecord) => {
+    setRecordToEdit(record);
+    setActiveTab(record.workflow === "smart_ai" ? "smart" : record.workflow === "technical" ? "technical" : "standard");
+  };
 
   return (
     <section className="space-y-5">
@@ -40,14 +48,14 @@ export default function QuotesWorkspace({
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">Orçamentos</h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Três processos independentes em um único espaço. Cada modalidade mantém seus próprios dados e histórico.
+              Três modalidades independentes e um registro geral para localizar e editar qualquer orçamento.
             </p>
           </div>
           <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
             Área comercial
           </span>
         </div>
-        <nav className="mt-5 grid grid-cols-1 gap-2 border-b border-slate-200 pb-3 sm:grid-cols-3 dark:border-slate-700" role="tablist" aria-label="Modalidades de orçamento">
+        <nav className="mt-5 grid grid-cols-1 gap-2 border-b border-slate-200 pb-3 sm:grid-cols-2 xl:grid-cols-4 dark:border-slate-700" role="tablist" aria-label="Modalidades de orçamento">
           {tabs.map(({ id, label, description, Icon }) => {
             const selected = activeTab === id;
             return (
@@ -94,7 +102,7 @@ export default function QuotesWorkspace({
         aria-labelledby="budget-tab-smart"
         hidden={activeTab !== "smart"}
       >
-        <SmartBudgetModule />
+        <SmartBudgetModule initialBudgetId={recordToEdit?.workflow === "smart_ai" ? recordToEdit.id : undefined} />
       </div>
 
       <div
@@ -103,7 +111,7 @@ export default function QuotesWorkspace({
         aria-labelledby="budget-tab-technical"
         hidden={activeTab !== "technical"}
       >
-        <TechnicalCalculatorModule />
+        <TechnicalCalculatorModule initialBudgetId={recordToEdit?.workflow === "technical" ? recordToEdit.id : undefined} />
       </div>
     </section>
   );
