@@ -104,6 +104,11 @@ service cloud.firestore {
     match /daily_expenses/{id} { allow read, write: if canManageFinance(); }
     match /client_advances/{id} { allow read, write: if canManageFinance(); }
     match /purchase_orders/{id} { allow read, write: if canManageFinance(); }
+    // Custos internos nunca são acessíveis ao cliente nem a perfis comerciais comuns.
+    match /internal_quote_costs/{id} {
+      allow read, create, update: if canManageFinance();
+      allow delete: if owner();
+    }
     match /payables/{id} { allow read, write: if canManageFinance(); }
     match /payments/{id} {
       allow read, update, delete: if canManageFinance();
