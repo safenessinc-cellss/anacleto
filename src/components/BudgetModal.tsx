@@ -41,27 +41,6 @@ export default function BudgetModal({
   const [items, setItems] = useState<BudgetLineItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    let active = true;
-    const loadTechnicalOptions = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
-        const response = await fetch("/api/supplier/technical-options", {
-          headers: { Authorization: "Bearer " + await user.getIdToken() }
-        });
-        const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(data?.error || "Não foi possível carregar os sistemas técnicos.");
-        if (active) setTechnicalOptions(Array.isArray(data?.systems) ? data.systems : []);
-      } catch (error) {
-        if (active) setTechnicalOptionsError(error instanceof Error ? error.message : "Falha ao carregar sistemas técnicos.");
-      }
-    };
-    void loadTechnicalOptions();
-    return () => { active = false; };
-  }, [isOpen]);
-
   // NIF search & auto-fill states
   const [isSearchingNif, setIsSearchingNif] = useState(false);
   const [nifFoundInfo, setNifFoundInfo] = useState<{ name: string; email: string; address?: string } | null>(null);
@@ -151,6 +130,27 @@ export default function BudgetModal({
   const [marketSearchedAt, setMarketSearchedAt] = useState("");
   const [marketError, setMarketError] = useState("");
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const loadTechnicalOptions = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const response = await fetch("/api/supplier/technical-options", {
+          headers: { Authorization: "Bearer " + await user.getIdToken() }
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.error || "Não foi possível carregar os sistemas técnicos.");
+        if (active) setTechnicalOptions(Array.isArray(data?.systems) ? data.systems : []);
+      } catch (error) {
+        if (active) setTechnicalOptionsError(error instanceof Error ? error.message : "Falha ao carregar sistemas técnicos.");
+      }
+    };
+    void loadTechnicalOptions();
+    return () => { active = false; };
+  }, [isOpen]);
 
   const handleGenerateBom = async () => {
     setIsGeneratingBom(true); setBomError(""); setBomData(null); setComparisons([]);
