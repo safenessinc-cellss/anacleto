@@ -31,6 +31,18 @@ const OFFICIAL_SOURCES = [
     ]
   },
   {
+    manufacturer: "Alusupra",
+    country: "Brasil · Santa Catarina · distribuição Sul",
+    url: "https://www.alusupra.com.br/catalogos",
+    lines: "Perfis estruturais, linhas de esquadrias, vidro temperado, acessórios, portões, brises, solar e decorativos",
+    note: "Portal oficial de catálogos de perfis e acessórios; o catálogo técnico de perfis PDF também está publicado.",
+    catalogs: [
+      { title: "Catálogos oficiais", line: "Geral", url: "https://www.alusupra.com.br/catalogos" },
+      { title: "Catálogo de Perfis PDF", line: "Perfis", url: "https://www.alusupra.com.br/pdf/cat%C3%A1logo-perfil.pdf" },
+      { title: "Perfis para Vidro Temperado", line: "Vidro Temperado", url: "https://www.alusupra.com.br/perfis-aluminio-vidro" }
+    ]
+  },
+  {
     manufacturer: "Aluita",
     country: "Brasil · Rio Grande do Sul",
     url: "https://www.aluita.com.br/perfisaluminio",
@@ -57,6 +69,20 @@ const OFFICIAL_SOURCES = [
       { title: "Perfis Novos 2024 PDF", line: "Novos 2024", url: "https://www.perfilsulaluminio.com.br/arquivos/catalogo/2022/Catalogo_Perfis_Sul_Novos_2024.pdf" },
       { title: "Linha 25", line: "Linha 25", url: "https://www.perfilsulaluminio.com.br/perfil/pesquisa/linha_25" },
       { title: "Box Temperado", line: "Box Temperado", url: "https://www.perfilsulaluminio.com.br/perfil/pesquisa/box_temperado" }
+    ]
+  },
+  {
+    manufacturer: "Alumiconte",
+    country: "Brasil · Rio Grande do Sul",
+    url: "https://www.alumiconte.com.br/catalogos/",
+    lines: "Construção civil, componentes para esquadrias, fachadas, moveleiro, persianas e sistemas Nostra, Montrak, Aurum e outros",
+    note: "Portal oficial de downloads com catálogos, folders por sistema e materiais técnicos.",
+    catalogs: [
+      { title: "Catálogos oficiais", line: "Geral", url: "https://www.alumiconte.com.br/catalogos/" },
+      { title: "Catálogo Geral da Construção Civil", line: "Construção Civil", url: "https://www.alumiconte.com.br/catalogos/" },
+      { title: "Catálogo Técnico de Componentes", line: "Componentes", url: "https://www.alumiconte.com.br/catalogos/" },
+      { title: "Catálogo de Componentes para Esquadrias", line: "Esquadrias", url: "https://www.alumiconte.com.br/catalogos/" },
+      { title: "Folders por Sistema", line: "Sistemas", url: "https://www.alumiconte.com.br/catalogos/" }
     ]
   },
   {
