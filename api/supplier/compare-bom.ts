@@ -62,7 +62,7 @@ export default async function handler(req:any,res:any){
     const qty=barsFor(item);
     const candidates=records.filter((row:any)=>{
      const supplier=String(row.supplier||row.manufacturer||"").trim();
-     return supplier===basket.supplier&&row.status==="verified"&&row.priceStatus==="verified"&&
+     return supplier===basket.supplier&&row.status==="verified"&&row.priceStatus==="verified"&&row.shippingConfirmed===true&&
       String(row.code||"").trim().toLowerCase()===String(item.code||"").trim().toLowerCase()&&
       String(row.line||"").trim().toLowerCase()===String(item.system||"").trim().toLowerCase()&&
       String(row.finish||"").trim().toLowerCase()===String(item.finish||"").trim().toLowerCase()&&
