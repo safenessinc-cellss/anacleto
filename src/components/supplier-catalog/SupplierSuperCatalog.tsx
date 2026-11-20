@@ -15,6 +15,8 @@ type PdfDraft = { id: string; name: string; price: string; category: string; pag
 const categories = ["Perfil de alumínio", "Vidro", "Ferragem", "Acessório", "Janela", "Porta", "Box de banheiro", "Serviço", "Outro"];
 const blank = { supplier: "", code: "", name: "", category: categories[0], material: "", unit: "un", price: "0", lengthMm: "", color: "" };
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const normalizeSupplierKey = (value: unknown) => norm(String(value || "").trim()).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const supplierProductKey = (supplier: unknown, code: unknown, name: unknown) => `${normalizeSupplierKey(supplier)}::${norm(String(code || name || "").trim()).replace(/[^a-z0-9]+/g, "-")}`;
 const classify = (s: string) => { const v = norm(s); if (/vidro|glass|temperad|laminad|espelho|cristal|float|fum[eê]|reflect|serigraf/.test(v)) return "Vidro"; if (/dobrad|roldana|fechadura|puxador|parafuso|ferragem/.test(v)) return "Ferragem"; if (/perfil|barra|alumin/.test(v)) return "Perfil de alumínio"; if (/box|banheiro|ducha/.test(v)) return "Box de banheiro"; if (/janela/.test(v)) return "Janela"; if (/porta/.test(v)) return "Porta"; if (/servic|instal|montag/.test(v)) return "Serviço"; if (/acessor/.test(v)) return "Acessório"; return "Outro"; };
 const canonicalCategory = (value: unknown, fallback = "") => { const raw = String(value ?? "").trim(); if (!raw) return classify(fallback); return categories.includes(raw) ? raw : classify(raw + " " + fallback); };
 const cropProductPhoto = async (sourceDataUrl: string, box?: { x: number; y: number; width: number; height: number }): Promise<Blob> => {
