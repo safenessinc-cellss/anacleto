@@ -21,8 +21,11 @@ const base = () => {
   return "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/" + databaseId + "/documents";
 };
 // Firestore REST commit exige resource names relativos, nunca URLs HTTPS completas.
-const documentResourceName = (path: string) =>
-  base().replace("https://firestore.googleapis.com/v1/", "") + path;
+const documentResourceName = (path: string) => {
+  const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
+  const relativeRoot = "projects/" + firebaseConfig.projectId + "/databases/" + databaseId + "/documents";
+  return relativeRoot + "/" + path.replace(/^\/+/, "");
+};
 function send(res: any, status: number, body: unknown) {
   res.setHeader?.("Cache-Control", "no-store");
   return res.status(status).json(body);
@@ -81,9 +84,17 @@ function encodeFields(value: Record<string, any>) {
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, encodeValue(item)]));
 }
 async function readDocument(req: any, collection: string, id: string) {
-  const result = await fetch(base() + "/" + collection + "/" + encodeURIComponent(id), {
-    headers: { Authorization: "Bearer " + tokenOf(req) }, signal: AbortSignal.timeout(12000),
-  });
+  const url = base() + "/" + collection + "/" + encodeURIComponent(id);
+  let result: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    result = await fetch(url, {
+      headers: { Authorization: "Bearer " + tokenOf(req) },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (result.status !== 429 && result.status !== 503 && result.status !== 500) break;
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250 * (2 ** attempt)));
+  }
+  if (!result) throw new Error("Falha ao consultar " + collection + ".");
   if (result.status === 404) return null;
   if (!result.ok) throw new Error("Falha ao ler " + collection + " (HTTP " + result.status + ").");
   const raw = await result.json() as any;
@@ -208,7 +219,6 @@ export default async function handler(req: any, res: any) {
   try {
     const user = await authenticate(req);
     if (!user) return send(res, 401, { error: "Autenticação obrigatória ou sessão expirada." });
-    if (!withinRateLimit(user.uid)) return send(res, 429, { error: "Limite de aprovações e consultas atingido. Aguarde um minuto." });
     if (req.method === "GET") {
       const snapshotId = String(req.query?.snapshotId || "").trim();
       if (!snapshotId || snapshotId.length > 300 || snapshotId.includes("/")) return send(res, 400, { error: "snapshotId inválido." });
@@ -238,6 +248,7 @@ export default async function handler(req: any, res: any) {
       res.setHeader?.("Allow", "GET, POST");
       return send(res, 405, { error: "Método não permitido." });
     }
+    if (!withinRateLimit(user.uid)) return send(res, 429, { error: "Limite de aprovações atingido. Aguarde um minuto." });
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
         Object.keys(body).some(key => !["type","documentId","senderSnapshot"].includes(key))) {
@@ -276,7 +287,8 @@ export default async function handler(req: any, res: any) {
         return send(res, 409, { error: "Somente orçamentos em rascunho ou pendentes podem ser aprovados." });
       }
       if (!Array.isArray(source.items) || source.items.length === 0 || source.items.length > 150) return send(res, 422, { error: "O orçamento deve possuir entre 1 e 150 itens." });
-      const catalog = await loadCatalogFromFirestore(req);
+      const requiresCatalogVerification = source.items.some((item: any) => item.catalogItemId || item.sku || item.itemId);
+      const catalog = requiresCatalogVerification ? await loadCatalogFromFirestore(req) : [];
       const reviewedItems = source.items.map((item: any) => {
         const quantity = Number(item.quantity);
         if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento: informe um valor positivo.");
