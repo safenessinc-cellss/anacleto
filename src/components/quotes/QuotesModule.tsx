@@ -47,7 +47,9 @@ interface QuotesModuleProps {
   onConvertToInvoice?: (quote: Quote) => void;
   language?: string;
   initialMode?: "standard" | "smart";
-  onOpenSmartQuote?: () => void;\n  initialQuoteId?: string;\n  hideHistory?: boolean;
+  onOpenSmartQuote?: () => void;
+  initialQuoteId?: string;
+  hideHistory?: boolean;\n  initialQuoteId?: string;\n  hideHistory?: boolean;
 }
 
 export default function QuotesModule({ senderConfig, companies, onConvertToInvoice, language = "pt", initialMode = "standard", onOpenSmartQuote, initialQuoteId, hideHistory = false}: QuotesModuleProps) {
@@ -148,6 +150,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   useEffect(() => {
     selectedQuoteIdRef.current = selectedQuote?.id || null;
   }, [selectedQuote?.id]);
+
+  useEffect(() => {
+    if (!initialQuoteId || !quotes.length) return;
+    const target = quotes.find((quote) => quote.id === initialQuoteId);
+    if (target) { setSelectedQuote(target); setIsEditing(true); }
+  }, [initialQuoteId, quotes]);
 
   useEffect(() => {
     setActionsMenuOpen(false);
