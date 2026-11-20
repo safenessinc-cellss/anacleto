@@ -51,12 +51,12 @@ const allAluminumModels: ArchitecturalModel[] = [
   ...baseModels.map(item=>({...item,id:`alu-${item.id}`,badge:`LINHA ALUMÍNIO • ${item.badge.replace(/^Linha (Suprema|Gold) • /,"")}`})),
 ];
 const showerBoxModels: ArchitecturalModel[] = [
-  { id:"box-frontal-2", title:"Box frontal de correr · 2 folhas", badge:"BOX DE BANHO • FRONTAL", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Box frontal com duas folhas deslizantes, roldanas e perfis de alumínio.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=88" },
-  { id:"box-frontal-3", title:"Box frontal de correr · 3 folhas", badge:"BOX DE BANHO • VÃO AMPLO", line:"Box", model:"Box de Banho", color:"Natural Fosco", panels:3, detail:"Composição de três folhas para vãos maiores, com trilhos e guias em alumínio.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=85" },
-  { id:"box-canto-l", title:"Box de canto em L", badge:"BOX DE BANHO • CANTO", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Fechamento em duas faces para área de banho de canto, com encontro em esquadro.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=82" },
-  { id:"box-ate-teto", title:"Box até o teto", badge:"BOX DE BANHO • PÉ-DIREITO", line:"Box", model:"Box de Banho", color:"Champagne", panels:2, detail:"Fechamento alto para projetos específicos, sujeito à avaliação de ventilação e ferragens.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=90" },
-  { id:"box-elegance", title:"Box com roldanas aparentes", badge:"BOX DE BANHO • ELEGANCE", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Sistema com roldanas aparentes e estética contemporânea.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=86" },
-  { id:"box-articulado", title:"Box articulado", badge:"BOX DE BANHO • ARTICULADO", line:"Box", model:"Box de Banho", color:"Prata", panels:2, detail:"Folhas articuladas para espaços compactos, conforme ferragens compatíveis.", image:"https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=1400&q=84" },
+  { id:"box-frontal-2", title:"Box frontal de correr · 2 folhas", badge:"BOX DE BANHO • FRONTAL", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Box frontal com duas folhas deslizantes, roldanas e perfis de alumínio.", image:"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=90" },
+  { id:"box-frontal-3", title:"Box frontal de correr · 3 folhas", badge:"BOX DE BANHO • VÃO AMPLO", line:"Box", model:"Box de Banho", color:"Natural Fosco", panels:3, detail:"Composição de três folhas para vãos maiores, com trilhos e guias em alumínio.", image:"https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1400&q=90" },
+  { id:"box-canto-l", title:"Box de canto em L", badge:"BOX DE BANHO • CANTO", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Fechamento em duas faces para área de banho de canto, com encontro em esquadro.", image:"https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=1400&q=90" },
+  { id:"box-ate-teto", title:"Box até o teto", badge:"BOX DE BANHO • PÉ-DIREITO", line:"Box", model:"Box de Banho", color:"Champagne", panels:2, detail:"Fechamento alto para projetos específicos, sujeito à avaliação de ventilação e ferragens.", image:"https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=90" },
+  { id:"box-elegance", title:"Box com roldanas aparentes", badge:"BOX DE BANHO • ELEGANCE", line:"Box", model:"Box de Banho", color:"Preto Fosco", panels:2, detail:"Sistema com roldanas aparentes e estética contemporânea.", image:"https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1400&q=90" },
+  { id:"box-articulado", title:"Box articulado", badge:"BOX DE BANHO • ARTICULADO", line:"Box", model:"Box de Banho", color:"Prata", panels:2, detail:"Folhas articuladas para espaços compactos, conforme ferragens compatíveis.", image:"https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=90" },
 ];
 const productCollections = [
   { id:"vidro-aluminio", title:"Linha vidro + alumínio", description:"Portas, janelas e painéis envidraçados com perfis de alumínio. Reúne os modelos já existentes das linhas Suprema e Gold.", items:[...baseModels,...doorModels] },
@@ -79,9 +79,25 @@ export default function ArchitecturalModelsCarousel({ onConfigure, onView }: Pro
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeCollection, setActiveCollection] = useState("vidro-aluminio");
+  const [activeModelType, setActiveModelType] = useState("Todos");
   const track = useRef<HTMLDivElement>(null);
-  const items = useMemo(() => [...generated, ...baseModels], [generated]);
+  const activeItems = useMemo(() => {
+    const collection = productCollections.find(item => item.id === activeCollection) ?? productCollections[0];
+    const sourceItems = activeCollection === "vidro-aluminio" ? [...generated, ...collection.items] : collection.items;
+    const seenImages = new Set<string>();
+    const uniqueImages = sourceItems.filter(item => {
+      const imageKey = item.image.split("?")[0];
+      if (seenImages.has(imageKey)) return false;
+      seenImages.add(imageKey);
+      return true;
+    });
+    if (activeModelType === "Todos") return uniqueImages;
+    if (activeModelType === "Portas") return uniqueImages.filter(item => item.model.startsWith("Porta"));
+    if (activeModelType === "Janelas") return uniqueImages.filter(item => item.model.startsWith("Janela") || item.model === "Maxim-Ar");
+    if (activeModelType === "Box") return uniqueImages.filter(item => item.model === "Box de Banho");
+    return uniqueImages.filter(item => item.model === "Painel Fixo");
+  }, [activeCollection, activeModelType, generated]);
 
   useEffect(() => { setGenerated(loadCache()); }, []);
   useEffect(() => { if (generated.length) saveCache(generated); }, [generated]);
@@ -135,35 +151,23 @@ export default function ArchitecturalModelsCarousel({ onConfigure, onView }: Pro
       <div className="amc-suggestions">{suggestions.map(s=><button key={s} type="button" onClick={()=>setPrompt(s)}>{s}</button>)}</div>
       {notice&&<p className="amc-notice" role="status">{notice}</p>}
     </div>
-    <div className="amc-track" ref={track} aria-label="Carrossel de modelos arquitetônicos" tabIndex={0} onScroll={e=>{const node=e.currentTarget;const card=node.querySelector<HTMLElement>(".amc-card");if(card)setActiveIndex(Math.max(0,Math.min(items.length-1,Math.round(node.scrollLeft/(card.offsetWidth+18)))));}}>
-      {items.map(item=><article className="amc-card" key={item.id}>
-        <button className="amc-image-button" type="button" onClick={()=>onView(item)} aria-label={`Abrir ${item.title} no visualizador 360 graus`}><img src={item.image} alt={`Render técnico de ${item.title}, acabamento ${item.color}`} loading={item.generated?"eager":"lazy"}/><span className="amc-watermark" aria-hidden="true">ANACLETO ESQUADRIAS</span><span className="amc-zoom"><Expand size={15}/> VER DETALHES</span></button>
-        <div className="amc-card-content"><span className="amc-badge">{item.badge}</span><h3>{item.title}</h3><p>{item.detail}</p><div className="amc-meta"><span><i style={{background:item.color==="Branco"?"#f2f2ef":item.color==="Bronze"?"#9a704d":item.color==="Natural Fosco"?"#aeb6b9":"#24282e"}}/>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button className="amc-configure" type="button" onClick={()=>onConfigure(item)}>Configurar este modelo <MoveUpRight size={16}/></button></div>
+    <div className="amc-catalog-tabs" role="tablist" aria-label="Linhas de produtos">
+      {productCollections.map(collection=><button key={collection.id} type="button" role="tab" aria-selected={activeCollection===collection.id} className={activeCollection===collection.id?"is-active":""} onClick={()=>{setActiveCollection(collection.id);setActiveModelType("Todos");track.current?.scrollTo({left:0});}}>{collection.title}</button>)}
+    </div>
+    <div className="amc-model-tabs" role="tablist" aria-label="Tipos de modelos">
+      {["Todos","Portas","Janelas","Box","Painéis"].map(type=><button key={type} type="button" role="tab" aria-selected={activeModelType===type} className={activeModelType===type?"is-active":""} onClick={()=>setActiveModelType(type)}>{type}</button>)}
+    </div>
+    <div className="amc-selected-line">
+      <div><span className="amc-kicker">CATÁLOGO / {productCollections.find(item=>item.id===activeCollection)?.title.toUpperCase()}</span><h3>{productCollections.find(item=>item.id===activeCollection)?.title}</h3><p>{productCollections.find(item=>item.id===activeCollection)?.description}</p></div>
+      <span>{activeItems.length} MODELOS</span>
+    </div>
+    <div className="amc-product-line-grid amc-tabbed-grid" ref={track}>
+      {activeItems.map(item=><article className="amc-line-card" key={item.id}>
+        <button className="amc-line-image" type="button" onClick={()=>onView(item)} aria-label={`Abrir ${item.title} no visualizador 360 graus`}><img src={item.image} alt={item.title} loading="lazy"/><span>VER EM 360° ↗</span></button>
+        <div className="amc-line-copy"><small>{item.badge}</small><h4>{item.title}</h4><p>{item.detail}</p><div><span>{item.line}</span><span>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button type="button" onClick={()=>onConfigure(item)}>Configurar modelo <MoveUpRight size={15}/></button></div>
       </article>)}
+      {activeItems.length===0&&<p className="amc-empty-state">Nenhum modelo nesta categoria. Selecione outro tipo de modelo.</p>}
     </div>
-    <section className="amc-doors" aria-labelledby="amc-doors-title">
-      <div className="amc-doors-heading"><div><span className="amc-kicker">ANACLETO / LINHA PORTAS</span><h3 id="amc-doors-title">Portas de alumínio para cada projeto.</h3><p>Modelos de correr, articulados, de giro e pivotantes. Toque em uma imagem para abrir o mesmo estúdio 360° interativo.</p></div><span className="amc-doors-count">{doorModels.length} TIPologias</span></div>
-      <div className="amc-doors-track">
-        {doorModels.map(item=><article className="amc-door-card" key={item.id}>
-          <button className="amc-door-image" type="button" onClick={()=>onView(item)} aria-label={`Abrir ${item.title} no visualizador 360 graus`}><img src={item.image} alt={`Modelo arquitetônico de ${item.title}, acabamento ${item.color}`} loading="lazy"/><span>VER EM 360° ↗</span></button>
-          <div className="amc-door-copy"><small>{item.badge}</small><h4>{item.title}</h4><p>{item.detail}</p><div><span>{item.line}</span><span>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button type="button" onClick={()=>onConfigure(item)}>Configurar modelo <MoveUpRight size={15}/></button></div>
-        </article>)}
-      </div>
-    </section>
-
-    <div className="amc-product-lines" aria-label="Linhas completas de produtos Anacleto">
-      {productCollections.map(collection=><section className="amc-product-line" key={collection.id} aria-labelledby={`line-${collection.id}`}>
-        <div className="amc-product-line-heading"><div><span className="amc-kicker">ANACLETO / CATÁLOGO DE PRODUTOS</span><h3 id={`line-${collection.id}`}>{collection.title}</h3><p>{collection.description}</p></div><span className="amc-product-line-count">{collection.items.length} MODELOS</span></div>
-        <div className="amc-product-line-grid">
-          {collection.items.map(item=><article className="amc-line-card" key={item.id}>
-            <button className="amc-line-image" type="button" onClick={()=>onView(item)} aria-label={`Abrir ${item.title} no visualizador 360 graus`}><img src={item.image} alt={item.title} loading="lazy"/><span>VER EM 360° ↗</span></button>
-            <div className="amc-line-copy"><small>{item.badge}</small><h4>{item.title}</h4><p>{item.detail}</p><div><span>{item.line}</span><span>{item.color}</span><span>{item.panels} {item.panels===1?"folha":"folhas"}</span></div><button type="button" onClick={()=>onConfigure(item)}>Configurar modelo <MoveUpRight size={15}/></button></div>
-          </article>)}
-        </div>
-      </section>)}
-    </div>
-
-    <div className="amc-mobile-hint"><span>DESLIZE PARA EXPLORAR</span><span>{items.length} MODELOS</span></div>
     <p className="amc-disclaimer">Renders conceituais para referência visual. Perfis, componentes, ferragens, dimensões e desempenho dependem de especificação e validação técnica.</p>
 
   </section>;
