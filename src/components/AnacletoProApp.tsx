@@ -8,6 +8,7 @@ import { Quote, Invoice, Company, TechnicalDrawing, SenderConfig } from "../type
 import DashboardOverview from "./dashboard/DashboardOverview";
 import CrmModule from "./crm/CrmModule";
 import QuotesModule from "./quotes/QuotesModule";
+import TechnicalCalculatorModule from "./TechnicalCalculatorModule";
 import InvoicesModule from "./invoices/InvoicesModule";
 import AgendaModule from "./agenda/AgendaModule";
 import SettingsModule from "./settings/SettingsModule";
@@ -171,7 +172,7 @@ export default function AnacletoProApp({
     { id: "home", label: "Início", icon: LayoutDashboard, tabs: [{ id: "dashboard", label: "Painel" }] },
     { id: "commercial", label: "Comercial", icon: FileText, tabs: [
       { id: "quotes", label: "Orçamentos & Propostas" },
-      { id: "smart_quotes", label: "Orçamento Inteligente" },
+      { id: "smart_quotes", label: "Calculadora Técnica de Esquadrias" },
       { id: "crm", label: "Clientes (CRM)" },
       { id: "contracts", label: "Contratos" },
     ] },
@@ -373,13 +374,14 @@ export default function AnacletoProApp({
             />
           )}
 
-          {(activeTab === "quotes" || activeTab === "smart_quotes") && (
-            <QuotesModule initialMode={activeTab === "smart_quotes" ? "smart" : "standard"} onOpenSmartQuote={() => setActiveTab("smart_quotes")} language={language}
+          {activeTab === "quotes" && (
+            <QuotesModule language={language}
               senderConfig={senderConfig}
               companies={companies}
               onConvertToInvoice={() => setActiveTab("invoices")}
             />
           )}
+          {activeTab === "smart_quotes" && <TechnicalCalculatorModule />}
 
           {activeTab === "invoices" && (
             <InvoicesModule language={language} senderConfig={senderConfig} canManageFinance={["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(effectiveRole)} />
