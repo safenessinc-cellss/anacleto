@@ -139,7 +139,7 @@ export default function TechnicalCatalogCards() {
   const consolidatedCards = useMemo(() => {
     const result: CatalogCard[] = [];
     const productKinds: CatalogKind[] = ["profiles", "hardware", "supplier_products"];
-    const normalize = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, "");
+    const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, "");
     for (const card of cards) {
       if (!productKinds.includes(card.kind)) { result.push(card); continue; }
       const identity = normalize(card.manufacturer) + "::" + normalize(card.code || card.title);
