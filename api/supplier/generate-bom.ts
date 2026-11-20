@@ -149,7 +149,7 @@ export default async function handler(req: any, res: any) {
     });
     return res.status(200).json({manufacturer,line,typology,configuration,widthMm:width,heightMm:height,quantity,finish,bom:finalBom,
       errors,complete:errors.length===0&&finalBom.length>0,generatedAt:new Date().toISOString(),
-      notice:"Somente regras, perfis e acessórios com status verified foram usados. Variáveis permitidas: W/L=largura em mm, H=altura em mm, Q=quantidade. Fórmulas aceitam apenas + - * / e parênteses."});
+      notice:"Somente regras, perfis e acessórios com status verified foram usados. A completude depende de a Biblioteca Técnica conter todos os componentes exigidos pelo fabricante para esta tipologia. Variáveis: W/L=largura em mm, H=altura em mm, Q=1 por esquadria. Fórmulas aceitam apenas + - * / e parênteses."});
   } catch(error:any) {
     console.error("ANACLETO BOM generation failed",error);
     return res.status(502).json({error:String(error?.message||"Falha ao gerar despiece técnico.")});
