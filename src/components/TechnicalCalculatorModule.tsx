@@ -338,6 +338,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-base font-bold text-slate-900 dark:text-white">Dados da esquadria</h2>
+        <label className="mt-3 block max-w-xl text-xs font-semibold text-slate-600 dark:text-slate-300">Cliente (opcional)<input value={clientName} onChange={(event) => setClientName(event.target.value)} placeholder="Nome do cliente" className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal dark:border-slate-700 dark:bg-slate-950" /></label>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {([
             ["manufacturer", "Fabricante"],
