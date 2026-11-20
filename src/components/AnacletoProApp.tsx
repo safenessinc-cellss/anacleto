@@ -19,6 +19,7 @@ import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from
 import CatalogModule from "./catalog/CatalogModule";
 import RegistryModule from "./registry/RegistryModule";
 import SupplierSuperCatalog from "./supplier-catalog/SupplierSuperCatalog";
+import TechnicalLibraryModule from "./technical-library/TechnicalLibraryModule";
 import logoImg from "../assets/images/anacleto-logo-premium.svg";
 import BusinessWorkspace from "./workspace/BusinessWorkspace";
 import PostSaleModule from "./post-sale/PostSaleModule";
@@ -27,7 +28,7 @@ import ProductionModule from "./production/ProductionModule";
 import InventoryModule from "./inventory/InventoryModule";
 import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
 
-type NavigationTab = "dashboard" | "crm" | "quotes" | "smart_quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory";
+type NavigationTab = "dashboard" | "crm" | "quotes" | "smart_quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory" | "technical_library";
 
 interface AnacletoProAppProps {
   senderConfig: SenderConfig;
@@ -75,7 +76,7 @@ export default function AnacletoProApp({
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
   const isFullMenuRole = ["super_admin", "super_usuario", "ceo", "admin"].includes(effectiveRole);
-  const canSeeNavigation = (id: string) => isFullMenuRole || (userPermissions ? userPermissions.includes(id) || (id === "smart_quotes" && userPermissions.includes("quotes")) : hasAccessToTab(effectiveRole, (id === "smart_quotes" ? "quotes" : id) as RoleNavTab));
+  const canSeeNavigation = (id: string) => { const permissionId = id === "smart_quotes" ? "quotes" : id === "technical_library" ? "cadastro_items" : id; return isFullMenuRole || (userPermissions ? userPermissions.includes(permissionId) : hasAccessToTab(effectiveRole, permissionId as RoleNavTab)); };
   // A autenticação precisa ser inicializada antes de qualquer efeito que a consulte.
   const [authReady, setAuthReady] = useState(false);
 
@@ -186,6 +187,7 @@ export default function AnacletoProApp({
     ] },
     { id: "catalog", label: "Catálogo & Estoque", icon: Package, tabs: [
       { id: "cadastro_items", label: "Catálogo de Fornecedores" },
+      { id: "technical_library", label: "Biblioteca Técnica" },
       { id: "services", label: "Serviços" },
       { id: "inventory", label: "Estoque" },
     ] },
@@ -387,6 +389,7 @@ export default function AnacletoProApp({
 
           {activeTab === "catalog" && <CatalogModule />}
           {activeTab === "cadastro_items" && <SupplierSuperCatalog onNavigateQuotes={() => setActiveTab("quotes")} />}
+          {activeTab === "technical_library" && <TechnicalLibraryModule />}
           {activeTab === "products" && <RegistryModule kind="products" />}
           {activeTab === "services" && <RegistryModule kind="services" />}
           {activeTab === "payment_methods" && <RegistryModule kind="payment_methods" />}
