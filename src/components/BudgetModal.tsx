@@ -268,7 +268,7 @@ export default function BudgetModal({
         unit: priceUnit.trim(),
         unitPrice,
         currency: "BRL",
-        priceDate: new Date().toISOString().slice(0, 10),
+        priceDate: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()),
         validUntil: null,
         sourceUrl: offer.url,
         quoteReference: "Preço conferido manualmente pelo usuário a partir da página online",
