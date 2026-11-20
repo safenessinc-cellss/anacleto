@@ -38,7 +38,9 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
   const filtered = useMemo(() => rows.filter((row) => {
     const term = search.trim().toLowerCase();
     const matches = !term || [row.number, row.clientName, row.request].some((v) => String(v || "").toLowerCase().includes(term));
-    return matches && (status === "all" || row.status?.toLowerCase() === status);
+    const currentStatus = String(row.status || "").toLowerCase();
+    const statusMatches = status === "all" || (status === "draft" && currentStatus === "draft") || (status === "pending" && ["pending", "pendente"].includes(currentStatus)) || (status === "approved" && ["approved", "aprovado"].includes(currentStatus)) || (status === "rejected" && ["rejected", "rejeitado"].includes(currentStatus));
+    return matches && statusMatches;
   }), [rows, search, status]);
 
   const workflowLabel = (workflow: BudgetWorkflow) => workflow === "smart" ? "Inteligente · IA" : workflow === "technical" ? "Esquadrias · Técnico" : "Tradicional";
