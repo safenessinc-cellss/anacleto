@@ -31,7 +31,10 @@ export default async function handler(req:any,res:any){
   const identity:any=await auth.json(),user=identity.users?.[0];
   if(!user?.email)return res.status(401).json({error:"Usuário não autenticado."});
   if(String(user.email).toLowerCase()!==OWNER_EMAIL){
-   const admins=await docs("admins",token),admin=admins.find((x:any)=>String(x.id).toLowerCase()===String(user.email).toLowerCase());
+   const adminUrl="https://firestore.googleapis.com/v1/projects/"+firebaseConfig.projectId+"/databases/"+encodeURIComponent(firebaseConfig.firestoreDatabaseId||"(default)")+"/documents/admins/"+encodeURIComponent(String(user.email).toLowerCase());
+   const adminResponse=await fetch(adminUrl,{headers:{Authorization:"Bearer "+token},signal:AbortSignal.timeout(10000)});
+   const adminData:any=adminResponse.ok?await adminResponse.json():null;
+   const admin={role:adminData?.fields?.role?.stringValue||""};
    if(!admin||!["super_admin","super_usuario","ceo","admin","supervisor","colaborador"].includes(String(admin.role||"")))return res.status(403).json({error:"Perfil sem permissão para comparar preços."});
   }
   const body=typeof req.body==="string"?JSON.parse(req.body):req.body;
