@@ -735,7 +735,8 @@ export default function BudgetModal({
                 {comparisonNotice&&<p className="text-xs text-slate-600 dark:text-slate-300">{comparisonNotice}</p>}
                 {comparisons.map((basket:any)=><div key={basket.supplier} className={`rounded-lg border p-3 dark:border-slate-700 ${bestSupplier===basket.supplier?"border-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/20":"border-slate-200"}`}>
                   <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-bold">{basket.supplier}{bestSupplier===basket.supplier?" · MENOR CUSTO TOTAL":""}</p><p className="text-xs font-bold">{basket.complete?basket.total.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"Cesta incompleta"}</p></div>
-                  <p className="text-[10px] text-slate-500">{basket.complete?"Todos os itens têm preço aprovado.":"Faltam preços: "+(basket.missingItems||[]).join(", ")}</p>
+                  <p className="text-[10px] text-slate-500">{basket.complete?"Todos os itens e frete têm confirmação aprovada.":"Faltam preços ou frete confirmado: "+(basket.missingItems||[]).join(", ")}</p>
+                  <p className="text-[10px] text-slate-500">Materiais: {Number(basket.materialSubtotal||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})} · Frete: {Number(basket.shippingCost||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</p>
                   {basket.lines?.map((line:any,i:number)=><p key={i} className="mt-1 text-[10px] text-slate-600">{line.description}: {line.subtotal==null?"Sem preço aprovado":line.subtotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}{line.sourceUnit&&line.sourceUnit!==line.unit?" · convertido de "+line.sourceUnit:""}</p>)}
                 </div>)}
               </div>}
