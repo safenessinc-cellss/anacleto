@@ -209,6 +209,7 @@ export function calculateAluminumCost(input: AluminumCostInput): AluminumCostRes
       notes: item.mode === "meter" ? "Preço por metro linear." : "Preço por unidade.",
     })),
     ...(labor > 0 ? [{ description: "Mão de obra", quantity: 1, unitPrice: money(labor), subtotal: money(labor), notes: "Custo de mão de obra informado." }] : []),
+    ...(sellingPrice > directCost ? [{ description: `Margem comercial · ${marginPercent}% sobre o preço de venda`, quantity: 1, unitPrice: money(sellingPrice - directCost), subtotal: money(sellingPrice - directCost), notes: "Margem calculada por preço de venda = custo direto ÷ (1 − margem)." }] : []),
   ];
   return {
     valid: errors.length === 0,
