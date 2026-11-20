@@ -103,7 +103,7 @@ function ExplodedWindow() {
 
 export default function PublicLanding() {
   const [config,setConfig] = useState<Config>(defaults);
-  const [introSeen,setIntroSeen] = useState(()=>{try{return sessionStorage.getItem("anacleto-assembly-seen")==="1";}catch{return false;}});
+  const [introSeen,setIntroSeen] = useState(false);
   const [introKey,setIntroKey] = useState(0);
   const [visualPrompt,setVisualPrompt] = useState("");
   const [referenceImage,setReferenceImage] = useState<string|undefined>();
@@ -118,8 +118,7 @@ export default function PublicLanding() {
   const [show3D,setShow3D] = useState(false);
   const viewerRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
-  const finishIntro = useCallback(()=>{try{sessionStorage.setItem("anacleto-assembly-seen","1");}catch{}setIntroSeen(true);},[]);
-  const replayIntro = ()=>{setIntroSeen(false);setIntroKey(k=>k+1);};
+  const finishIntro = useCallback(()=>setIntroSeen(true),[]);
   const handleReference = (file?:File)=>{if(!file){setReferenceImage(undefined);setReferenceName("");return;}if(!["image/png","image/jpeg","image/webp"].includes(file.type)||file.size>3*1024*1024){setRenderMessage("Envie uma imagem PNG, JPG ou WebP de até 3 MB.");return;}const reader=new FileReader();reader.onload=()=>{setReferenceImage(String(reader.result));setReferenceName(file.name);setRenderMessage("");};reader.readAsDataURL(file);};
   const generateArchitecturalView = async()=>{if(visualPrompt.trim().length<8){setRenderMessage("Descreva o ambiente e a esquadria desejada.");return;}setRenderLoading(true);setRenderMessage("");setRenderImage("");try{const response=await fetch("/api/public/architectural-visualization",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description:visualPrompt,referenceImage})});const data=await response.json();if(!response.ok)throw new Error(data.error||"Não foi possível gerar a visualização.");if(data.image){setRenderImage(data.image);setRenderFallback(Boolean(data.fallback));setRenderMessage(data.message||"Visualização pronta.");}else throw new Error(data.error||"O serviço não retornou uma imagem.");}catch(error){setRenderMessage(error instanceof Error?error.message:"Serviço temporariamente indisponível.");}finally{setRenderLoading(false);}};
   useEffect(()=>{const node=viewerRef.current;if(!node)return;if(!("IntersectionObserver" in window)){setShow3D(true);return;}const io=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){setShow3D(true);io.disconnect();}},{rootMargin:"280px"});io.observe(node);return()=>io.disconnect();},[]);
