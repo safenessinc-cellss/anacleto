@@ -62,12 +62,33 @@ export default async function handler(req: any, res: any) {
     if(!manufacturer||!line||!typology||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0||!Number.isInteger(quantity)||quantity<1||quantity>500)
       return res.status(400).json({error:"Informe fabricante, linha, tipologia, largura, altura e quantidade válidos."});
 
-    const [profiles,rules,hardware]=await Promise.all([
-      collectionDocs(firebaseConfig.projectId,databaseId,"aluminum_profiles",token),
-      collectionDocs(firebaseConfig.projectId,databaseId,"cutting_rules",token),
-      collectionDocs(firebaseConfig.projectId,databaseId,"hardware_catalog",token)
+    // Canonical engineering identity is authoritative for profiles and hardware.
+    // Cutting formulas remain in the reviewed legacy rules collection until a dedicated
+    // rule migration exists; no unreviewed product can enter the BOM.
+    const [technicalProducts,rules]=await Promise.all([
+      collectionDocs(firebaseConfig.projectId,databaseId,"technical_products",token),
+      collectionDocs(firebaseConfig.projectId,databaseId,"cutting_rules",token)
     ]);
-    const verified=(row:FirestoreDoc)=>row.status==="verified" && row.reviewStatus!=="rejected";
+    const verified=(row:FirestoreDoc)=>row.status==="verified"
+      && !!row.source?.sourceDocumentId
+      && Number.isInteger(Number(row.source?.sourcePage)) && Number(row.source.sourcePage)>=1
+      && !!row.reviewedBy && !!row.reviewedAt;
+    const profiles=technicalProducts.filter(row=>row.kind==="aluminum_profile"&&verified(row)).map(row=>({
+      ...row, code:row.manufacturerCode, description:row.description,
+      commercialLengthMm:Number(row.technicalProperties?.commercialLengthMm||row.technicalProperties?.barLengthMm||0),
+      weightKgM:Number(row.technicalProperties?.weightKgM||0), finish:row.finish||"",
+      documentId:row.source.sourceDocumentId,page:row.source.sourcePage,
+      technicalProductId:row.id
+    }));
+    const hardware=technicalProducts.filter(row=>["hardware","seal","fastener","glass","consumable"].includes(row.kind)&&verified(row)).map(row=>({
+      ...row, code:row.manufacturerCode, description:row.description,
+      quantity:Number(row.technicalProperties?.quantity||0),
+      quantityFormula:String(row.technicalProperties?.quantityFormula||""),
+      unit:String(row.technicalProperties?.unit||"piece"),
+      typology:String(row.technicalProperties?.typology||"*"),
+      documentId:row.source.sourceDocumentId,page:row.source.sourcePage,
+      technicalProductId:row.id
+    }));
     const eq=(a:any,b:string)=>String(a||"").trim().toLowerCase()===b.toLowerCase();
     const matchedRules=rules.filter(row=>verified(row)&&eq(row.manufacturer,manufacturer)&&eq(row.line,line)&&eq(row.typology,typology)&&(!row.configuration||!configuration||eq(row.configuration,configuration)));
     const errors:string[]=[], bom:any[]=[];
@@ -105,7 +126,7 @@ export default async function handler(req: any, res: any) {
         const description=String(profile?.description||rule.description||code);
         const componentFinish=finish||profile?.finish||rule.finish||"";
         bom.push({
-          id:String(rule.id),category,code,description,quantity:count,
+          id:String(profile?.technicalProductId||rule.id),technicalProductId:isProfile?String(profile?.technicalProductId||""):undefined,category,code,description,quantity:count,
           unit:isProfile?"bar":unit,cutLengthsMm:cuts,
           commercialBarLengthMm:isProfile?commercialLength:undefined,kerfMm:Number(rule.kerfMm||3),
           manufacturer,system:line,finish:componentFinish,weightKgM:Number(profile?.weightKgM||0)||undefined,compatibilityKey:[manufacturer,line,code,componentFinish].join(":").toLowerCase(),
