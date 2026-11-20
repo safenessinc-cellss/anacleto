@@ -184,7 +184,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         const selectedId = selectedQuoteIdRef.current;
         const refreshedSelection = selectedId ? loaded.find((quote) => quote.id === selectedId) : undefined;
         if (refreshedSelection) setSelectedQuote(refreshedSelection);
-        else if (!selectedId && loaded.length > 0) setSelectedQuote(loaded[0]);
+        else if (!hideHistory && !selectedId && loaded.length > 0) setSelectedQuote(loaded[0]);
       },
       (err) => {
         console.error("Firestore quotes load failed:", err);
