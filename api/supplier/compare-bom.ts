@@ -1,4 +1,5 @@
 import firebaseConfig from "../../firebase-applet-config.json" with { type: "json" };
+import { convertSupplierPriceToPurchaseUnit } from "../../src/server/technical-bom";
 
 const OWNER_EMAIL="safeness.c.a@gmail.com";
 const decode=(v:any):any=>!v||typeof v!=="object"?v:"stringValue"in v?v.stringValue:"integerValue"in v?Number(v.integerValue):"doubleValue"in v?Number(v.doubleValue):"booleanValue"in v?v.booleanValue:"timestampValue"in v?v.timestampValue:"nullValue"in v?null:"mapValue"in v?Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,decode(x)])):v;
@@ -63,13 +64,10 @@ export default async function handler(req:any,res:any){
       String(row.finish||"").trim().toLowerCase()===String(item.finish||"").trim().toLowerCase()&&
       Number(row.unitPrice)>0&&Date.parse(String(row.priceDate||""))>=now-30*86400000&&(!row.validUntil||Date.parse(String(row.validUntil))>=now);
     }).map((row:any)=>{
-      const sourceUnit=normalizeUnit(row.unit),targetUnit=normalizeUnit(item.unit);
-      let convertedPrice:number|null=null;
-      if(sourceUnit===targetUnit) convertedPrice=Number(row.unitPrice);
-      else if(targetUnit==="bar"&&sourceUnit==="meter"&&Number(item.commercialBarLengthMm)>0)
-        convertedPrice=Number(row.unitPrice)*Number(item.commercialBarLengthMm)/1000;
-      else if(targetUnit==="bar"&&sourceUnit==="kg"&&Number(item.commercialBarLengthMm)>0&&Number(item.weightKgM)>0)
-        convertedPrice=Number(row.unitPrice)*Number(item.commercialBarLengthMm)/1000*Number(item.weightKgM);
+      const sourceUnit=normalizeUnit(row.unit);
+      const convertedPrice=convertSupplierPriceToPurchaseUnit(Number(row.unitPrice),sourceUnit,String(item.unit||""),{
+        commercialBarLengthMm:Number(item.commercialBarLengthMm||0),weightKgM:Number(item.weightKgM||0)
+      });
       return convertedPrice!==null?{...row,convertedPrice,sourceUnit}:null;
     }).filter(Boolean).sort((a:any,b:any)=>Number(a.convertedPrice)-Number(b.convertedPrice));
     const offer:any=candidates[0];
