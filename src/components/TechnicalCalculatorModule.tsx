@@ -100,7 +100,8 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Entre na sua conta para salvar o orçamento.");
-      const payload = { clientName: budgetClientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, comparisons, bestSupplier, status: "draft", workflow: "technical_esquadrias", updatedAt: serverTimestamp() };
+      const selectedBasket = comparisons.find((basket: any) => basket.supplier === bestSupplier && basket.complete);
+      const payload = { clientName: budgetClientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, comparisons, bestSupplier, total: selectedBasket ? Number(selectedBasket.total) : null, currency: "BRL", status: "draft", workflow: "technical_esquadrias", updatedAt: serverTimestamp() };
       if (editingBudgetId) await updateDoc(doc(db, "technical_budgets", editingBudgetId), payload);
       else await addDoc(collection(db, "technical_budgets"), { ...payload, createdBy: user.uid, createdAt: serverTimestamp() });
       showToast(editingBudgetId ? "Orçamento de esquadrias atualizado." : "Orçamento de esquadrias salvo.", "success");
