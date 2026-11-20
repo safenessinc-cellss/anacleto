@@ -187,7 +187,13 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     return () => unsub();
   }, []);
 
-  useEffect(() => {\n    if (!initialQuoteId || !quotes.length) return;\n    const match = quotes.find((quote) => quote.id === initialQuoteId);\n    if (match) { setSelectedQuote(match); setIsEditing(true); }\n  }, [initialQuoteId, quotes]);\n\n  // Criar orçamento vazio; nenhum cliente, produto, imposto ou valor fictício.
+  useEffect(() => {
+    if (!initialQuoteId || !quotes.length) return;
+    const match = quotes.find((quote) => quote.id === initialQuoteId);
+    if (match) { setSelectedQuote(match); setIsEditing(true); }
+  }, [initialQuoteId, quotes]);
+
+  // Criar orçamento vazio; nenhum cliente, produto, imposto ou valor fictício.
   const handleCreateNewQuote = () => {
     const now = new Date().toISOString();
     const quoteId = "quote_" + crypto.randomUUID();
@@ -514,7 +520,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         else window.location.href = url;
       } else {
         const subject = encodeURIComponent(`Orçamento ${pdfQuote.number} - Anacleto Esquadrias`);
-        const body = encodeURIComponent(`${message}\n\nAtenciosamente,\nAnacleto Esquadrias\n\nAnexe o PDF baixado antes de enviar.`);
+        const body = encodeURIComponent(`${message}
+
+Atenciosamente,
+Anacleto Esquadrias
+
+Anexe o PDF baixado antes de enviar.`);
         const url = `mailto:${encodeURIComponent(pdfQuote.clientEmail || "")}?subject=${subject}&body=${body}`;
         if (popup) popup.location.href = url;
         else window.location.href = url;
@@ -1564,7 +1575,8 @@ const handleAddItem = () => {
                       value={selectedQuote.notes || ""}
                       onChange={(event) => setSelectedQuote({ ...selectedQuote, notes: event.target.value, pdfDataUri: undefined, pdfFileName: undefined, pdfGeneratedAt: undefined })}
                       rows={4}
-                      placeholder={"Ex.: Entrada de 40% do valor total. Prazo estimado de execução: 90 dias. Saldo restante conforme acordado com o cliente.\nAcrescente outras condições se necessário."}
+                      placeholder={"Ex.: Entrada de 40% do valor total. Prazo estimado de execução: 90 dias. Saldo restante conforme acordado com o cliente.
+Acrescente outras condições se necessário."}
                       className="w-full resize-y rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs leading-relaxed text-white outline-none placeholder:text-slate-500 focus:border-amber-500/60"
                     />
                     <p className="mt-2 text-[10px] text-slate-500">Os exemplos são apenas sugestões. Edite ou apague livremente; se ficar vazio, esta seção não será impressa no PDF.</p>
