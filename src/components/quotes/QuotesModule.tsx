@@ -1085,17 +1085,7 @@ const handleAddItem = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-2xl">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-            <FileText className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">"Orçamento"</h1>
-            <span className="text-xs text-slate-500">`${quotes.length} orçamentos`</span>
-          </div>
-        </div>
-
+      <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-4 bg-white border border-slate-200/80 p-3 sm:p-4 rounded-2xl">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
