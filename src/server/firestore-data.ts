@@ -34,16 +34,24 @@ export async function loadCatalogFromFirestore(request: any): Promise<any[]> {
   const token = getToken(request);
   if (!token) throw new Error("Autenticação necessária para consultar o catálogo oficial.");
   const collectionNames = ["catalog", "supplier_catalog", "registry_items", "price_table"];
-  const collections = await Promise.all(collectionNames.map(async (collectionName) => {
+  const collections: any[][] = [];
+  // Read collections sequentially and retry transient Firestore throttling. A burst of
+  // four parallel 1000-row reads can otherwise make quote approval fail with HTTP 429.
+  for (const collectionName of collectionNames) {
     const rows: any[] = [];
     let pageToken: string | undefined;
     do {
-      const response = await fetch(collectionUrl(collectionName, pageToken), {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(12_000),
-      });
-      if (!response.ok) {
-        throw new Error(`Não foi possível consultar o catálogo ${collectionName} (HTTP ${response.status}).`);
+      let response: Response | null = null;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        response = await fetch(collectionUrl(collectionName, pageToken), {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(12_000),
+        });
+        if (![429, 500, 503].includes(response.status)) break;
+        if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 300 * (2 ** attempt)));
+      }
+      if (!response || !response.ok) {
+        throw new Error(`Não foi possível consultar o catálogo ${collectionName} (HTTP ${response?.status || 503}).`);
       }
       const payload = await response.json() as { documents?: any[]; nextPageToken?: string };
       for (const document of payload.documents || []) {
@@ -62,8 +70,8 @@ export async function loadCatalogFromFirestore(request: any): Promise<any[]> {
       pageToken = payload.nextPageToken || undefined;
       if (rows.length > 5000) throw new Error(`O catálogo ${collectionName} excede o limite seguro de leitura.`);
     } while (pageToken);
-    return rows;
-  }));
+    collections.push(rows);
+  }
   return collections.flat();
 }
 
