@@ -81,7 +81,7 @@ export default function TechnicalCatalogCards() {
       manufacturer: text(row.manufacturer) || "Fabricante não informado",
       line: text(row.line) || "Linha não informada",
       code: text(row.code),
-      image: text(row.photoUrl || row.imageUrl || row.thumbnailUrl || row.image),
+      image: text(row.photoUrl || row.imageUrl || row.sourcePageImageUrl || row.thumbnailUrl || row.image),
       sourceUrl: text(row.sourceUrl), sourcePage: Number(row.page) || undefined,
       status: text(row.status) || "pending_review",
       details: [["Código", text(row.code) || "Não informado"], ["Peso linear", text(row.weightKgM) ? text(row.weightKgM) + " kg/m" : "Não informado"], ["Peso por barra", text(row.weightKgBar) ? text(row.weightKgBar) + " kg" : "Não informado"], ["Comprimento comercial", text(row.commercialLengthMm) ? text(row.commercialLengthMm) + " mm" : "Não informado"], ["Acabamento", text(row.finish) || "Não informado"], ["Documento de origem", text(row.documentId) || "Não vinculado"], ["Página", text(row.page) || "Não informada"]],
