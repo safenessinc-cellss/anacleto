@@ -29,7 +29,8 @@ export default async function handler(req:Request,res:any){
     const apiKey=process.env.AI_GATEWAY_API_KEY;
     const oidc=process.env.VERCEL_OIDC_TOKEN;
     if(!apiKey&&!oidc)return send(res,200,{image:fallbackFor(description),fallback:true,message:"Provedor de IA não configurado. Exibindo render técnico local."});
-    try{
+    let geminiError:any=null;
+    try {
       const {generateText}=await import("ai");
       const result=await generateText({
         model:"google/gemini-nano-banana-2.1",
@@ -39,9 +40,35 @@ export default async function handler(req:Request,res:any){
       const generated=(result as any).files?.find((file:any)=>String(file.mediaType||"").startsWith("image/"));
       if(generated?.uint8Array){
         const mime=generated.mediaType||"image/png";
-        return send(res,200,{image:`data:${mime};base64,${Buffer.from(generated.uint8Array).toString("base64")}`,fallback:false});
+        return send(res,200,{image:`data:${mime};base64,${Buffer.from(generated.uint8Array).toString("base64")}`,fallback:false,provider:"gemini-gateway"});
       }
-      return send(res,200,{image:fallbackFor(description),fallback:true,message:"A IA não retornou uma imagem nesta tentativa. Exibindo render técnico local."});
-    }catch(error){console.error("[GENERATE_3D_RENDER]",error);return send(res,200,{image:fallbackFor(description),fallback:true,message:"Geração indisponível no momento. Exibindo render técnico local."});}
+      throw new Error("Gemini Nano Banana returned no image bytes.");
+    } catch(error:any) {
+      geminiError=error;
+      console.error("[GENERATE_3D_RENDER] Gemini image generation failed; trying OpenAI Gateway fallback",{
+        status:error?.status||error?.statusCode||0,
+        message:String(error?.message||error).slice(0,700),
+      });
+    }
+    try {
+      const {generateImage}=await import("ai");
+      const generated=await generateImage({
+        model:process.env.ANACLETO_IMAGE_FALLBACK_MODEL||"openai/gpt-image-2.6-flare",
+        prompt:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`,
+      });
+      const bytes=generated.image?.uint8Array;
+      if(bytes?.length){
+        const mime=generated.image.mediaType||"image/png";
+        return send(res,200,{image:`data:${mime};base64,${Buffer.from(bytes).toString("base64")}`,fallback:false,provider:"openai-gateway-fallback"});
+      }
+      throw new Error("OpenAI Gateway image fallback returned no image bytes.");
+    } catch(fallbackError:any) {
+      console.error("[GENERATE_3D_RENDER] OpenAI Gateway image fallback failed",{
+        status:fallbackError?.status||fallbackError?.statusCode||0,
+        message:String(fallbackError?.message||fallbackError).slice(0,700),
+        primaryError:String(geminiError?.message||geminiError).slice(0,300),
+      });
+      return send(res,200,{image:fallbackFor(description),fallback:true,message:"A geração de imagem está temporariamente indisponível. Exibindo render técnico local."});
+    }
   }catch(error){console.error("[GENERATE_3D_RENDER_REQUEST]",error);return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Não foi possível processar o pedido. Exibindo render técnico local."});}
 }
