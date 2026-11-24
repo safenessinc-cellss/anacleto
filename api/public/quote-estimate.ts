@@ -1,25 +1,12 @@
-import { createHash } from "node:crypto";
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "../../src/server/ai-config.js";
 import { parseAIJson } from "../../src/server/ai-json.js";
 import { recordAIAudit } from "../../src/server/ai-audit.js";
+import { consumeRateLimit, getClientIp } from "../../src/server/rate-limit.js";
 
-type RateState = { count: number; resetAt: number };
-const localWindows = new Map<string, RateState>();
 function send(res: any, status: number, payload: unknown) {
   res.setHeader?.("Cache-Control", "no-store");
   return res.status(status).json(payload);
-}
-function clientIp(req: any): string {
-  const trustedRealIp = String(req.headers?.["x-real-ip"] || "").trim();
-  const forwarded = String(req.headers?.["x-forwarded-for"] || "").split(",").map((value: string) => value.trim()).filter(Boolean);
-  const address = trustedRealIp || forwarded[forwarded.length - 1] || String(req.socket?.remoteAddress || req.ip || "unknown");
-  return createHash("sha256").update(address).digest("hex");
-}
-async function consumePublicQuota(ip: string): Promise<boolean> {
- const now=Date.now();for(const [key,value] of localWindows)if(now>=value.resetAt)localWindows.delete(key);
- const current=localWindows.get(ip);if(!current||now>=current.resetAt){localWindows.set(ip,{count:1,resetAt:now+3600000});return true;}
- current.count+=1;return current.count<=3;
 }
 export default async function handler(req: any, res: any) {
   const requestStartedAt = Date.now();
@@ -29,8 +16,8 @@ export default async function handler(req: any, res: any) {
     return send(res, 405, { error: "Método não permitido." });
   }
   try {
-    const ip = clientIp(req);
-    if (!(await consumePublicQuota(ip))) return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial." });
+    const ip = getClientIp(req);
+    if (!(await consumeRateLimit("public-quote-estimate", ip, 3, 60 * 60_000))) return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial." });
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some(key => key !== "description")) {
       return send(res, 400, { error: "A solicitação contém campos não permitidos." });
