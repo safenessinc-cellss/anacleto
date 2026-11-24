@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { consumeRateLimit, getClientIp } from "../../src/server/rate-limit.js";
+import { getAIGatewayFallbackModel } from "../../src/server/ai-config.js";
 import { getAIRateLimit } from "../../src/server/ai-limits.js";
 
 type WindowRequest = { description?: string; referenceImage?: string };
@@ -53,11 +54,26 @@ export default async function handler(req:any,res:any){
    }
    if(gatewayConfigured) {
     try {
-     const { generateImage }=await import("ai");
+     const { generateImage, generateText }=await import("ai");
      const imageBytes=image?Buffer.from(image.slice(image.indexOf(",")+1),"base64"):undefined;
+     let fallbackPrompt=prompt;
+     if(imageBytes){
+      const reference=await generateText({
+       model:getAIGatewayFallbackModel(),
+       system:"Descreva objetivamente a arquitetura, o vão, a posição da esquadria, os materiais, as cores, a iluminação e a perspectiva da imagem de referência. Não invente medidas.",
+       messages:[{role:"user",content:[
+        {type:"text",text:"Analise esta imagem para orientar um render arquitetônico fiel."},
+        {type:"image",image:imageBytes}
+       ]}],
+       providerOptions:{gateway:{only:["openai","azure"]}},
+       maxOutputTokens:700,
+       abortSignal:AbortSignal.timeout(12_000),
+      });
+      fallbackPrompt+="\nDescrição visual da referência: "+reference.text.slice(0,2500);
+     }
      const generated=await generateImage({
       model:process.env.ANACLETO_IMAGE_FALLBACK_MODEL||"openai/gpt-image-2.6-flare",
-      prompt:imageBytes?{text:prompt,images:[imageBytes]}:prompt,
+      prompt:fallbackPrompt,
       abortSignal:AbortSignal.timeout(20_000),
      });
      const bytes=generated.image?.uint8Array;
