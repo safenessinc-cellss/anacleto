@@ -1,5 +1,6 @@
 import express from "express";
 import http from "http";
+import { randomUUID } from "node:crypto";
 import path from "path";
 import dotenv from "dotenv";
 // import estático de vite eliminado - se usa import dinámico en desarrollo
@@ -483,13 +484,16 @@ Solicitação atual: ${message}`,
 
 app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
   const aiStartedAt = Date.now();
+  const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || randomUUID());
   const aiUsage = { inputTokens: 0, outputTokens: 0 };
+  let stage = "catalog_loading";
   try {
     const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
     const fullCatalog = await loadCatalogFromFirestore(req);
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
     const catalog = selectRelevantBudgetCatalog(prompt, fullCatalog, 450);
+    stage = "ai_generation";
     const parsed = await generateValidatedJson({
       capability: "budget",
       system: `Você é o engenheiro orçamentista da Anacleto Esquadrias, especialista em sistemas de janelas e portas de alumínio, vidro, ferragens, acessórios, vedação, fixação e fabricação/instalação. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","supplier":"","category":"","variant":"","side":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real relevante: ${JSON.stringify(catalog)}.
@@ -512,14 +516,24 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         return value;
       },
     });
-    await recordAIAudit({
-      serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
-      input: { prompt, language, catalogCount: catalog.length },
-      output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
-      requestId: String(req.headers["x-request-id"] || ""),
-      startedAt: aiStartedAt,
-      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
-    });
+    stage = "success_audit";
+    try {
+      await recordAIAudit({
+        serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
+        input: { prompt, language, catalogCount: catalog.length },
+        output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
+        requestId,
+        startedAt: aiStartedAt,
+        authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+      });
+    } catch (auditError: any) {
+      console.error("[BUDGET_ITEMS_AI] success audit persistence failed", {
+        requestId,
+        message: String(auditError?.message || auditError).slice(0, 800),
+        stack: auditError?.stack,
+      });
+    }
+    stage = "response_mapping";
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
       if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
@@ -553,17 +567,38 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
     try {
       await recordAIAudit({
         serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
-        input: req.body || null, error: err,
+        input: { stage, promptLength: typeof req.body?.prompt === "string" ? req.body.prompt.length : 0 },
+        error: err,
         actorUid: res.locals.firebaseUser?.uid,
-        requestId: String(req.headers["x-request-id"] || ""),
+        requestId,
         startedAt: aiStartedAt,
         authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
       });
-    } catch (auditError) { console.error("Budget failure audit could not be persisted:", auditError); }
-    const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
-    const status = Number(err?.statusCode || err?.status || 502);
-    console.error("[BUDGET_ITEMS_AI] failed", { requestId, code: err?.code || "BUDGET_AI_UNAVAILABLE", status, message: String(err?.message || err).slice(0, 1200), stack: err?.stack });
-    return res.status(status >= 400 && status < 600 ? status : 502).json({ error: String(err?.message || "Falha ao gerar os itens do orçamento."), code: err?.code || "BUDGET_AI_UNAVAILABLE", requestId });
+    } catch (auditError: any) {
+      console.error("[BUDGET_ITEMS_AI] failure audit persistence failed", {
+        requestId,
+        message: String(auditError?.message || auditError).slice(0, 800),
+        stack: auditError?.stack,
+      });
+    }
+    const upstreamStatus = Number(err?.statusCode || err?.status || 0);
+    const status = stage === "catalog_loading"
+      ? (upstreamStatus === 401 || upstreamStatus === 403 ? upstreamStatus : 503)
+      : upstreamStatus === 408 || err?.name === "TimeoutError" || err?.name === "AbortError"
+        ? 504
+        : upstreamStatus === 429 ? 503
+          : upstreamStatus >= 500 ? upstreamStatus
+            : 502;
+    console.error("[BUDGET_ITEMS_AI] failed", {
+      requestId, stage, durationMs: Date.now() - aiStartedAt,
+      code: err?.code || "BUDGET_AI_UNAVAILABLE", status,
+      message: String(err?.message || err).slice(0, 1200), stack: err?.stack,
+    });
+    return res.status(status).json({
+      error: "Não foi possível gerar os itens do orçamento.",
+      code: err?.code || (stage === "catalog_loading" ? "BUDGET_CATALOG_UNAVAILABLE" : "BUDGET_AI_UNAVAILABLE"),
+      stage, requestId,
+    });
   }
 });
 
