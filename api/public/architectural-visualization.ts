@@ -53,7 +53,7 @@ export default async function handler(req:any,res:any){
    }
    if(gatewayConfigured) {
     try {
-     const { experimental_generateImage: generateImage }=await import("ai");
+     const { generateImage }=await import("ai");
      const imageBytes=image?Buffer.from(image.slice(image.indexOf(",")+1),"base64"):undefined;
      const generated=await generateImage({
       model:process.env.ANACLETO_IMAGE_FALLBACK_MODEL||"openai/gpt-image-2.6-flare",
