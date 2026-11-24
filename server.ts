@@ -760,7 +760,7 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
   const binary = Buffer.from(data, "base64");
   if (!binary.length || binary.length > 10 * 1024 * 1024) throw Object.assign(new Error("Documento vazio ou acima do limite de 10 MB."), { statusCode: 413 });
   const client = new GoogleGenAI({ apiKey });
-  const model = process.env.ANACLETO_DOCUMENT_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash";
+  const model = (process.env.ANACLETO_DOCUMENT_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash").replace(/^google\//, "");
   const requestParts: any[] = [{ text: prompt }, { inlineData: { mimeType, data: binary.toString("base64") } }];
   const deadline = Date.now() + Math.min(AI_CONFIG.documentExtraction.timeoutMs, 50_000);
   let response: any;
