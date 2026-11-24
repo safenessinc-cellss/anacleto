@@ -28,5 +28,23 @@ export default async function handler(req: any, res: any) {
     return res.status(404).json({ error: "Rota de fornecedor não encontrada." });
   }
 
-  return selected(req, res);
+  try {
+    await selected(req, res);
+  } catch (error: any) {
+    const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
+    console.error("[supplier-api] unhandled handler failure", {
+      route,
+      method: req.method,
+      requestId,
+      message: String(error?.message || error),
+      stack: error?.stack,
+    });
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: "Falha interna na API de fornecedores.",
+        code: "SUPPLIER_API_INTERNAL_ERROR",
+        route,
+      });
+    }
+  }
 }
