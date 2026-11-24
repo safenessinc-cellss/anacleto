@@ -170,10 +170,10 @@ Pergunta: ${question}`,
         return { answer: value.answer.slice(0,8000), metrics: value.metrics.slice(0,8).map((m:any)=>({label:String(m?.label||"").slice(0,100),value:String(m?.value??"").slice(0,120),explanation:String(m?.explanation||"").slice(0,300)})), warnings: value.warnings.slice(0,8).map((w:any)=>String(w).slice(0,300)) };
       },
     });
-    await recordAIAudit({serviceName:"FINANCIAL_ASSISTANT",modelUsed:AI_CONFIG.chat.model,input:{question,collectionCounts:context.collectionCounts},output:result,actorUid:user.uid,requestId:String(req.headers["x-request-id"]||""),startedAt,authorizationToken:String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"")});
+    await recordAIAudit({serviceName:"FINANCIAL_ASSISTANT",modelUsed:AI_CONFIG.chat.model,input:{question,collectionCounts:context.collectionCounts},output:result,actorUid:user.uid,requestId:String(req.headers["x-request-id"]||""),startedAt,authorizationToken:String(req.headers.authorization||"").replace(/^Bearer\s+/i,"")});
     return res.json(result);
   } catch (error:any) {
-    try { await recordAIAudit({serviceName:"FINANCIAL_ASSISTANT",modelUsed:AI_CONFIG.chat.model,input:{question},error,actorUid:user.uid,requestId:String(req.headers["x-request-id"]||""),startedAt,authorizationToken:String(req.headers.authorization||"").replace(/^Bearer\\s+/i,"")}); } catch {}
+    try { await recordAIAudit({serviceName:"FINANCIAL_ASSISTANT",modelUsed:AI_CONFIG.chat.model,input:{question},error,actorUid:user.uid,requestId:String(req.headers["x-request-id"]||""),startedAt,authorizationToken:String(req.headers.authorization||"").replace(/^Bearer\s+/i,"")}); } catch {}
     console.error("Financial assistant failed:", error?.message || error);
     return res.status(502).json({error:"O Assistente Financeiro não conseguiu consultar os dados agora. Verifique a conexão e tente novamente.",code:"FINANCIAL_ASSISTANT_UNAVAILABLE"});
   }
