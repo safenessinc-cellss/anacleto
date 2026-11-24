@@ -11,14 +11,14 @@ export const AI_CONFIG = {
     model: DEFAULT_MODEL,
     temperature: 0.2,
     maxOutputTokens: 8192,
-    timeoutMs: 45_000,
+    timeoutMs: 25_000,
     retries: 1,
   },
   chat: {
     model: process.env.ANACLETO_CHAT_MODEL || DEFAULT_MODEL,
     temperature: 0.7,
     maxOutputTokens: 4096,
-    timeoutMs: 45_000,
+    timeoutMs: 20_000,
     retries: 0,
   },
   quote: {
