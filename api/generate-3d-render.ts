@@ -1,4 +1,5 @@
 import { consumeRateLimit, getClientIp } from "../src/server/rate-limit.js";
+import { getAIRateLimit } from "../src/server/ai-limits.js";
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown; socket?: { remoteAddress?: string } };
 const FALLBACKS: Record<string,string> = {
   "suprema-2":"/renders-3d/suprema-2.svg","suprema-4":"/renders-3d/suprema-4.svg",

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { consumeRateLimit, getClientIp } from "../../src/server/rate-limit.js";
+import { getAIRateLimit } from "../../src/server/ai-limits.js";
 
 type WindowRequest = { description?: string; referenceImage?: string };
 const fallbackSvg = (description:string) => {

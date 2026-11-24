@@ -29,3 +29,20 @@ test("local rate limits enforce the configured window and limit", async () => {
     if (oldToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN; else process.env.UPSTASH_REDIS_REST_TOKEN = oldToken;
   }
 });
+
+
+test("production rate limits fail closed without shared Redis even when not explicitly requested", async () => {
+  const oldNodeEnv = process.env.NODE_ENV;
+  const oldUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const oldToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  process.env.NODE_ENV = "production";
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  try {
+    await assert.rejects(consumeRateLimit("production-test", "user-1", 3, 60_000), /UPSTASH_REDIS_REST_URL.*required/);
+  } finally {
+    if (oldNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = oldNodeEnv;
+    if (oldUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL; else process.env.UPSTASH_REDIS_REST_URL = oldUrl;
+    if (oldToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN; else process.env.UPSTASH_REDIS_REST_TOKEN = oldToken;
+  }
+});

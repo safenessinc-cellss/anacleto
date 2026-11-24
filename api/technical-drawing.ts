@@ -7,6 +7,7 @@ import { recordAIAudit } from "../src/server/ai-audit.js";
 import { stripBearerPrefix } from "../src/server/auth-token.js";
 import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
 import { consumeRateLimit } from "../src/server/rate-limit.js";
+import { getAIRateLimit } from "../src/server/ai-limits.js";
 import { hasAIRole } from "../src/server/ai-roles.js";
 import { withDraftVectorWatermark } from "../src/server/drawing-vector.js";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec, type AluminumTipologia, type ParametricWindowSpec } from "../src/utils/parametricCad.js";
@@ -417,7 +418,8 @@ export default async function handler(req: any, res: any) {
     stage = "catalog_loading";
     catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
     try {
-      if (!(await consumeRateLimit("technical-drawing", user.uid, 12, 60_000))) {
+      const drawingLimit = getAIRateLimit("technical-drawing");
+      if (!(await consumeRateLimit("technical-drawing", user.uid, drawingLimit.limit, drawingLimit.windowMs, { requireDistributed: true }))) {
         return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
       }
     } catch (rateLimitError: any) {

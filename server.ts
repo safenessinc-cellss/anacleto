@@ -22,6 +22,7 @@ import { recordAIAudit } from "./src/server/ai-audit.js";
 import { stripBearerPrefix } from "./src/server/auth-token.js";
 import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
 import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
+import { getAIRateLimit } from "./src/server/ai-limits.js";
 import { hasAIRole } from "./src/server/ai-roles.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
@@ -82,7 +83,7 @@ function compactFinancialRows(rows: any[], fields: string[]) {
 }
 
 // Assistente Financeiro: answers only from the authenticated user's live business records.
-app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("financial-assistant", 15, 60_000), async (req, res) => {
+app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("financial-assistant"), async (req, res) => {
   const startedAt = Date.now();
   const user = res.locals.firebaseUser as { uid?: string; email?: string };
   const question = String(req.body?.message || "").trim().slice(0, 3000);
@@ -155,12 +156,15 @@ Pergunta: ${question}`,
   }
 });
 
-function rateLimitByUser(bucket: string, limit: number, windowMs: number): express.RequestHandler {
+function rateLimitByUser(bucket: string, limit?: number, windowMs?: number): express.RequestHandler {
+  const policy = getAIRateLimit(bucket);
+  const effectiveLimit = limit ?? policy.limit;
+  const effectiveWindowMs = windowMs ?? policy.windowMs;
   return async (req, res, next) => {
     const user = res.locals.firebaseUser as { uid?: string } | undefined;
     const identifier = user?.uid || getClientIp(req);
     try {
-      if (!(await consumeRateLimit(bucket, identifier, limit, windowMs))) {
+      if (!(await consumeRateLimit(bucket, identifier, effectiveLimit, effectiveWindowMs, { requireDistributed: true }))) {
         return res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente.", code: "RATE_LIMITED" });
       }
       return next();
@@ -312,7 +316,7 @@ function selectRelevantBudgetCatalog(prompt: string, catalog: any[], limit = 450
 // ----------------------------------------------------
 // 2. Quotes & Invoices AI Agent (/api/ai/quote-agent)
 // ----------------------------------------------------
-app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("quote-agent", 30, 60_000), async (req, res) => {
+app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("quote-agent"), async (req, res) => {
   const aiStartedAt = Date.now();
   const aiUsage = { inputTokens: 0, outputTokens: 0 };
   try {
@@ -458,7 +462,7 @@ Solicitação atual: ${message}`,
   }
 });
 
-app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("budget-items", 30, 60_000), async (req, res) => {
+app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("budget-items"), async (req, res) => {
   const aiStartedAt = Date.now();
   const aiUsage = { inputTokens: 0, outputTokens: 0 };
   try {
@@ -578,7 +582,7 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
 // ----------------------------------------------------
 // 3. Project intake AI (/api/ai/project-intake)
 // ----------------------------------------------------
-app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("project-intake", 20, 60_000), async (req, res) => {
+app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLimitByUser("project-intake"), async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim().slice(0, 180);
     const description = String(req.body?.description || "").trim().slice(0, 10000);
@@ -802,7 +806,7 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
 }
 
 // ============ FINANCIAL AI: Extraer datos de boleto ============
-app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("financial-ai", 8, 60_000), async (req, res) => {
+app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("financial-ai"), async (req, res) => {
   try {
     const { data, mimeType, fileName } = req.body || {};
     const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
@@ -826,7 +830,7 @@ app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, r
 });
 
 // ============ COMPRAS: leitura inteligente de documentos ============
-app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("purchase-ai", 8, 60_000), async (req, res) => {
+app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("purchase-ai"), async (req, res) => {
   try {
     const { storageUrl, mimeType, fileName } = req.body || {};
     const user = res.locals.firebaseUser as { uid?: string };
