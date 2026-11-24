@@ -27,7 +27,7 @@ export default async function handler(req:Request,res:any){
     try{
       const {generateText}=await import("ai");
       const result=await generateText({
-        model:"google/gemini-3.1-flash-image-preview",
+        model:"google/gemini-nano-banana-2.1",
         prompt:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`,
         maxOutputTokens:1200,
       });
