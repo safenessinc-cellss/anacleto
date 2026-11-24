@@ -39,7 +39,7 @@ test("production rate limits fail closed without shared Redis even when not expl
   delete process.env.UPSTASH_REDIS_REST_URL;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
   try {
-    await assert.rejects(consumeRateLimit("production-test", "user-1", 3, 60_000), /UPSTASH_REDIS_REST_URL.*required/);
+    await assert.rejects(consumeRateLimit("production-test", "user-1", 3, 60_000, { requireDistributed: true }), /UPSTASH_REDIS_REST_URL.*required/);
   } finally {
     if (oldNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = oldNodeEnv;
     if (oldUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL; else process.env.UPSTASH_REDIS_REST_URL = oldUrl;
