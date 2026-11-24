@@ -1,5 +1,5 @@
+import { consumeRateLimit, getClientIp } from "../src/server/rate-limit.js";
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown; socket?: { remoteAddress?: string } };
-const buckets = new Map<string, { count: number; reset: number }>();
 const FALLBACKS: Record<string,string> = {
   "suprema-2":"/renders-3d/suprema-2.svg","suprema-4":"/renders-3d/suprema-4.svg",
   "gold-3":"/renders-3d/gold-3.svg","gold-fold":"/renders-3d/gold-fold.svg",
@@ -11,12 +11,15 @@ function send(res:any,status:number,body:unknown){res.setHeader?.("Cache-Control
 export default async function handler(req:Request,res:any){
   res.setHeader?.("Cache-Control","no-store, private");
   if(req.method!=="POST"){res.setHeader?.("Allow","POST");return send(res,405,{error:"Método não permitido."});}
-  const forwarded=req.headers?.["x-forwarded-for"];
-  const ip=String(req.headers?.["x-real-ip"]||forwarded||req.socket?.remoteAddress||"unknown").split(",")[0].trim();
-  const now=Date.now();let bucket=buckets.get(ip);
-  if(!bucket||now>bucket.reset){bucket={count:0,reset:now+60_000};buckets.set(ip,bucket);}
-  if(bucket.count>=3)return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Limite de geração atingido. Exibindo a galeria local de respaldo."});
-  bucket.count++;
+  const ip=getClientIp(req);
+  try {
+    if(!(await consumeRateLimit("generate-3d-render",ip,3,60_000))) {
+      return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Limite de geração atingido. Exibindo a galeria local de respaldo."});
+    }
+  } catch(rateLimitError:any) {
+    console.error("[GENERATE_3D_RATE_LIMIT_UNAVAILABLE]",String((rateLimitError as any)?.message||rateLimitError).slice(0,500));
+    return send(res,503,{error:"O controle de uso está temporariamente indisponível.",code:"RATE_LIMIT_UNAVAILABLE"});
+  }
   try{
     const body=(typeof req.body==="string"?JSON.parse(req.body):req.body||{}) as {description?:unknown;modelId?:unknown};
     const description=String(body.description||"").trim().slice(0,1200);
