@@ -30,8 +30,7 @@ export default async function handler(req:any,res:any){
   }
   const apiKey=process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY;
   if(!apiKey)return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"GEMINI_API_KEY não configurada. Esta é uma prévia vetorial local, não um render de IA."});
-  try {
-   const prompt=`Gere um render fotorrealista arquitetônico horizontal 3:2 de uma esquadria de alumínio sob medida instalada em uma residência contemporânea brasileira. Descrição do cliente: ${description}. Mostre proporções plausíveis, perfis de alumínio bem definidos, vidro fisicamente plausível, luz natural, fachada premium, fotografia de arquitetura editorial. Não inclua texto, marcas, logotipos ou medidas. A imagem enviada, se houver, é a referência da obra; preserve a arquitetura existente e integre a esquadria no vão.`;
+  const prompt=`Gere um render fotorrealista arquitetônico horizontal 3:2 de uma esquadria de alumínio sob medida instalada em uma residência contemporânea brasileira. Descrição do cliente: ${description}. Mostre proporções plausíveis, perfis de alumínio bem definidos, vidro fisicamente plausível, luz natural, fachada premium, fotografia de arquitetura editorial. Não inclua texto, marcas, logotipos ou medidas. A imagem enviada, se houver, é a referência da obra; preserve a arquitetura existente e integre a esquadria no vão.`;
    const gatewayConfigured=Boolean(process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN);
    let primaryError:any=null;
    try {
@@ -77,6 +76,5 @@ export default async function handler(req:any,res:any){
     message:String(primaryError?.message||primaryError).slice(0,700)
    });
    return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"A geração de imagem por IA está temporariamente indisponível. Exibimos uma prévia vetorial local."});
-  }
  }catch(error){console.error("[PUBLIC_ARCHITECTURAL_REQUEST]",error);return res.status(200).json({image:fallbackSvg("Esquadria de alumínio sob medida"),fallback:true,message:"Não foi possível processar a solicitação. Exibimos uma prévia local."});}
 }
