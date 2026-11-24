@@ -71,7 +71,7 @@ export default async function handler(req: any, res: any) {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) return res.status(503).json({ error: "IA indisponível: configure GEMINI_API_KEY no Vercel." });
     const client = new GoogleGenAI({ apiKey });
-    const model = (process.env.ANACLETO_BUDGET_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash").replace(/^google\\//, "");
+    const model = (process.env.ANACLETO_BUDGET_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash").replace(/^google\//, "");
     const deadline = Date.now() + 40_000;
     let result: any;
     let lastProviderError: any;
