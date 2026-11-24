@@ -7,6 +7,7 @@ import { recordAIAudit } from "../src/server/ai-audit.js";
 import { stripBearerPrefix } from "../src/server/auth-token.js";
 import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
 import { consumeRateLimit } from "../src/server/rate-limit.js";
+import { hasAIRole } from "../src/server/ai-roles.js";
 import { withDraftVectorWatermark } from "../src/server/drawing-vector.js";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec, type AluminumTipologia, type ParametricWindowSpec } from "../src/utils/parametricCad.js";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
@@ -410,7 +411,7 @@ export default async function handler(req: any, res: any) {
     }
     authenticated = true;
     actorUid = user.uid;
-    if (!["owner","super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role)) {
+    if (!hasAIRole(user.role, "technicalDrawing")) {
       return json(res, 403, { error: "Seu perfil não possui permissão para operações de desenho técnico.", code: "ROLE_FORBIDDEN" });
     }
     stage = "catalog_loading";
