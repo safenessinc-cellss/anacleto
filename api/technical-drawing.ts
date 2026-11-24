@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { generateText } from "ai";
 import { GoogleGenAI, Type } from "@google/genai";
 import { AI_CONFIG, getAIModel } from "../src/server/ai-config.js";
@@ -368,7 +369,8 @@ function localTechnicalFallback(prompt: string, catalog: any[]) {
 }
 
 export default async function handler(req: any, res: any) {
-  const requestId = String(req.headers?.["x-vercel-id"] || req.headers?.["x-request-id"] || "unknown");
+  const requestId = String(req.headers?.["x-vercel-id"] || req.headers?.["x-request-id"] || randomUUID());
+  const startedAt = Date.now();
   let prompt = "";
   let authenticated = false;
   let catalog: any[] = [];
@@ -572,10 +574,15 @@ export default async function handler(req: any, res: any) {
     return json(res, 200, responseDrawing);
   } catch (error) {
     // Never leak provider credentials or internal stack traces to the browser.
-    console.error("Technical drawing request failed", {
+    console.error("[TECHNICAL_DRAWING] request failed", {
       requestId,
       stage,
-      error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+      durationMs: Date.now() - startedAt,
+      code: (error as any)?.code || "TECHNICAL_DRAWING_FAILED",
+      statusCode: (error as any)?.statusCode || (error as any)?.status || null,
+      error: error instanceof Error
+        ? { name: error.name, message: error.message, stack: error.stack }
+        : String(error),
     });
 
     if (authenticated && prompt.length >= 3) {
@@ -611,7 +618,12 @@ export default async function handler(req: any, res: any) {
         fallback.assumptions = [...(Array.isArray(fallback.assumptions) ? fallback.assumptions : []), "Rascunho local sem IA: validar todas as medidas, perfis, ferragens e cortes antes de fabricar."];
         return json(res, 200, withDraftVectorWatermark(fallback));
       } catch (fallbackError) {
-        console.error("Local drawing fallback failed:", fallbackError);
+        console.error("[TECHNICAL_DRAWING] primary local fallback failed", {
+          requestId,
+          stage,
+          message: String((fallbackError as any)?.message || fallbackError).slice(0, 1000),
+          stack: (fallbackError as any)?.stack,
+        });
         const fallback: any = localFallback(prompt);
         fallback.isDraft = true;
         fallback._fallback = true;
