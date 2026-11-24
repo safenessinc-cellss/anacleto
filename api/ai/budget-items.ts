@@ -72,7 +72,7 @@ export default async function handler(req: any, res: any) {
     if (!apiKey) return res.status(503).json({ error: "IA indisponível: configure GEMINI_API_KEY no Vercel." });
     const client = new GoogleGenAI({ apiKey });
     const result = await client.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         systemInstruction: `Você é o engenheiro orçamentista da Anacleto Esquadrias. Organize o pedido em linhas de orçamento no idioma ${language}. Use o catálogo fornecido apenas para reconhecer nomes, códigos e unidades; nunca invente códigos nem quantidades que dependam de medidas ausentes. Se faltar informação, mantenha uma linha pendente e explique exatamente o que falta. Não gere preço. Todos os valores serão preenchidos e conferidos pelo usuário. Catálogo de referência: ${JSON.stringify(catalog)}`,
