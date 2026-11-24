@@ -14,6 +14,10 @@ import publicQuoteEstimateHandler from "./api/public/quote-estimate.js";
 import publicProposalHandler from "./api/proposta.js";
 import architecturalVisualizationHandler from "./api/public/architectural-visualization.js";
 import generate3DRenderHandler from "./api/generate-3d-render.js";
+import technicalOptionsHandler from "./src/server/supplier-api/technical-options.js";
+import generateBomHandler from "./src/server/supplier-api/generate-bom.js";
+import compareBomHandler from "./src/server/supplier-api/compare-bom.js";
+import marketResearchHandler from "./src/server/supplier-api/market-research.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
 import { google } from "googleapis";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -26,6 +30,12 @@ dotenv.config();
 const app = express();
 const httpServer = http.createServer(app);
 app.use(express.json({ limit: "16mb" }));
+// Supplier technical endpoints are mounted on the main Express API because
+// Vercel rewrites /api/* requests to api/index.ts in this project.
+app.get("/api/supplier/technical-options", (req, res) => technicalOptionsHandler(req, res));
+app.post("/api/supplier/generate-bom", (req, res) => generateBomHandler(req, res));
+app.post("/api/supplier/compare-bom", (req, res) => compareBomHandler(req, res));
+app.post("/api/supplier/market-research", (req, res) => marketResearchHandler(req, res));
 app.post(["/api/supplier-catalog-vision", "/api/supplier/catalogo"], (req, res) => supplierCatalogVisionHandler(req, res));
 app.post("/api/public/architectural-visualization", architecturalVisualizationHandler);
 app.post("/api/generate-3d-render", generate3DRenderHandler);
