@@ -6,13 +6,12 @@ import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { recordAIAudit } from "../src/server/ai-audit.js";
 import { stripBearerPrefix } from "../src/server/auth-token.js";
 import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
+import { consumeRateLimit } from "../src/server/rate-limit.js";
 import { withDraftVectorWatermark } from "../src/server/drawing-vector.js";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec, type AluminumTipologia, type ParametricWindowSpec } from "../src/utils/parametricCad.js";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
-type WindowEntry = { startedAt: number; count: number };
-const windows = new Map<string, WindowEntry>();
 const OWNER_EMAIL = "safeness.c.a@gmail.com";
 
 const drawingResponseSchema = {
@@ -219,18 +218,6 @@ async function authenticate(req: any): Promise<{ uid: string; email: string; rol
   return authenticateFirebaseRequest(req);
 }
 
-function allowRequest(uid: string): boolean {
-  const now = Date.now();
-  const current = windows.get(uid);
-  if (!current || now - current.startedAt >= 60_000) {
-    windows.set(uid, { startedAt: now, count: 1 });
-    return true;
-  }
-  if (current.count >= 12) return false;
-  current.count += 1;
-  return true;
-}
-
 function normalizeName(value: unknown): string {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -429,8 +416,13 @@ export default async function handler(req: any, res: any) {
     }
     stage = "catalog_loading";
     catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
-    if (!allowRequest(user.uid)) {
-      return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
+    try {
+      if (!(await consumeRateLimit("technical-drawing", user.uid, 12, 60_000))) {
+        return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
+      }
+    } catch (rateLimitError: any) {
+      console.error("[TECHNICAL_DRAWING_RATE_LIMIT_UNAVAILABLE]", String(rateLimitError?.message || rateLimitError).slice(0, 500));
+      return json(res, 503, { error: "O controle de uso está temporariamente indisponível.", code: "RATE_LIMIT_UNAVAILABLE", requestId });
     }
     if (isAluminumPrompt(prompt)) {
       stage = "parametric_spec_extraction";
