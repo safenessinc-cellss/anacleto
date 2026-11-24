@@ -13,6 +13,7 @@ export default async function handler(req: any, res: any) {
   const requestStartedAt = Date.now();
   let auditPrompt = "";
   let usage: any;
+  let modelUsed = AI_CONFIG.publicEstimate.model;
   if (req.method !== "POST") {
     res.setHeader?.("Allow", "POST");
     return send(res, 405, { error: "Método não permitido." });
@@ -39,7 +40,7 @@ export default async function handler(req: any, res: any) {
       capability: "publicEstimate",
       system: "Você é um assistente de pré-atendimento comercial. Resuma escopo, tipologia provável, medidas mencionadas e perguntas faltantes. NÃO invente preços, SKUs, prazos ou disponibilidade. NÃO produza orçamento vinculante nem preço comercial. Responda em português do Brasil, JSON válido com scopeSummary, detectedDimensions, questions e disclaimer.",
       prompt,
-      onGeneration: event => { usage = event.usage; },
+      onGeneration: event => { usage = event.usage; modelUsed = event.model || modelUsed; },
       validate: (value: any) => {
         if (!value || typeof value !== "object" || Array.isArray(value) ||
             typeof value.scopeSummary !== "string" ||
@@ -60,7 +61,7 @@ export default async function handler(req: any, res: any) {
 
     await recordAIAudit({
       serviceName: "BUDGET",
-      modelUsed: AI_CONFIG.publicEstimate.model,
+      modelUsed,
       input: { description: prompt, channel: "public" },
       output: estimate,
       usage,
