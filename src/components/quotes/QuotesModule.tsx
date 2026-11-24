@@ -192,6 +192,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       items: [],
       subtotal: 0,
       labor: 0,
+      laborRate: 100,
       marginRate: 0,
       margin: 0,
       freight: 0,
@@ -261,7 +262,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     }));
 
     const subtotal = Number(updatedItems.reduce((acc, curr) => acc + curr.subtotal, 0).toFixed(2));
-    const labor = Math.max(0, Number(current.labor || 0));
+    const laborRate = Math.max(0, Math.min(300, Number(current.laborRate ?? 0)));
+    const labor = current.laborRate !== undefined
+      ? Number((subtotal * laborRate / 100).toFixed(2))
+      : Math.max(0, Number(current.labor || 0));
     const marginRate = Math.max(0, Number(current.marginRate || 0));
     const margin = Number(((subtotal + labor) * marginRate / 100).toFixed(2));
     const freight = Math.max(0, Number(current.freight || 0));
@@ -276,6 +280,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       items: updatedItems,
       subtotal,
       labor,
+      ...(current.laborRate !== undefined ? { laborRate } : {}),
       marginRate,
       margin,
       freight,
@@ -1463,9 +1468,13 @@ const handleAddItem = () => {
                       <span>Materiais:</span>
                       <span className="font-mono text-white">{selectedQuote.subtotal?.toFixed(2)} R$</span>
                     </div>
+                    <div className="mt-2 flex justify-between w-64 text-slate-400">
+                      <span>Mão de obra ({(selectedQuote.laborRate ?? (Number(selectedQuote.subtotal || 0) > 0 ? Number(selectedQuote.labor || 0) / Number(selectedQuote.subtotal || 1) * 100 : 100)).toFixed(0)}%):</span>
+                      <span className="font-mono text-white">{Number(selectedQuote.labor || 0).toFixed(2)} R$</span>
+                    </div>
                     <div className="my-3 grid grid-cols-2 gap-2 border-y border-slate-800 py-3 sm:grid-cols-5">
                       {([
-                        ["Mão de Obra (R$)", "labor"],
+                        ["Mão de obra (%)", "laborRate"],
                         ["Margem (%)", "marginRate"],
                         ["Imposto (%)", "taxRate"],
                         ["Frete (R$)", "freight"],
@@ -1477,7 +1486,7 @@ const handleAddItem = () => {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={selectedQuote[field] || 0}
+                            value={field === "laborRate" ? (selectedQuote.laborRate ?? (Number(selectedQuote.subtotal || 0) > 0 ? Number(selectedQuote.labor || 0) / Number(selectedQuote.subtotal || 1) * 100 : 100)) : (selectedQuote[field] || 0)}
                             onChange={(event) => setSelectedQuote(recalculateQuote({ ...selectedQuote, [field]: Number(event.target.value) || 0 }))}
                             className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-900 p-2 text-xs text-white outline-none focus:border-amber-500/50"
                           />
