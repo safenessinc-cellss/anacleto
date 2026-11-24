@@ -849,8 +849,23 @@ app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, r
 // ============ COMPRAS: leitura inteligente de documentos ============
 app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("purchase-ai", 8, 60_000), async (req, res) => {
   try {
-    const { data, mimeType, fileName } = req.body || {};
-    if (typeof data !== "string" || !data || data.length > 14_000_000) return res.status(400).json({ error: "Envie um documento de até 10 MB." });
+    const { storageUrl, mimeType, fileName } = req.body || {};
+    const user = res.locals.firebaseUser as { uid?: string };
+    if (typeof storageUrl !== "string" || !storageUrl || !user.uid) return res.status(400).json({ error: "Envie a referência do documento armazenado." });
+    const bucket = String(firebaseConfig.storageBucket || "");
+    let parsedUrl: URL;
+    try { parsedUrl = new URL(storageUrl); } catch { return res.status(400).json({ error: "Referência de arquivo inválida." }); }
+    const expectedPrefix = `/v0/b/${bucket}/o/${encodeURIComponent("purchases/" + user.uid + "/")}`;
+    if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "firebasestorage.googleapis.com" || !parsedUrl.pathname.startsWith(expectedPrefix) || parsedUrl.searchParams.get("alt") !== "media" || !parsedUrl.searchParams.get("token")) {
+      return res.status(403).json({ error: "O documento não pertence à área financeira da sua conta." });
+    }
+    const fileResponse = await fetch(parsedUrl.toString(), { signal: AbortSignal.timeout(20000) });
+    if (!fileResponse.ok) throw new Error(`Falha ao baixar documento do Storage (HTTP ${fileResponse.status}).`);
+    const contentType = (fileResponse.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (contentType !== mimeType) throw new Error("O tipo do arquivo armazenado não corresponde ao arquivo enviado.");
+    const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+    if (!fileBuffer.length || fileBuffer.length > 10 * 1024 * 1024) return res.status(413).json({ error: "O documento deve ter até 10 MB." });
+    const data = fileBuffer.toString("base64");
     const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
     if (!allowed.includes(mimeType)) return res.status(415).json({ error: "Formato não suportado. Use PDF, JPG, PNG ou WEBP." });
     const prompt = "Você é um analista financeiro e fiscal brasileiro. Leia a nota fiscal, boleto, recibo, orçamento ou documento de compra. Extraia apenas dados visíveis, sem inventar. Responda APENAS JSON válido: { \"documentType\":\"nfe|danfe|supplier_quote|purchase_order|boleto|receipt|other\", \"supplierName\":\"\", \"supplierCnpj\":\"\", \"documentNumber\":\"\", \"accessKey\":\"\", \"issueDate\":\"YYYY-MM-DD\", \"dueDate\":\"YYYY-MM-DD\", \"currency\":\"BRL\", \"total\":0, \"tax\":0, \"description\":\"\", \"digitableLine\":\"\", \"barcode\":\"\", \"payerName\":\"\", \"payerCnpj\":\"\", \"items\":[{\"description\":\"\",\"sku\":\"\",\"quantity\":1,\"unit\":\"un\",\"unitPrice\":0,\"total\":0}], \"confidence\":\"high|medium|low\", \"warnings\":[] }. Use string vazia, zero ou lista vazia quando ausente. Não confunda CNPJ do emitente com destinatário/pagador. Valores em reais. Limite itens a 100. Arquivo: " + String(fileName || "").slice(0, 120);
