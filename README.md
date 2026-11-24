@@ -1,5 +1,5 @@
 # Anacleto Pro 🚀
-### Plataforma SaaS Enterprise de Presupuestos, Facturación, CRM y Dibujo Técnico CAD con IA (Gemini 2.5)
+### Plataforma SaaS Enterprise de Presupuestos, Facturación, CRM y Dibujo Técnico CAD con IA (Gemini 3.8)
 
 Anacleto Pro es una solución full-stack moderna y de alto rendimiento diseñada para talleres de carpintería de aluminio, vidrio arquitectónico y mobiliario a medida. Integra un agente de IA en tiempo real para presupuestos y facturación, persistencia multi-colección en Firebase Firestore, y un motor de **Dibujo Técnico 2D** interactivo con cotas, despiece tipo puzzle y visualización en 5 fases de construcción.
 
@@ -16,7 +16,7 @@ Anacleto Pro es una solución full-stack moderna y de alto rendimiento diseñada
   - **Dibujo Técnico**: Motor CAD interactivo de dos paneles (instrucciones IA + lienzo SVG escalable con zoom/pan) y despiece con cotas en 5 fases.
   - **Configuración**: Edición de datos de emisor (razón social, NIF, IBAN bancario, moneda, etc.).
 
-### 2. Agente de IA para Presupuestos y Facturas (Gemini 2.5)
+### 2. Agente de IA para Presupuestos y Facturas (Gemini 3.8)
 - Describe en lenguaje natural los trabajos y el agente generará automáticamente:
   - Descripción técnica, cantidad, precio unitario de mercado y subtotal.
   - Recálculo en vivo de base imponible, impuestos y total.
@@ -40,7 +40,7 @@ Anacleto Pro es una solución full-stack moderna y de alto rendimiento diseñada
 
 ## 🛠️ Stack Tecnológico
 - **Frontend**: React 19, TypeScript, Vite, TailwindCSS.
-- **Backend / Proxy**: Node.js, Express, `server.ts` con `@google/genai` TypeScript SDK (modelos Gemini 2.5 Flash).
+- **Backend / Proxy**: Node.js, Express, `server.ts` con `@google/genai` TypeScript SDK (modelos Gemini 3.8 Flash).
 - **Persistencia & Auth**: Firebase Firestore (colecciones `companies`, `quotes`, `invoices`, `technical_drawings`, `ledger`, `sender_config`).
 - **Exportación PDF**: `jsPDF` + `jspdf-autotable`.
 
@@ -58,9 +58,11 @@ Anacleto Pro es una solución full-stack moderna y de alto rendimiento diseñada
    ```bash
    cp .env.example .env.local
    ```
-   Configura tu clave de Gemini:
+   Configura las credenciales de IA y el límite compartido:
    ```env
    GEMINI_API_KEY="AIzaSy..."
+UPSTASH_REDIS_REST_URL="https://...upstash.io"
+UPSTASH_REDIS_REST_TOKEN="..."
    ```
 
 3. **Iniciar el servidor de desarrollo**:
