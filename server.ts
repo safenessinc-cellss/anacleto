@@ -157,14 +157,14 @@ Pergunta: ${question}`,
 });
 
 function rateLimitByUser(bucket: string, limit?: number, windowMs?: number): express.RequestHandler {
-  const policy = getAIRateLimit(bucket);
+  const policy = limit === undefined || windowMs === undefined ? getAIRateLimit(bucket) : { limit, windowMs };
   const effectiveLimit = limit ?? policy.limit;
   const effectiveWindowMs = windowMs ?? policy.windowMs;
   return async (req, res, next) => {
     const user = res.locals.firebaseUser as { uid?: string } | undefined;
     const identifier = user?.uid || getClientIp(req);
     try {
-      if (!(await consumeRateLimit(bucket, identifier, effectiveLimit, effectiveWindowMs))) {
+      if (!(await consumeRateLimit(bucket, identifier, effectiveLimit, effectiveWindowMs, { requireDistributed: true }))) {
         return res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente.", code: "RATE_LIMITED" });
       }
       return next();
