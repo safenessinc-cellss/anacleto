@@ -120,8 +120,9 @@ export default async function handler(req: any, res: any) {
       loadedAt: new Date().toISOString(),
     });
   } catch (error: any) {
-    const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
-    const statusCode = Number(error?.statusCode || (stage === "firebase_authentication" ? 503 : 502));
+    const statusCode = Number(error?.statusCode
+      || (error?.name === "TimeoutError" || error?.name === "AbortError" ? 504 : 0)
+      || (stage === "firebase_authentication" || stage === "server_configuration" ? 503 : 502));
     console.error("[supplier/technical-options] failed", {
       stage,
       requestId,
