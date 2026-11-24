@@ -65,30 +65,53 @@ export default async function handler(req: any, res: any) {
     // Canonical engineering identity is authoritative for profiles and hardware.
     // Cutting formulas remain in the reviewed legacy rules collection until a dedicated
     // rule migration exists; no unreviewed product can enter the BOM.
-    const [technicalProducts,rules]=await Promise.all([
+    const [technicalProducts,legacyProfiles,legacyHardware,rules]=await Promise.all([
       collectionDocs(firebaseConfig.projectId,databaseId,"technical_products",token),
+      collectionDocs(firebaseConfig.projectId,databaseId,"aluminum_profiles",token),
+      collectionDocs(firebaseConfig.projectId,databaseId,"hardware_catalog",token),
       collectionDocs(firebaseConfig.projectId,databaseId,"cutting_rules",token)
     ]);
-    const verified=(row:FirestoreDoc)=>row.status==="verified"
-      && !!row.source?.sourceDocumentId
-      && Number.isInteger(Number(row.source?.sourcePage)) && Number(row.source.sourcePage)>=1
-      && !!row.reviewedBy && !!row.reviewedAt;
-    const profiles: any[]=technicalProducts.filter(row=>row.kind==="aluminum_profile"&&verified(row)).map((row): any=>({
+    // Accept the canonical schema and the collections used by the current Technical Library.
+    // A record is eligible only after explicit review and with a traceable source page.
+    const verified=(row:FirestoreDoc)=>{
+      const sourceId=row.source?.sourceDocumentId||row.documentId;
+      const sourcePage=Number(row.source?.sourcePage||row.page);
+      return row.status==="verified" && !!sourceId
+        && Number.isInteger(sourcePage) && sourcePage>=1
+        && !!(row.reviewedAt||row.reviewedBy);
+    };
+    const canonicalProfiles: any[]=technicalProducts.filter(row=>row.kind==="aluminum_profile"&&verified(row)).map((row): any=>({
       ...row, code:row.manufacturerCode, description:row.description,
       commercialLengthMm:Number(row.technicalProperties?.commercialLengthMm||row.technicalProperties?.barLengthMm||0),
       weightKgM:Number(row.technicalProperties?.weightKgM||0), finish:row.finish||"",
-      documentId:row.source.sourceDocumentId,page:row.source.sourcePage,
+      documentId:row.source?.sourceDocumentId,page:row.source?.sourcePage,
+      imageUrl:row.imageUrl||row.photoUrl||row.sourcePageImageUrl||"",
       technicalProductId:row.id
     }));
-    const hardware: any[]=technicalProducts.filter(row=>["hardware","seal","fastener","glass","consumable"].includes(row.kind)&&verified(row)).map((row): any=>({
+    const importedProfiles:any[]=legacyProfiles.filter(verified).map((row):any=>({
+      ...row, commercialLengthMm:Number(row.commercialLengthMm||row.barLengthMm||0),
+      weightKgM:Number(row.weightKgM||0), imageUrl:row.imageUrl||row.photoUrl||row.sourcePageImageUrl||"",
+      documentId:row.documentId,page:row.page,technicalProductId:row.id
+    }));
+    const profiles:any[]= [...canonicalProfiles,...importedProfiles];
+    const canonicalHardware:any[]=technicalProducts.filter(row=>["hardware","seal","fastener","glass","consumable"].includes(row.kind)&&verified(row)).map((row): any=>({
       ...row, code:row.manufacturerCode, description:row.description,
       quantity:Number(row.technicalProperties?.quantity||0),
       quantityFormula:String(row.technicalProperties?.quantityFormula||""),
       unit:String(row.technicalProperties?.unit||"piece"),
       typology:String(row.technicalProperties?.typology||"*"),
-      documentId:row.source.sourceDocumentId,page:row.source.sourcePage,
+      documentId:row.source?.sourceDocumentId,page:row.source?.sourcePage,
+      imageUrl:row.imageUrl||row.photoUrl||row.sourcePageImageUrl||"",
       technicalProductId:row.id
     }));
+    const importedHardware:any[]=legacyHardware.filter(verified).map((row):any=>({
+      ...row, code:row.code||row.manufacturerCode, description:row.description,
+      quantity:Number(row.quantity||0),quantityFormula:String(row.quantityFormula||""),
+      unit:String(row.unit||"piece"),typology:String(row.typology||"*"),
+      documentId:row.documentId,page:row.page,
+      imageUrl:row.imageUrl||row.photoUrl||row.sourcePageImageUrl||"",technicalProductId:row.id
+    }));
+    const hardware:any[]=[...canonicalHardware,...importedHardware];
     const eq=(a:any,b:string)=>String(a||"").trim().toLowerCase()===b.toLowerCase();
     const matchedRules=rules.filter(row=>row.status==="verified"&&row.reviewStatus!=="rejected"
       &&!!row.documentId&&Number.isInteger(Number(row.page))&&Number(row.page)>=1
@@ -134,7 +157,7 @@ export default async function handler(req: any, res: any) {
           commercialBarLengthMm:isProfile?commercialLength:undefined,kerfMm:Number(rule.kerfMm||3),
           manufacturer,system:line,finish:componentFinish,weightKgM:Number(profile?.weightKgM||0)||undefined,compatibilityKey:[manufacturer,line,code,componentFinish].join(":").toLowerCase(),
           required:true,glassType:rule.glassType||"",glassThicknessMm:Number(rule.glassThicknessMm||0)||undefined,
-          sourceDocumentId:rule.documentId||profile?.documentId||"",sourcePage:Number(rule.page||profile?.page||0)||undefined,
+          sourceDocumentId:rule.documentId||profile?.documentId||"",sourcePage:Number(rule.page||profile?.page||0)||undefined,imageUrl:profile?.imageUrl||"",
           ruleId:rule.id,technicalStatus:"verified",formula:rule.formula
         });
       } catch(error:any) { errors.push("Regra "+String(rule.id)+": "+String(error?.message||"fórmula inválida")); }
