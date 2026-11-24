@@ -83,7 +83,7 @@ export default function AdvisorTab({ budgets, invoices, visits, senderConfig, cu
           </p>
         </div>
         <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 font-extrabold text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-md border border-amber-205/30">
-          <Sparkles className="w-3.5 h-3.5" /> Gemini Pro active
+          <Sparkles className="w-3.5 h-3.5" /> IA Anacleto
         </div>
       </div>
 
