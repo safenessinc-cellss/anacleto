@@ -5,6 +5,7 @@ import { parseAIJson } from "../src/server/ai-json.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { recordAIAudit } from "../src/server/ai-audit.js";
 import { stripBearerPrefix } from "../src/server/auth-token.js";
+import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
 import { withDraftVectorWatermark } from "../src/server/drawing-vector.js";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec, type AluminumTipologia, type ParametricWindowSpec } from "../src/utils/parametricCad.js";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
@@ -215,38 +216,7 @@ async function readDrawingJob(req: any, jobId: string): Promise<Record<string, a
 }
 
 async function authenticate(req: any): Promise<{ uid: string; email: string; role: string } | null> {
-  const authorization = String(req.headers.authorization || "");
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-  const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
-  if (!token || !apiKey) return null;
-
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken: token }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!response.ok) return null;
-  const data = await response.json() as { users?: Array<{ localId?: string; email?: string }> };
-  const user = data.users?.[0];
-  if (!user?.localId || !user.email) return null;
-
-  const email = user.email.toLowerCase();
-  let role = "owner";
-  if (email !== OWNER_EMAIL) {
-    const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
-    const documentId = encodeURIComponent(email);
-    const roleUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${databaseId}/documents/admins/${documentId}`;
-    const roleResponse = await fetch(roleUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!roleResponse.ok) return null;
-    const roleData = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
-    if (!roleData.fields?.role?.stringValue) return null;
-    role = roleData.fields.role.stringValue;
-  }
-  return { uid: user.localId, email, role };
+  return authenticateFirebaseRequest(req);
 }
 
 function allowRequest(uid: string): boolean {
