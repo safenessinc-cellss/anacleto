@@ -27,8 +27,9 @@ export function getClientIp(req: any): string {
 
 /**
  * Atomic fixed-window quota shared across serverless instances through Upstash.
- * Production fails closed when Redis is not configured; local memory is only
- * a development fallback and is bounded/pruned to avoid unbounded growth.
+ * When Redis is unavailable, callers without requireDistributed use a bounded
+ * per-instance fallback; public AI routes are additionally protected at the
+ * Vercel edge by the active firewall rule.
  */
 export async function consumeRateLimit(
   bucket: string,
