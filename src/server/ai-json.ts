@@ -203,7 +203,7 @@ export async function generateValidatedJson<T>(options: {
       });
       const result = await generateText({
         model: getAIGatewayFallbackModel(),
-        system: options.system,
+        system: options.system + (options.responseSchema ? "\nSchema JSON obrigatório: " + JSON.stringify(options.responseSchema) : "") + "\nRetorne somente JSON válido, sem markdown.",
         prompt: options.prompt,
         temperature: options.temperature ?? config.temperature,
         maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
