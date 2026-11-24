@@ -60,14 +60,28 @@ export async function generateValidatedJson<T>(options: {
   onGeneration?: (event: { text: string; usage?: { inputTokens?: number; outputTokens?: number; promptTokens?: number; completionTokens?: number }; attempt: number }) => void;
 }): Promise<T> {
   const config = AI_CONFIG[options.capability];
+  // timeoutMs is the TOTAL budget for all attempts, not a per-attempt timeout.
+  // This prevents a retry from running beyond Vercel's function execution window.
+  const deadline = Date.now() + config.timeoutMs;
   let raw = "";
   let lastError: unknown;
+
   for (let attempt = 0; attempt <= config.retries; attempt++) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs < 1_500) break;
+
+    // Reserve up to 5 seconds for one bounded JSON-repair attempt.
+    const attemptTimeoutMs = attempt === 0 && config.retries > 0
+      ? Math.max(1_500, remainingMs - 5_000)
+      : remainingMs;
+    const signal = AbortSignal.timeout(attemptTimeoutMs);
     const prompt = attempt === 0
       ? options.prompt
-      : `Corrija exclusivamente a estrutura da resposta abaixo para JSON válido conforme as instruções. Preserve todos os dados; não invente nem complete informações ausentes. Retorne somente JSON.\nERRO DE VALIDAÇÃO: ${String((lastError as Error)?.message || lastError)}\nRESPOSTA ORIGINAL:\n${raw}`;
+      : `Corrija exclusivamente a estrutura da resposta abaixo para JSON válido conforme as instruções. Preserve os dados; não invente nem complete informações ausentes. Retorne somente JSON.\\nERRO DE VALIDAÇÃO: ${String((lastError as Error)?.message || lastError).slice(0, 500)}\\nRESPOSTA ORIGINAL:\\n${raw.slice(0, 20_000)}`;
+
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
     let usage: any;
+
     if (apiKey) {
       const client = new GoogleGenAI({ apiKey });
       const result = await client.models.generateContent({
@@ -79,7 +93,7 @@ export async function generateValidatedJson<T>(options: {
           ...(options.responseSchema ? { responseSchema: options.responseSchema } : {}),
           temperature: options.temperature ?? config.temperature,
           maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
-          abortSignal: AbortSignal.timeout(config.timeoutMs),
+          abortSignal: signal,
         },
       });
       raw = result.text || "";
@@ -91,11 +105,12 @@ export async function generateValidatedJson<T>(options: {
         prompt,
         temperature: options.temperature ?? config.temperature,
         maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
-        abortSignal: AbortSignal.timeout(config.timeoutMs),
+        abortSignal: signal,
       });
       raw = result.text || "";
       usage = result.usage as any;
     }
+
     options.onGeneration?.({ text: raw, usage, attempt });
     try {
       return parseAIJson(raw, options.validate);
@@ -103,5 +118,9 @@ export async function generateValidatedJson<T>(options: {
       lastError = error;
     }
   }
-  throw new AIJsonError("A IA não conseguiu gerar uma resposta estruturada válida após a tentativa de recuperação.", lastError);
+
+  if (lastError) {
+    throw new AIJsonError("A IA não conseguiu gerar uma resposta estruturada válida dentro do tempo disponível.", lastError);
+  }
+  throw new AIJsonError("Tempo limite excedido ao consultar o provedor de IA.");
 }
