@@ -24,6 +24,7 @@ import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
 import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
 import { getAIRateLimit } from "./src/server/ai-limits.js";
 import { hasAIRole } from "./src/server/ai-roles.js";
+import { AI_GATEWAY_FALLBACK_MODEL, getAIGatewayFallbackModel } from "./src/server/ai-config.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -202,15 +203,47 @@ app.post("/api/chat",async(req,res)=>{
  }
  const {message,history,language="pt"}=req.body||{};if(typeof message!=="string"||!message.trim())return res.status(400).json({error:"Mensagem obrigatória."});
  const fallback=publicChatFallback(message,language);
- try{
-  if(!process.env.AI_GATEWAY_API_KEY&&!process.env.GEMINI_API_KEY&&!process.env.GOOGLE_API_KEY)return res.json({response:fallback,fallback:true});
+ try {
   const systemInstruction="Você é o assistente comercial da Anacleto Esquadrias, em São Leopoldo, RS. Responda no idioma "+language+". Não invente preços nem disponibilidade. Garantia: 5 anos estrutural nas esquadrias de alumínio e até 10 anos de fábrica para vidros temperados certificados. WhatsApp +55 51 99819-3931.";
   const geminiKey=process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY;
-  if(geminiKey){const {GoogleGenAI}=await import("@google/genai");const client=new GoogleGenAI({apiKey:geminiKey});const historyContents=Array.isArray(history)?history.slice(-8).map((m:any)=>({role:m.role==="assistant"?"model":"user",parts:[{text:String(m.text||m.content||"").slice(0,1500)}]})):[];const response=await client.models.generateContent({model:"gemini-3.8-flash",contents:[...historyContents,{role:"user",parts:[{text:message.trim().slice(0,3000)}]}],config:{systemInstruction,temperature:0.5,maxOutputTokens:700}});return res.json({response:response.text||fallback,fallback:!response.text});}
-  const gatewayHistory=Array.isArray(history)?history.slice(-8).map((m:any)=>({role:m.role==="assistant"?"assistant":"user",content:String(m.text||m.content||"").slice(0,1500)})):[];
-  const result=await generateText({model:getAIModel("chat"),system:systemInstruction,messages:[...gatewayHistory,{role:"user",content:message.trim().slice(0,3000)}] as any,temperature:0.5,maxOutputTokens:700});
-  return res.json({response:result.text||fallback,fallback:!result.text});
- }catch(error){console.error("Public chat provider unavailable; local fallback:",error);return res.json({response:fallback,fallback:true});}
+  const historyMessages=Array.isArray(history)?history.slice(-8).map((m:any)=>({role:m.role==="assistant"?"assistant":"user",content:String(m.text||m.content||"").slice(0,1500)})):[];
+
+  if(geminiKey) {
+   try {
+    const {GoogleGenAI}=await import("@google/genai");
+    const client=new GoogleGenAI({apiKey:geminiKey});
+    const historyContents=Array.isArray(history)?history.slice(-8).map((m:any)=>({role:m.role==="assistant"?"model":"user",parts:[{text:String(m.text||m.content||"").slice(0,1500)}]})):[];
+    const response=await client.models.generateContent({
+     model:"gemini-3.8-flash",
+     contents:[...historyContents,{role:"user",parts:[{text:message.trim().slice(0,3000)}]}],
+     config:{systemInstruction,temperature:0.5,maxOutputTokens:700}
+    });
+    if(response.text)return res.json({response:response.text,fallback:false,provider:"gemini-direct"});
+    throw new Error("Gemini returned an empty chat response.");
+   } catch(geminiError:any) {
+    console.error("[PUBLIC_CHAT] Gemini failed; trying cross-provider AI Gateway fallback",{
+     status:geminiError?.status||geminiError?.statusCode||0,
+     message:String(geminiError?.message||geminiError).slice(0,700)
+    });
+   }
+  }
+
+  if(process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN) {
+   const result=await generateText({
+    model:getAIGatewayFallbackModel(),
+    system:systemInstruction,
+    messages:[...historyMessages,{role:"user",content:message.trim().slice(0,3000)}] as any,
+    temperature:0.5,
+    maxOutputTokens:700,
+    providerOptions:{gateway:{only:["openai","azure"]}}
+   });
+   if(result.text)return res.json({response:result.text,fallback:false,provider:AI_GATEWAY_FALLBACK_MODEL});
+  }
+  return res.json({response:fallback,fallback:true});
+ } catch(error) {
+  console.error("[PUBLIC_CHAT] All AI providers unavailable; using local response",error);
+  return res.json({response:fallback,fallback:true});
+ }
 });
 
 // ----------------------------------------------------
