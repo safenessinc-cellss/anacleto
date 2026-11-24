@@ -59,7 +59,7 @@ const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
       status: Number(error?.statusCode || 0),
       message: String(error?.message || error).slice(0, 500),
     });
-    return res.status(Number(error?.statusCode) === 503 ? 503 : 503)
+    return res.status(503)
       .json({ error: "Não foi possível validar a sessão no momento." });
   }
 };
