@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 import { GoogleGenAI, Type } from "@google/genai";
-import { AI_CONFIG, getAIModel } from "../src/server/ai-config.js";
+import { AI_CONFIG, AI_GATEWAY_FALLBACK_MODEL, getAIGatewayFallbackModel } from "../src/server/ai-config.js";
 import { parseAIJson } from "../src/server/ai-json.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { recordAIAudit } from "../src/server/ai-audit.js";
@@ -95,6 +95,7 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
             responseSchema: options.responseSchema || drawingResponseSchema,
             temperature: options.temperature,
             maxOutputTokens: options.maxOutputTokens,
+            providerOptions: { gateway: { only: ["openai", "azure"] } },
             abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? Math.max(5_000, remaining - 1_500) : remaining)),
           }
         });
@@ -116,7 +117,7 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
       if (gatewayConfigured && Date.now() + 1_500 < deadline) {
         try {
           const fallback = await generateText({
-            model: getAIModel("technicalDrawing"),
+            model: getAIGatewayFallbackModel(),
             system: options.system,
             messages: [{ role: "user", content: [
               { type: "text", text: options.prompt },
@@ -127,8 +128,8 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
             abortSignal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
           });
           if (fallback.text?.trim()) {
-            console.warn("[TECHNICAL_DRAWING_AI] direct Gemini failed; AI Gateway fallback succeeded", { model });
-            return { text: fallback.text, usage: fallback.usage as any, model: AI_CONFIG.technicalDrawing.model + " (gateway-fallback)" };
+            console.warn("[TECHNICAL_DRAWING_AI] direct Gemini failed; cross-provider AI Gateway fallback succeeded", { model: AI_GATEWAY_FALLBACK_MODEL });
+            return { text: fallback.text, usage: fallback.usage as any, model: AI_GATEWAY_FALLBACK_MODEL + " (gateway-fallback)" };
           }
         } catch (fallbackError: any) {
           console.error("[TECHNICAL_DRAWING_AI] AI Gateway fallback failed", {
