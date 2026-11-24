@@ -2,7 +2,7 @@
 
 ## Segredos e variáveis obrigatórias
 
-`GEMINI_API_KEY` (ou `GOOGLE_API_KEY`) habilita a chamada direta ao Gemini 2.5 Flash pelo SDK oficial `@google/genai`, com `responseMimeType: application/json` e `responseSchema` nos agentes estruturados. Sem essa chave, o sistema mantém o fallback existente pelo Vercel AI Gateway; o fallback não oferece a mesma garantia nativa de schema do endpoint Gemini. A chave deve existir somente como variável sensível no servidor (Vercel Preview/Production), nunca em `localStorage`, no bundle do navegador ou no Git. A camada gratuita do Google tem limites e disponibilidade sujeitos à política atual do provedor; não é possível prometer uso ilimitado ou 100% de disponibilidade.
+`GEMINI_API_KEY` (ou `GOOGLE_API_KEY`) habilita chamadas diretas ao Gemini 3.8 Flash pelo SDK oficial `@google/genai`, com `responseMimeType: application/json` e `responseSchema` nos agentes estruturados. Os fluxos de geração de imagem usam `gemini-nano-banana-2.1`. Sem a chave direta, os agentes estruturados mantêm o fallback existente pelo Vercel AI Gateway; a validação de JSON continua obrigatória na aplicação. A chave deve existir somente como variável sensível no servidor (Vercel Preview/Production), nunca em `localStorage`, no bundle do navegador ou no Git. A camada gratuita do Google tem limites e disponibilidade sujeitos à política atual do provedor; não é possível prometer uso ilimitado ou 100% de disponibilidade.
 
 Configure no ambiente de execução (Preview e Production separadamente). Nunca coloque estes valores no frontend, no Git ou em logs.
 
@@ -13,13 +13,13 @@ Configure no ambiente de execução (Preview e Production separadamente). Nunca 
 | `GEMINI_API_KEY` (ou `GOOGLE_API_KEY`) | Chave do Google AI Studio para Gemini 2.5 Flash direto com JSON Schema. Configurar como variável sensível em Preview e Production. |
 | `ANACLETO_SERVICE_API_KEY` | Segredo HMAC compartilhado entre o servidor principal e o serviço independente de desenhos. Mínimo de 32 caracteres aleatórios. Deve ser idêntico nos dois serviços. |
 | `ANACLETO_DRAWING_SERVICE_URL` | URL HTTPS base do serviço independente. O contrato usa `POST /api/technical-drawing` e `GET /api/technical-drawing?jobId={uuid}`. |
-| `UPSTASH_REDIS_REST_URL` | Endpoint REST do Redis para rate limit distribuído do endpoint público. Obrigatório em produção. |
-| `UPSTASH_REDIS_REST_TOKEN` | Token REST do Redis. Obrigatório em produção. |
+| `UPSTASH_REDIS_REST_URL` | Endpoint REST do Redis para limites compartilhados de uso em chat público, pré-orçamento, geração de imagem, desenho técnico e assistente financeiro. Obrigatório em produção. |
+| `UPSTASH_REDIS_REST_TOKEN` | Token REST padrão do Redis, somente no servidor. Obrigatório em produção. |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | JSON da service account para persistir auditorias originadas de chamadas públicas sem token Firebase de usuário. Alternativamente, use `FIREBASE_CLIENT_EMAIL` e `FIREBASE_PRIVATE_KEY`. |
 | `ANACLETO_PUBLIC_ESTIMATE_MODEL` | Override opcional do modelo leve de pré-avaliação pública. |
 | `ANACLETO_QUOTE_MODEL`, `ANACLETO_BUDGET_MODEL`, `ANACLETO_DRAWING_MODEL` | Overrides opcionais por capacidade, centralizados em `src/server/ai-config.ts`. |
 
-## Contrato do serviço de desenhos
+## Limites de uso compartilhados\n\n- `src/server/rate-limit.ts` usa uma operação Lua atômica no Upstash Redis para aplicar janelas fixas compartilhadas entre instâncias serverless.\n- As chaves Redis armazenam somente hashes SHA-256 do identificador de usuário/IP, não o IP em texto.\n- Em desenvolvimento local, há fallback em memória limitado e com limpeza. Em produção, a ausência ou falha do Upstash bloqueia a chamada com HTTP 503; não há fallback silencioso para contadores locais.\n- Os limites são definidos por rota/capacidade no servidor e não substituem autenticação nem autorização por função.\n\n## Contrato do serviço de desenhos
 
 1. O servidor principal gera um UUID de tarefa, serializa o corpo JSON e assina `METHOD + path + timestamp + body` com HMAC-SHA256.
 2. Envia `x-service-signature`, `x-service-timestamp`, `x-request-id` e o Bearer token Firebase do utilizador.
