@@ -94,8 +94,9 @@ async function generateWithOpenAI(options: {
 /**
  * Uses direct Gemini API first (does not depend on Vercel AI Gateway billing),
  * retries transient provider errors once within a single total deadline, then
- * falls back to OpenAI when OPENAI_API_KEY is configured. JSON is always parsed
- * and validated by the caller before it can be used by business workflows.
+ * tries direct OpenAI when configured and finally a cross-provider OpenAI/Azure
+ * fallback through AI Gateway even when the direct Gemini key is present. JSON
+ * is always parsed and validated before it can be used by business workflows.
  */
 export async function generateValidatedJson<T>(options: {
   capability: keyof typeof AI_CONFIG;
