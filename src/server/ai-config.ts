@@ -2,9 +2,10 @@ import { gateway } from "ai";
 
 /**
  * Single source of truth for Anacleto AI model routing and runtime limits.
- * Override models per capability without changing application code.
+ * Pin the production model in code so stale Vercel environment overrides
+ * cannot silently route requests back to retired Gemini 2.5 models.
  */
-const DEFAULT_MODEL = process.env.ANACLETO_AI_MODEL || "google/gemini-3.8-flash";
+const DEFAULT_MODEL = "google/gemini-3.8-flash";
 
 export const AI_CONFIG = {
   default: {
@@ -15,49 +16,49 @@ export const AI_CONFIG = {
     retries: 1,
   },
   chat: {
-    model: process.env.ANACLETO_CHAT_MODEL || DEFAULT_MODEL,
+    model: DEFAULT_MODEL,
     temperature: 0.7,
     maxOutputTokens: 4096,
     timeoutMs: 20_000,
     retries: 0,
   },
   quote: {
-    model: process.env.ANACLETO_QUOTE_MODEL || DEFAULT_MODEL,
+    model: DEFAULT_MODEL,
     temperature: 0.1,
     maxOutputTokens: 5000,
     timeoutMs: 35_000,
     retries: 1,
   },
   budget: {
-    model: process.env.ANACLETO_BUDGET_MODEL || DEFAULT_MODEL,
+    model: DEFAULT_MODEL,
     temperature: 0.1,
     maxOutputTokens: 5000,
     timeoutMs: 35_000,
     retries: 1,
   },
   projectIntake: {
-    model: process.env.ANACLETO_PROJECT_MODEL || DEFAULT_MODEL,
+    model: DEFAULT_MODEL,
     temperature: 0.2,
     maxOutputTokens: 3000,
     timeoutMs: 35_000,
     retries: 1,
   },
   technicalDrawing: {
-    model: process.env.ANACLETO_DRAWING_MODEL || DEFAULT_MODEL,
+    model: DEFAULT_MODEL,
     temperature: 0.2,
     maxOutputTokens: 12000,
     timeoutMs: 40_000,
     retries: 1,
   },
   documentExtraction: {
-    model: process.env.ANACLETO_DOCUMENT_MODEL || DEFAULT_MODEL,
+    model: DEFAULT_MODEL,
     temperature: 0.1,
     maxOutputTokens: 5000,
     timeoutMs: 35_000,
     retries: 1,
   },
   publicEstimate: {
-    model: process.env.ANACLETO_PUBLIC_ESTIMATE_MODEL || "google/gemini-3.5-flash-lite",
+    model: DEFAULT_MODEL,
     temperature: 0.1,
     maxOutputTokens: 1200,
     timeoutMs: 8_000,
