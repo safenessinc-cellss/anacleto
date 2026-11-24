@@ -74,7 +74,7 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
       parts.push({ inlineData: { mimeType: response.headers.get("content-type") || "image/jpeg", data: Buffer.from(bytes).toString("base64") } });
     }
     const client = new GoogleGenAI({ apiKey });
-    const model = options.responseSchema === parametricResponseSchema ? "gemini-3.8-flash" : "gemini-3.8-flash";
+    const model = options.responseSchema === parametricResponseSchema ? "gemini-3.5-flash-lite" : "gemini-3.8-flash";
     const response = await client.models.generateContent({
       model,
       contents: [{ role: "user", parts }],
