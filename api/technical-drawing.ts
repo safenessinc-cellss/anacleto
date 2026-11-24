@@ -76,7 +76,7 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
     const client = new GoogleGenAI({ apiKey });
     const model = options.responseSchema === parametricResponseSchema
       ? (process.env.ANACLETO_PARAMETRIC_MODEL || "gemini-3.5-flash-lite")
-      : (process.env.ANACLETO_DRAWING_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash").replace(/^google\\//, "");
+      : (process.env.ANACLETO_DRAWING_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash").replace(/^google\//, "");
     const deadline = Date.now() + Math.min(AI_CONFIG.technicalDrawing.timeoutMs, 50_000);
     let response: any;
     let lastError: any;
