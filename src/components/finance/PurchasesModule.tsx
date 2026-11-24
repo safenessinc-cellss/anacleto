@@ -165,10 +165,18 @@ export default function PurchasesModule() {
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("Entre novamente para processar documentos.");
-      const data = await readFileBase64(file);
+      const user = auth.currentUser;
+      if (!user) throw new Error("Sessão expirada. Entre novamente.");
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
+      const storagePath = "purchases/" + user.uid + "/" + Date.now() + "-" + safeName;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, file, { contentType: mimeType, customMetadata: { uploadedBy: user.uid, source: "purchases-module" } });
+      const storageUrl = await getDownloadURL(storageRef);
+      setDocumentPath(storagePath);
+      setDocumentUrl(storageUrl);
       const response = await fetch("/api/ai/purchase-extract", {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ data, mimeType, fileName: file.name })
+        body: JSON.stringify({ storageUrl, mimeType, fileName: file.name })
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Não foi possível interpretar o documento.");
@@ -239,7 +247,7 @@ export default function PurchasesModule() {
       let url = documentUrl, path = documentPath;
       if (documentFile && !path) {
         const safeName = documentFile.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
-        path = "purchases/" + Date.now() + "-" + safeName;
+        path = "purchases/" + (auth.currentUser?.uid || "unknown") + "/" + Date.now() + "-" + safeName;
         const storageRef = ref(storage, path);
         await uploadBytes(storageRef, documentFile, { contentType: documentFile.type || "application/pdf", customMetadata: { supplierId, uploadedBy: auth.currentUser?.uid || "" } });
         url = await getDownloadURL(storageRef);
