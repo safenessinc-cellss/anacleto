@@ -21,6 +21,7 @@ import marketResearchHandler from "./src/server/supplier-api/market-research.js"
 import { recordAIAudit } from "./src/server/ai-audit.js";
 import { stripBearerPrefix } from "./src/server/auth-token.js";
 import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
+import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -74,8 +75,6 @@ const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
   if (user && ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role || "")) return next();
   return res.status(403).json({ error: "Seu perfil não tem autorização para operações financeiras." });
 };
-
-const requestWindows = new Map<string, { startedAt: number; count: number }>();
 
 function compactFinancialRows(rows: any[], fields: string[]) {
   return rows.slice(0, 120).map(row => Object.fromEntries(fields.filter(key => row[key] !== undefined).map(key => [key, row[key]])));
@@ -156,24 +155,21 @@ Pergunta: ${question}`,
 });
 
 function rateLimitByUser(bucket: string, limit: number, windowMs: number): express.RequestHandler {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const user = res.locals.firebaseUser as { uid?: string } | undefined;
-    const key = `${bucket}:${user?.uid || req.ip}`;
-    const now = Date.now();
-    if (requestWindows.size > 5000) {
-      for (const [entry, window] of requestWindows) {
-        if (now - window.startedAt >= windowMs) requestWindows.delete(entry);
+    const identifier = user?.uid || getClientIp(req);
+    try {
+      if (!(await consumeRateLimit(bucket, identifier, limit, windowMs))) {
+        return res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente.", code: "RATE_LIMITED" });
       }
-    }
-    const current = requestWindows.get(key);
-    if (!current && requestWindows.size >= 10000) return res.status(429).json({ error: "Limite temporário de solicitações atingido. Tente novamente em instantes." });
-    if (!current || now - current.startedAt >= windowMs) {
-      requestWindows.set(key, { startedAt: now, count: 1 });
       return next();
+    } catch (error: any) {
+      console.error("[AI_RATE_LIMIT_UNAVAILABLE]", {
+        bucket,
+        message: String(error?.message || error).slice(0, 500),
+      });
+      return res.status(503).json({ error: "O controle de uso está temporariamente indisponível. Tente novamente em instantes.", code: "RATE_LIMIT_UNAVAILABLE" });
     }
-    if (current.count >= limit) return res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente." });
-    current.count += 1;
-    return next();
   };
 }
 
@@ -181,7 +177,6 @@ function rateLimitByUser(bucket: string, limit: number, windowMs: number): expre
 // ----------------------------------------------------
 // 1. General AI Chat Proxy
 // ----------------------------------------------------
-const publicChatWindows = new Map<string, { count: number; resetAt: number }>();
 function publicChatFallback(message: string, language: string): string {
  const q=message.toLowerCase(),es=language==="es",en=language==="en";
  if(/horar|abert|funcion|atend|abre|open|hours/.test(q))return es?"La atención y las visitas técnicas se coordinan mediante cita. WhatsApp +55 51 99819-3931 para confirmar disponibilidad.":en?"Service and technical visits are arranged by appointment. WhatsApp +55 51 99819-3931 to confirm availability.":"O atendimento e as visitas técnicas são mediante agendamento. WhatsApp +55 51 99819-3931 para confirmar disponibilidade.";
@@ -192,8 +187,13 @@ function publicChatFallback(message: string, language: string): string {
 app.options("/api/chat",(_req,res)=>res.status(204).end());
 app.get("/api/chat",(_req,res)=>res.json({ok:true,service:"anacleto-public-chat"}));
 app.post("/api/chat",async(req,res)=>{
- const ip=String(req.headers["x-real-ip"]||req.headers["x-forwarded-for"]||req.socket.remoteAddress||"unknown").split(",")[0].trim(),now=Date.now(),quota=publicChatWindows.get(ip);
- if(!quota||now>=quota.resetAt)publicChatWindows.set(ip,{count:1,resetAt:now+60000});else if(quota.count>=12)return res.status(429).json({response:publicChatFallback(String(req.body?.message||""),String(req.body?.language||"pt")),code:"RATE_LIMITED"});else quota.count++;
+ const ip=getClientIp(req);
+ try {
+  if(!(await consumeRateLimit("public-chat",ip,12,60_000)) return res.status(429).json({response:publicChatFallback(String(req.body?.message||""),String(req.body?.language||"pt")),code:"RATE_LIMITED"});
+ } catch(rateLimitError:any) {
+  console.error("[PUBLIC_CHAT_RATE_LIMIT_UNAVAILABLE]",String(rateLimitError?.message||rateLimitError).slice(0,500));
+  return res.status(503).json({error:"O controle de uso está temporariamente indisponível.",code:"RATE_LIMIT_UNAVAILABLE"});
+ }
  const {message,history,language="pt"}=req.body||{};if(typeof message!=="string"||!message.trim())return res.status(400).json({error:"Mensagem obrigatória."});
  const fallback=publicChatFallback(message,language);
  try{
