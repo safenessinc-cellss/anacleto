@@ -167,7 +167,7 @@ export default function SettingsModule({ senderConfig, setSenderConfig }: Settin
       <section className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-5 text-sm text-indigo-950 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100">
         <h3 className="flex items-center gap-2 font-black"><ShieldCheck className="h-4 w-4" /> Conexão segura da IA</h3>
         <p className="mt-2 text-xs leading-relaxed">
-          O ANACLETO utiliza Gemini 2.5 Flash. Para ativar a API oficial com JSON Schema, configure GEMINI_API_KEY como variável sensível do servidor no Vercel (Preview e Production). Por segurança, a chave nunca é salva em localStorage, Firestore ou no navegador. Se não existir, o sistema utiliza o AI Gateway quando disponível.
+          O ANACLETO utiliza Gemini 3.8 Flash. Para ativar a API oficial com JSON Schema, configure GEMINI_API_KEY como variável sensível do servidor no Vercel (Preview e Production). Por segurança, a chave nunca é salva em localStorage, Firestore ou no navegador. Se não existir, o sistema utiliza o AI Gateway quando disponível.
         </p>
         <p className="mt-2 text-[11px] opacity-80">
           A cota gratuita do Google possui limites de uso e disponibilidade; não é ilimitada.
