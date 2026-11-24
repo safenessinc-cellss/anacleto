@@ -580,7 +580,7 @@ export default async function handler(req: any, res: any) {
     });
 
     if (authenticated && prompt.length >= 3) {
-      if (!auditRecorded && (stage === "ai_generation" || stage === "validate_ai_response")) {
+      if (!auditRecorded && (stage === "parametric_spec_extraction" || stage === "ai_generation" || stage === "validate_ai_response")) {
         try {
           await recordAIAudit({
             serviceName: "TECHNICAL_DRAWING",
