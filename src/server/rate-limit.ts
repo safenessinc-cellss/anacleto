@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 type LocalWindow = { count: number; resetAt: number };
 const localWindows = new Map<string, LocalWindow>();
+let warnedMissingProductionRedis = false;
 
 const RATE_LIMIT_SCRIPT = [
   "local count = redis.call('INCR', KEYS[1])",
@@ -34,6 +35,7 @@ export async function consumeRateLimit(
   identifier: string,
   limit: number,
   windowMs: number,
+  options: { requireDistributed?: boolean } = {},
 ): Promise<boolean> {
   if (!bucket || !identifier || !Number.isFinite(limit) || limit < 1 || !Number.isFinite(windowMs) || windowMs < 1) {
     throw new Error("Invalid rate-limit configuration.");
@@ -41,8 +43,10 @@ export async function consumeRateLimit(
   const url = String(process.env.UPSTASH_REDIS_REST_URL || "").trim().replace(/\/+$/, "");
   const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
   const production = process.env.NODE_ENV === "production";
+  if (Boolean(url) !== Boolean(token)) throw new Error("Both Upstash REST URL and token must be configured together.");
+  const distributedConfigured = Boolean(url && token);
 
-  if (url && token) {
+  if (distributedConfigured) {
     const identityHash = createHash("sha256").update(identifier).digest("hex");
     const key = "anacleto:rate:" + bucket + ":" + identityHash;
     const response = await fetch(url, {
@@ -59,7 +63,13 @@ export async function consumeRateLimit(
     return result <= limit;
   }
 
-  if (production) throw new Error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for production rate limiting.");
+  if (production && options.requireDistributed) {
+    throw new Error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for public production rate limiting.");
+  }
+  if (production && !warnedMissingProductionRedis) {
+    warnedMissingProductionRedis = true;
+    console.error("[AI_RATE_LIMIT_DEGRADED] Upstash is not configured; authenticated AI routes are using bounded per-instance fallback limits.");
+  }
 
   const now = Date.now();
   for (const [key, value] of localWindows) if (now >= value.resetAt) localWindows.delete(key);
