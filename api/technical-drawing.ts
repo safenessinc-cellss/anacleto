@@ -78,7 +78,7 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
     const response = await client.models.generateContent({
       model,
       contents: [{ role: "user", parts }],
-      config: { systemInstruction: options.system, responseMimeType: "application/json", responseSchema: options.responseSchema || drawingResponseSchema, temperature: options.temperature, maxOutputTokens: options.maxOutputTokens }
+      config: { systemInstruction: options.system, responseMimeType: "application/json", responseSchema: options.responseSchema || drawingResponseSchema, temperature: options.temperature, maxOutputTokens: options.maxOutputTokens, abortSignal: AbortSignal.timeout(AI_CONFIG.technicalDrawing.timeoutMs) }
     });
     return { text: response.text || "", usage: { inputTokens: response.usageMetadata?.promptTokenCount, outputTokens: response.usageMetadata?.candidatesTokenCount }, model };
   }
