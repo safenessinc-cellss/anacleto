@@ -30,7 +30,12 @@ export async function authenticateFirebaseRequest(req: any): Promise<FirebaseSer
       signal: AbortSignal.timeout(8_000),
     },
   );
-  if (!identityResponse.ok) return null;
+  if (!identityResponse.ok) {
+    if (identityResponse.status >= 500 || identityResponse.status === 429) {
+      throw authError("O serviço de autenticação Firebase está temporariamente indisponível.", 503);
+    }
+    return null;
+  }
 
   const identity = await identityResponse.json() as { users?: Array<{ localId?: string; email?: string }> };
   const identityUser = identity.users?.[0];
@@ -46,7 +51,12 @@ export async function authenticateFirebaseRequest(req: any): Promise<FirebaseSer
     headers: { Authorization: "Bearer " + token },
     signal: AbortSignal.timeout(8_000),
   });
-  if (!roleResponse.ok) return null;
+  if (!roleResponse.ok) {
+    if (roleResponse.status >= 500 || roleResponse.status === 429) {
+      throw authError("Não foi possível consultar o perfil de acesso no momento.", 503);
+    }
+    return null;
+  }
 
   const roleDocument = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
   const role = String(roleDocument.fields?.role?.stringValue || "").trim();
