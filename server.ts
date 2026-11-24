@@ -20,6 +20,7 @@ import compareBomHandler from "./src/server/supplier-api/compare-bom.js";
 import marketResearchHandler from "./src/server/supplier-api/market-research.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
 import { stripBearerPrefix } from "./src/server/auth-token.js";
+import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -46,45 +47,19 @@ const PORT = 3000;
 
 // Vercel AI Gateway supplies authentication in previews and deployments.
 
-const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
-const ownerEmail = "safeness.c.a@gmail.com";
-
 const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
-  const authorization = req.headers.authorization || "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-  if (!token) return res.status(401).json({ error: "Autenticação obrigatória." });
-  if (!firebaseApiKey) return res.status(503).json({ error: "A verificação de autenticação não está configurada no servidor." });
-
   try {
-    const identityResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken: token }),
-    });
-    if (!identityResponse.ok) return res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
-    const identity = await identityResponse.json() as { users?: Array<{ localId?: string; email?: string }> };
-    const user = identity.users?.[0];
-    if (!user?.localId || !user.email) return res.status(401).json({ error: "Conta autenticada inválida." });
-
-    const email = user.email.toLowerCase();
-    if (email === ownerEmail) {
-      res.locals.firebaseUser = { uid: user.localId, email, role: "super_admin" };
-      return next();
-    }
-
-    const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
-    const documentId = encodeURIComponent(email);
-    const roleUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${databaseId}/documents/admins/${documentId}`;
-    const roleResponse = await fetch(roleUrl, { headers: { Authorization: `Bearer ${token}` } });
-    if (!roleResponse.ok) return res.status(403).json({ error: "Acesso pendente de aprovação ou perfil não autorizado." });
-    const roleDocument = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
-    const role = roleDocument.fields?.role?.stringValue;
-    if (!role) return res.status(403).json({ error: "Perfil de acesso não encontrado." });
-    res.locals.firebaseUser = { uid: user.localId, email, role };
+    const user = await authenticateFirebaseRequest(req);
+    if (!user) return res.status(401).json({ error: "Sessão inválida, expirada ou sem perfil autorizado. Entre novamente." });
+    res.locals.firebaseUser = user;
     return next();
-  } catch (error) {
-    console.error("Firebase API authentication error:", error);
-    return res.status(503).json({ error: "Não foi possível validar a sessão no momento." });
+  } catch (error: any) {
+    console.error("Firebase API authentication error:", {
+      status: Number(error?.statusCode || 0),
+      message: String(error?.message || error).slice(0, 500),
+    });
+    return res.status(Number(error?.statusCode) === 503 ? 503 : 503)
+      .json({ error: "Não foi possível validar a sessão no momento." });
   }
 };
 
