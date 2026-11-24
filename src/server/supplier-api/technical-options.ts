@@ -26,7 +26,7 @@ async function readCollection(name: string, token: string, fieldPaths: string[])
 
   const response = await fetch(url, {
     headers: { Authorization: "Bearer " + token },
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(3000),
   });
 
   if (!response.ok) {
@@ -70,7 +70,7 @@ export default async function handler(req: any, res: any) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken: token }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(3000),
       },
     );
     if (!auth.ok) return res.status(401).json({ error: "Sessão inválida." });
