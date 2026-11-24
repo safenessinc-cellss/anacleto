@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { GoogleGenAI } from "@google/genai";
 
 type WindowRequest = { description?: string; referenceImage?: string };
 const buckets = new Map<string,{count:number;reset:number}>();
@@ -21,16 +21,21 @@ export default async function handler(req:any,res:any){
    if(typeof body.referenceImage!=="string"||body.referenceImage.length>4_300_000||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(body.referenceImage))return res.status(400).json({error:"Imagem inválida. Envie PNG, JPG ou WebP de até 3 MB."});
    image=body.referenceImage;
   }
-  if(!process.env.AI_GATEWAY_API_KEY&&!process.env.VERCEL_OIDC_TOKEN)return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"Provedor de imagem não configurado. Esta é uma prévia vetorial local, não um render de IA."});
+  const apiKey=process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY;
+  if(!apiKey)return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"GEMINI_API_KEY não configurada. Esta é uma prévia vetorial local, não um render de IA."});
   try{
-   const {result}=await import("ai").then(async({generateText})=>({result:await generateText({
-    model:"google/gemini-3.1-flash-image-preview",
-    messages:[{role:"user",content:[{type:"text",text:`Gere um render fotorrealista arquitetônico horizontal 3:2 de uma esquadria de alumínio sob medida instalada em uma residência contemporânea brasileira. Descrição do cliente: ${description}. Mostre proporções plausíveis, perfis de alumínio bem definidos, vidro fisicamente plausível, luz natural, fachada premium, fotografia de arquitetura editorial. Não inclua texto, marcas, logotipos ou medidas. A imagem enviada, se houver, é a referência da obra; preserve a arquitetura existente e integre a esquadria no vão.`},...(image?[{type:"image" as const,image,mimeType:image.slice(5,image.indexOf(";"))}]:[])]}] as any,
-    maxOutputTokens:1200,
-   })}));
-   const generated=(result as any).files?.find((file:any)=>String(file.mediaType||"").startsWith("image/"));
-   if(generated?.uint8Array){const mime=generated.mediaType||"image/png";return res.status(200).json({image:`data:${mime};base64,${Buffer.from(generated.uint8Array).toString("base64")}`,fallback:false});}
+   const client=new GoogleGenAI({apiKey});
+   const parts:any[]=[{text:`Gere um render fotorrealista arquitetônico horizontal 3:2 de uma esquadria de alumínio sob medida instalada em uma residência contemporânea brasileira. Descrição do cliente: ${description}. Mostre proporções plausíveis, perfis de alumínio bem definidos, vidro fisicamente plausível, luz natural, fachada premium, fotografia de arquitetura editorial. Não inclua texto, marcas, logotipos ou medidas. A imagem enviada, se houver, é a referência da obra; preserve a arquitetura existente e integre a esquadria no vão.`}];
+   if(image){const comma=image.indexOf(",");const header=image.slice(0,comma);const mime=header.slice(5,header.indexOf(";"));parts.push({inlineData:{mimeType:mime,data:image.slice(comma+1)}});}
+   const result=await client.models.generateContent({
+    model:process.env.ANACLETO_IMAGE_MODEL||"gemini-3.1-flash-image-preview",
+    contents:[{role:"user",parts}],
+    config:{responseModalities:["IMAGE","TEXT"],imageConfig:{aspectRatio:"3:2"},abortSignal:AbortSignal.timeout(45_000)},
+   });
+   const generated=result.candidates?.flatMap((candidate:any)=>candidate.content?.parts||[]).find((part:any)=>part.inlineData?.data&&String(part.inlineData.mimeType||"").startsWith("image/"));
+   if(generated?.inlineData?.data){const mime=generated.inlineData.mimeType||"image/png";return res.status(200).json({image:`data:${mime};base64,${generated.inlineData.data}`,fallback:false,provider:"gemini-direct"});}
+   console.warn("[PUBLIC_ARCHITECTURAL_IMAGE] Gemini returned no image part", {model:process.env.ANACLETO_IMAGE_MODEL||"gemini-3.1-flash-image-preview"});
    return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"O modelo não retornou uma imagem nesta tentativa. Exibimos uma prévia vetorial local."});
-  }catch(error){console.error("[PUBLIC_ARCHITECTURAL_IMAGE]",error);return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"A visualização com IA está temporariamente indisponível. Exibimos uma prévia vetorial local."});}
+  }catch(error:any){console.error("[PUBLIC_ARCHITECTURAL_IMAGE]",{name:error?.name,status:error?.status||error?.statusCode,message:String(error?.message||error).slice(0,1000)});return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"A geração de imagem por IA está temporariamente indisponível. Exibimos uma prévia vetorial local."});}
  }catch(error){console.error("[PUBLIC_ARCHITECTURAL_REQUEST]",error);return res.status(200).json({image:fallbackSvg("Esquadria de alumínio sob medida"),fallback:true,message:"Não foi possível processar a solicitação. Exibimos uma prévia local."});}
 }
