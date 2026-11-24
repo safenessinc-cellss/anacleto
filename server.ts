@@ -19,6 +19,7 @@ import generateBomHandler from "./src/server/supplier-api/generate-bom.js";
 import compareBomHandler from "./src/server/supplier-api/compare-bom.js";
 import marketResearchHandler from "./src/server/supplier-api/market-research.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
+import { stripBearerPrefix } from "./src/server/auth-token.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -398,7 +399,7 @@ Solicitação atual: ${message}`,
       output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
       requestId: String(req.headers["x-request-id"] || ""),
       startedAt: aiStartedAt,
-      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+      authorizationToken: stripBearerPrefix(req.headers.authorization),
     });
     const items = parsed.items.map((item: any, index: number) => {
       const quantity = Number(item.quantity);
@@ -464,7 +465,7 @@ Solicitação atual: ${message}`,
         actorUid: res.locals.firebaseUser?.uid,
         requestId: String(req.headers["x-request-id"] || ""),
         startedAt: aiStartedAt,
-        authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+        authorizationToken: stripBearerPrefix(req.headers.authorization),
       });
     } catch (auditError) { console.error("Quote failure audit could not be persisted:", auditError); }
     console.error("Quote agent error:", {
@@ -518,7 +519,7 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
       output: parsed, usage: aiUsage, actorUid: res.locals.firebaseUser?.uid,
       requestId: String(req.headers["x-request-id"] || ""),
       startedAt: aiStartedAt,
-      authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+      authorizationToken: stripBearerPrefix(req.headers.authorization),
     });
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
@@ -557,7 +558,7 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         actorUid: res.locals.firebaseUser?.uid,
         requestId: String(req.headers["x-request-id"] || ""),
         startedAt: aiStartedAt,
-        authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
+        authorizationToken: stripBearerPrefix(req.headers.authorization),
       });
     } catch (auditError) { console.error("Budget failure audit could not be persisted:", auditError); }
     const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
