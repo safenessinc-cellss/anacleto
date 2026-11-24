@@ -120,6 +120,7 @@ export async function generateValidatedJson<T>(options: {
   ])];
   let lastError: unknown;
   let raw = "";
+  let activePrompt = options.prompt;
 
   if (!geminiKey && !openAIKey && !gatewayConfigured) {
     throw Object.assign(new Error("Nenhum provedor de IA configurado. Configure GEMINI_API_KEY ou OPENAI_API_KEY no Vercel."), { statusCode: 503, code: "AI_PROVIDER_NOT_CONFIGURED" });
@@ -135,7 +136,7 @@ export async function generateValidatedJson<T>(options: {
         try {
           const result = await client.models.generateContent({
             model,
-            contents: [{ role: "user", parts: [{ text: options.prompt }] }],
+            contents: [{ role: "user", parts: [{ text: activePrompt }] }],
             config: {
               systemInstruction: options.system,
               responseMimeType: "application/json",
@@ -157,6 +158,11 @@ export async function generateValidatedJson<T>(options: {
             retryable: isRetryableProviderError(error), message: providerMessage(error),
           });
           if (status === 404 && modelIndex === 0 && modelCandidates.length > 1) break;
+          if (error instanceof AIJsonError && attempt === 0 && Date.now() + 1_500 < deadline) {
+            activePrompt = "Corrija exclusivamente a estrutura da resposta abaixo para JSON válido conforme o schema. Preserve os dados; não invente nem complete informações ausentes. Retorne somente JSON.\\nErro de validação: "
+              + providerMessage(error) + "\\nResposta original:\\n" + raw.slice(0, 20_000);
+            continue;
+          }
           if (attempt === 0 && isRetryableProviderError(error) && Date.now() + 500 < deadline) {
             await new Promise(resolve => setTimeout(resolve, 350));
             continue;
