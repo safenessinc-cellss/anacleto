@@ -588,7 +588,7 @@ export default async function handler(req: any, res: any) {
             error,
             actorUid,
             requestId,
-            authorizationToken: String(req.headers?.authorization || "").replace(/^Bearer\\s+/i, ""),
+            authorizationToken: String(req.headers?.authorization || "").replace(/^Bearer\s+/i, ""),
           });
         } catch (auditError) {
           console.error("Technical drawing failure audit could not be persisted", auditError);
