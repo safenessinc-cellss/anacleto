@@ -35,7 +35,9 @@ export default async function handler(req:Request,res:any){
       const result=await generateText({
         model:"google/gemini-nano-banana-2.1",
         prompt:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`,
+        abortSignal:AbortSignal.timeout(20_000),
         maxOutputTokens:1200,
+        abortSignal:AbortSignal.timeout(30_000),
       });
       const generated=(result as any).files?.find((file:any)=>String(file.mediaType||"").startsWith("image/"));
       if(generated?.uint8Array){
