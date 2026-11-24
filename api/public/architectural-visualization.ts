@@ -30,19 +30,53 @@ export default async function handler(req:any,res:any){
   }
   const apiKey=process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY;
   if(!apiKey)return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"GEMINI_API_KEY não configurada. Esta é uma prévia vetorial local, não um render de IA."});
-  try{
-   const client=new GoogleGenAI({apiKey});
-   const parts:any[]=[{text:`Gere um render fotorrealista arquitetônico horizontal 3:2 de uma esquadria de alumínio sob medida instalada em uma residência contemporânea brasileira. Descrição do cliente: ${description}. Mostre proporções plausíveis, perfis de alumínio bem definidos, vidro fisicamente plausível, luz natural, fachada premium, fotografia de arquitetura editorial. Não inclua texto, marcas, logotipos ou medidas. A imagem enviada, se houver, é a referência da obra; preserve a arquitetura existente e integre a esquadria no vão.`}];
-   if(image){const comma=image.indexOf(",");const header=image.slice(0,comma);const mime=header.slice(5,header.indexOf(";"));parts.push({inlineData:{mimeType:mime,data:image.slice(comma+1)}});}
-   const result=await client.models.generateContent({
-    model:process.env.ANACLETO_IMAGE_MODEL||"gemini-nano-banana-2.1",
-    contents:[{role:"user",parts}],
-    config:{responseModalities:["IMAGE","TEXT"],imageConfig:{aspectRatio:"3:2"},abortSignal:AbortSignal.timeout(45_000)},
+  try {
+   const prompt=`Gere um render fotorrealista arquitetônico horizontal 3:2 de uma esquadria de alumínio sob medida instalada em uma residência contemporânea brasileira. Descrição do cliente: ${description}. Mostre proporções plausíveis, perfis de alumínio bem definidos, vidro fisicamente plausível, luz natural, fachada premium, fotografia de arquitetura editorial. Não inclua texto, marcas, logotipos ou medidas. A imagem enviada, se houver, é a referência da obra; preserve a arquitetura existente e integre a esquadria no vão.`;
+   const gatewayConfigured=Boolean(process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN);
+   let primaryError:any=null;
+   try {
+    const client=new GoogleGenAI({apiKey});
+    const parts:any[]=[{text:prompt}];
+    if(image){const comma=image.indexOf(",");const header=image.slice(0,comma);const mime=header.slice(5,header.indexOf(";"));parts.push({inlineData:{mimeType:mime,data:image.slice(comma+1)}});}
+    const result=await client.models.generateContent({
+     model:process.env.ANACLETO_IMAGE_MODEL||"gemini-nano-banana-2.1",
+     contents:[{role:"user",parts}],
+     config:{responseModalities:["IMAGE","TEXT"],imageConfig:{aspectRatio:"3:2"},abortSignal:AbortSignal.timeout(45_000)},
+    });
+    const generated=result.candidates?.flatMap((candidate:any)=>candidate.content?.parts||[]).find((part:any)=>part.inlineData?.data&&String(part.inlineData.mimeType||"").startsWith("image/"));
+    if(generated?.inlineData?.data){const mime=generated.inlineData.mimeType||"image/png";return res.status(200).json({image:`data:${mime};base64,${generated.inlineData.data}`,fallback:false,provider:"gemini-direct"});}
+    throw new Error("Gemini did not return an image part.");
+   } catch(error:any) {
+    primaryError=error;
+    console.error("[PUBLIC_ARCHITECTURAL_IMAGE] Gemini failed; trying AI Gateway image fallback",{
+     status:error?.status||error?.statusCode||0,message:String(error?.message||error).slice(0,700)
+    });
+   }
+   if(gatewayConfigured) {
+    try {
+     const { generateImage }=await import("ai");
+     const imageBytes=image?Buffer.from(image.slice(image.indexOf(",")+1),"base64"):undefined;
+     const generated=await generateImage({
+      model:process.env.ANACLETO_IMAGE_FALLBACK_MODEL||"openai/gpt-image-2.6-flare",
+      prompt:imageBytes?{text:prompt,images:[imageBytes]}:prompt,
+     });
+     const bytes=generated.image?.uint8Array;
+     if(bytes?.length){
+      const mime=generated.image.mediaType||"image/png";
+      return res.status(200).json({image:`data:${mime};base64,${Buffer.from(bytes).toString("base64")}`,fallback:false,provider:"openai-gateway-fallback"});
+     }
+     throw new Error("AI Gateway image fallback returned no image bytes.");
+    } catch(fallbackError:any) {
+     console.error("[PUBLIC_ARCHITECTURAL_IMAGE] AI Gateway fallback failed",{
+      status:fallbackError?.status||fallbackError?.statusCode||0,
+      message:String(fallbackError?.message||fallbackError).slice(0,700)
+     });
+    }
+   }
+   console.error("[PUBLIC_ARCHITECTURAL_IMAGE] no provider generated an image",{
+    message:String(primaryError?.message||primaryError).slice(0,700)
    });
-   const generated=result.candidates?.flatMap((candidate:any)=>candidate.content?.parts||[]).find((part:any)=>part.inlineData?.data&&String(part.inlineData.mimeType||"").startsWith("image/"));
-   if(generated?.inlineData?.data){const mime=generated.inlineData.mimeType||"image/png";return res.status(200).json({image:`data:${mime};base64,${generated.inlineData.data}`,fallback:false,provider:"gemini-direct"});}
-   console.warn("[PUBLIC_ARCHITECTURAL_IMAGE] Gemini returned no image part", {model:process.env.ANACLETO_IMAGE_MODEL||"gemini-nano-banana-2.1"});
-   return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"O modelo não retornou uma imagem nesta tentativa. Exibimos uma prévia vetorial local."});
-  }catch(error:any){console.error("[PUBLIC_ARCHITECTURAL_IMAGE]",{name:error?.name,status:error?.status||error?.statusCode,message:String(error?.message||error).slice(0,1000)});return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"A geração de imagem por IA está temporariamente indisponível. Exibimos uma prévia vetorial local."});}
+   return res.status(200).json({image:fallbackSvg(description),fallback:true,message:"A geração de imagem por IA está temporariamente indisponível. Exibimos uma prévia vetorial local."});
+  }
  }catch(error){console.error("[PUBLIC_ARCHITECTURAL_REQUEST]",error);return res.status(200).json({image:fallbackSvg("Esquadria de alumínio sob medida"),fallback:true,message:"Não foi possível processar a solicitação. Exibimos uma prévia local."});}
 }
