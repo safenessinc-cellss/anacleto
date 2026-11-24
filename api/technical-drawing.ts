@@ -12,7 +12,6 @@ import { buildParametricDrawing, isAluminumPrompt, localParametricSpec, type Alu
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
-const OWNER_EMAIL = "safeness.c.a@gmail.com";
 
 const drawingResponseSchema = {
   type: Type.OBJECT,
