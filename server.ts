@@ -761,6 +761,7 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
     messages: [{ role: "user", content: [{ type: "text", text: prompt }, attachment] }],
     temperature: 0.1,
     maxOutputTokens,
+    abortSignal: AbortSignal.timeout(AI_CONFIG.documentExtraction.timeoutMs),
   });
   const validate = (value: any) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Documento sem objeto de dados válido.");
@@ -775,7 +776,7 @@ async function extractFinancialDocument(data: string, mimeType: string, fileName
       prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "\nResposta original:\n" + String(response.text || "").slice(0, 30000),
       temperature: 0,
       maxOutputTokens,
-      abortSignal: AbortSignal.timeout(AI_CONFIG.documentExtraction.timeoutMs),
+      abortSignal: AbortSignal.timeout(8_000),
     });
     return parseAIJson(repaired.text, validate);
   }
