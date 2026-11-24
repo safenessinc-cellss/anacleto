@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
   }
   try {
     const ip = getClientIp(req);
-    if (!(await consumeRateLimit("public-quote-estimate", ip, 3, 60 * 60_000))) return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial." });
+    if (!(await consumeRateLimit("public-quote-estimate", ip, 3, 60 * 60_000, { requireDistributed: true }))) return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial." });
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some(key => key !== "description")) {
       return send(res, 400, { error: "A solicitação contém campos não permitidos." });
