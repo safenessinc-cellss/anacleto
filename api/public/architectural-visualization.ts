@@ -12,7 +12,7 @@ export default async function handler(req:any,res:any){
  if(req.method!=="POST"){res.setHeader?.("Allow","POST");return res.status(405).json({error:"Método não permitido."});}
  const ip=getClientIp(req);
  try {
-  if(!(await consumeRateLimit("public-architectural-visualization",ip,3,60_000,{requireDistributed:true}))) return res.status(429).json({error:"Limite temporário atingido. Tente novamente em um minuto."});
+  if(!(await consumeRateLimit("public-architectural-visualization",ip,3,60_000))) return res.status(429).json({error:"Limite temporário atingido. Tente novamente em um minuto."});
  } catch(rateLimitError:any) {
   console.error("[PUBLIC_ARCHITECTURAL_RATE_LIMIT_UNAVAILABLE]",String(rateLimitError?.message||rateLimitError).slice(0,500));
   return res.status(503).json({error:"O controle de uso está temporariamente indisponível.",code:"RATE_LIMIT_UNAVAILABLE"});
