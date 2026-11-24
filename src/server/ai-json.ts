@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 import { GoogleGenAI } from "@google/genai";
-import { AI_CONFIG, getAIModel } from "./ai-config.js";
+import { AI_CONFIG, AI_GATEWAY_FALLBACK_MODEL, getAIGatewayFallbackModel } from "./ai-config.js";
 
 export class AIJsonError extends Error {
   readonly code = "AI_INVALID_STRUCTURED_RESPONSE";
@@ -123,7 +123,7 @@ export async function generateValidatedJson<T>(options: {
   let activePrompt = options.prompt;
 
   if (!geminiKey && !openAIKey && !gatewayConfigured) {
-    throw Object.assign(new Error("Nenhum provedor de IA configurado. Configure GEMINI_API_KEY ou OPENAI_API_KEY no Vercel."), { statusCode: 503, code: "AI_PROVIDER_NOT_CONFIGURED" });
+    throw Object.assign(new Error("Nenhum provedor de IA configurado. Configure GEMINI_API_KEY ou AI_GATEWAY_API_KEY no Vercel."), { statusCode: 503, code: "AI_PROVIDER_NOT_CONFIGURED" });
   }
 
   if (geminiKey) {
@@ -192,20 +192,34 @@ export async function generateValidatedJson<T>(options: {
     }
   }
 
-  // Gateway is a last resort only. A 403 customer-verification/billing error is
-  // not retried and is surfaced clearly instead of being mislabeled as timeout.
-  if (!geminiKey && !openAIKey && gatewayConfigured && Date.now() < deadline) {
+  // Cross-provider fallback runs even when a direct Gemini key exists but Gemini
+  // is overloaded/unavailable. Keep it on OpenAI/Azure so it is not the same
+  // failing Gemini model behind a different authentication path.
+  if (gatewayConfigured && Date.now() + 1_500 < deadline) {
     try {
+      console.warn("[AI_PROVIDER] using cross-provider AI Gateway fallback", {
+        capability: options.capability,
+        model: AI_GATEWAY_FALLBACK_MODEL,
+      });
       const result = await generateText({
-        model: getAIModel(options.capability), system: options.system, prompt: options.prompt,
+        model: getAIGatewayFallbackModel(),
+        system: options.system,
+        prompt: options.prompt,
         temperature: options.temperature ?? config.temperature,
         maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
+        providerOptions: { gateway: { only: ["openai", "azure"] } },
         abortSignal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
       });
-      options.onGeneration?.({ text: result.text || "", usage: result.usage as any, attempt: 0 });
+      options.onGeneration?.({ text: result.text || "", usage: result.usage as any, attempt: 3 });
       return parseAIJson(result.text, options.validate);
     } catch (error) {
       lastError = error;
+      console.error("[AI_PROVIDER] cross-provider AI Gateway fallback failed", {
+        capability: options.capability,
+        model: AI_GATEWAY_FALLBACK_MODEL,
+        status: providerStatus(error),
+        message: providerMessage(error),
+      });
     }
   }
 
