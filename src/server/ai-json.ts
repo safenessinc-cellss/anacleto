@@ -65,7 +65,7 @@ function geminiModelName(value: string): string {
 }
 async function generateWithOpenAI(options: {
   system: string; prompt: string; timeoutMs: number; maxOutputTokens: number;
-}): Promise<{ text: string; usage?: any }> {
+}): Promise<{ text: string; usage?: any; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY não configurada para fallback.");
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -88,6 +88,7 @@ async function generateWithOpenAI(options: {
   return {
     text: String(payload?.choices?.[0]?.message?.content || ""),
     usage: { inputTokens: payload?.usage?.prompt_tokens, outputTokens: payload?.usage?.completion_tokens },
+    model: process.env.ANACLETO_OPENAI_FALLBACK_MODEL || "gpt-4.1-mini",
   };
 }
 
@@ -106,7 +107,7 @@ export async function generateValidatedJson<T>(options: {
   temperature?: number;
   maxOutputTokens?: number;
   responseSchema?: Record<string, unknown>;
-  onGeneration?: (event: { text: string; usage?: { inputTokens?: number; outputTokens?: number; promptTokens?: number; completionTokens?: number }; attempt: number }) => void;
+  onGeneration?: (event: { text: string; usage?: { inputTokens?: number; outputTokens?: number; promptTokens?: number; completionTokens?: number }; attempt: number; model?: string }) => void;
 }): Promise<T> {
   const config = AI_CONFIG[options.capability];
   const totalTimeoutMs = Math.min(config.timeoutMs, 50_000);
@@ -149,7 +150,7 @@ export async function generateValidatedJson<T>(options: {
           });
           raw = result.text || "";
           const usage = { inputTokens: result.usageMetadata?.promptTokenCount, outputTokens: result.usageMetadata?.candidatesTokenCount };
-          options.onGeneration?.({ text: raw, usage, attempt });
+          options.onGeneration?.({ text: raw, usage, attempt, model });
           return parseAIJson(raw, options.validate);
         } catch (error: any) {
           lastError = error;
@@ -183,7 +184,7 @@ export async function generateValidatedJson<T>(options: {
         maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
       });
       raw = fallback.text;
-      options.onGeneration?.({ text: raw, usage: fallback.usage, attempt: 2 });
+      options.onGeneration?.({ text: raw, usage: fallback.usage, attempt: 2, model: fallback.model });
       return parseAIJson(raw, options.validate);
     } catch (error) {
       lastError = error;
@@ -211,7 +212,7 @@ export async function generateValidatedJson<T>(options: {
         providerOptions: { gateway: { only: ["openai", "azure"] } },
         abortSignal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
       });
-      options.onGeneration?.({ text: result.text || "", usage: result.usage as any, attempt: 3 });
+      options.onGeneration?.({ text: result.text || "", usage: result.usage as any, attempt: 3, model: AI_GATEWAY_FALLBACK_MODEL });
       return parseAIJson(result.text, options.validate);
     } catch (error) {
       lastError = error;
