@@ -36,6 +36,7 @@ export default function PendingBoletosModule() {
   const [matches, setMatches] = useState<PendingBoleto[]>([]);
   const [searchMessage, setSearchMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedStorage, setUploadedStorage] = useState<{ path: string; url: string } | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<Partial<PendingBoleto>>({});
@@ -77,11 +78,18 @@ export default function PendingBoletosModule() {
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) throw new Error("Entre novamente para importar boletos.");
-      const data = await readBase64(file);
+      const user = auth.currentUser;
+      if (!user) throw new Error("Sessão expirada. Entre novamente.");
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
+      const storagePath = "purchases/" + user.uid + "/" + Date.now() + "-" + safeName;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, file, { contentType: mimeType, customMetadata: { uploadedBy: user.uid, source: "pending-boletos" } });
+      const storageUrl = await getDownloadURL(storageRef);
+      setUploadedStorage({ path: storagePath, url: storageUrl });
       const response = await fetch("/api/ai/purchase-extract", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ data, mimeType, fileName: file.name })
+        body: JSON.stringify({ storageUrl, mimeType, fileName: file.name })
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Não foi possível interpretar o boleto.");
@@ -112,11 +120,9 @@ export default function PendingBoletosModule() {
     try {
       const uid = auth.currentUser?.uid;
       if (!uid) throw new Error("Sessão expirada. Entre novamente.");
-      const safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
-      const storagePath = "pending_boletos/" + uid + "/" + Date.now() + "-" + safeName;
-      const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, selectedFile, { contentType: selectedFile.type || "application/pdf", customMetadata: { uploadedBy: uid } });
-      const fileUrl = await getDownloadURL(storageRef);
+      if (!uploadedStorage) throw new Error("O documento ainda não foi enviado ao armazenamento. Faça a leitura novamente.");
+      const storagePath = uploadedStorage.path;
+      const fileUrl = uploadedStorage.url;
       await addDoc(collection(db, "pending_boletos"), {
         ...draft,
         fileName: selectedFile.name,
@@ -131,7 +137,7 @@ export default function PendingBoletosModule() {
         createdAt: new Date().toISOString(),
         createdBy: uid
       });
-      setSelectedFile(null); setDraft({}); setUploadMessage("Boleto salvo em Boletos a Revisar. Nenhum pagamento foi efetuado.");
+      setSelectedFile(null); setUploadedStorage(null); setDraft({}); setUploadMessage("Boleto salvo em Boletos a Revisar. Nenhum pagamento foi efetuado.");
       if (fileRef.current) fileRef.current.value = "";
       if (cameraRef.current) cameraRef.current.value = "";
     } catch (error) { setUploadError((error as Error).message || "Não foi possível salvar o boleto."); }
