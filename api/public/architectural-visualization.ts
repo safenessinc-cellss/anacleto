@@ -71,6 +71,7 @@ export default async function handler(req:any,res:any){
       });
       fallbackPrompt+="\nDescrição visual da referência: "+reference.text.slice(0,2500);
      }
+     // GPT Image fallback is text-only; the reference photo was summarized by the vision model above.
      const generated=await generateImage({
       model:process.env.ANACLETO_IMAGE_FALLBACK_MODEL||"openai/gpt-image-2.6-flare",
       prompt:fallbackPrompt,
