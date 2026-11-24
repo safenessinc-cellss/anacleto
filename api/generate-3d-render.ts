@@ -35,7 +35,6 @@ export default async function handler(req:Request,res:any){
       const result=await generateText({
         model:"google/gemini-nano-banana-2.1",
         prompt:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`,
-        abortSignal:AbortSignal.timeout(20_000),
         maxOutputTokens:1200,
         abortSignal:AbortSignal.timeout(30_000),
       });
@@ -57,6 +56,7 @@ export default async function handler(req:Request,res:any){
       const generated=await generateImage({
         model:process.env.ANACLETO_IMAGE_FALLBACK_MODEL||"openai/gpt-image-2.6-flare",
         prompt:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`,
+        abortSignal:AbortSignal.timeout(20_000),
       });
       const bytes=generated.image?.uint8Array;
       if(bytes?.length){
