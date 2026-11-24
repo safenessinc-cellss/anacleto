@@ -14,7 +14,8 @@ export default async function handler(req:Request,res:any){
   if(req.method!=="POST"){res.setHeader?.("Allow","POST");return send(res,405,{error:"Método não permitido."});}
   const ip=getClientIp(req);
   try {
-    if(!(await consumeRateLimit("generate-3d-render",ip,3,60_000))) {
+    const quota = getAIRateLimit("generate-3d-render");
+    if(!(await consumeRateLimit("generate-3d-render",ip,quota.limit,quota.windowMs,{requireDistributed:true}))) {
       return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Limite de geração atingido. Exibindo a galeria local de respaldo."});
     }
   } catch(rateLimitError:any) {
