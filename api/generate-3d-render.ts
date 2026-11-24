@@ -51,7 +51,7 @@ export default async function handler(req:Request,res:any){
       });
     }
     try {
-      const {generateImage}=await import("ai");
+      const {experimental_generateImage:generateImage}=await import("ai");
       const generated=await generateImage({
         model:process.env.ANACLETO_IMAGE_FALLBACK_MODEL||"openai/gpt-image-2.6-flare",
         prompt:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`,
