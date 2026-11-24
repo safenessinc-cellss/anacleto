@@ -71,7 +71,7 @@ export async function generateValidatedJson<T>(options: {
     if (apiKey) {
       const client = new GoogleGenAI({ apiKey });
       const result = await client.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
           systemInstruction: options.system,
