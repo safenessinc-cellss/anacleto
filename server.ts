@@ -20,6 +20,7 @@ import compareBomHandler from "./src/server/supplier-api/compare-bom.js";
 import marketResearchHandler from "./src/server/supplier-api/market-research.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
 import { google } from "googleapis";
+import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
 // Load .env.local first if available, then fallback to .env
@@ -752,32 +753,72 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
 
 
 async function extractFinancialDocument(data: string, mimeType: string, fileName: string, prompt: string, maxOutputTokens = 4000) {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw Object.assign(new Error("GEMINI_API_KEY não configurada para extração financeira. Configure a chave no ambiente Production do Vercel."), { statusCode: 503, code: "AI_PROVIDER_NOT_CONFIGURED" });
   const binary = Buffer.from(data, "base64");
-  const attachment = mimeType === "application/pdf"
-    ? { type: "file" as const, data: binary, mediaType: mimeType, filename: fileName.slice(0, 120) }
-    : { type: "image" as const, image: binary, mediaType: mimeType };
-  const response = await generateText({
-    model: getAIModel("documentExtraction"),
-    messages: [{ role: "user", content: [{ type: "text", text: prompt }, attachment] }],
-    temperature: 0.1,
-    maxOutputTokens,
+  if (!binary.length || binary.length > 10 * 1024 * 1024) throw Object.assign(new Error("Documento vazio ou acima do limite de 10 MB."), { statusCode: 413 });
+  const client = new GoogleGenAI({ apiKey });
+  const model = process.env.ANACLETO_DOCUMENT_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash";
+  const requestParts: any[] = [{ text: prompt }, { inlineData: { mimeType, data: binary.toString("base64") } }];
+  const deadline = Date.now() + Math.min(AI_CONFIG.documentExtraction.timeoutMs, 50_000);
+  let response: any;
+  let lastError: any;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < 1_500) break;
+    try {
+      response = await client.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: requestParts }],
+        config: {
+          systemInstruction: "Você extrai dados fiscais brasileiros. Use somente o conteúdo visível do documento. Não invente valores, datas, CNPJ ou itens. Retorne somente JSON válido.",
+          responseMimeType: "application/json",
+          temperature: 0.1,
+          maxOutputTokens,
+          abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? Math.max(5_000, remaining - 1_500) : remaining)),
+        },
+      });
+      break;
+    } catch (error: any) {
+      lastError = error;
+      const status = Number(error?.status || error?.statusCode || error?.cause?.status || 0);
+      const retryable = [408, 429, 500, 502, 503, 504].includes(status) || /high demand|temporarily unavailable|resource exhausted/i.test(String(error?.message || ""));
+      console.error("[FINANCIAL_DOCUMENT_AI] Gemini failed", { status, attempt, model, message: String(error?.message || error).slice(0, 800) });
+      if (attempt === 0 && retryable && Date.now() + 500 < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 350));
+        continue;
+      }
+      break;
+    }
+  }
+  if (!response) throw Object.assign(new Error("Falha na extração financeira: " + String(lastError?.message || lastError || "provedor indisponível")), {
+    statusCode: Number(lastError?.status || lastError?.statusCode || 503),
+    code: "FINANCIAL_AI_PROVIDER_FAILED",
   });
   const validate = (value: any) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Documento sem objeto de dados válido.");
     return value;
   };
   try {
-    return parseAIJson(response.text, validate);
+    return parseAIJson(response.text || "", validate);
   } catch (firstError) {
-    const repaired = await generateText({
-      model: getAIModel("documentExtraction"),
-      system: "Corrija somente a estrutura JSON da extração. Não invente, complete ou altere nenhum dado do documento. Retorne apenas JSON válido.",
-      prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "\nResposta original:\n" + String(response.text || "").slice(0, 30000),
-      temperature: 0,
-      maxOutputTokens,
-      abortSignal: AbortSignal.timeout(AI_CONFIG.documentExtraction.timeoutMs),
+    const remaining = deadline - Date.now();
+    if (remaining < 2_000) throw firstError;
+    const repaired = await client.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text:
+        "Corrija somente a estrutura JSON da extração. Não invente, complete ou altere nenhum dado do documento. Retorne apenas JSON válido.\nErro de parser: "
+        + String((firstError as Error)?.message || firstError).slice(0, 500)
+        + "\nResposta original:\n" + String(response.text || "").slice(0, 20_000)
+      }] }],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0,
+        maxOutputTokens,
+        abortSignal: AbortSignal.timeout(Math.min(8_000, remaining)),
+      },
     });
-    return parseAIJson(repaired.text, validate);
+    return parseAIJson(repaired.text || "", validate);
   }
 }
 
