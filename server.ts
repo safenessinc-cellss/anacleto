@@ -189,7 +189,7 @@ app.get("/api/chat",(_req,res)=>res.json({ok:true,service:"anacleto-public-chat"
 app.post("/api/chat",async(req,res)=>{
  const ip=getClientIp(req);
  try {
-  if(!(await consumeRateLimit("public-chat",ip,12,60_000))) return res.status(429).json({response:publicChatFallback(String(req.body?.message||""),String(req.body?.language||"pt")),code:"RATE_LIMITED"});
+  if(!(await consumeRateLimit("public-chat",ip,12,60_000,{requireDistributed:true}))) return res.status(429).json({response:publicChatFallback(String(req.body?.message||""),String(req.body?.language||"pt")),code:"RATE_LIMITED"});
  } catch(rateLimitError:any) {
   console.error("[PUBLIC_CHAT_RATE_LIMIT_UNAVAILABLE]",String(rateLimitError?.message||rateLimitError).slice(0,500));
   return res.status(503).json({error:"O controle de uso está temporariamente indisponível.",code:"RATE_LIMIT_UNAVAILABLE"});
