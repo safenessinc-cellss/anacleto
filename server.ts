@@ -4,7 +4,7 @@ import path from "path";
 import dotenv from "dotenv";
 // import estático de vite eliminado - se usa import dinámico en desarrollo
 import { generateText } from "ai";
-import { AI_CONFIG, getAIModel } from "./src/server/ai-config.js";
+import { AI_CONFIG, AI_GATEWAY_FALLBACK_MODEL, getAIModel, getAIGatewayFallbackModel } from "./src/server/ai-config.js";
 import { generateValidatedJson, parseAIJson } from "./src/server/ai-json.js";
 import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore } from "./src/server/firestore-data.js";
 import technicalDrawingHandler from "./api/technical-drawing.js";
@@ -24,7 +24,6 @@ import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
 import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
 import { getAIRateLimit } from "./src/server/ai-limits.js";
 import { hasAIRole } from "./src/server/ai-roles.js";
-import { AI_GATEWAY_FALLBACK_MODEL, getAIGatewayFallbackModel } from "./src/server/ai-config.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
