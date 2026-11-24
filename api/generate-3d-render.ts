@@ -15,7 +15,7 @@ export default async function handler(req:Request,res:any){
   const ip=getClientIp(req);
   try {
     const quota = getAIRateLimit("generate-3d-render");
-    if(!(await consumeRateLimit("generate-3d-render",ip,quota.limit,quota.windowMs,{requireDistributed:true}))) {
+    if(!(await consumeRateLimit("generate-3d-render",ip,quota.limit,quota.windowMs))) {
       return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Limite de geração atingido. Exibindo a galeria local de respaldo."});
     }
   } catch(rateLimitError:any) {
