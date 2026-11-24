@@ -1,6 +1,6 @@
 import { generateText } from "ai";
 import { GoogleGenAI, Type } from "@google/genai";
-import { AI_CONFIG, AI_GATEWAY_FALLBACK_MODEL, getAIGatewayFallbackModel } from "../src/server/ai-config.js";
+import { AI_CONFIG, AI_GATEWAY_FALLBACK_MODEL, getAIModel, getAIGatewayFallbackModel } from "../src/server/ai-config.js";
 import { parseAIJson } from "../src/server/ai-json.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { recordAIAudit } from "../src/server/ai-audit.js";
