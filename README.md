@@ -58,7 +58,7 @@ Anacleto Pro es una solución full-stack moderna y de alto rendimiento diseñada
    ```bash
    cp .env.example .env.local
    ```
-   Configura las credenciales de IA y el límite compartido:
+   Configura la clave de IA. Upstash es opcional si necesitas cuotas compartidas por usuario entre instancias:
    ```env
    GEMINI_API_KEY="AIzaSy..."
 UPSTASH_REDIS_REST_URL="https://...upstash.io"
