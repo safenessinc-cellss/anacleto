@@ -23,6 +23,9 @@
     },
     "api/generate-3d-render.ts": {
       "maxDuration": 60
+    },
+    "api/supplier/[...path].ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
