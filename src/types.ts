@@ -67,6 +67,7 @@ export interface Quote {
   technicalDrawing?: TechnicalDrawing | TechnicalDrawingReference;
   subtotal: number;
   labor?: number;
+  laborRate?: number;
   marginRate?: number;
   margin?: number;
   freight?: number;
