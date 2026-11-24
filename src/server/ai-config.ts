@@ -4,7 +4,7 @@ import { gateway } from "ai";
  * Single source of truth for Anacleto AI model routing and runtime limits.
  * Override models per capability without changing application code.
  */
-const DEFAULT_MODEL = process.env.ANACLETO_AI_MODEL || "google/gemini-2.5-flash";
+const DEFAULT_MODEL = process.env.ANACLETO_AI_MODEL || "google/gemini-3.8-flash";
 
 export const AI_CONFIG = {
   default: {
