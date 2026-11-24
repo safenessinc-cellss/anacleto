@@ -420,7 +420,7 @@ export default async function handler(req: any, res: any) {
     catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
     try {
       const drawingLimit = getAIRateLimit("technical-drawing");
-      if (!(await consumeRateLimit("technical-drawing", user.uid, drawingLimit.limit, drawingLimit.windowMs, { requireDistributed: true }))) {
+      if (!(await consumeRateLimit("technical-drawing", user.uid, drawingLimit.limit, drawingLimit.windowMs))) {
         return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
       }
     } catch (rateLimitError: any) {
