@@ -560,8 +560,10 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
       });
     } catch (auditError) { console.error("Budget failure audit could not be persisted:", auditError); }
-    console.error("Budget items AI error:", err?.message || err);
-    return res.status(502).json({ error: "Falha ao gerar os itens do orçamento. Nenhum preço sem confirmação no catálogo foi aplicado.", code: "BUDGET_AI_UNAVAILABLE" });
+    const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
+    const status = Number(err?.statusCode || err?.status || 502);
+    console.error("[BUDGET_ITEMS_AI] failed", { requestId, code: err?.code || "BUDGET_AI_UNAVAILABLE", status, message: String(err?.message || err).slice(0, 1200), stack: err?.stack });
+    return res.status(status >= 400 && status < 600 ? status : 502).json({ error: String(err?.message || "Falha ao gerar os itens do orçamento."), code: err?.code || "BUDGET_AI_UNAVAILABLE", requestId });
   }
 });
 
@@ -894,8 +896,10 @@ app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, ra
     parsed.confidence = ["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low";
     return res.json(parsed);
   } catch (error: any) {
-    console.error("Purchase document extraction error:", error?.message || error);
-    return res.status(422).json({ error: "Não foi possível interpretar o documento com segurança. Revise o PDF ou preencha manualmente." });
+    const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
+    const status = Number(error?.statusCode || 422);
+    console.error("[PURCHASE_EXTRACT] failed", { requestId, code: error?.code || "PURCHASE_EXTRACT_FAILED", status, message: String(error?.message || error).slice(0, 1200), stack: error?.stack });
+    return res.status(status >= 400 && status < 600 ? status : 422).json({ error: String(error?.message || "Não foi possível interpretar o documento."), code: error?.code || "PURCHASE_EXTRACT_FAILED", requestId });
   }
 });
 
