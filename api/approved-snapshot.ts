@@ -7,6 +7,7 @@ import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
 import { stripBearerPrefix } from "../src/server/auth-token.js";
 import { consumeRateLimit } from "../src/server/rate-limit.js";
+import { hasAIRole } from "../src/server/ai-roles.js";
 
 type AuthUser = { uid: string; email: string; role: string };
 const base = () => {
@@ -83,19 +84,13 @@ function catalogMatch(item: any, catalog: any[]) {
 }
 
 function canApproveManualPrice(user: AuthUser) {
-  return user.role === "owner" || ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role);
+  return hasAIRole(user.role, "manualPriceApproval");
 }
 function canApprove(user: AuthUser, type: "quote" | "drawing") {
-  if (user.role === "owner") return true;
-  const quoteRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"];
-  const drawingRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "qualidade", "producao"];
-  return (type === "quote" ? quoteRoles : drawingRoles).includes(user.role);
+  return hasAIRole(user.role, type === "quote" ? "snapshotQuote" : "snapshotDrawing");
 }
 function canReadSnapshot(user: AuthUser, type: "quote" | "drawing") {
-  if (user.role === "owner") return true;
-  const quoteRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"];
-  const drawingRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "qualidade", "producao"];
-  return (type === "quote" ? quoteRoles : drawingRoles).includes(user.role);
+  return hasAIRole(user.role, type === "quote" ? "snapshotQuote" : "snapshotDrawing");
 }
 
 async function commitSnapshot(req: any, collection: string, documentId: string, updateTime: string, snapshot: any) {
