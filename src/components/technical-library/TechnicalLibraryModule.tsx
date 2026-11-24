@@ -164,9 +164,9 @@ export default function TechnicalLibraryModule() {
 
   const config = {
     documents: { title: "Documentos técnicos", subtitle: "Catálogos, mapas de perfis, manuais e boletins oficiais.", collection: "technical_documents", rows: documents, fields: [["manufacturer", "Fabricante"], ["line", "Linha / sistema"], ["title", "Nome do documento"], ["version", "Versão / data"], ["sourceUrl", "URL oficial"], ["pageCount", "Quantidade de páginas"]] },
-    profiles: { title: "Perfis de alumínio", subtitle: "Código, peso linear e referência documental de cada perfil.", collection: "aluminum_profiles", rows: profiles, fields: [["manufacturer", "Fabricante"], ["line", "Linha / sistema"], ["code", "Código do perfil"], ["description", "Descrição"], ["finish", "Acabamento"], ["weightKgM", "Peso linear (kg/m)"], ["commercialLengthMm", "Comprimento comercial (mm)"], ["documentId", "ID do documento / referência"], ["page", "Página de origem"]] },
+    profiles: { title: "Perfis de alumínio", subtitle: "Código, peso linear e referência documental de cada perfil.", collection: "aluminum_profiles", rows: profiles, fields: [["manufacturer", "Fabricante"], ["line", "Linha / sistema"], ["code", "Código do perfil"], ["description", "Descrição"], ["finish", "Acabamento"], ["weightKgM", "Peso linear (kg/m)"], ["commercialLengthMm", "Comprimento comercial (mm)"], ["imageUrl", "Imagem do perfil (URL)"], ["documentId", "ID do documento / referência"], ["page", "Página de origem"]] },
     rules: { title: "Regras de corte", subtitle: "Fórmula = comprimento de cada corte em mm; quantidade = cortes por esquadria.", collection: "cutting_rules", rows: rules, fields: [["manufacturer", "Fabricante"], ["line", "Linha / sistema"], ["typology", "Tipologia"], ["configuration", "Configuração"], ["profileCode", "Código do perfil / componente"], ["description", "Descrição do componente"], ["category", "Categoria (aluminum_profile / glass / seal / fastener)"], ["finish", "Acabamento"], ["glassType", "Tipo de vidro (se aplicável)"], ["glassThicknessMm", "Espessura do vidro (mm)"], ["formula", "Fórmula do corte / consumo"], ["quantityFormula", "Quantidade por esquadria (fórmula opcional)"], ["cutCount", "Número fixo de cortes / consumo"], ["kerfMm", "Espessura do disco (mm)"], ["unit", "Unidade"], ["documentId", "Documento de origem"], ["page", "Página de origem"]] },
-    hardware: { title: "Acessórios e ferragens", subtitle: "Componentes vinculados ao fabricante e à linha compatível, com consumo por tipologia.", collection: "hardware_catalog", rows: hardware, fields: [["manufacturer", "Fabricante"], ["line", "Linha compatível"], ["typology", "Tipologia (opcional)"], ["finish", "Acabamento (opcional)"], ["code", "Código"], ["description", "Descrição"], ["unit", "Unidade"], ["quantity", "Quantidade fixa por esquadria"], ["quantityFormula", "Fórmula de consumo por esquadria"], ["documentId", "Documento de origem"], ["page", "Página de origem"]] },
+    hardware: { title: "Acessórios e ferragens", subtitle: "Componentes vinculados ao fabricante e à linha compatível, com consumo por tipologia.", collection: "hardware_catalog", rows: hardware, fields: [["manufacturer", "Fabricante"], ["line", "Linha compatível"], ["typology", "Tipologia (opcional)"], ["finish", "Acabamento (opcional)"], ["code", "Código"], ["description", "Descrição"], ["unit", "Unidade"], ["quantity", "Quantidade fixa por esquadria"], ["quantityFormula", "Fórmula de consumo por esquadria"], ["imageUrl", "Imagem do acessório (URL)"], ["documentId", "Documento de origem"], ["page", "Página de origem"]] },
     prices: { title: "Preços de fornecedores", subtitle: "Histórico de preços cotados, com validade, unidade e fonte. Cada cotação gera um registro independente.", collection: "supplier_prices", rows: prices, fields: [["manufacturer", "Fornecedor"], ["line", "Linha / sistema"], ["code", "Código do item"], ["description", "Descrição"], ["finish", "Acabamento"], ["unit", "Unidade (barra, kg, peça...)"], ["unitPrice", "Preço unitário (R$)"], ["shippingCost", "Frete total confirmado (R$)"], ["priceDate", "Data da cotação (AAAA-MM-DD)"], ["validUntil", "Validade até (AAAA-MM-DD)"], ["sourceUrl", "Fonte / link da cotação"], ["quoteReference", "Nº da cotação / observação"]] }
   } as const;
 
@@ -260,6 +260,7 @@ export default function TechnicalLibraryModule() {
       const pdfTask = getDocument({ data: await file.arrayBuffer() });
       const pdf = await pdfTask.promise;
       const candidates: Array<{ code: string; weightKgM: number; page: number; excerpt: string }> = [];
+      const pageImageUrls = new Map<number, string>();
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
         const page = await pdf.getPage(pageNumber);
         const content = await page.getTextContent();
@@ -280,6 +281,27 @@ export default function TechnicalLibraryModule() {
           if (!Number.isFinite(weight) || weight <= 0 || weight > 100) continue;
           candidates.push({ code: codeMatch[1].toUpperCase(), weightKgM: weight, page: pageNumber, excerpt: line.slice(0, 280) });
         }
+        if (candidates.some(candidate => candidate.page === pageNumber)) {
+          const baseViewport = page.getViewport({ scale: 1 });
+          const scale = Math.min(1.25, 1200 / Math.max(baseViewport.width, baseViewport.height));
+          const viewport = page.getViewport({ scale });
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          const context = canvas.getContext("2d");
+          if (context) {
+            await page.render({ canvasContext: context, viewport }).promise;
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+            if (blob) {
+              const imagePath = `technical-catalogs/${user.uid}/previews/${Date.now()}-page-${pageNumber}.png`;
+              const imageRef = storageRef(storage, imagePath);
+              await uploadBytes(imageRef, blob, { contentType: "image/png" });
+              pageImageUrls.set(pageNumber, await getDownloadURL(imageRef));
+            }
+          }
+          canvas.width = 0;
+          canvas.height = 0;
+        }
       }
       await pdfTask.destroy();
       const docRef = await addDoc(collection(db, "technical_documents"), {
@@ -294,6 +316,7 @@ export default function TechnicalLibraryModule() {
           await addDoc(collection(db, "aluminum_profiles"), {
             manufacturer: importManufacturer.trim(), line: importLine.trim(), code: candidate.code, description: candidate.excerpt,
             weightKgM: candidate.weightKgM, documentId: docRef.id, page: candidate.page,
+            sourcePageImageUrl: pageImageUrls.get(candidate.page) || "",
             sourceUrl: downloadUrl, status: "pending_review", extractionMethod: "pdf_text_layer_regex",
             createdBy: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
           });
@@ -384,7 +407,7 @@ export default function TechnicalLibraryModule() {
 
   const changeStatus = async (row: Row, status: ReviewStatus) => {
     try {
-      await updateDoc(doc(db, current.collection, row.id), { status, ...(section === "prices" ? { priceStatus: status } : {}), updatedAt: serverTimestamp(), reviewedAt: status === "verified" ? serverTimestamp() : null });
+      await updateDoc(doc(db, current.collection, row.id), { status, ...(section === "prices" ? { priceStatus: status } : {}), updatedAt: serverTimestamp(), reviewedAt: status === "verified" ? serverTimestamp() : null, reviewedBy: status === "verified" ? (auth.currentUser?.email || auth.currentUser?.uid || "authenticated-user") : null });
     } catch (e) { setError(e instanceof Error ? e.message : "Falha ao atualizar a validação."); }
   };
 
