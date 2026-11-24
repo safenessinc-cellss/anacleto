@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import firebaseConfig from "../../../firebase-applet-config.json" with { type: "json" };
 
 type FirestoreValue = Record<string, any>;
@@ -26,7 +27,7 @@ async function readCollection(name: string, token: string, fieldPaths: string[])
 
   const response = await fetch(url, {
     headers: { Authorization: "Bearer " + token },
-    signal: AbortSignal.timeout(3000),
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!response.ok) {
@@ -37,8 +38,14 @@ async function readCollection(name: string, token: string, fieldPaths: string[])
     } catch {
       // Keep the diagnostic limited to the HTTP status when Firestore returns no JSON.
     }
-    throw new Error("Firestore " + name + " respondeu HTTP " + response.status
-      + (firestoreStatus ? " (" + firestoreStatus + ")" : ""));
+    const statusCode = response.status === 401 || response.status === 403
+      ? response.status
+      : response.status === 404 ? 404 : response.status >= 500 ? 503 : 502;
+    throw Object.assign(
+      new Error("Firestore " + name + " respondeu HTTP " + response.status
+        + (firestoreStatus ? " (" + firestoreStatus + ")" : "")),
+      { statusCode, code: "FIRESTORE_COLLECTION_READ_FAILED", collection: name },
+    );
   }
 
   const data = await response.json() as any;
@@ -52,6 +59,8 @@ export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") return res.status(405).json({ error: "Método não permitido." });
 
+  const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || randomUUID());
+  const startedAt = Date.now();
   let stage = "request_validation";
   try {
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
@@ -70,10 +79,14 @@ export default async function handler(req: any, res: any) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken: token }),
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(8000),
       },
     );
-    if (!auth.ok) return res.status(401).json({ error: "Sessão inválida." });
+    if (auth.status === 401 || auth.status === 400) return res.status(401).json({ error: "Sessão inválida.", code: "INVALID_SESSION", requestId });
+    if (!auth.ok) throw Object.assign(new Error("Firebase Identity Toolkit respondeu HTTP " + auth.status), {
+      statusCode: auth.status >= 500 ? 503 : 502,
+      code: "FIREBASE_AUTH_UPSTREAM_FAILED",
+    });
 
     stage = "firestore_read";
     const [profiles, rules] = await Promise.all([
@@ -108,16 +121,22 @@ export default async function handler(req: any, res: any) {
     });
   } catch (error: any) {
     const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
+    const statusCode = Number(error?.statusCode || (stage === "firebase_authentication" ? 503 : 502));
     console.error("[supplier/technical-options] failed", {
       stage,
       requestId,
-      message: String(error?.message || error),
+      durationMs: Date.now() - startedAt,
+      code: error?.code || "TECHNICAL_OPTIONS_LOAD_FAILED",
+      statusCode,
+      collection: error?.collection,
+      message: String(error?.message || error).slice(0, 1200),
       stack: error?.stack,
     });
-    return res.status(502).json({
-      error: "Falha ao carregar opções técnicas. Consulte o diagnóstico do servidor.",
-      code: "TECHNICAL_OPTIONS_LOAD_FAILED",
+    return res.status(statusCode >= 400 && statusCode < 600 ? statusCode : 502).json({
+      error: "Falha ao carregar opções técnicas.",
+      code: error?.code || "TECHNICAL_OPTIONS_LOAD_FAILED",
       stage,
+      requestId,
     });
   }
 }
