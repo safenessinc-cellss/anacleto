@@ -290,7 +290,7 @@ export default function TechnicalLibraryModule() {
           canvas.height = Math.ceil(viewport.height);
           const context = canvas.getContext("2d");
           if (context) {
-            await page.render({ canvasContext: context, viewport }).promise;
+            await page.render({ canvas, canvasContext: context, viewport }).promise;
             const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
             if (blob) {
               const imagePath = `technical-catalogs/${user.uid}/previews/${Date.now()}-page-${pageNumber}.png`;
