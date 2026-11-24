@@ -41,11 +41,16 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
   const [marketError, setMarketError] = useState("");
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
   const [aluminumPricePerKg, setAluminumPricePerKg] = useState("");
+  const [laborRate, setLaborRate] = useState(100);
   const [aluminumPriceSource, setAluminumPriceSource] = useState<any>(null);
   const [isSearchingAluminumPrice, setIsSearchingAluminumPrice] = useState(false);
   const aluminumPurchasedKg = (bomData?.bom || []).filter((item: any) => item.category === "aluminum_profile" && Number(item.weightKgM) > 0 && Number(item.commercialBarLengthMm) > 0)
     .reduce((sum: number, item: any) => sum + Number(item.quantity || 0) * Number(item.commercialBarLengthMm) / 1000 * Number(item.weightKgM), 0);
   const aluminumEstimatedCost = aluminumPurchasedKg * Math.max(0, Number(aluminumPricePerKg.replace(",", ".")) || 0);
+  const selectedBasket = comparisons.find((basket: any) => basket.supplier === bestSupplier && basket.complete);
+  const laborBase = Number(selectedBasket?.materialSubtotal || 0);
+  const laborAmount = Number((laborBase * Math.max(0, Math.min(300, laborRate)) / 100).toFixed(2));
+  const technicalTotal = selectedBasket ? Number(selectedBasket.total || 0) + laborAmount : null;
 
   const handleSearchAluminumPrice = async () => {
     setIsSearchingAluminumPrice(true);
@@ -86,6 +91,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
       setBomForm(data.bomForm || bomForm);
       setBomData(data.bomData || null);
       setAluminumPricePerKg(data.aluminumPricePerKg || "");
+      setLaborRate(Number.isFinite(Number(data.laborRate)) ? Number(data.laborRate) : 100);
       setBudgetClientName(data.clientName || "");
       setEditingBudgetId(snap.id);
       setComparisons(Array.isArray(data.comparisons) ? data.comparisons : []);
@@ -100,8 +106,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Entre na sua conta para salvar o orçamento.");
-      const selectedBasket = comparisons.find((basket: any) => basket.supplier === bestSupplier && basket.complete);
-      const payload = { clientName: budgetClientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, comparisons, bestSupplier, total: selectedBasket ? Number(selectedBasket.total) : null, currency: "BRL", status: "draft", workflow: "technical_esquadrias", updatedAt: serverTimestamp() };
+      const payload = { clientName: budgetClientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, comparisons, bestSupplier, laborRate, laborAmount, labor: { description: "Mão de obra", percentage: laborRate, basis: "materials", amount: laborAmount }, total: technicalTotal, currency: "BRL", status: "draft", workflow: "technical_esquadrias", updatedAt: serverTimestamp() };
       if (editingBudgetId) await updateDoc(doc(db, "technical_budgets", editingBudgetId), payload);
       else await addDoc(collection(db, "technical_budgets"), { ...payload, createdBy: user.uid, createdAt: serverTimestamp() });
       showToast(editingBudgetId ? "Orçamento de esquadrias atualizado." : "Orçamento de esquadrias salvo.", "success");
@@ -426,6 +431,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
               {(basket.lines || []).map((line: any, index: number) => <p key={index} className="mt-1 text-xs text-slate-600">{line.description}: {line.subtotal == null ? "Sem preço aprovado" : line.subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}{line.sourceUnit && line.sourceUnit !== line.unit ? " · convertido de " + line.sourceUnit : ""}</p>)}
             </div>
           ))}
+          {selectedBasket && <div className="mt-4 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><label className="block max-w-xs text-xs font-semibold text-slate-700 dark:text-slate-200">Mão de obra (% sobre materiais)<input type="number" min="0" max="300" step="1" value={laborRate} onChange={(event) => setLaborRate(Math.max(0, Math.min(300, Number(event.target.value) || 0)))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950" /></label><div className="mt-3 space-y-1 text-sm"><p className="flex justify-between"><span>Materiais</span><b>{laborBase.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</b></p><p className="flex justify-between"><span>Frete</span><b>{Number(selectedBasket.shippingCost || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</b></p><p className="flex justify-between"><span>Mão de obra ({laborRate}%)</span><b>{laborAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</b></p><p className="flex justify-between border-t pt-2 font-bold"><span>Total</span><b>{Number(technicalTotal || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</b></p></div></div>}
         </section>
       )}
 
