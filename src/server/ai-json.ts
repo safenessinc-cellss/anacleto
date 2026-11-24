@@ -50,6 +50,8 @@ export function parseAIJson<T>(input: unknown, validate: (value: any) => T): T {
  * structure using the original response and schema instructions.
  */
 function providerStatus(error: any): number {
+  const name = String(error?.name || error?.cause?.name || "");
+  if (name === "TimeoutError" || name === "AbortError" || error?.code === "ETIMEDOUT" || error?.cause?.code === "ETIMEDOUT") return 504;
   return Number(error?.status || error?.statusCode || error?.cause?.status || error?.cause?.statusCode || 0);
 }
 function providerMessage(error: any): string {
