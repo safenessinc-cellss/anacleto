@@ -2,7 +2,9 @@
 
 ## Segredos e variáveis obrigatórias
 
-`GEMINI_API_KEY` (ou `GOOGLE_API_KEY`) habilita chamadas diretas ao Gemini 3.8 Flash pelo SDK oficial `@google/genai`, com `responseMimeType: application/json` e `responseSchema` nos agentes estruturados. Os fluxos de geração de imagem usam `gemini-nano-banana-2.1`. Sem a chave direta, os agentes estruturados mantêm o fallback existente pelo Vercel AI Gateway; a validação de JSON continua obrigatória na aplicação. A chave deve existir somente como variável sensível no servidor (Vercel Preview/Production), nunca em `localStorage`, no bundle do navegador ou no Git. A camada gratuita do Google tem limites e disponibilidade sujeitos à política atual do provedor; não é possível prometer uso ilimitado ou 100% de disponibilidade.
+`GEMINI_API_KEY` (ou `GOOGLE_API_KEY`) habilita chamadas diretas ao Gemini 3.8 Flash pelo SDK oficial `@google/genai`, com `responseMimeType: application/json` e `responseSchema` nos agentes estruturados. Os fluxos de geração de imagem usam `gemini-nano-banana-2.1`. Sem a chave direta, os agentes estruturados mantêm o fallback existente pelo Vercel AI Gateway; a validação de JSON continua obrigatória na aplicação.
+
+Quando Gemini falha ou está sobrecarregado, o pipeline tenta `OPENAI_API_KEY` direto, se existir, e depois o modelo `openai/gpt-4.1-mini` via `AI_GATEWAY_API_KEY` (configurável por `ANACLETO_AI_GATEWAY_FALLBACK_MODEL`). O fallback do CAD usa o mesmo modelo multimodal. Os renders de imagem usam Nano Banana 2.1 e, em falha, `openai/gpt-image-2.6-flare` via AI Gateway. A chave deve existir somente como variável sensível no servidor (Vercel Preview/Production), nunca em `localStorage`, no bundle do navegador ou no Git. A camada gratuita do Google tem limites e disponibilidade sujeitos à política atual do provedor; não é possível prometer uso ilimitado ou 100% de disponibilidade.
 
 Configure no ambiente de execução (Preview e Production separadamente). Nunca coloque estes valores no frontend, no Git ou em logs.
 
