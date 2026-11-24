@@ -110,10 +110,37 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
         break;
       }
     }
-    if (!response) throw Object.assign(new Error("Falha na geração CAD: " + String(lastError?.message || lastError || "provedor indisponível")), {
-      statusCode: Number(lastError?.status || lastError?.statusCode || 503),
-      code: "TECHNICAL_DRAWING_PROVIDER_FAILED",
-    });
+    if (!response) {
+      const gatewayConfigured = Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN);
+      if (gatewayConfigured && Date.now() + 1_500 < deadline) {
+        try {
+          const fallback = await generateText({
+            model: getAIModel("technicalDrawing"),
+            system: options.system,
+            messages: [{ role: "user", content: [
+              { type: "text", text: options.prompt },
+              ...(options.images || []).map(image => ({ type: "image" as const, image })),
+            ] }],
+            temperature: options.temperature,
+            maxOutputTokens: options.maxOutputTokens,
+            abortSignal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
+          });
+          if (fallback.text?.trim()) {
+            console.warn("[TECHNICAL_DRAWING_AI] direct Gemini failed; AI Gateway fallback succeeded", { model });
+            return { text: fallback.text, usage: fallback.usage as any, model: AI_CONFIG.technicalDrawing.model + " (gateway-fallback)" };
+          }
+        } catch (fallbackError: any) {
+          console.error("[TECHNICAL_DRAWING_AI] AI Gateway fallback failed", {
+            status: Number(fallbackError?.status || fallbackError?.statusCode || 0),
+            message: String(fallbackError?.message || fallbackError).slice(0, 800),
+          });
+        }
+      }
+      throw Object.assign(new Error("Falha na geração CAD: " + String(lastError?.message || lastError || "provedor indisponível")), {
+        statusCode: Number(lastError?.status || lastError?.statusCode || 503),
+        code: "TECHNICAL_DRAWING_PROVIDER_FAILED",
+      });
+    }
     return { text: response.text || "", usage: { inputTokens: response.usageMetadata?.promptTokenCount, outputTokens: response.usageMetadata?.candidatesTokenCount }, model };
   }
   // Backward-compatible provider path. Runtime validation remains mandatory.
