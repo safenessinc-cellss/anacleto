@@ -74,11 +74,44 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
       parts.push({ inlineData: { mimeType: response.headers.get("content-type") || "image/jpeg", data: Buffer.from(bytes).toString("base64") } });
     }
     const client = new GoogleGenAI({ apiKey });
-    const model = options.responseSchema === parametricResponseSchema ? "gemini-3.5-flash-lite" : "gemini-3.8-flash";
-    const response = await client.models.generateContent({
-      model,
-      contents: [{ role: "user", parts }],
-      config: { systemInstruction: options.system, responseMimeType: "application/json", responseSchema: options.responseSchema || drawingResponseSchema, temperature: options.temperature, maxOutputTokens: options.maxOutputTokens }
+    const model = options.responseSchema === parametricResponseSchema
+      ? (process.env.ANACLETO_PARAMETRIC_MODEL || "gemini-3.5-flash-lite")
+      : (process.env.ANACLETO_DRAWING_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash").replace(/^google\//, "");
+    const deadline = Date.now() + Math.min(AI_CONFIG.technicalDrawing.timeoutMs, 50_000);
+    let response: any;
+    let lastError: any;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const remaining = deadline - Date.now();
+      if (remaining < 1_500) break;
+      try {
+        response = await client.models.generateContent({
+          model,
+          contents: [{ role: "user", parts }],
+          config: {
+            systemInstruction: options.system,
+            responseMimeType: "application/json",
+            responseSchema: options.responseSchema || drawingResponseSchema,
+            temperature: options.temperature,
+            maxOutputTokens: options.maxOutputTokens,
+            abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? Math.max(5_000, remaining - 1_500) : remaining)),
+          }
+        });
+        break;
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.status || error?.statusCode || error?.cause?.status || 0);
+        const retryable = [408, 429, 500, 502, 503, 504].includes(status) || /high demand|temporarily unavailable|resource exhausted/i.test(String(error?.message || ""));
+        console.error("[TECHNICAL_DRAWING_AI] Gemini failed", { status, attempt, model, message: String(error?.message || error).slice(0, 800) });
+        if (attempt === 0 && retryable && Date.now() + 500 < deadline) {
+          await new Promise(resolve => setTimeout(resolve, 350));
+          continue;
+        }
+        break;
+      }
+    }
+    if (!response) throw Object.assign(new Error("Falha na geração CAD: " + String(lastError?.message || lastError || "provedor indisponível")), {
+      statusCode: Number(lastError?.status || lastError?.statusCode || 503),
+      code: "TECHNICAL_DRAWING_PROVIDER_FAILED",
     });
     return { text: response.text || "", usage: { inputTokens: response.usageMetadata?.promptTokenCount, outputTokens: response.usageMetadata?.candidatesTokenCount }, model };
   }

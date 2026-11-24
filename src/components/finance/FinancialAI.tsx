@@ -12,6 +12,7 @@ const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "curren
 
 export default function FinancialAI({ language = "pt" }: { language?: string }) {
   const [file, setFile] = useState<File | null>(null);
+  const [uploadedDocument, setUploadedDocument] = useState<{ path: string; url: string } | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ExtractedDocument | null>(null);
@@ -33,13 +34,6 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
     { role: "assistant", text: language === "es" ? "¡Hola! Soy el Asistente Financiero de Anacleto. Puedo analizar facturación, cobros, costos registrados de aluminio y vidrio, inventario, cuentas por pagar y cobrar y flujo de caja usando los registros actuales del sistema. No invento valores cuando faltan datos." : "Olá! Sou o Assistente Financeiro da Anacleto. Posso analisar faturamento, recebimentos, custos cadastrados de alumínio e vidro, estoque, contas a pagar e receber e fluxo de caixa usando os registros atuais do sistema. Não invento valores quando faltam dados." }
   ]);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  const readBase64 = (selected: File) => new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo selecionado."));
-    reader.onload = () => { const encoded = String(reader.result || "").split(",")[1]; encoded ? resolve(encoded) : reject(new Error("Arquivo vazio ou inválido.")); };
-    reader.readAsDataURL(selected);
-  });
 
   const sendFinancialQuestion = async () => {
     const question = assistantQuestion.trim();
@@ -76,8 +70,19 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
     try {
       const idToken = await auth.currentUser?.getIdToken();
       if (!idToken) throw new Error("Entre na sua conta para processar documentos financeiros.");
-      const data = await readBase64(file);
-      const response = await fetch("/api/ai/purchase-extract", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken }, body: JSON.stringify({ data, mimeType, fileName: file.name }) });
+      const user = auth.currentUser;
+      if (!user) throw new Error("Sessão expirada. Entre novamente.");
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
+      const storagePath = "purchases/" + user.uid + "/" + Date.now() + "-" + safeName;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, file, { contentType: mimeType, customMetadata: { uploadedBy: user.uid, source: "financial-ai" } });
+      const storageUrl = await getDownloadURL(storageRef);
+      setUploadedDocument({ path: storagePath, url: storageUrl });
+      const response = await fetch("/api/ai/purchase-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken },
+        body: JSON.stringify({ storageUrl, mimeType, fileName: file.name })
+      });
       const parsed = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(parsed.error || "A IA não conseguiu interpretar o documento.");
       if (!Number(parsed.total) || Number(parsed.total) <= 0) throw new Error("A IA não identificou um valor total válido. Tente uma imagem mais nítida ou preencha manualmente em Compras Gerais.");
@@ -135,10 +140,9 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
         const match = supplierCatalog.find(row => code && normalize(row.code || "") === code) || supplierCatalog.find(row => name && normalize(row.name || "") === name);
         return { description: String(item.description).slice(0, 300), sku: String(item.sku || "").slice(0, 80), quantity: Math.max(0.01, Number(item.quantity) || 1), unit: String(match?.unit || item.unit || "un").slice(0, 20), unitPrice: Math.max(0, Number(item.unitPrice) || 0), total: Math.max(0, Number(item.total) || 0), supplierCatalogId: match?.id || "", supplierCatalogName: match?.name || "", supplierCatalogCategory: match?.category || "" };
       }) : [];
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
-      const storagePath = "purchases/" + user.uid + "/" + Date.now() + "-" + safeName;
-      await uploadBytes(ref(storage, storagePath), file, { contentType: file.type || "application/pdf", customMetadata: { uploadedBy: user.uid, source: "financial-ai" } });
-      const documentUrl = await getDownloadURL(ref(storage, storagePath));
+      if (!uploadedDocument) throw new Error("O documento enviado para leitura não foi localizado. Faça a leitura novamente.");
+      const storagePath = uploadedDocument.path;
+      const documentUrl = uploadedDocument.url;
       const subtotal = Math.round((amount - taxes + Number.EPSILON) * 100) / 100;
       const items = extractedItems.length ? extractedItems : [{ description: description.trim() || "Total do documento", sku: "", quantity: 1, unit: "un", unitPrice: subtotal, total: subtotal }];
       const number = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -152,7 +156,7 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user.email || "", source: "financial-ai"
       });
       setMessage("Documento enviado para Compras Gerais, aguardando aprovação. Os boletos vinculados serão lançados separadamente em Contas a Pagar.");
-      setFile(null); setResult(null); setNotes(""); setBoletos([]); if (fileRef.current) fileRef.current.value = "";
+      setFile(null); setResult(null); setUploadedDocument(null); setNotes(""); setBoletos([]); if (fileRef.current) fileRef.current.value = "";
     } catch (e) { setError((e as Error).message || "Não foi possível enviar o documento ao Financeiro."); }
     finally { setSaving(false); }
   };
@@ -178,7 +182,7 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
     <section className="space-y-4 rounded-2xl border bg-white p-5 dark:bg-slate-900">
       <div onClick={() => fileRef.current?.click()} role="button" tabIndex={0} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") fileRef.current?.click(); }} className="cursor-pointer rounded-xl border-2 border-dashed border-slate-300 p-8 text-center transition hover:border-indigo-500 hover:bg-indigo-50/30">
         <Upload className="mx-auto mb-2 h-10 w-10 text-slate-400"/><p className="font-bold">Enviar nota fiscal, boleto ou recibo (PDF ou imagem)</p><p className="mt-1 text-xs text-slate-500">{file ? file.name : "Nenhum arquivo selecionado"}</p>
-        <input ref={fileRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={e => { setFile(e.target.files?.[0] || null); setResult(null); setMessage(""); setError(""); }} className="hidden"/>
+        <input ref={fileRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={e => { setFile(e.target.files?.[0] || null); setUploadedDocument(null); setResult(null); setMessage(""); setError(""); }} className="hidden"/>
       </div>
       <div className="flex flex-wrap gap-2"><button onClick={() => void handleUpload()} disabled={!file || extracting || saving} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{extracting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4"/>}{extracting ? "Lendo documento..." : "Ler documento com IA"}</button>{file && <button onClick={() => { setFile(null); setResult(null); setMessage(""); setError(""); if (fileRef.current) fileRef.current.value = ""; }} className="rounded-lg border px-4 py-2.5 text-sm font-semibold">Limpar arquivo</button>}</div>
       {error && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}{message && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}

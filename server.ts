@@ -20,6 +20,7 @@ import compareBomHandler from "./src/server/supplier-api/compare-bom.js";
 import marketResearchHandler from "./src/server/supplier-api/market-research.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
 import { google } from "googleapis";
+import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
 // Load .env.local first if available, then fallback to .env
@@ -559,8 +560,10 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         authorizationToken: String(req.headers.authorization || "").replace(/^Bearer\s+/i, ""),
       });
     } catch (auditError) { console.error("Budget failure audit could not be persisted:", auditError); }
-    console.error("Budget items AI error:", err?.message || err);
-    return res.status(502).json({ error: "Falha ao gerar os itens do orçamento. Nenhum preço sem confirmação no catálogo foi aplicado.", code: "BUDGET_AI_UNAVAILABLE" });
+    const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
+    const status = Number(err?.statusCode || err?.status || 502);
+    console.error("[BUDGET_ITEMS_AI] failed", { requestId, code: err?.code || "BUDGET_AI_UNAVAILABLE", status, message: String(err?.message || err).slice(0, 1200), stack: err?.stack });
+    return res.status(status >= 400 && status < 600 ? status : 502).json({ error: String(err?.message || "Falha ao gerar os itens do orçamento."), code: err?.code || "BUDGET_AI_UNAVAILABLE", requestId });
   }
 });
 
@@ -752,32 +755,72 @@ app.post("/api/create-calendar-event", requireFirebaseAuth, async (req, res) => 
 
 
 async function extractFinancialDocument(data: string, mimeType: string, fileName: string, prompt: string, maxOutputTokens = 4000) {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw Object.assign(new Error("GEMINI_API_KEY não configurada para extração financeira. Configure a chave no ambiente Production do Vercel."), { statusCode: 503, code: "AI_PROVIDER_NOT_CONFIGURED" });
   const binary = Buffer.from(data, "base64");
-  const attachment = mimeType === "application/pdf"
-    ? { type: "file" as const, data: binary, mediaType: mimeType, filename: fileName.slice(0, 120) }
-    : { type: "image" as const, image: binary, mediaType: mimeType };
-  const response = await generateText({
-    model: getAIModel("documentExtraction"),
-    messages: [{ role: "user", content: [{ type: "text", text: prompt }, attachment] }],
-    temperature: 0.1,
-    maxOutputTokens,
+  if (!binary.length || binary.length > 10 * 1024 * 1024) throw Object.assign(new Error("Documento vazio ou acima do limite de 10 MB."), { statusCode: 413 });
+  const client = new GoogleGenAI({ apiKey });
+  const model = (process.env.ANACLETO_DOCUMENT_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash").replace(/^google\//, "");
+  const requestParts: any[] = [{ text: prompt }, { inlineData: { mimeType, data: binary.toString("base64") } }];
+  const deadline = Date.now() + Math.min(AI_CONFIG.documentExtraction.timeoutMs, 50_000);
+  let response: any;
+  let lastError: any;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining < 1_500) break;
+    try {
+      response = await client.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: requestParts }],
+        config: {
+          systemInstruction: "Você extrai dados fiscais brasileiros. Use somente o conteúdo visível do documento. Não invente valores, datas, CNPJ ou itens. Retorne somente JSON válido.",
+          responseMimeType: "application/json",
+          temperature: 0.1,
+          maxOutputTokens,
+          abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? Math.max(5_000, remaining - 1_500) : remaining)),
+        },
+      });
+      break;
+    } catch (error: any) {
+      lastError = error;
+      const status = Number(error?.status || error?.statusCode || error?.cause?.status || 0);
+      const retryable = [408, 429, 500, 502, 503, 504].includes(status) || /high demand|temporarily unavailable|resource exhausted/i.test(String(error?.message || ""));
+      console.error("[FINANCIAL_DOCUMENT_AI] Gemini failed", { status, attempt, model, message: String(error?.message || error).slice(0, 800) });
+      if (attempt === 0 && retryable && Date.now() + 500 < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 350));
+        continue;
+      }
+      break;
+    }
+  }
+  if (!response) throw Object.assign(new Error("Falha na extração financeira: " + String(lastError?.message || lastError || "provedor indisponível")), {
+    statusCode: Number(lastError?.status || lastError?.statusCode || 503),
+    code: "FINANCIAL_AI_PROVIDER_FAILED",
   });
   const validate = (value: any) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Documento sem objeto de dados válido.");
     return value;
   };
   try {
-    return parseAIJson(response.text, validate);
+    return parseAIJson(response.text || "", validate);
   } catch (firstError) {
-    const repaired = await generateText({
-      model: getAIModel("documentExtraction"),
-      system: "Corrija somente a estrutura JSON da extração. Não invente, complete ou altere nenhum dado do documento. Retorne apenas JSON válido.",
-      prompt: "A extração não passou no parser. Erro: " + String((firstError as Error)?.message || firstError) + "\nResposta original:\n" + String(response.text || "").slice(0, 30000),
-      temperature: 0,
-      maxOutputTokens,
-      abortSignal: AbortSignal.timeout(AI_CONFIG.documentExtraction.timeoutMs),
+    const remaining = deadline - Date.now();
+    if (remaining < 2_000) throw firstError;
+    const repaired = await client.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text:
+        "Corrija somente a estrutura JSON da extração. Não invente, complete ou altere nenhum dado do documento. Retorne apenas JSON válido.\nErro de parser: "
+        + String((firstError as Error)?.message || firstError).slice(0, 500)
+        + "\nResposta original:\n" + String(response.text || "").slice(0, 20_000)
+      }] }],
+      config: {
+        responseMimeType: "application/json",
+        temperature: 0,
+        maxOutputTokens,
+        abortSignal: AbortSignal.timeout(Math.min(8_000, remaining)),
+      },
     });
-    return parseAIJson(repaired.text, validate);
+    return parseAIJson(repaired.text || "", validate);
   }
 }
 
@@ -808,8 +851,23 @@ app.post("/api/ai/financial-extract", requireFirebaseAuth, requireFinanceRole, r
 // ============ COMPRAS: leitura inteligente de documentos ============
 app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, rateLimitByUser("purchase-ai", 8, 60_000), async (req, res) => {
   try {
-    const { data, mimeType, fileName } = req.body || {};
-    if (typeof data !== "string" || !data || data.length > 14_000_000) return res.status(400).json({ error: "Envie um documento de até 10 MB." });
+    const { storageUrl, mimeType, fileName } = req.body || {};
+    const user = res.locals.firebaseUser as { uid?: string };
+    if (typeof storageUrl !== "string" || !storageUrl || !user.uid) return res.status(400).json({ error: "Envie a referência do documento armazenado." });
+    const bucket = String(firebaseConfig.storageBucket || "");
+    let parsedUrl: URL;
+    try { parsedUrl = new URL(storageUrl); } catch { return res.status(400).json({ error: "Referência de arquivo inválida." }); }
+    const expectedPrefix = `/v0/b/${bucket}/o/${encodeURIComponent("purchases/" + user.uid + "/")}`;
+    if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "firebasestorage.googleapis.com" || !parsedUrl.pathname.startsWith(expectedPrefix) || parsedUrl.searchParams.get("alt") !== "media" || !parsedUrl.searchParams.get("token")) {
+      return res.status(403).json({ error: "O documento não pertence à área financeira da sua conta." });
+    }
+    const fileResponse = await fetch(parsedUrl.toString(), { signal: AbortSignal.timeout(20000) });
+    if (!fileResponse.ok) throw new Error(`Falha ao baixar documento do Storage (HTTP ${fileResponse.status}).`);
+    const contentType = (fileResponse.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (contentType !== mimeType) throw new Error("O tipo do arquivo armazenado não corresponde ao arquivo enviado.");
+    const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+    if (!fileBuffer.length || fileBuffer.length > 10 * 1024 * 1024) return res.status(413).json({ error: "O documento deve ter até 10 MB." });
+    const data = fileBuffer.toString("base64");
     const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
     if (!allowed.includes(mimeType)) return res.status(415).json({ error: "Formato não suportado. Use PDF, JPG, PNG ou WEBP." });
     const prompt = "Você é um analista financeiro e fiscal brasileiro. Leia a nota fiscal, boleto, recibo, orçamento ou documento de compra. Extraia apenas dados visíveis, sem inventar. Responda APENAS JSON válido: { \"documentType\":\"nfe|danfe|supplier_quote|purchase_order|boleto|receipt|other\", \"supplierName\":\"\", \"supplierCnpj\":\"\", \"documentNumber\":\"\", \"accessKey\":\"\", \"issueDate\":\"YYYY-MM-DD\", \"dueDate\":\"YYYY-MM-DD\", \"currency\":\"BRL\", \"total\":0, \"tax\":0, \"description\":\"\", \"digitableLine\":\"\", \"barcode\":\"\", \"payerName\":\"\", \"payerCnpj\":\"\", \"items\":[{\"description\":\"\",\"sku\":\"\",\"quantity\":1,\"unit\":\"un\",\"unitPrice\":0,\"total\":0}], \"confidence\":\"high|medium|low\", \"warnings\":[] }. Use string vazia, zero ou lista vazia quando ausente. Não confunda CNPJ do emitente com destinatário/pagador. Valores em reais. Limite itens a 100. Arquivo: " + String(fileName || "").slice(0, 120);
@@ -838,8 +896,10 @@ app.post("/api/ai/purchase-extract", requireFirebaseAuth, requireFinanceRole, ra
     parsed.confidence = ["high", "medium", "low"].includes(parsed.confidence) ? parsed.confidence : "low";
     return res.json(parsed);
   } catch (error: any) {
-    console.error("Purchase document extraction error:", error?.message || error);
-    return res.status(422).json({ error: "Não foi possível interpretar o documento com segurança. Revise o PDF ou preencha manualmente." });
+    const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
+    const status = Number(error?.statusCode || 422);
+    console.error("[PURCHASE_EXTRACT] failed", { requestId, code: error?.code || "PURCHASE_EXTRACT_FAILED", status, message: String(error?.message || error).slice(0, 1200), stack: error?.stack });
+    return res.status(status >= 400 && status < 600 ? status : 422).json({ error: String(error?.message || "Não foi possível interpretar o documento."), code: error?.code || "PURCHASE_EXTRACT_FAILED", requestId });
   }
 });
 
