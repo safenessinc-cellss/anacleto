@@ -22,6 +22,7 @@ import { recordAIAudit } from "./src/server/ai-audit.js";
 import { stripBearerPrefix } from "./src/server/auth-token.js";
 import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
 import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
+import { hasAIRole } from "./src/server/ai-roles.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -66,13 +67,13 @@ const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
 
 const requireQuoteRole: express.RequestHandler = (_req, res, next) => {
   const user = res.locals.firebaseUser as { role?: string } | undefined;
-  if (user && ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"].includes(user.role || "")) return next();
+  if (user && hasAIRole(user.role, "budget")) return next();
   return res.status(403).json({ error: "Seu perfil não tem autorização para operações comerciais e orçamentos." });
 };
 
 const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
   const user = res.locals.firebaseUser as { role?: string } | undefined;
-  if (user && ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role || "")) return next();
+  if (user && hasAIRole(user.role, "financial")) return next();
   return res.status(403).json({ error: "Seu perfil não tem autorização para operações financeiras." });
 };
 
