@@ -95,7 +95,6 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
             responseSchema: options.responseSchema || drawingResponseSchema,
             temperature: options.temperature,
             maxOutputTokens: options.maxOutputTokens,
-            providerOptions: { gateway: { only: ["openai", "azure"] } },
             abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? Math.max(5_000, remaining - 1_500) : remaining)),
           }
         });
@@ -125,6 +124,7 @@ async function generateDrawingJson(options: { system: string; prompt: string; im
             ] }],
             temperature: options.temperature,
             maxOutputTokens: options.maxOutputTokens,
+            providerOptions: { gateway: { only: ["openai", "azure"] } },
             abortSignal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())),
           });
           if (fallback.text?.trim()) {
