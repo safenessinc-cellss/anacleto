@@ -5,6 +5,7 @@ import { gateway } from "ai";
  * Override models per capability without changing application code.
  */
 const DEFAULT_MODEL = process.env.ANACLETO_AI_MODEL || "google/gemini-3.8-flash";
+export const AI_GATEWAY_FALLBACK_MODEL = process.env.ANACLETO_AI_GATEWAY_FALLBACK_MODEL || "openai/gpt-4.1-mini";
 
 export const AI_CONFIG = {
   default: {
@@ -67,4 +68,8 @@ export const AI_CONFIG = {
 
 export function getAIModel(capability: keyof typeof AI_CONFIG = "default") {
   return gateway(AI_CONFIG[capability].model);
+}
+
+export function getAIGatewayFallbackModel() {
+  return gateway(AI_GATEWAY_FALLBACK_MODEL);
 }
