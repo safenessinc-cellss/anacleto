@@ -40,7 +40,7 @@ export default async function handler(req:any,res:any){
     const result=await client.models.generateContent({
      model:process.env.ANACLETO_IMAGE_MODEL||"gemini-nano-banana-2.1",
      contents:[{role:"user",parts}],
-     config:{responseModalities:["IMAGE","TEXT"],imageConfig:{aspectRatio:"3:2"},abortSignal:AbortSignal.timeout(45_000)},
+     config:{responseModalities:["IMAGE","TEXT"],imageConfig:{aspectRatio:"3:2"},abortSignal:AbortSignal.timeout(30_000)},
     });
     const generated=result.candidates?.flatMap((candidate:any)=>candidate.content?.parts||[]).find((part:any)=>part.inlineData?.data&&String(part.inlineData.mimeType||"").startsWith("image/"));
     if(generated?.inlineData?.data){const mime=generated.inlineData.mimeType||"image/png";return res.status(200).json({image:`data:${mime};base64,${generated.inlineData.data}`,fallback:false,provider:"gemini-direct"});}
@@ -58,6 +58,7 @@ export default async function handler(req:any,res:any){
      const generated=await generateImage({
       model:process.env.ANACLETO_IMAGE_FALLBACK_MODEL||"openai/gpt-image-2.6-flare",
       prompt:imageBytes?{text:prompt,images:[imageBytes]}:prompt,
+      abortSignal:AbortSignal.timeout(20_000),
      });
      const bytes=generated.image?.uint8Array;
      if(bytes?.length){
