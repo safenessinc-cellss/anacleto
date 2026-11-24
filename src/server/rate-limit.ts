@@ -64,7 +64,7 @@ export async function consumeRateLimit(
     return result <= limit;
   }
 
-  const requireDistributed = options.requireDistributed ?? production;
+  const requireDistributed = options.requireDistributed ?? false;
   if (production && requireDistributed) {
     throw new Error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for public production rate limiting.");
   }
