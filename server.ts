@@ -215,7 +215,7 @@ app.post("/api/chat",async(req,res)=>{
     const response=await client.models.generateContent({
      model:"gemini-3.8-flash",
      contents:[...historyContents,{role:"user",parts:[{text:message.trim().slice(0,3000)}]}],
-     config:{systemInstruction,temperature:0.5,maxOutputTokens:700}
+     config:{systemInstruction,temperature:0.5,maxOutputTokens:700,abortSignal:AbortSignal.timeout(20_000)}
     });
     if(response.text)return res.json({response:response.text,fallback:false,provider:"gemini-direct"});
     throw new Error("Gemini returned an empty chat response.");
@@ -234,7 +234,8 @@ app.post("/api/chat",async(req,res)=>{
     messages:[...historyMessages,{role:"user",content:message.trim().slice(0,3000)}] as any,
     temperature:0.5,
     maxOutputTokens:700,
-    providerOptions:{gateway:{only:["openai","azure"]}}
+    providerOptions:{gateway:{only:["openai","azure"]}},
+    abortSignal:AbortSignal.timeout(15_000)
    });
    if(result.text)return res.json({response:result.text,fallback:false,provider:AI_GATEWAY_FALLBACK_MODEL});
   }
