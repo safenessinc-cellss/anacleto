@@ -49,6 +49,19 @@ const PORT = 3000;
 const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
 const ownerEmail = "safeness.c.a@gmail.com";
 
+// Log configuration presence only. Never print API keys, tokens or private credentials.
+console.info("[ANACLETO_RUNTIME_CONFIG]", {
+  firebaseApiKeyConfigured: Boolean(firebaseApiKey),
+  firebaseProjectIdConfigured: Boolean(firebaseConfig.projectId),
+  geminiApiKeyConfigured: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+  openAIFallbackConfigured: Boolean(process.env.OPENAI_API_KEY),
+  aiGatewayConfigured: Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN),
+  budgetModel: AI_CONFIG.budget.model,
+  drawingModel: AI_CONFIG.technicalDrawing.model,
+  environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
+  region: process.env.VERCEL_REGION || "unknown",
+});
+
 const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
   const authorization = req.headers.authorization || "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
