@@ -21,12 +21,12 @@ const galleryModels = [
 {name:"Porta de correr ampla",detail:"Fachada contemporânea · 3 folhas",model:"Porta Balcão" as Model,color:"Amadeirado",panels:3,image:"https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1400&q=90"},
 {name:"Esquadria piso-teto",detail:"Grandes panos de vidro · luz natural",model:"Porta Balcão" as Model,color:"Grafite",panels:4,image:"https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=90"},
 {name:"Janela panorâmica",detail:"Vista ampla · perfil minimalista",model:"Janela de Correr Suprema" as Model,color:"Natural Fosco",panels:3,image:"https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=1400&q=90"},
-{name:"Porta de entrada",detail:"Acesso principal · desenho contemporâneo",model:"Porta de Giro" as Model,color:"Corten",panels:1,image:"https://images.unsplash.com/photo-1600607687860-8a7b1f5b4f6d?auto=format&fit=crop&w=1400&q=90&sat=-12"},
-{name:"Fechamento de varanda",detail:"Proteção e transparência · 4 folhas",model:"Janela de Correr Suprema" as Model,color:"Champagne",panels:4,image:"https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3x?auto=format&fit=crop&w=1400&q=90&sat=-20"},
-{name:"Porta pivotante",detail:"Entrada imponente · eixo de giro",model:"Porta Pivotante" as Model,color:"Preto Fosco",panels:1,image:"https://images.unsplash.com/photo-1600607687920-4e2a09cf159d2?auto=format&fit=crop&w=1400&q=90&sat=-15"},
-{name:"Janela oscilobatente",detail:"Abertura dupla · ventilação controlada",model:"Janela Oscilobatente" as Model,color:"Prata",panels:1,image:"https://images.unsplash.com/photo-1600607687939-ce8a6c25118c2?auto=format&fit=crop&w=1400&q=90&sat=-25"},
-{name:"Janela basculante",detail:"Ventilação superior · ambientes compactos",model:"Janela Basculante" as Model,color:"Verde Oliva",panels:2,image:"https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea2?auto=format&fit=crop&w=1400&q=90&sat=-18"},
-{name:"Porta de abrir",detail:"Abertura lateral · linhas limpas",model:"Porta de Giro" as Model,color:"Bronze",panels:1,image:"https://images.unsplash.com/photo-1600607687644-c7171b42498f2?auto=format&fit=crop&w=1400&q=90&sat=-24"}
+{name:"Porta de entrada",detail:"Acesso principal · desenho contemporâneo",model:"Porta de Giro" as Model,color:"Corten",panels:1,image:"https://images.unsplash.com/photo-1726471760435-1646fa0c02ef?auto=format&fit=crop&w=1400&q=90&sat=-12"},
+{name:"Fechamento de varanda",detail:"Proteção e transparência · 4 folhas",model:"Janela de Correr Suprema" as Model,color:"Champagne",panels:4,image:"https://images.unsplash.com/photo-1706855203772-c249b75fe016?auto=format&fit=crop&w=1400&q=90&sat=-20"},
+{name:"Porta pivotante",detail:"Entrada imponente · eixo de giro",model:"Porta Pivotante" as Model,color:"Preto Fosco",panels:1,image:"https://images.unsplash.com/photo-1762811054950-b74e0a055c80?auto=format&fit=crop&w=1400&q=90&sat=-15"},
+{name:"Janela oscilobatente",detail:"Abertura dupla · ventilação controlada",model:"Janela Oscilobatente" as Model,color:"Prata",panels:1,image:"https://images.unsplash.com/photo-1783125127199-860da9744dcc?auto=format&fit=crop&w=1400&q=90&sat=-25"},
+{name:"Janela basculante",detail:"Ventilação superior · ambientes compactos",model:"Janela Basculante" as Model,color:"Verde Oliva",panels:2,image:"https://images.unsplash.com/photo-1775112862850-02b1f72edcb1?auto=format&fit=crop&w=1400&q=90&sat=-18"},
+{name:"Porta de abrir",detail:"Abertura lateral · linhas limpas",model:"Porta de Giro" as Model,color:"Bronze",panels:1,image:"https://images.unsplash.com/photo-1755816764831-2803235f0099?auto=format&fit=crop&w=1400&q=90&sat=-24"}
 ];
 const glasses = ["Incolor","Fumê","Reflecta"];
 const models: Model[] = ["Janela de Correr Suprema","Porta Balcão","Maxim-Ar","Porta Camarão","Porta de Giro","Porta Pivotante","Janela Oscilobatente","Janela Basculante","Box de Banho","Porta Lambril","Janela Veneziana","Painel Fixo"];
@@ -204,11 +204,11 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
             <span className="service-number">04 / MADEIRA</span><div className="service-copy"><h3>Pergolados de madeira</h3><p>Estruturas acolhedoras para jardins, varandas e espaços gourmet.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para pergolado de alumínio.")} target="_blank" rel="noreferrer">
-            <img src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb02?auto=format&fit=crop&w=1000&q=85&sat=-12" alt="Arquitetura contemporânea com estrutura metálica e grandes vãos" loading="lazy"/>
+            <img src="https://images.unsplash.com/photo-1633354747567-e0682586f082?auto=format&fit=crop&w=1000&q=85&sat=-12" alt="Arquitetura contemporânea com estrutura metálica e grandes vãos" loading="lazy"/>
             <span className="service-number">05 / ALUMÍNIO</span><div className="service-copy"><h3>Pergolados de alumínio</h3><p>Design contemporâneo, baixa manutenção e opções de cobertura.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para lareira ou chaminé.")} target="_blank" rel="noreferrer">
-            <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c2?auto=format&fit=crop&w=1000&q=85&sat=-10" alt="Sala de estar contemporânea com área de lareira" loading="lazy"/>
+            <img src="https://images.unsplash.com/photo-1706808849780-7a04fbac83ef?auto=format&fit=crop&w=1000&q=85&sat=-10" alt="Sala de estar contemporânea com área de lareira" loading="lazy"/>
             <span className="service-number">06 / CONFORTO</span><div className="service-copy"><h3>Lareiras e chaminés</h3><p>Soluções integradas ao ambiente, com atenção à exaustão e segurança técnica.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para construção ou reforma de piscina.")} target="_blank" rel="noreferrer">
@@ -216,7 +216,7 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
             <span className="service-number">07 / LAZER</span><div className="service-copy"><h3>Piscinas e áreas de lazer</h3><p>Espaços externos para convivência, descanso e valorização do imóvel.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para churrasqueira e espaço gourmet.")} target="_blank" rel="noreferrer">
-            <img src="https://images.unsplash.com/photo-1600566752355-35792bedcfea2?auto=format&fit=crop&w=1000&q=85&sat=-10" alt="Espaço gourmet residencial com bancada e churrasqueira" loading="lazy"/>
+            <img src="https://images.unsplash.com/photo-1766603636617-0c71c2188160?auto=format&fit=crop&w=1000&q=85&sat=-10" alt="Espaço gourmet residencial com bancada e churrasqueira" loading="lazy"/>
             <span className="service-number">08 / GOURMET</span><div className="service-copy"><h3>Churrasqueiras e espaço gourmet</h3><p>Churrasqueiras, bancadas e ambientes preparados para receber.</p><b>Solicitar avaliação ↗</b></div>
           </a>
         </div>
