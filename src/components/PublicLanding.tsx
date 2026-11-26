@@ -192,7 +192,7 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
             <span className="service-number">01 / OBRA COMPLETA</span><div className="service-copy"><h3>Construção e ampliação</h3><p>Projetos residenciais e comerciais, novas áreas e ampliações planejadas.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero solicitar um orçamento para reforma residencial ou comercial.")} target="_blank" rel="noreferrer">
-            <img src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1000&q=85" alt="Ambiente residencial renovado com acabamento contemporâneo" loading="lazy"/>
+            <img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1000&q=85" alt="Ambiente residencial renovado com acabamento contemporâneo" loading="lazy"/>
             <span className="service-number">02 / RENOVAÇÃO</span><div className="service-copy"><h3>Reformas</h3><p>Modernização de ambientes, melhorias e renovação de acabamentos.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para lavagem de fachada e limpeza de vidros.")} target="_blank" rel="noreferrer">
@@ -200,15 +200,15 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
             <span className="service-number">03 / CONSERVAÇÃO</span><div className="service-copy"><h3>Fachadas e vidros</h3><p>Lavagem de fachadas, limpeza de vidros e conservação externa.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para pergolado de madeira.")} target="_blank" rel="noreferrer">
-            <img src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1000&q=85" alt="Área externa de residência com estrutura de madeira e paisagismo" loading="lazy"/>
+            <img src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1000&q=85" alt="Área externa de residência com estrutura de madeira e paisagismo" loading="lazy"/>
             <span className="service-number">04 / MADEIRA</span><div className="service-copy"><h3>Pergolados de madeira</h3><p>Estruturas acolhedoras para jardins, varandas e espaços gourmet.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para pergolado de alumínio.")} target="_blank" rel="noreferrer">
-            <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1000&q=85" alt="Arquitetura contemporânea com estrutura metálica e grandes vãos" loading="lazy"/>
+            <img src="https://images.unsplash.com/photo-1511818966892-d7d671e672a2?auto=format&fit=crop&w=1000&q=85&sat=-12" alt="Arquitetura contemporânea com estrutura metálica e grandes vãos" loading="lazy"/>
             <span className="service-number">05 / ALUMÍNIO</span><div className="service-copy"><h3>Pergolados de alumínio</h3><p>Design contemporâneo, baixa manutenção e opções de cobertura.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para lareira ou chaminé.")} target="_blank" rel="noreferrer">
-            <img src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1000&q=85&sat=-20" alt="Sala de estar contemporânea com área de lareira" loading="lazy"/>
+            <img src="https://images.unsplash.com/photo-1600607687644-c7171b42498f?auto=format&fit=crop&w=1000&q=85&sat=-10" alt="Sala de estar contemporânea com área de lareira" loading="lazy"/>
             <span className="service-number">06 / CONFORTO</span><div className="service-copy"><h3>Lareiras e chaminés</h3><p>Soluções integradas ao ambiente, com atenção à exaustão e segurança técnica.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para construção ou reforma de piscina.")} target="_blank" rel="noreferrer">
@@ -216,7 +216,7 @@ Gostaria de agendar uma avaliação e medição técnica. Não considerar preço
             <span className="service-number">07 / LAZER</span><div className="service-copy"><h3>Piscinas e áreas de lazer</h3><p>Espaços externos para convivência, descanso e valorização do imóvel.</p><b>Solicitar avaliação ↗</b></div>
           </a>
           <a className="service-card" href={wa("Olá! Quero orçamento para churrasqueira e espaço gourmet.")} target="_blank" rel="noreferrer">
-            <img src="https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1000&q=85" alt="Espaço gourmet residencial com bancada e churrasqueira" loading="lazy"/>
+            <img src="https://images.unsplash.com/photo-1572331165267-854da2b10ccc?auto=format&fit=crop&w=1000&q=85&sat=-10" alt="Espaço gourmet residencial com bancada e churrasqueira" loading="lazy"/>
             <span className="service-number">08 / GOURMET</span><div className="service-copy"><h3>Churrasqueiras e espaço gourmet</h3><p>Churrasqueiras, bancadas e ambientes preparados para receber.</p><b>Solicitar avaliação ↗</b></div>
           </a>
         </div>
