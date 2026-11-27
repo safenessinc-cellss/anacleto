@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, limit, onSnapshot, query, runTransaction, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 
 type DailyExpense = { id: string; description?: string; amount?: number; date?: string; category?: string; paymentMethod?: string; status?: string };
@@ -23,6 +23,7 @@ export default function DailyExpensesModule() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [payables, setPayables] = useState<Payable[]>([]);
   const [ledger, setLedger] = useState<Ledger[]>([]);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<(typeof categories)[number][0]>("fuel");
   const [amount, setAmount] = useState("");
@@ -36,10 +37,10 @@ export default function DailyExpensesModule() {
 
   useEffect(() => {
     const watchers = [
-      onSnapshot(collection(db, "daily_expenses"), (snap) => setExpenses(snap.docs.map((item) => ({ id: item.id, ...item.data() } as DailyExpense))), (reason) => setError(`Falha ao carregar gastos diários: ${reason.message}`)),
-      onSnapshot(collection(db, "purchase_orders"), (snap) => setPurchases(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Purchase))), (reason) => setError(`Falha ao carregar compras para reclasificar: ${reason.message}`)),
-      onSnapshot(collection(db, "payables"), (snap) => setPayables(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Payable))), (reason) => setError(`Falha ao carregar contas relacionadas: ${reason.message}`)),
-      onSnapshot(collection(db, "ledger_entries"), (snap) => setLedger(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Ledger))), (reason) => setError(`Falha ao carregar lançamentos de caixa: ${reason.message}`)),
+      onSnapshot(query(collection(db, "daily_expenses"), limit(1000)), (snap) => { setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "daily_expenses"])] : v.filter(x => x !== "daily_expenses")); setExpenses(snap.docs.map((item) => ({ id: item.id, ...item.data() } as DailyExpense))); }, (reason) => setError(`Falha ao carregar gastos diários: ${reason.message}`)),
+      onSnapshot(query(collection(db, "purchase_orders"), limit(500)), (snap) => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "purchase_orders"])] : v.filter(x => x !== "purchase_orders")); setPurchases(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Purchase))); }, (reason) => setError(`Falha ao carregar compras para reclasificar: ${reason.message}`)),
+      onSnapshot(query(collection(db, "payables"), limit(1000)), (snap) => { setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "payables"])] : v.filter(x => x !== "payables")); setPayables(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Payable))); }, (reason) => setError(`Falha ao carregar contas relacionadas: ${reason.message}`)),
+      onSnapshot(query(collection(db, "ledger_entries"), limit(1000)), (snap) => { setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "ledger_entries"])] : v.filter(x => x !== "ledger_entries")); setLedger(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Ledger))); }, (reason) => setError(`Falha ao carregar lançamentos de caixa: ${reason.message}`)),
     ];
     return () => watchers.forEach((stop) => stop());
   }, []);
@@ -113,6 +114,7 @@ export default function DailyExpensesModule() {
     (historyFilter === "all" || purchase.status === historyFilter)), [purchases, search, historyFilter]);
 
   return <section className="space-y-5">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados: {limitedSources.join(", ")}. Totais e histórico podem estar parciais; a paginação completa ainda está pendente.</p>}
     <header><p className="text-xs font-bold uppercase tracking-widest text-violet-700">Saídas operacionais · fora do estoque</p><h2 className="text-2xl font-black">Gastos Diários</h2><p className="mt-1 text-sm text-slate-500">Cada gasto pago é lançado imediatamente no caixa e nunca movimenta o Almoxarifado.</p></header>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     {message && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
