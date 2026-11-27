@@ -24,8 +24,8 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
     ];
     const snapshots = new Map<string, Row[]>();
     const unsubscribers = collections.map(({ name, workflow }) =>
-      onSnapshot(query(collection(db, name), orderBy("createdAt", "desc"), limit(300)), (snap) => {
-        setLimitedSources((current) => snap.size >= 300 ? [...new Set([...current, name])] : current.filter((item) => item !== name));
+      onSnapshot(query(collection(db, name), orderBy("createdAt", "desc"), limit(301)), (snap) => {
+        setLimitedSources((current) => snap.size > 300 ? [...new Set([...current, name])] : current.filter((item) => item !== name));
         snapshots.set(name, snap.docs.map((d) => {
           const data = d.data() as any;
           return { id: d.id, workflow, number: data.number, clientName: data.clientName || data.customerName || "Cliente não informado", status: data.status || "draft", total: data.total == null && data.subtotal == null ? undefined : Number(data.total ?? data.subtotal), currency: data.currency || "BRL", createdAt: data.createdAt, request: data.request, sourceData: data, canonicalQuoteId: String(data.canonicalQuoteId || ""), technicalVisitStatus: String(data.technicalVisitStatus || "pending"), requiresTechnicalVisit: data.visitRequired === true || data.requiresTechnicalVisit === true || workflow === "technical" };
