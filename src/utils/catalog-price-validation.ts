@@ -11,7 +11,7 @@ export function hasConfirmedCatalogPrice(row: unknown): boolean {
   const price = Number(item.price);
   if (!Number.isFinite(price) || price <= 0 || item.verified === false) return false;
 
-  const states = [item.reviewStatus, item.priceStatus, item.status]
+  const states = [item.reviewStatus, item.priceStatus]
     .map((value) => String(value ?? "").trim().toLowerCase())
     .filter((value) => REVIEW_STATES.has(value));
 
