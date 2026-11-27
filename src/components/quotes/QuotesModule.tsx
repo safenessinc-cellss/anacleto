@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, deleteField, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { collection, deleteField, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp, updateDoc, where, limit } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
