@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, updateDoc, runTransaction, serverTimestamp, getDocs } from "firebase/firestore";
+import { addDoc, collection, doc, onSnapshot, updateDoc, runTransaction, serverTimestamp, getDocs, limit, query, where } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage } from "../../firebase";
 import { AlertCircle, Camera, CheckCircle2, FileText, Loader2, Plus, ScanSearch, ShoppingCart, Upload, Pencil, X } from "lucide-react";
@@ -411,16 +411,38 @@ export default function PurchasesModule() {
       });
       const entries = [...aggregates.entries()];
       if (!entries.length) throw new Error("Entrada bloqueada: a compra não contém itens com descrição e quantidade válidas. Cadastre os materiais em Compras Gerais antes de receber no estoque.");
-      const inventorySnapshot = await getDocs(collection(db, "inventory_items"));
+      const uniqueChunks = (values: string[]) => {
+        const unique = [...new Set(values.map(value => String(value || "").trim()).filter(Boolean))];
+        const chunks: string[][] = [];
+        for (let i = 0; i < unique.length; i += 30) chunks.push(unique.slice(i, i + 30));
+        return chunks;
+      };
+      const queryInventoryField = (field: string, values: string[]) => Promise.all(
+        uniqueChunks(values).map(batch => getDocs(query(collection(db, "inventory_items"), where(field, "in", batch), limit(100))))
+      );
+      const catalogIds = entries.map(([, item]) => String(item.supplierCatalogId || ""));
+      const skus = entries.map(([, item]) => String(item.sku || ""));
+      const names = entries.map(([, item]) => String(item.description || ""));
+      const inventoryGroups = await Promise.all([
+        queryInventoryField("supplierCatalogId", catalogIds),
+        queryInventoryField("productCatalogId", catalogIds),
+        queryInventoryField("catalogId", catalogIds),
+        queryInventoryField("supplierSku", skus),
+        queryInventoryField("sku", skus),
+        queryInventoryField("name", names),
+        queryInventoryField("normalizedName", names.map(name => normalizeText(name))),
+      ]);
+      const inventoryDocs = [...new Map(inventoryGroups.flatMap(group => group.flatMap(snapshot => snapshot.docs)).map(snapshot => [snapshot.id, snapshot])).values()];
       const stockRefs = entries.map(([key, item]) => {
-        const match = inventorySnapshot.docs.find(d => {
-          const data = d.data();
+        const matches = inventoryDocs.filter(snapshot => {
+          const data = snapshot.data();
           const sameCatalog = item.supplierCatalogId && [data.supplierCatalogId, data.productCatalogId, data.catalogId].includes(item.supplierCatalogId);
           const sameSku = item.sku && normalizeText(String(data.supplierSku || data.sku || "")) === normalizeText(item.sku);
-          const sameName = normalizeText(String(data.name || "")) === normalizeText(item.description || "");
+          const sameName = normalizeText(String(data.normalizedName || data.name || "")) === normalizeText(item.description || "");
           return Boolean(sameCatalog || sameSku || sameName);
         });
-        return doc(db, "inventory_items", match?.id || key);
+        if (matches.length > 1) throw new Error("Há registros duplicados deste material no Estoque. Unifique os cadastros antes de lançar o recebimento para não somar no item errado.");
+        return doc(db, "inventory_items", matches[0]?.id || key);
       });
       const movementRefs = entries.map(() => doc(collection(db, "inventory_movements")));
       await runTransaction(db, async tx => {
@@ -434,6 +456,7 @@ export default function PurchasesModule() {
           const currentQty = snap.exists() ? Number(snap.data().quantity || 0) : 0;
           tx.set(stockRefs[i], {
             name: item.description,
+            normalizedName: normalizeText(item.description || ""),
             sku: snap.exists() ? snap.data().sku || item.sku || key : item.sku || key,
             supplierSku: item.sku || (snap.exists() ? snap.data().supplierSku || "" : ""),
             unit: item.unit || "un",
