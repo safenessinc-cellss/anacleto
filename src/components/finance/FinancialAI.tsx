@@ -131,11 +131,19 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
       const digitableValues = uniqueChunks(normalizedBoletos.flatMap(row => [row.digitableLine, row.digitableLine.replace(/\D/g, "")]));
       const numberValues = uniqueChunks(normalizedBoletos.flatMap(row => [row.number, row.number.replace(/\D/g, "")]));
       const queryIn = (collectionName: string, field: string, chunks: string[][]) => Promise.all(chunks.map(values => getDocs(query(collection(db, collectionName), where(field, "in", values), limit(100)))));
+      const pendingBoletoLookup = Promise.all([
+        queryIn("pending_boletos", "digitableLine", digitableValues),
+        queryIn("pending_boletos", "number", numberValues)
+      ]).then(groups => groups.flat());
+      const payableLookup = Promise.all([
+        queryIn("payables", "digitableLine", digitableValues),
+        queryIn("payables", "boletoNumber", numberValues)
+      ]).then(groups => groups.flat());
       const [invoiceSnap, supplierPurchaseSnaps, pendingBoletoSnaps, payableSnaps, catalogSnap] = await Promise.all([
         invoiceLookup,
         Promise.all(supplierPurchaseQueries),
-        Promise.all([...queryIn("pending_boletos", "digitableLine", digitableValues), ...queryIn("pending_boletos", "number", numberValues)]),
-        Promise.all([...queryIn("payables", "digitableLine", digitableValues), ...queryIn("payables", "boletoNumber", numberValues)]),
+        pendingBoletoLookup,
+        payableLookup,
         getDocs(query(collection(db, "supplier_catalog"), where("supplier", "==", supplierName.trim()), limit(500)))
       ]);
       const duplicateInvoice = invoiceSnap?.docs.find(d => {
