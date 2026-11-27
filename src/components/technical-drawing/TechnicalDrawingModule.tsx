@@ -169,24 +169,24 @@ const furnitureSampleDrawing: TechnicalDrawing = {
   updatedAt: new Date().toISOString(),
 };
 
-const defaultCadPrompt = "Janela de Correr 2 Folhas - Linha Suprema - 1500x1200mm - Vidro Temperado 8mm";
+const defaultCadPrompt = "Novo desenho técnico — informe tipologia, altura × largura com unidade, quantidade de folhas, linha, acabamento, tipo/espessura do vidro, abertura e módulo fixo. Campos não informados permanecem pendentes.";
 const defaultCadSpec = {
-  tipologia: "janela_correr",
-  linha_aluminio: "Linha Suprema",
-  cor_perfil: "#9da8ae",
-  cor_vidro: "incolor",
-  largura_mm: 1500,
-  altura_mm: 1200,
-  folhas: 2,
-  modulo_fixo: false,
-  tipo_vidro: "temperado",
-  espessura_mm: 8,
-  abertura: "central",
+  tipologia: "a_definir",
+  linha_aluminio: "a_definir",
+  cor_perfil: "a_definir",
+  cor_vidro: "a_definir",
+  largura_mm: 0,
+  altura_mm: 0,
+  folhas: 0,
+  modulo_fixo: null,
+  tipo_vidro: "a_definir",
+  espessura_mm: 0,
+  abertura: "a_definir",
 } as const;
 const initialSampleDrawing: TechnicalDrawing = {
   ...buildParametricDrawing(defaultCadSpec, defaultCadPrompt),
-  id: "draw-sample-01",
-  title: defaultCadPrompt,
+  id: "draw-placeholder",
+  title: "Novo desenho — especificações pendentes",
   description: defaultCadPrompt,
 };
 
@@ -465,6 +465,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   const promptForSpec = (spec: ParametricWindowSpec) => {
     const typeLabels: Record<ParametricWindowSpec["tipologia"], string> = {
+      a_definir: "Tipologia a definir",
       janela_correr: "Janela de Correr",
       porta_correr: "Porta de Correr",
       porta_giro: "Porta de Giro",
@@ -473,7 +474,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       basculante: "Basculante",
       box_banheiro: "Box de Banheiro",
     };
-    const colorLabel = /branc/i.test(spec.cor_perfil) ? "Branco"
+    const colorLabel = spec.cor_perfil === "a_definir" ? "Cor a definir"
+      : /branc/i.test(spec.cor_perfil) ? "Branco"
       : /pret|#1f2937/i.test(spec.cor_perfil) ? "Preto"
       : /bronze|#80552f/i.test(spec.cor_perfil) ? "Bronze"
       : "Anodizado Natural";
@@ -483,7 +485,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   const updateDrawingSpec = (patch: Partial<ParametricWindowSpec>) => {
     if (drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") return;
     const spec = { ...(drawing.parametricSpec || defaultCadSpec), ...patch };
-    if (spec.tipologia === "box_banheiro") spec.folhas = Math.max(2, spec.folhas);
+    if (spec.tipologia === "box_banheiro" && spec.folhas > 0) spec.folhas = Math.max(2, spec.folhas);
     const command = promptForSpec(spec);
     setDrawing((current) => rebuildParametricPreview(current, spec, command));
     setPrompt(command);
@@ -491,9 +493,8 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
 
   const updateParametricField = (field: "largura_mm" | "altura_mm" | "folhas", value: number) => {
-    if (!Number.isFinite(value) || value <= 0 || drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") return;
-    const minValue = field === "folhas" && drawing.parametricSpec?.tipologia === "box_banheiro" ? 2 : 1;
-    const boundedValue = field === "folhas" ? Math.min(8, Math.max(minValue, value)) : Math.min(20_000, value);
+    if (!Number.isFinite(value) || value < 0 || drawing.approvedSnapshotId || drawing.status === "APPROVED_FOR_MANUFACTURING") return;
+    const boundedValue = field === "folhas" ? Math.min(8, Math.max(0, value)) : Math.min(20_000, Math.max(0, value));
     const nextValue = Math.round(boundedValue);
     updateDrawingSpec(field === "largura_mm" ? { largura_mm: nextValue }
       : field === "altura_mm" ? { altura_mm: nextValue }
@@ -1368,6 +1369,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <label className="text-[10px] font-semibold text-slate-500">Tipologia
                 <select value={parametricSpec.tipologia} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ tipologia: event.target.value as ParametricWindowSpec["tipologia"] })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50">
+                  <option value="a_definir">Tipologia a definir</option>
                   <option value="janela_correr">Janela de Correr</option>
                   <option value="porta_correr">Porta de Correr</option>
                   <option value="porta_giro">Porta de Giro</option>
@@ -1378,9 +1380,10 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               </label>
               <label className="text-[10px] font-semibold text-slate-500">Largura (mm)<input type="number" min="1" max="20000" value={parametricSpec.largura_mm} disabled={!canEditParametric} onChange={(event) => updateParametricField("largura_mm", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
               <label className="text-[10px] font-semibold text-slate-500">Alto (mm)<input type="number" min="1" max="20000" value={parametricSpec.altura_mm} disabled={!canEditParametric} onChange={(event) => updateParametricField("altura_mm", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
-              <label className="text-[10px] font-semibold text-slate-500">Nº de Hojas<input type="number" min={parametricSpec.tipologia === "box_banheiro" ? 2 : 1} max="8" value={parametricSpec.folhas} disabled={!canEditParametric} onChange={(event) => updateParametricField("folhas", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
+              <label className="text-[10px] font-semibold text-slate-500">Nº de Hojas<input type="number" min="0" max="8" value={parametricSpec.folhas} disabled={!canEditParametric} onChange={(event) => updateParametricField("folhas", Number(event.target.value))} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" /></label>
               <label className="text-[10px] font-semibold text-slate-500">Línea
                 <select value={parametricSpec.linha_aluminio} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ linha_aluminio: event.target.value })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50">
+                  <option value="a_definir">A definir</option>
                   <option value="Linha Suprema">Suprema</option>
                   <option value="Linha Gold">Gold</option>
                   <option value="Linha 25">Linha 25</option>
@@ -1388,6 +1391,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               </label>
               <label className="text-[10px] font-semibold text-slate-500">Cor do Alumínio
                 <select value={parametricSpec.cor_perfil} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ cor_perfil: event.target.value })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50">
+                  <option value="a_definir">A definir</option>
                   <option value="#f8fafc">Branco</option>
                   <option value="#1f2937">Preto</option>
                   <option value="#9da8ae">Anodizado Natural</option>
@@ -1396,6 +1400,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
               </label>
               <label className="text-[10px] font-semibold text-slate-500">Tipo de Vidro
                 <select value={parametricSpec.tipo_vidro} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ tipo_vidro: event.target.value })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50">
+                  <option value="a_definir">A definir</option>
                   <option value="temperado">Temperado</option>
                   <option value="laminado">Laminado</option>
                   <option value="comum">Comum / Float</option>
@@ -1408,7 +1413,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
                 <input value={parametricSpec.abertura} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ abertura: event.target.value })} className="mt-1 w-full rounded-lg border p-2 text-xs disabled:opacity-50" />
               </label>
               <label className="text-[10px] font-semibold text-slate-500">Módulo fixo
-                <select value={parametricSpec.modulo_fixo ? "sim" : "nao"} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ modulo_fixo: event.target.value === "sim" })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50"><option value="nao">Não</option><option value="sim">Sim</option></select>
+                <select value={parametricSpec.modulo_fixo === null ? "" : parametricSpec.modulo_fixo ? "sim" : "nao"} disabled={!canEditParametric} onChange={(event) => updateDrawingSpec({ modulo_fixo: event.target.value === "" ? null : event.target.value === "sim" })} className="mt-1 w-full rounded-lg border bg-white p-2 text-xs disabled:opacity-50"><option value="">A definir</option><option value="nao">Não</option><option value="sim">Sim</option></select>
               </label>
             </div>
             <div className="mt-4 grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-[1fr_auto]">
