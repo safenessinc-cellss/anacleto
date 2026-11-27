@@ -8,6 +8,7 @@ test("local parametric extraction never invents dimensions, leaves or glass thic
   assert.equal(spec.altura_mm, 0);
   assert.equal(spec.folhas, 0);
   assert.equal(spec.espessura_mm, 0);
+  assert.equal(spec.modulo_fixo, null);
   assert.ok((spec.pendencias || []).some((item) => item.includes("largura e altura")));
   assert.ok((spec.pendencias || []).some((item) => item.includes("folhas")));
 });
@@ -65,4 +66,14 @@ test("does not assume sliding opening when the aluminum opening system is not sp
   const spec = localParametricSpec("janela de alumínio");
   assert.equal(spec.tipologia, "a_definir");
   assert.ok((spec.pendencias || []).some((item) => item.includes("tipologia")));
+});
+
+test("a complete drawing requires explicit fixed-module choice", () => {
+  const pending = localParametricSpec("janela de correr altura 1200 mm largura 1500 mm 2 folhas linha suprema branco vidro temperado 8 mm");
+  assert.equal(pending.modulo_fixo, null);
+  const pendingDrawing = buildParametricDrawing(pending, "janela de correr");
+  assert.ok(pendingDrawing.visualElements?.some((element: any) => String(element.text || "").includes("módulo fixo")));
+  const confirmed = localParametricSpec("janela de correr altura 1200 mm largura 1500 mm 2 folhas linha suprema branco vidro temperado 8 mm sem módulo fixo");
+  const confirmedDrawing = buildParametricDrawing(confirmed, "janela de correr");
+  assert.ok(confirmedDrawing.visualElements?.some((element: any) => element.type === "rect"));
 });
