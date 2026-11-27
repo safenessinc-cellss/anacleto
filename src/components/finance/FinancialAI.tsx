@@ -10,9 +10,9 @@ type InvoiceBoleto = { id: string; number: string; digitableLine: string; amount
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value) || 0);
 const normalizeDocumentType = (value: unknown): "nfe" | "nfce" | "boleto" | "receipt" | "other" => {
-  const normalized = String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  if (/\\b(nfe|nf e|danfe|modelo 55)\\b/.test(normalized) || normalized.includes("nota fiscal eletronica")) return "nfe";
-  if (/\\b(nfce|nf ce|modelo 65)\\b/.test(normalized) || normalized.includes("nota fiscal consumidor")) return "nfce";
+  const normalized = String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (/\b(nfe|nf e|danfe|modelo 55)\b/.test(normalized) || normalized.includes("nota fiscal eletronica")) return "nfe";
+  if (/\b(nfce|nf ce|modelo 65)\b/.test(normalized) || normalized.includes("nota fiscal consumidor")) return "nfce";
   if (normalized.includes("boleto")) return "boleto";
   if (normalized.includes("recibo")) return "receipt";
   return "other";
