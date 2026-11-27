@@ -68,7 +68,7 @@ export default function SmartBudgetModule({ initialBudgetId, hideHistory = false
           "X-Request-ID": requestId,
         },
         body: JSON.stringify({ prompt: `Tipo de produto: ${productType}. ${request}`, productType, language }),
-        signal: AbortSignal.timeout(28_000),
+        signal: AbortSignal.timeout(55_000),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw Error(data?.error || "Falha ao gerar com IA.");
