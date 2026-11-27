@@ -71,7 +71,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
         return;
       }
       const draft = buildCommercialQuoteDraft(source, row.workflow, row.id);
-      await setDoc(quoteRef, { ...draft, id: quoteId, updatedAt: serverTimestamp(), ...(existing.exists() ? {} : { createdAt: serverTimestamp() }) }, { merge: true });
+      await setDoc(quoteRef, { ...draft, id: quoteId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge: true });
       await updateDoc(sourceRef, {
         canonicalQuoteId: quoteId,
         workflowStatus: "converted_to_quote",
