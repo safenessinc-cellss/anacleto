@@ -23,6 +23,7 @@ import { recordAIAudit } from "./src/server/ai-audit.js";
 import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
 import { hasAIRole } from "./src/server/ai-roles.js";
 import { getAIRateLimit } from "./src/server/ai-limits.js";
+import { normalizeNonNegativeQuantity } from "./src/server/quantity.js";
 import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
 import { hasConfirmedCatalogPrice } from "./src/utils/catalog-price-validation.js";
 import { google } from "googleapis";
@@ -483,7 +484,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
       system: `Você é o engenheiro orçamentista da Anacleto Esquadrias. Responda somente JSON com items, notes, pendingQuestions (perguntas objetivas que faltam para fechar o orçamento), visitRequired (boolean) e visitReason (motivo da visita, ou string vazia). Idioma: ${language}. Catálogo real relevante: ${JSON.stringify(catalog)}.
 Interprete o conceito comercial informado (por exemplo janela/porta de correr, abrir, maxim-ar, box, linha Lux, Gold ou outro nome comercial) e identifique no catálogo o sistema/linha compatível. Monte uma lista de materiais completa para fabricar e instalar o conjunto: perfis específicos do sistema, travessas/montantes, folhas/marcos, roldanas, fechos/fechaduras, puxadores, escovas, borrachas/juntas, parafusos, cantoneiras, baguetes, acessórios e vidro conforme a tipologia. Inclua somente componentes aplicáveis à tipologia; não acrescente peças genéricas sem justificativa.
 Procure primeiro no catálogo pelos campos de sistema/linha/modelo/família, compatibilidade, categoria, SKU/código e variante. Use o registro real mais específico e retorne o SKU e catalogItemId EXATOS do registro escolhido. Quando houver opções esquerda/direita, cor, acabamento, dimensão ou variante, selecione somente se o pedido ou os dados técnicos determinarem; caso contrário, crie linha pendente e explique a escolha necessária em notes. Nunca confunda peças parecidas ou lados diferentes.
-Não invente medidas, quantidade de folhas, perímetros, cortes, consumo, códigos nem compatibilidade. Se faltarem medidas ou configuração necessárias para calcular quantidades, apresente as linhas como estimativas de levantamento/pendentes e explique exatamente quais medidas/configurações o usuário precisa informar. Quantidades só podem ser calculadas quando deriváveis de medidas e regras técnicas existentes no catálogo; não presuma dimensões padrão.
+Não invente medidas, quantidade de folhas, perímetros, cortes, consumo, códigos nem compatibilidade. Quando a quantidade não estiver explícita nem puder ser calculada por regra técnica verificada, use qty=0 e marque a quantidade como pendente; nunca use 1 como valor padrão. Dimensões no formato A × L significam primeiro ALTURA e depois LARGURA. Só aceite medidas com unidade explícita (mm, cm ou m); sem unidade, mantenha a dimensão pendente. Se faltarem medidas ou configuração necessárias para calcular quantidades, apresente as linhas como estimativas de levantamento/pendentes e explique exatamente quais medidas/configurações o usuário precisa informar. Quantidades só podem ser calculadas quando deriváveis de medidas e regras técnicas existentes no catálogo; não presuma dimensões padrão.
 O preço será substituído pelo servidor pelo valor registrado. Só informe sku/catalogItemId de um registro real do catálogo. Se não houver correspondência inequívoca, deixe sku/catalogItemId vazios, price=0 e priceSource="pending". Preço ausente, zero ou não verificado deve permanecer pendente. Nunca invente preço, custo, imposto, margem ou valor.
 Preencha pendingQuestions com perguntas curtas e específicas sempre que faltarem medidas, tipologia, acabamento, quantidade, acesso, condições do local ou decisões do cliente. Não faça perguntas genéricas se puder identificar exatamente o dado ausente. Use visitRequired=true quando a execução depender de medição presencial, inspeção do terreno/estrutura, avaliação de acesso, instalações existentes ou condições locais; explique o motivo em visitReason. Para trabalhos como reformas residenciais/comerciais, piscinas, lareiras, churrasqueiras, pergolados, estruturas de madeira ou madeira laminada colada (MLC) e construção civil, não presuma condições do local: gere orçamento preliminar e sinalize avaliação presencial quando necessária. Se não houver pendências reais, retorne array vazio, visitRequired=false e visitReason vazio.`,
       prompt,
@@ -565,15 +566,16 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
   const rawItems = Array.isArray(rawBudget?.items) ? rawBudget.items : pieces.map((piece: any) => ({
     pieceId: piece.id,
     description: piece.name || piece.material || "Componente técnico",
-    quantity: Math.max(1, Number(piece.quantity) || 1),
+    quantity: normalizeNonNegativeQuantity(piece.quantity).quantity,
   }));
   // Preços do orçamento técnico só podem vir de uma correspondência exata no catálogo.
   // Nunca aceitar preço estimado pela IA nem associação por palavras parcialmente coincidentes.
   const items = rawItems.map((item: any, index: number) => {
-    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const normalizedQuantity = normalizeNonNegativeQuantity(item.quantity);
+    const quantity = normalizedQuantity.quantity;
     const match = findExactCatalogItem(item, catalogRows);
     const catalogPrice = match ? Number(match.price) : 0;
-    const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+    const confirmed = quantity > 0 && hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice > 0;
     const unitPrice = confirmed ? catalogPrice : 0;
     return {
       ...item,
@@ -581,9 +583,11 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
       sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
       catalogItemId: confirmed ? String(match.id || "") : "",
       quantity,
+      quantityPending: normalizedQuantity.pending,
       unitPrice,
       subtotal: quantity * unitPrice,
       priceSource: confirmed ? "catalogo" : "pendente",
+      notes: [item.notes, normalizedQuantity.pending ? "Quantidade pendente de medição; não usar para fabricação." : ""].filter(Boolean).join(" · "),
     };
   });
   const subtotal = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);

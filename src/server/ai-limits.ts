@@ -12,6 +12,9 @@ export const AI_RATE_LIMITS: Readonly<Record<string, AIRateLimitPolicy>> = Objec
   "payment-link": { limit: 5, windowMs: WINDOW_MINUTE },
   "technical-drawing": { limit: 12, windowMs: WINDOW_MINUTE },
   "approved-snapshot": { limit: 6, windowMs: WINDOW_MINUTE },
+  "generate-3d-render": { limit: 3, windowMs: WINDOW_MINUTE },
+  "architectural-visualization": { limit: 3, windowMs: WINDOW_MINUTE },
+  "public-quote-estimate": { limit: 3, windowMs: 60 * WINDOW_MINUTE },
 });
 export function getAIRateLimit(bucket: string): AIRateLimitPolicy {
   const policy = AI_RATE_LIMITS[bucket];

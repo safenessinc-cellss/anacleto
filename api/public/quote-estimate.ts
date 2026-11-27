@@ -1,26 +1,41 @@
-import { createHash } from "node:crypto";
-import { generateText } from "ai";
-import { AI_CONFIG, getAIModel } from "../../src/server/ai-config.js";
-import { parseAIJson } from "../../src/server/ai-json.js";
+import { AI_CONFIG } from "../../src/server/ai-config.js";
+import { generateValidatedJson } from "../../src/server/ai-json.js";
 import { recordAIAudit } from "../../src/server/ai-audit.js";
+import { consumeRateLimit, getClientIp } from "../../src/server/rate-limit.js";
+import { getAIRateLimit } from "../../src/server/ai-limits.js";
 
-type RateState = { count: number; resetAt: number };
-const localWindows = new Map<string, RateState>();
 function send(res: any, status: number, payload: unknown) {
   res.setHeader?.("Cache-Control", "no-store");
   return res.status(status).json(payload);
 }
-function clientIp(req: any): string {
-  const trustedRealIp = String(req.headers?.["x-real-ip"] || "").trim();
-  const forwarded = String(req.headers?.["x-forwarded-for"] || "").split(",").map((value: string) => value.trim()).filter(Boolean);
-  const address = trustedRealIp || forwarded[forwarded.length - 1] || String(req.socket?.remoteAddress || req.ip || "unknown");
-  return createHash("sha256").update(address).digest("hex");
+
+function buildLocalPublicEstimate(prompt: string) {
+  const text = prompt.toLowerCase();
+  const questions: string[] = [];
+  const hasDimensions = /altura\s*(?:de|:|=)?\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b[\s\S]{0,80}largura\s*(?:de|:|=)?\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b/i.test(prompt)
+    || /\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)?\b/i.test(prompt);
+  const hasQuantity = /\b\d+\s*(?:un(?:idades?)?|peças?|portas?|janelas?|boxes?|m²|metros?)\b/i.test(prompt);
+  const hasMaterial = /alum[ií]nio|vidro|madeira|aço|aço inox|concreto|pedra|porcelanato|gesso|tijolo|PVC/i.test(prompt);
+  const hasFinish = /branco|preto|bronze|natural|anodiz|pintura|fosco|brilhante|amadeirado/i.test(prompt);
+  if (!hasDimensions) questions.push("Informar as medidas de cada item em altura × largura, com unidade (mm, cm ou m).");
+  if (!hasQuantity) questions.push("Confirmar a quantidade de unidades, vãos ou áreas.");
+  if (!hasMaterial) questions.push("Definir o material e o sistema construtivo de cada serviço.");
+  if (!hasFinish) questions.push("Definir acabamento, cor e padrão visual.");
+  const needsSiteInspection = /reforma|piscina|churrasqueira|lareira|chimenea|pergolado|estrutura|constru[cç][aã]o|terreno|instala[cç][aã]o|madeira laminada|\\bMLC\\b/i.test(prompt);
+  const needsOpeningMeasurement = /esquadria|janela|porta|box/i.test(prompt) && !hasDimensions;
+  const needsVisit = needsSiteInspection || needsOpeningMeasurement;
+  if (needsVisit) questions.push("Agendar visita técnica para medir e avaliar acesso, estrutura e condições existentes.");
+  if (questions.length === 0) questions.push("Confirmar escopo final e condições de instalação antes de emitir proposta vinculante.");
+  return {
+    scopeSummary: "Rascunho provisório baseado somente na descrição recebida: " + prompt.slice(0, 700),
+    detectedDimensions: [],
+    questions,
+    visitRequired: needsVisit,
+    visitReason: needsVisit ? "A descrição envolve medição/inspeção presencial antes de definir quantidades e condições de execução." : "",
+    disclaimer: "Pré-avaliação de contingência: não contém preço, quantidade presumida nem especificação executiva. Validar os dados com a equipe técnica.",
+  };
 }
-async function consumePublicQuota(ip: string): Promise<boolean> {
- const now=Date.now();for(const [key,value] of localWindows)if(now>=value.resetAt)localWindows.delete(key);
- const current=localWindows.get(ip);if(!current||now>=current.resetAt){localWindows.set(ip,{count:1,resetAt:now+3600000});return true;}
- current.count+=1;return current.count<=3;
-}
+
 export default async function handler(req: any, res: any) {
   const requestStartedAt = Date.now();
   let auditPrompt = "";
@@ -29,8 +44,15 @@ export default async function handler(req: any, res: any) {
     return send(res, 405, { error: "Método não permitido." });
   }
   try {
-    const ip = clientIp(req);
-    if (!(await consumePublicQuota(ip))) return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial." });
+    const quota = getAIRateLimit("public-quote-estimate");
+    try {
+      if (!(await consumeRateLimit("public-quote-estimate", getClientIp(req), quota.limit, quota.windowMs))) {
+        return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial.", code: "RATE_LIMITED" });
+      }
+    } catch (rateError: any) {
+      console.error("[PUBLIC_QUOTE_ESTIMATE_RATE_LIMIT]", String(rateError?.message || rateError).slice(0, 500));
+      return send(res, 503, { error: "Controle de uso indisponível no momento.", code: "RATE_LIMIT_UNAVAILABLE" });
+    }
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some(key => key !== "description")) {
       return send(res, 400, { error: "A solicitação contém campos não permitidos." });
@@ -39,37 +61,34 @@ export default async function handler(req: any, res: any) {
     auditPrompt = prompt;
     if (prompt.length < 12 || prompt.length > 3000) return send(res, 400, { error: "Descreva o projeto em 12 a 3000 caracteres." });
     const aiStartedAt = Date.now();
-    const result = await generateText({
-      model: getAIModel("publicEstimate"),
-      system: "Você é um assistente de pré-atendimento comercial. Resuma escopo, tipologia provável, medidas mencionadas e perguntas faltantes. NÃO invente preços, SKUs, prazos ou disponibilidade. NÃO produza orçamento vinculante nem preço comercial. Responda em português do Brasil, JSON válido com scopeSummary, detectedDimensions, questions, disclaimer.",
+    let generatedUsage: any = undefined;
+    const estimate = await generateValidatedJson({
+      capability: "publicEstimate",
+      system: "Você é um assistente de pré-atendimento comercial. Resuma escopo, tipologia provável, medidas mencionadas e perguntas faltantes. NÃO invente preços, SKUs, prazos ou disponibilidade. NÃO produza orçamento vinculante nem preço comercial. Responda em português do Brasil, JSON válido com scopeSummary, detectedDimensions, questions, disclaimer. Nunca inclua price, total, cost, sku ou valores monetários.",
       prompt,
       temperature: AI_CONFIG.publicEstimate.temperature,
       maxOutputTokens: AI_CONFIG.publicEstimate.maxOutputTokens,
-      abortSignal: AbortSignal.timeout(AI_CONFIG.publicEstimate.timeoutMs),
-    });
-    let estimate: Record<string, unknown>;
-    try {
-      estimate = parseAIJson(result.text, (value: any) => {
+      validate: (value: any) => {
         if (!value || typeof value !== "object" || Array.isArray(value) ||
             typeof value.scopeSummary !== "string" || !Array.isArray(value.questions) ||
-            typeof value.disclaimer !== "string") throw new Error("Invalid public estimate response schema.");
+            !value.questions.every((item: unknown) => typeof item === "string") ||
+            typeof value.disclaimer !== "string" ||
+            (value.detectedDimensions !== undefined && !Array.isArray(value.detectedDimensions)) ||
+            ["price", "total", "cost", "sku", "amount"].some((key) => Object.prototype.hasOwnProperty.call(value, key))) {
+          throw new Error("Invalid or unsafe public estimate response schema.");
+        }
         return value as Record<string, unknown>;
-      });
-    } catch (parseError) {
-      await recordAIAudit({
-        serviceName: "BUDGET", modelUsed: AI_CONFIG.publicEstimate.model,
-        input: { description: prompt, channel: "public" }, output: result.text,
-        usage: result.usage as any, error: parseError, startedAt: aiStartedAt,
-        requestId: String(req.headers?.["x-request-id"] || ""),
-      });
-      return send(res, 502, { error: "Não foi possível estruturar a pré-avaliação. Tente novamente." });
-    }
+      },
+      onGeneration: (event) => {
+        generatedUsage = event.usage;
+      },
+    });
     await recordAIAudit({
       serviceName: "BUDGET",
       modelUsed: AI_CONFIG.publicEstimate.model,
       input: { description: prompt, channel: "public" },
       output: estimate,
-      usage: result.usage as any,
+      usage: generatedUsage,
       requestId: String(req.headers?.["x-request-id"] || ""),
       startedAt: aiStartedAt,
     });
@@ -90,6 +109,12 @@ export default async function handler(req: any, res: any) {
       } catch (auditError) { console.error("[PUBLIC_QUOTE_FAILURE_AUDIT]", auditError); }
     }
     console.error("[PUBLIC_QUOTE_ESTIMATE]", error);
-    return send(res, 503, { error: "Pré-avaliação temporariamente indisponível." });
+    return send(res, 200, {
+      type: "NON_BINDING_PRE_ESTIMATE",
+      fallback: true,
+      code: "AI_PROVIDER_FALLBACK",
+      estimate: buildLocalPublicEstimate(auditPrompt),
+      disclaimer: "A IA está temporariamente indisponível. Este rascunho foi organizado localmente e não contém preços nem medidas presumidas.",
+    });
   }
 }
