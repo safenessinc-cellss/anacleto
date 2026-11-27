@@ -4,6 +4,7 @@ import { AI_CONFIG, getAIModel } from "../src/server/ai-config.js";
 import { parseAIJson } from "../src/server/ai-json.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { recordAIAudit } from "../src/server/ai-audit.js";
+import { hasConfirmedCatalogPrice } from "../src/utils/catalog-price-validation.js";
 import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
 import { hasAIRole } from "../src/server/ai-roles.js";
 import { consumeRateLimit } from "../src/server/rate-limit.js";
@@ -196,7 +197,8 @@ function normalizeName(value: unknown): string {
 
 function buildTechnicalBudget(pieces: any[], catalog: any[]) {
   const items = (Array.isArray(pieces) ? pieces : []).map((piece: any, index: number) => {
-    const quantity = Math.max(1, Number(piece?.quantity) || 1);
+    const parsedQuantity = Number(piece?.quantity);
+    const quantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 0;
     const sku = String(piece?.sku || piece?.code || "").trim().toLowerCase();
     const itemId = String(piece?.catalogItemId || piece?.itemId || "").trim();
     const description = normalizeName(piece?.name || piece?.material);
@@ -211,7 +213,7 @@ function buildTechnicalBudget(pieces: any[], catalog: any[]) {
       return !!description && !!rowName && description === rowName;
     });
     const rawPrice = match?.price;
-    const priceVerified = rawPrice !== undefined && rawPrice !== null && String(rawPrice).trim() !== "" && Number.isFinite(Number(rawPrice)) && Number(rawPrice) >= 0;
+    const priceVerified = quantity > 0 && !!match && hasConfirmedCatalogPrice(match);
     const unitPrice = priceVerified ? Number(rawPrice) : 0;
     return {
       id: String(piece?.id || "piece-" + (index + 1)),
@@ -238,16 +240,11 @@ function buildTechnicalBudget(pieces: any[], catalog: any[]) {
 
 function localFallback(prompt: string) {
   const text = prompt.toLowerCase();
-  const match = text.match(/(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?))?/);
-  const n = (value?: string, fallback = 100) => value ? Number(value.replace(",", ".")) : fallback;
-  const width = Math.max(1, n(match?.[1]));
-  const height = Math.max(1, n(match?.[2]));
-  const depth = Math.max(1, n(match?.[3], /janela|ventana|esquadria/.test(text) ? 12 : 50));
   const isWindow = /janela|ventana|esquadria|corredi[cç]a/.test(text);
   const isDoor = /porta|puerta/.test(text);
   const isTable = /mesa|table/.test(text);
   const isCabinet = /arm[aá]rio|closet|guarda roupa/.test(text);
-  const unit = /\bmm\b|milímetro|milimetro/.test(text) ? "mm" : "cm";
+  const unit = /\bmm\b|milímetro|milimetro/.test(text) ? "mm" : /\bcm\b|centímetro|centimetro/.test(text) ? "cm" : "mm";
   const category = isWindow ? "aluminum_window" : isDoor ? "glass_door" : isTable || isCabinet ? "furniture" : "custom";
   const names = isWindow || isDoor
     ? ["Perfil superior do marco", "Perfil inferior do marco", "Montantes laterais", "Folhas / painéis"]
@@ -257,41 +254,47 @@ function localFallback(prompt: string) {
         ? ["Lateral esquerda", "Lateral direita", "Tampo e base", "Portas frontais"]
         : ["Componente principal", "Elemento de suporte", "Reforços / uniões"];
   const pieces = names.map((name, index) => ({
-    id: `p${index + 1}`, pieceNumber: index + 1, name, quantity: index === 1 || index === 2 ? 2 : 1,
-    dimensions: { width: index === 0 ? width : Math.max(1, width / 2), height: index === 0 ? height : Math.max(1, height / 2), depth: Math.max(1, depth / 4), thickness: Math.max(1, depth / 4), unit },
-    material: isWindow || isDoor ? "Alumínio / vidro — especificação a validar" : "Material a definir pelo responsável técnico",
-    color: ["#C5A850", "#8C6D37", "#60A5FA", "#94A3B8"][index],
-    cutAngle: /45|inglete|mitre/.test(text) ? "Ângulo solicitado: validar corte a 45°" : "90° — validar antes de fabricar",
-    notes: "Dimensão preliminar; validar medidas, folgas, material e sistema antes da fabricação."
+    id: `p${index + 1}`, pieceNumber: index + 1, name, quantity: 0,
+    dimensions: { width: 0, height: 0, depth: 0, thickness: 0, unit },
+    material: "Material a definir pelo responsável técnico",
+    color: "#94A3B8",
+    cutAngle: "A definir após levantamento e validação técnica",
+    notes: "Dimensões e quantidade pendentes. Não utilizar para corte ou fabricação."
   }));
   const phases = [
-    ["Definição das dimensões gerais", "Dimensões gerais", `Largura ${width} × altura ${height} × profundidade ${depth} ${unit}.`],
-    ["Despiece e lista de componentes", "Lista de peças", `${pieces.length} grupos de componentes estruturados para detalhamento.`],
-    ["Corte e cotagem individual", "Corte de cada peça", "Cotas e ângulos preliminares; validar espessuras, tolerâncias e ferramentas."],
-    ["Encaixe e montagem", "Montagem / encaixe", "Verificar sequência, esquadro, folgas e fixações adequadas ao material."],
-    ["Vista final e conferência", "Resultado final", "Conferir medidas reais e tolerâncias antes de liberar para fabricação."]
+    ["Levantamento de medidas", "Dimensões gerais", "Largura, altura e profundidade pendentes de medição."],
+    ["Definição de materiais", "Materiais e componentes", "Material, perfis, ferragens e acabamentos pendentes de especificação."],
+    ["Despiece técnico", "Lista de peças", "Quantidades, cotas e ângulos pendentes de projeto executivo."],
+    ["Corte e montagem", "Corte e montagem", "Não liberar corte ou montagem antes da aprovação técnica."],
+    ["Conferência final", "Resultado final", "Validar medidas reais, tolerâncias e condições do local."],
   ];
   return {
     _fallback: true,
+    isDraft: true,
+    status: "PRELIMINARY_CONTINGENCY",
     draftStatus: "preliminary",
-    draftLabel: "RASCUNHO PRELIMINAR — NÃO LIBERADO PARA FABRICAÇÃO",
-    assumptions: ["Gerado pelo mecanismo local de contingência porque o provedor de IA falhou. Todas as medidas, materiais, ferragens, folgas e cortes exigem validação humana."],
+    draftLabel: "RASCUNHO PRELIMINAR — SEM MEDIDAS — NÃO LIBERADO PARA FABRICAÇÃO",
+    assumptions: [
+      "Gerado pelo mecanismo local de contingência porque o provedor de IA falhou.",
+      "Nenhuma dimensão, quantidade, material, ferragem, folga ou ângulo foi presumido.",
+      "É necessário levantamento técnico e confirmação das especificações antes do orçamento executivo.",
+    ],
     title: isWindow ? "Esquadria / janela sob medida" : isDoor ? "Porta sob medida" : isTable ? "Mesa sob medida" : isCabinet ? "Armário sob medida" : "Projeto técnico sob medida",
     description: `Projeto preliminar criado a partir de: ${prompt}`,
-    category, unit, overallDimensions: { width, height, depth }, pieces,
+    category, unit, overallDimensions: { width: 0, height: 0, depth: 0 }, pieces,
     budget: buildTechnicalBudget(pieces, []),
     dimensionLines: [
-      { id: "d1", label: `${width} ${unit}`, value: width, unit, orientation: "horizontal", start: { x: 80, y: 50 }, end: { x: 520, y: 50 } },
-      { id: "d2", label: `${height} ${unit}`, value: height, unit, orientation: "vertical", start: { x: 50, y: 80 }, end: { x: 50, y: 380 } },
-      { id: "d3", label: `${depth} ${unit}`, value: depth, unit, orientation: "diagonal", start: { x: 540, y: 80 }, end: { x: 570, y: 50 } }
+      { id: "d1", label: "LARGURA PENDENTE", value: 0, unit, orientation: "horizontal", start: { x: 80, y: 50 }, end: { x: 520, y: 50 } },
+      { id: "d2", label: "ALTURA PENDENTE", value: 0, unit, orientation: "vertical", start: { x: 50, y: 80 }, end: { x: 50, y: 380 } },
+      { id: "d3", label: "PROFUNDIDADE PENDENTE", value: 0, unit, orientation: "diagonal", start: { x: 540, y: 80 }, end: { x: 570, y: 50 } }
     ],
-    assemblyInstructions: ["Conferir todas as dimensões no local.", "Validar componentes e materiais.", "Executar corte apenas após aprovação técnica.", "Montar e verificar esquadro e folgas.", "Registrar revisão final do projeto."],
+    assemblyInstructions: ["Realizar levantamento no local.", "Definir materiais e componentes.", "Aprovar desenho executivo e lista de corte.", "Executar montagem após liberação.", "Registrar revisão final do projeto."],
     steps: phases.map(([phaseName, title, description], index) => ({
       stepNumber: index + 1, phaseName, title, description,
-      instructions: [[ "Confirmar largura, altura e profundidade no local." ],
-        [ "Conferir materiais, quantidades e identificadores." ],
-        [ "Validar espessuras, folgas, ângulos e ferramentas." ],
-        [ "Montar a seco e verificar alinhamento e esquadro." ],
+      instructions: [[ "Medir altura, largura e profundidade no local." ],
+        [ "Confirmar materiais, perfis, ferragens e acabamento." ],
+        [ "Gerar despiece somente com regras técnicas verificadas." ],
+        [ "Não cortar ou montar antes da aprovação." ],
         [ "Aprovar o desenho revisado antes da fabricação." ]][index]
     }))
   };
@@ -302,8 +305,8 @@ function localTechnicalFallback(prompt: string, catalog: any[]) {
     const extracted = localParametricSpec(prompt);
     const spec = {
       ...extracted,
-      largura_mm: extracted.largura_mm > 0 && extracted.largura_mm <= 20_000 ? extracted.largura_mm : 1000,
-      altura_mm: extracted.altura_mm > 0 && extracted.altura_mm <= 20_000 ? extracted.altura_mm : 1000,
+      largura_mm: extracted.largura_mm > 0 && extracted.largura_mm <= 20_000 ? extracted.largura_mm : 0,
+      altura_mm: extracted.altura_mm > 0 && extracted.altura_mm <= 20_000 ? extracted.altura_mm : 0,
     };
     const drawing = buildParametricDrawing(spec, prompt, catalog);
     return {
@@ -314,7 +317,8 @@ function localTechnicalFallback(prompt: string, catalog: any[]) {
       draftLabel: "RASCUNHO PARAMÉTRICO LOCAL — VALIDAR ANTES DE FABRICAR",
       assumptions: [
         "A extração de IA não ficou disponível; os dados foram identificados localmente por palavras-chave.",
-        ...(extracted.largura_mm > 0 && extracted.altura_mm > 0 ? [] : ["Dimensões ausentes ou inválidas: foi usada a medida provisória de 1000 mm; informe as medidas reais antes de fabricar."]),
+        ...(extracted.largura_mm > 0 && extracted.altura_mm > 0 ? [] : ["Dimensões ausentes ou inválidas: permanecem pendentes; nenhuma medida provisória foi inventada."]),
+        ...(extracted.pendencias || []),
         "Confirme tipologia, linha, cotas, folgas, perfis, ferragens e vidro antes da fabricação.",
       ],
     };
@@ -400,7 +404,7 @@ export default async function handler(req: any, res: any) {
     if (isAluminumPrompt(prompt)) {
       stage = "parametric_spec_extraction";
       const aiStartedAt = Date.now();
-      const system = `Extraia somente dados técnicos explícitos de uma esquadria de alumínio. Não calcule nem devolva coordenadas, linhas, geometrias, lista de peças ou orçamento. Devolva JSON estrito com exatamente as chaves tipologia, linha_aluminio, cor_perfil, largura_mm, altura_mm, folhas, modulo_fixo, tipo_vidro, espessura_mm, abertura. Tipologias permitidas: janela_correr, porta_correr, porta_giro, porta_pivotante, maxim_ar, basculante, box_banheiro. Converta dimensões explicitamente fornecidas para milímetros. Use valores vazios ou zero quando não forem informados; não invente linha, cor, tipo de vidro ou espessura. folhas deve ser 2/3/4 para correr e 1 para os demais. modulo_fixo é booleano.`;
+      const system = `Extraia somente dados técnicos explícitos de uma esquadria de alumínio. Não calcule nem devolva coordenadas, linhas, geometrias, lista de peças ou orçamento. Devolva JSON estrito com exatamente as chaves tipologia, linha_aluminio, cor_perfil, largura_mm, altura_mm, folhas, modulo_fixo, tipo_vidro, espessura_mm, abertura. Tipologias permitidas: janela_correr, porta_correr, porta_giro, porta_pivotante, maxim_ar, basculante, box_banheiro. Converta dimensões explicitamente fornecidas para milímetros. Use valores vazios ou zero quando não forem informados; não invente linha, cor, tipo de vidro ou espessura. Use folhas=0 quando a quantidade não estiver explicitamente informada; nunca deduza folhas pela tipologia. Não invente espessura, linha, acabamento, vidro, abertura ou módulo fixo. modulo_fixo é booleano e só deve ser true quando explicitamente informado.`;
       const extracted = await generateDrawingJson({
         system,
         prompt: `${prompt}${drawingContext ? `\nContexto técnico existente: ${drawingContext}` : ""}`,
@@ -427,14 +431,14 @@ export default async function handler(req: any, res: any) {
             parametricResponseSchema.required.some((key) => !(key in value)) ||
             !validTypes.includes(value.tipologia) || typeof value.linha_aluminio !== "string" ||
             typeof value.cor_perfil !== "string" || !Number.isFinite(value.largura_mm) || value.largura_mm < 0 ||
-            !Number.isFinite(value.altura_mm) || value.altura_mm < 0 || !Number.isInteger(value.folhas) ||
+            !Number.isFinite(value.altura_mm) || value.altura_mm < 0 || !Number.isInteger(value.folhas) || value.folhas < 0 || value.folhas > 8 ||
             typeof value.modulo_fixo !== "boolean" || typeof value.tipo_vidro !== "string" ||
             !Number.isFinite(value.espessura_mm) || value.espessura_mm < 0 || typeof value.abertura !== "string") {
           throw new Error("A extração não retornou o schema paramétrico de esquadrias válido.");
         }
-        if ((value.tipologia === "janela_correr" && ![2, 3, 4].includes(value.folhas)) ||
+        if (value.folhas > 0 && ((value.tipologia === "janela_correr" && ![2, 3, 4].includes(value.folhas)) ||
             (value.tipologia === "porta_correr" && ![2, 4].includes(value.folhas)) ||
-            (!["janela_correr", "porta_correr"].includes(value.tipologia) && value.folhas !== 1)) {
+            (!["janela_correr", "porta_correr"].includes(value.tipologia) && value.folhas !== 1))) {
           throw new Error("Quantidade de folhas incompatível com a tipologia.");
         }
         if (value.largura_mm > 20_000 || value.altura_mm > 20_000 || value.espessura_mm > 100) {
@@ -442,11 +446,27 @@ export default async function handler(req: any, res: any) {
         }
         return value;
       });
-      if (spec.largura_mm <= 0 || spec.altura_mm <= 0) {
+      const grounded = localParametricSpec(prompt);
+      const groundedSpec: ParametricWindowSpec = {
+        ...spec,
+        tipologia: grounded.tipologia,
+        linha_aluminio: grounded.linha_aluminio,
+        cor_perfil: grounded.cor_perfil,
+        cor_vidro: grounded.cor_vidro,
+        largura_mm: grounded.largura_mm,
+        altura_mm: grounded.altura_mm,
+        folhas: grounded.folhas,
+        modulo_fixo: grounded.modulo_fixo,
+        tipo_vidro: grounded.tipo_vidro,
+        espessura_mm: grounded.espessura_mm,
+        abertura: grounded.abertura,
+        pendencias: grounded.pendencias,
+      };
+      if (groundedSpec.largura_mm <= 0 || groundedSpec.altura_mm <= 0 || groundedSpec.folhas <= 0) {
         const fallback: any = localTechnicalFallback(prompt, catalog);
         return json(res, 200, withDraftVectorWatermark(fallback));
       }
-      const responseDrawing = withDraftVectorWatermark(buildParametricDrawing(spec, prompt, catalog));
+      const responseDrawing = withDraftVectorWatermark(buildParametricDrawing(groundedSpec, prompt, catalog));
       return json(res, 200, responseDrawing);
     }
     stage = "ai_generation";
