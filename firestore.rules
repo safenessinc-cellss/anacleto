@@ -77,7 +77,15 @@ service cloud.firestore {
     // Orçamentos técnicos de esquadrias: coleção própria, editável apenas pelo Comercial/Financeiro.
     match /technical_budgets/{id} {
       allow read: if canManageCommercial() || canManageFinance();
-      allow create, update: if canManageCommercial();
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial() && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['technicalVisitStatus','technicalVisitCompletedAt','technicalVisitCompletedBy'])
+        || (
+          request.resource.data.technicalVisitStatus == 'pending'
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['technicalVisitCompletedAt','technicalVisitCompletedBy'])
+        )
+        || canReviewCatalogPrices()
+      );
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
     match /quotes/{id} {
@@ -85,9 +93,15 @@ service cloud.firestore {
       allow create: if canManageCommercial();
       allow update: if (
         (canManageCommercial() || canManageFinance()) && (
-          !('approvedSnapshotId' in resource.data) ||
+          (!('approvedSnapshotId' in resource.data)
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['technicalVisitStatus','technicalVisitCompletedAt','technicalVisitCompletedBy'])) ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','invoiceId','invoicedAt','updatedAt','clientAdvanceTotal','balanceDue','productionStatus','productionOrderId','deliveryId','deliveryStatus','deliveredAt','deliveryEvidence'])
         )
+      ) || (
+        canReviewCatalogPrices() && resource.data.requiresTechnicalVisit == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'technicalVisitStatus','technicalVisitCompletedAt','technicalVisitCompletedBy','updatedAt'
+        ])
       ) || (
         canManageQuality() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'productionStatus','qualityStatus','qualityRecordId','qualityInspectedAt','updatedAt'
