@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, limit, onSnapshot, query } from "firebase/firestore";
 import { db } from "../../firebase";
 
 type Ledger = { id: string; date?: string; paidAt?: string; direction?: string; type?: string; amount?: number; total?: number; value?: number; category?: string; description?: string; status?: string; sourceType?: string; sourceId?: string; payableId?: string; receivableId?: string; purchaseId?: string; quoteId?: string; projectId?: string; paymentMethod?: string; method?: string; kind?: string; };
@@ -47,13 +47,17 @@ export default function FinanceDashboard() {
   const [historicalPayments, setHistoricalPayments] = useState<Ledger[]>([]);
   const [historicalQuotes, setHistoricalQuotes] = useState<HistoricalQuote[]>([]);
   const [error, setError] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [activeMonth, setActiveMonth] = useState(monthId(new Date()));
   const [activeExpense, setActiveExpense] = useState("");
 
   useEffect(() => {
     const watch = <T,>(name: string, receive: (rows: T[]) => void) => onSnapshot(
-      collection(db, name),
-      (snap) => receive(snap.docs.map((item) => ({ id: item.id, ...item.data() } as T))),
+      query(collection(db, name), limit(1000)),
+      (snap) => {
+        setLimitedSources((current) => snap.size >= 1000 ? Array.from(new Set([...current, name])) : current.filter((item) => item !== name));
+        receive(snap.docs.map((item) => ({ id: item.id, ...item.data() } as T)));
+      },
       (reason) => setError(`Falha ao carregar ${name}: ${reason.message}`),
     );
     const stops = [
