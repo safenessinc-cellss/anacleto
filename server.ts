@@ -542,6 +542,7 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         price: confirmed ? catalogPrice : 0,
         sku: confirmed ? String(identity.sku || identity.code || "") : String(item.sku || ""),
         catalogItemId: confirmed ? String(identity.id || "") : "",
+        catalogSource: confirmed ? String(identity.source || "") : "",
         supplier: confirmed ? String(identity.supplier || "") : String(item.supplier || ""),
         category: confirmed ? String(identity.category || "") : String(item.category || ""),
         variant: String(item.variant || identity?.variant || ""),
