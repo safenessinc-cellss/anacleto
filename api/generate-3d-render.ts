@@ -1,5 +1,6 @@
+import { consumeRateLimit, getClientIp } from "../src/server/rate-limit.js";
+import { getAIRateLimit } from "../src/server/ai-limits.js";
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown; socket?: { remoteAddress?: string } };
-const buckets = new Map<string, { count: number; reset: number }>();
 const FALLBACKS: Record<string,string> = {
   "suprema-2":"/renders-3d/suprema-2.svg","suprema-4":"/renders-3d/suprema-4.svg",
   "gold-3":"/renders-3d/gold-3.svg","gold-fold":"/renders-3d/gold-fold.svg",
@@ -11,16 +12,21 @@ function send(res:any,status:number,body:unknown){res.setHeader?.("Cache-Control
 export default async function handler(req:Request,res:any){
   res.setHeader?.("Cache-Control","no-store, private");
   if(req.method!=="POST"){res.setHeader?.("Allow","POST");return send(res,405,{error:"Método não permitido."});}
-  const forwarded=req.headers?.["x-forwarded-for"];
-  const ip=String(req.headers?.["x-real-ip"]||forwarded||req.socket?.remoteAddress||"unknown").split(",")[0].trim();
-  const now=Date.now();let bucket=buckets.get(ip);
-  if(!bucket||now>bucket.reset){bucket={count:0,reset:now+60_000};buckets.set(ip,bucket);}
-  if(bucket.count>=3)return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Limite de geração atingido. Exibindo a galeria local de respaldo."});
-  bucket.count++;
-  try{
+  try {
     const body=(typeof req.body==="string"?JSON.parse(req.body):req.body||{}) as {description?:unknown;modelId?:unknown};
-    const description=String(body.description||"").trim().slice(0,1200);
+    const description=String(body.description||"").trim();
     if(description.length<8)return send(res,400,{error:"Descreva o modelo com pelo menos 8 caracteres."});
+    if(description.length>1200)return send(res,413,{error:"A descrição deve ter até 1.200 caracteres."});
+    const quota=getAIRateLimit("generate-3d-render");
+    try {
+      if(!(await consumeRateLimit("generate-3d-render",getClientIp(req),quota.limit,quota.windowMs))) {
+        return send(res,429,{image:fallbackFor(description),fallback:true,code:"RATE_LIMITED",message:"Limite de geração atingido. Exibindo render técnico local."});
+      }
+    } catch(rateError:any) {
+      console.error("[GENERATE_3D_RENDER_RATE_LIMIT]",String(rateError?.message||rateError).slice(0,500));
+      return send(res,503,{image:fallbackFor(description),fallback:true,code:"RATE_LIMIT_UNAVAILABLE",message:"Controle de uso indisponível. Exibindo render técnico local."});
+    }
+  try{
     const apiKey=process.env.AI_GATEWAY_API_KEY;
     const oidc=process.env.VERCEL_OIDC_TOKEN;
     if(!apiKey&&!oidc)return send(res,200,{image:fallbackFor(description),fallback:true,message:"Provedor de IA não configurado. Exibindo render técnico local."});
@@ -30,10 +36,13 @@ export default async function handler(req:Request,res:any){
         model:"google/gemini-3.1-flash-image-preview",
         prompt:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`,
         maxOutputTokens:1200,
+        abortSignal:AbortSignal.timeout(45_000),
       });
       const generated=(result as any).files?.find((file:any)=>String(file.mediaType||"").startsWith("image/"));
       if(generated?.uint8Array){
-        const mime=generated.mediaType||"image/png";
+        if(generated.uint8Array.byteLength > 8 * 1024 * 1024) return send(res,200,{image:fallbackFor(description),fallback:true,code:"IMAGE_TOO_LARGE",message:"A imagem gerada excedeu o limite de resposta. Exibindo render técnico local."});
+        const mime=String(generated.mediaType||"image/png");
+        if(!["image/png","image/jpeg","image/webp"].includes(mime)) return send(res,200,{image:fallbackFor(description),fallback:true,code:"IMAGE_FORMAT_UNSUPPORTED",message:"Formato de imagem não suportado. Exibindo render técnico local."});
         return send(res,200,{image:`data:${mime};base64,${Buffer.from(generated.uint8Array).toString("base64")}`,fallback:false});
       }
       return send(res,200,{image:fallbackFor(description),fallback:true,message:"A IA não retornou uma imagem nesta tentativa. Exibindo render técnico local."});
