@@ -103,6 +103,14 @@ export interface Quote {
   clientNif?: string;
   language?: string;
   translations?: Record<string, any>;
+  sourceBudgetCollection?: string;
+  sourceBudgetId?: string;
+  sourceBudgetWorkflow?: "smart" | "technical";
+  requiresTechnicalVisit?: boolean;
+  technicalVisitStatus?: "pending" | "completed" | "not_required";
+  technicalVisitCompletedAt?: any;
+  technicalVisitCompletedBy?: string;
+  preliminaryOnly?: boolean;
   deliveryId?: string;
   deliveryStatus?: string;
   deliveredAt?: string;
