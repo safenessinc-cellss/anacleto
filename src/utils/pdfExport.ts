@@ -192,7 +192,7 @@ const applyQuoteWatermark = (doc: jsPDF, quote: Quote, sender?: SenderConfig, of
     doc.setFont("helvetica", "bold");
     doc.setFontSize(25);
     doc.setTextColor(226, 232, 240);
-    doc.text(quote.status === "approved" ? "APROVADO" : "ORÇAMENTO", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
+    doc.text(quote.status === "approved" ? "APROVADO" : (quote as any).preliminaryOnly === true ? "ORÇAMENTO PRELIMINAR" : "ORÇAMENTO", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
   }
   doc.setPage(pageCount);
 };
@@ -206,6 +206,13 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
   }
   const pageWidth = doc.internal.pageSize.width;
   const currency = quote.currency || "BRL";
+  const quoteItems = Array.isArray(quote.items) ? quote.items as any[] : [];
+  const approvedQuote = quote.status === "approved" || Boolean(quote.approvedSnapshotId);
+  const confirmedSubtotal = quoteItems.reduce((sum, item) => sum + ((item.priceSource === "catalog" || (approvedQuote && item.priceSource === "manual")) ? Math.max(0, Number(item.quantity) || 0) * Math.max(0, Number(item.unitPrice) || 0) : 0), 0);
+  const estimatedSubtotal = quoteItems.reduce((sum, item) => sum + ((item.priceSource === "pending" || !(Number(item.unitPrice) > 0) || item.priceSource === "catalog" || (approvedQuote && item.priceSource === "manual")) ? 0 : Math.max(0, Number(item.quantity) || 0) * Math.max(0, Number(item.unitPrice) || 0)), 0);
+  const pendingPriceCount = quoteItems.filter(item => item.priceSource === "pending" || !(Number(item.unitPrice) > 0)).length;
+  const pendingQuantityCount = quoteItems.filter(item => item.quantityPending === true || !(Number(item.quantity) > 0)).length;
+  const isPreliminary = !approvedQuote && ((quote as any).preliminaryOnly === true || estimatedSubtotal > 0 || pendingPriceCount > 0 || pendingQuantityCount > 0 || (Array.isArray((quote as any).pendingQuestions) && (quote as any).pendingQuestions.length > 0) || (quote as any).requiresTechnicalVisit === true);
 
   // Gold / Dark Luxury Header
   doc.setFillColor(15, 23, 42); // Slate 900
@@ -233,7 +240,7 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(255, 255, 255);
-  doc.text("ORÇAMENTO", pageWidth - 14, 20, { align: "right" });
+  doc.text(isPreliminary ? "ORÇAMENTO PRELIMINAR" : "ORÇAMENTO", pageWidth - 14, 20, { align: "right" });
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
@@ -275,16 +282,23 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
   const itemPhotoData = includeItemImages
     ? await Promise.all(quote.items.map((item) => loadQuoteItemPhoto(item.itemPhotoUrl || item.itemPhotoUrls?.[0])))
     : [];
-  const tableData = quote.items.map((item, idx) => [
-    idx + 1,
-    ...(includeItemImages ? [""] : []),
-    item.sku
-      ? item.sku + " · " + item.description + (Number(item.cutLengthMm) > 0 ? " (" + item.cutLengthMm + " mm)" : "")
-      : item.description,
-    item.quantity,
-    formatMoney(item.unitPrice, currency),
-    formatMoney(item.subtotal ?? item.quantity * item.unitPrice, currency),
-  ]);
+  const tableData = quote.items.map((item: any, idx) => {
+    const priceSource = String(item.priceSource || "");
+    const pricePending = priceSource === "pending" || !(Number(item.unitPrice) > 0);
+    const priceEstimated = !pricePending && priceSource !== "catalog" && !(approvedQuote && priceSource === "manual");
+    const unitPriceLabel = pricePending ? "A confirmar" : formatMoney(item.unitPrice, currency) + (isPreliminary && priceEstimated ? " (estimado)" : "");
+    const subtotalLabel = pricePending ? "A confirmar" : formatMoney(item.subtotal ?? item.quantity * item.unitPrice, currency) + (isPreliminary && priceEstimated ? " (estimado)" : "");
+    return [
+      idx + 1,
+      ...(includeItemImages ? [""] : []),
+      item.sku
+        ? item.sku + " · " + item.description + (Number(item.cutLengthMm) > 0 ? " (" + item.cutLengthMm + " mm)" : "")
+        : item.description,
+      item.quantityPending === true || !(Number(item.quantity) > 0) ? "A confirmar" : item.quantity,
+      unitPriceLabel,
+      subtotalLabel,
+    ];
+  });
 
   autoTable(doc, {
     startY: yPos + 35,
@@ -343,7 +357,12 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
 
   let finalY = (doc as any).lastAutoTable.finalY + 8;
   const totalRows = [
-    ["Materiais:", formatMoney(quote.subtotal, currency)],
+    ...(isPreliminary ? [
+      ["Preços confirmados:", formatMoney(confirmedSubtotal, currency)],
+      ["Preços estimados:", formatMoney(estimatedSubtotal, currency)],
+      ...(pendingPriceCount > 0 ? [["Itens sem preço:", String(pendingPriceCount)]] : []),
+      ...(pendingQuantityCount > 0 ? [["Quantidades a confirmar:", String(pendingQuantityCount)]] : []),
+    ] : [["Materiais:", formatMoney(quote.subtotal, currency)]]),
     ...(Number(quote.labor || 0) > 0 ? [["Mão de obra:", formatMoney(quote.labor || 0, currency)]] : []),
     ...(Number(quote.margin || 0) > 0 ? [[`Margem (${quote.marginRate || 0}%):`, formatMoney(quote.margin || 0, currency)]] : []),
     ...(Number(quote.freight || 0) > 0 ? [["Frete:", formatMoney(quote.freight || 0, currency)]] : []),
@@ -385,7 +404,7 @@ export const buildQuotePdf = async (quote: Quote, sender?: SenderConfig): Promis
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42);
-  doc.text("TOTAL GERAL:", totalsX, dividerY + 7);
+  doc.text(isPreliminary ? "TOTAL PRELIMINAR:" : "TOTAL GERAL:", totalsX, dividerY + 7);
   doc.setTextColor(180, 83, 9);
   doc.text(formatMoney(quote.total, currency), pageWidth - 14, dividerY + 7, { align: "right" });
 
