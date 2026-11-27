@@ -244,7 +244,7 @@ function localFallback(prompt: string) {
   const isDoor = /porta|puerta/.test(text);
   const isTable = /mesa|table/.test(text);
   const isCabinet = /arm[aá]rio|closet|guarda roupa/.test(text);
-  const unit = /\\bmm\\b|milímetro|milimetro/.test(text) ? "mm" : /\\bcm\\b|centímetro|centimetro/.test(text) ? "cm" : "mm";
+  const unit = /\bmm\b|milímetro|milimetro/.test(text) ? "mm" : /\bcm\b|centímetro|centimetro/.test(text) ? "cm" : "mm";
   const category = isWindow ? "aluminum_window" : isDoor ? "glass_door" : isTable || isCabinet ? "furniture" : "custom";
   const names = isWindow || isDoor
     ? ["Perfil superior do marco", "Perfil inferior do marco", "Montantes laterais", "Folhas / painéis"]
