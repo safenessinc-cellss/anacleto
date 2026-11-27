@@ -129,3 +129,11 @@ export function buildCommercialQuoteDraft(
 export function isTechnicalVisitPending(quote: Record<string, any>): boolean {
   return quote.requiresTechnicalVisit === true && String(quote.technicalVisitStatus || "pending") !== "completed";
 }
+
+export function hasPendingBudgetApprovalData(quote: Record<string, any>): boolean {
+  if (isTechnicalVisitPending(quote)) return true;
+  if (Array.isArray(quote.pendingQuestions) && quote.pendingQuestions.length > 0) return true;
+  if (quote.requiresClientConfirmation === true && String(quote.clientConfirmationStatus || "pending") !== "completed") return true;
+  const items = Array.isArray(quote.items) ? quote.items : [];
+  return items.some((item: any) => item.quantityPending === true || !(Number(item.quantity) > 0));
+}
