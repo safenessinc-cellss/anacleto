@@ -57,6 +57,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
       return "";
     }
     if (row.workflow === "technical") {
+      if (data.visitRequired === true || data.measurementsConfirmed !== true) return "As medidas precisam ser confirmadas pelo cliente ou em visita técnica.";
       if (data.bomData?.complete !== true) return "A lista técnica ainda está incompleta.";
       if (!data.bestSupplier || !Array.isArray(data.comparisons) || !data.comparisons.some((basket: any) => basket.complete === true && basket.supplier === data.bestSupplier)) return "Falta uma cesta completa com preços de fornecedor verificados.";
       return "";
