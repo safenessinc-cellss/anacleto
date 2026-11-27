@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { FileText, Search, Pencil } from "lucide-react";
 import { auth, db } from "../../firebase";
 import { buildCommercialQuoteDraft } from "../../utils/budget-workflow.js";
@@ -14,6 +14,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
 
   useEffect(() => {
     const collections: Array<{ name: string; workflow: BudgetWorkflow }> = [
@@ -23,7 +24,8 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
     ];
     const snapshots = new Map<string, Row[]>();
     const unsubscribers = collections.map(({ name, workflow }) =>
-      onSnapshot(query(collection(db, name), orderBy("createdAt", "desc")), (snap) => {
+      onSnapshot(query(collection(db, name), orderBy("createdAt", "desc"), limit(300)), (snap) => {
+        setLimitedSources((current) => snap.size >= 300 ? [...new Set([...current, name])] : current.filter((item) => item !== name));
         snapshots.set(name, snap.docs.map((d) => {
           const data = d.data() as any;
           return { id: d.id, workflow, number: data.number, clientName: data.clientName || data.customerName || "Cliente não informado", status: data.status || "draft", total: data.total == null && data.subtotal == null ? undefined : Number(data.total ?? data.subtotal), currency: data.currency || "BRL", createdAt: data.createdAt, request: data.request, sourceData: data, canonicalQuoteId: String(data.canonicalQuoteId || ""), technicalVisitStatus: String(data.technicalVisitStatus || "pending"), requiresTechnicalVisit: data.visitRequired === true || data.requiresTechnicalVisit === true || workflow === "technical" };
@@ -125,6 +127,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
         <select value={status} onChange={(e)=>setStatus(e.target.value)} className="rounded-xl border px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="all">Todos os status</option><option value="draft">Rascunho</option><option value="pending">Pendente</option><option value="approved">Aprovado</option><option value="rejected">Rejeitado</option></select>
       </div>
     </header>
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado a 300 registros por modalidade ({limitedSources.join(", ")}). A paginação do acervo completo ainda está pendente.</p>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     {notice && <p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{notice}</p>}
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">

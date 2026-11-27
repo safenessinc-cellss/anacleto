@@ -59,32 +59,37 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
   const [limitedSources, setLimitedSources] = useState<string[]>([]);
+  const [limitedCatalogSources, setLimitedCatalogSources] = useState<string[]>([]);
 
   // Cargar catálogo
   useEffect(() => {
     const unsubs = [
-      onSnapshot(collection(db, "catalog"), (snap) => {
+      onSnapshot(query(collection(db, "catalog"), limit(500)), (snap) => {
+        setLimitedCatalogSources((current) => snap.size >= 500 ? [...new Set([...current, "catalog"])] : current.filter((item) => item !== "catalog"));
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, name: data.name || data.description || "Item sem nome", sku: data.sku || data.code || "", price: Number(data.price || 0), source: "catalog" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "catalog"), ...list]);
       }, (err) => {
         console.error("Catalog listener (quotes):", err);
         showToast("Não foi possível carregar o catálogo de produtos.", "error");
       }),
-      onSnapshot(collection(db, "supplier_catalog"), (snap) => {
+      onSnapshot(query(collection(db, "supplier_catalog"), limit(500)), (snap) => {
+        setLimitedCatalogSources((current) => snap.size >= 500 ? [...new Set([...current, "supplier_catalog"])] : current.filter((item) => item !== "supplier_catalog"));
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), supplier: data.supplier || "", category: data.category || "", unit: data.unit || "un", source: "supplier_catalog" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...list]);
       }, (err) => {
         console.error("Supplier catalog listener (quotes):", err);
         showToast("Não foi possível carregar o catálogo de fornecedores.", "error");
       }),
-      onSnapshot(collection(db, "registry_items"), (snap) => {
+      onSnapshot(query(collection(db, "registry_items"), limit(500)), (snap) => {
+        setLimitedCatalogSources((current) => snap.size >= 500 ? [...new Set([...current, "registry_items"])] : current.filter((item) => item !== "registry_items"));
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, itemId: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", width: data.width || 0, height: data.height || 0, depth: data.depth || 0, itemPhotoUrls: data.itemPhotoUrls || [], source: "registry_items" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "registry_items"), ...list]);
       }, (err) => {
         console.error("Items registry listener (quotes):", err);
         showToast("Não foi possível carregar os itens cadastrados.", "error");
       }),
-      onSnapshot(collection(db, "price_table"), (snap) => {
+      onSnapshot(query(collection(db, "price_table"), limit(500)), (snap) => {
+        setLimitedCatalogSources((current) => snap.size >= 500 ? [...new Set([...current, "price_table"])] : current.filter((item) => item !== "price_table"));
         const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", supplier: data.priceSupplier || data.supplier || "", source: "price_table" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "price_table"), ...list]);
       }, (err) => {
@@ -1101,6 +1106,7 @@ const handleAddItem = () => {
   return (
     <div className="space-y-6">
       {limitedSources.includes("quotes")&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado aos 300 orçamentos mais recentes. Orçamentos antigos não aparecem nesta lista; use o histórico unificado para consultar os registros disponíveis.</p>}
+      {limitedCatalogSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Catálogo limitado a 500 registros por origem ({limitedCatalogSources.join(", ")}). Alguns itens antigos podem não aparecer na seleção; a paginação do catálogo ainda está pendente.</p>}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-2xl">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
