@@ -1424,6 +1424,9 @@ const handleAddItem = () => {
                             {Number(item.unitPrice) <= 0 && (item.catalogItemId || item.catalogSource) && (
                               <span className="ml-8 mt-1 text-[9px] font-medium text-amber-300">Informar preço</span>
                             )}
+                            <span className={`ml-8 mt-1 text-[9px] font-semibold ${item.priceSource === "catalog" ? "text-emerald-400" : item.priceSource === "manual" ? "text-sky-300" : item.priceSource === "estimated" ? "text-amber-300" : "text-rose-300"}`}>
+                              {item.priceSource === "catalog" ? "Confirmado no catálogo" : item.priceSource === "manual" ? "Manual · validação da direção/Financeiro" : item.priceSource === "estimated" ? "Estimado · confirmar" : "Pendente"}
+                            </span>
                           </div>
 
                           <span className="w-24 text-right font-mono font-bold text-xs text-amber-400">
