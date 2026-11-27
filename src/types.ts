@@ -18,6 +18,7 @@ export interface QuoteItem {
   id: string;
   description: string;
   quantity: number;
+  quantityPending?: boolean;
   unitPrice: number;
   subtotal?: number;
   notes?: string;
