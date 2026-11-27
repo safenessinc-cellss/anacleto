@@ -135,7 +135,7 @@ export async function generateValidatedJson<T>(options: {
         if (remaining < 1_500) break;
         try {
           const isBudget = options.capability === "budget";
-          const firstAttemptBudgetMs = isBudget ? 11_000 : Math.max(5_000, remaining - 1_500);
+          const firstAttemptBudgetMs = isBudget ? 20_000 : Math.max(5_000, remaining - 1_500);
           const result = await client.models.generateContent({
             model,
             contents: [{ role: "user", parts: [{ text: activePrompt }] }],
@@ -145,7 +145,7 @@ export async function generateValidatedJson<T>(options: {
               ...(options.responseSchema ? { responseSchema: options.responseSchema } : {}),
               temperature: options.temperature ?? config.temperature,
               maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
-              abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? firstAttemptBudgetMs : (isBudget ? 6_000 : remaining))),
+              abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? firstAttemptBudgetMs : (isBudget ? 12_000 : remaining))),
             },
           });
           raw = result.text || "";
