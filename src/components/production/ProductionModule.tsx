@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { CheckCircle2, Factory, Loader2, PackageCheck, Play, Plus, XCircle } from "lucide-react";
 import CuttingPlanTab from "./CuttingPlanTab";
@@ -33,14 +33,14 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
   const [activeTab, setActiveTab] = useState<"orders" | "cutting">("orders");
 
   useEffect(() => {
-    const a = onSnapshot(collection(db, "quotes"), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as QuoteRecord))), e => console.error("Production quotes:", e));
-    const b = onSnapshot(collection(db, "inventory_items"), snap => setStock(snap.docs.map(d => ({ id: d.id, ...d.data() } as Material))), e => console.error("Production stock:", e));
-    const c = onSnapshot(collection(db, "production_orders"), snap => {
+    const a = onSnapshot(query(collection(db, "quotes"), orderBy("createdAt", "desc"), limit(300)), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as QuoteRecord))), e => console.error("Production quotes:", e));
+    const b = onSnapshot(query(collection(db, "inventory_items"), limit(500)), snap => setStock(snap.docs.map(d => ({ id: d.id, ...d.data() } as Material))), e => console.error("Production stock:", e));
+    const c = onSnapshot(query(collection(db, "production_orders"), orderBy("createdAt", "desc"), limit(300)), snap => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() } as WorkOrder));
       rows.sort((x,y) => String(y.createdAt?.toDate?.() || y.createdAt || "").localeCompare(String(x.createdAt?.toDate?.() || x.createdAt || "")));
       setOrders(rows);
     }, e => console.error("Production orders:", e));
-    const d = onSnapshot(collection(db, "technical_drawings"), snap => setDrawings(snap.docs.map(row => ({ id: row.id, ...row.data() } as TechnicalDrawing))), e => console.error("Production drawings:", e));
+    const d = onSnapshot(query(collection(db, "technical_drawings"), limit(200)), snap => setDrawings(snap.docs.map(row => ({ id: row.id, ...row.data() } as TechnicalDrawing))), e => console.error("Production drawings:", e));
     return () => { a(); b(); c(); d(); };
   }, []);
 
