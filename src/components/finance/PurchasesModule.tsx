@@ -430,6 +430,7 @@ export default function PurchasesModule() {
         queryInventoryField("supplierSku", skus),
         queryInventoryField("sku", skus),
         queryInventoryField("name", names),
+        queryInventoryField("normalizedName", names.map(name => normalizeText(name))),
       ]);
       const inventoryDocs = [...new Map(inventoryGroups.flatMap(group => group.flatMap(snapshot => snapshot.docs)).map(snapshot => [snapshot.id, snapshot])).values()];
       const stockRefs = entries.map(([key, item]) => {
@@ -437,7 +438,7 @@ export default function PurchasesModule() {
           const data = snapshot.data();
           const sameCatalog = item.supplierCatalogId && [data.supplierCatalogId, data.productCatalogId, data.catalogId].includes(item.supplierCatalogId);
           const sameSku = item.sku && normalizeText(String(data.supplierSku || data.sku || "")) === normalizeText(item.sku);
-          const sameName = normalizeText(String(data.name || "")) === normalizeText(item.description || "");
+          const sameName = normalizeText(String(data.normalizedName || data.name || "")) === normalizeText(item.description || "");
           return Boolean(sameCatalog || sameSku || sameName);
         });
         if (matches.length > 1) throw new Error("Há registros duplicados deste material no Estoque. Unifique os cadastros antes de lançar o recebimento para não somar no item errado.");
@@ -455,6 +456,7 @@ export default function PurchasesModule() {
           const currentQty = snap.exists() ? Number(snap.data().quantity || 0) : 0;
           tx.set(stockRefs[i], {
             name: item.description,
+            normalizedName: normalizeText(item.description || ""),
             sku: snap.exists() ? snap.data().sku || item.sku || key : item.sku || key,
             supplierSku: item.sku || (snap.exists() ? snap.data().supplierSku || "" : ""),
             unit: item.unit || "un",
