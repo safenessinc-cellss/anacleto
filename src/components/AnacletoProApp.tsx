@@ -1,32 +1,53 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Compass, ExternalLink, Factory, FileText, LayoutDashboard, LogOut, Menu, Moon, Package, Settings, Sun, Wallet, X } from "lucide-react";
 import { collection, onSnapshot, query, orderBy, doc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 import { db } from "../firebase";
 import { Quote, Invoice, Company, TechnicalDrawing, SenderConfig } from "../types";
-import DashboardOverview from "./dashboard/DashboardOverview";
-import CrmModule from "./crm/CrmModule";
-import QuotesWorkspace from "./quotes/QuotesWorkspace";
-import InvoicesModule from "./invoices/InvoicesModule";
-import AgendaModule from "./agenda/AgendaModule";
-import SettingsModule from "./settings/SettingsModule";
-import FinanceModule from "./finance/FinanceModule";
-import InternalQuoteCostsModule from "./finance/InternalQuoteCostsModule";
-import FinancialAI from "./finance/FinancialAI";
-import ThemeModule from "./settings/ThemeModule";
-import AdminModule from "./admin/AdminModule";
+
+
+
+
+
+
+
+
+
+
+
 import { Role, getRoleConfig, hasAccessToTab, NavigationTab as RoleNavTab } from "../utils/roles";
-import CatalogModule from "./catalog/CatalogModule";
-import RegistryModule from "./registry/RegistryModule";
-import CentralMaterialsModule from "./materials/CentralMaterialsModule";
+const DashboardOverview = lazy(() => import("./dashboard/DashboardOverview"));
+const CrmModule = lazy(() => import("./crm/CrmModule"));
+const QuotesWorkspace = lazy(() => import("./quotes/QuotesWorkspace"));
+const InvoicesModule = lazy(() => import("./invoices/InvoicesModule"));
+const AgendaModule = lazy(() => import("./agenda/AgendaModule"));
+const SettingsModule = lazy(() => import("./settings/SettingsModule"));
+const FinanceModule = lazy(() => import("./finance/FinanceModule"));
+const InternalQuoteCostsModule = lazy(() => import("./finance/InternalQuoteCostsModule"));
+const FinancialAI = lazy(() => import("./finance/FinancialAI"));
+const ThemeModule = lazy(() => import("./settings/ThemeModule"));
+const AdminModule = lazy(() => import("./admin/AdminModule"));
+const CatalogModule = lazy(() => import("./catalog/CatalogModule"));
+const RegistryModule = lazy(() => import("./registry/RegistryModule"));
+const CentralMaterialsModule = lazy(() => import("./materials/CentralMaterialsModule"));
+const BusinessWorkspace = lazy(() => import("./workspace/BusinessWorkspace"));
+const PostSaleModule = lazy(() => import("./post-sale/PostSaleModule"));
+const DeliveryModule = lazy(() => import("./deliveries/DeliveryModule"));
+const ProductionModule = lazy(() => import("./production/ProductionModule"));
+const InventoryModule = lazy(() => import("./inventory/InventoryModule"));
+const ProjectEngineeringModule = lazy(() => import("./projects/ProjectEngineeringModule"));
+
+
+
+
 import logoImg from "../assets/images/anacleto-logo-premium.svg";
-import BusinessWorkspace from "./workspace/BusinessWorkspace";
-import PostSaleModule from "./post-sale/PostSaleModule";
-import DeliveryModule from "./deliveries/DeliveryModule";
-import ProductionModule from "./production/ProductionModule";
-import InventoryModule from "./inventory/InventoryModule";
-import ProjectEngineeringModule from "./projects/ProjectEngineeringModule";
+
+
+
+
+
+
 
 type NavigationTab = "dashboard" | "crm" | "quotes" | "invoices" | "technical_drawing" | "agenda" | "catalog" | "finance" | "settings" | "financial_ai" | "theme" | "admin" | "cadastro_items" | "products" | "services" | "payment_methods" | "measurement" | "contracts" | "cut_plan" | "profile_optimization" | "materials" | "reports" | "tipologias" | "projects" | "profile" | "suggestions" | "post_sale" | "deliveries" | "production" | "inventory" | "technical_library" | "internal_costs";
 
@@ -345,6 +366,7 @@ export default function AnacletoProApp({
               ))}
             </nav>
           )}
+          <Suspense fallback={<div className="flex min-h-48 items-center justify-center text-sm text-slate-500">Carregando módulo...</div>}>
           {activeTab === "reports" && <BusinessWorkspace kind="reports" quotes={quotes} invoices={invoices} />}
           
           {activeTab === "projects" && <ProjectEngineeringModule language={language} senderConfig={senderConfig} />}
@@ -409,6 +431,7 @@ export default function AnacletoProApp({
         {activeTab === "settings" && (
             <SettingsModule language={language} senderConfig={senderConfig} setSenderConfig={setSenderConfig} />
           )}
+          </Suspense>
         </div>
       </main>
     </div>
