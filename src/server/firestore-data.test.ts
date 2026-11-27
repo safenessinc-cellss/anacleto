@@ -35,6 +35,10 @@ test("catalog cache avoids repeating four full Firestore reads during its TTL", 
     const second = await loadCatalogFromFirestore(request, { cacheTtlMs: 20_000, cacheKey: "test-user" });
     assert.equal(second.length, 4);
     assert.equal(calls, 4);
+
+    const otherUser = await loadCatalogFromFirestore(request, { cacheTtlMs: 20_000, cacheKey: "other-user" });
+    assert.equal(otherUser.length, 4);
+    assert.equal(calls, 8);
   } finally {
     globalThis.fetch = originalFetch;
   }
