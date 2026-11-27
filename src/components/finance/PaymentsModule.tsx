@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, where, setDoc, getDoc, runTransaction,
+  collection, limit, onSnapshot, addDoc, doc, updateDoc, query, orderBy, where, setDoc, getDoc, runTransaction,
 } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import {
@@ -50,6 +50,7 @@ type PaymentMethod = typeof METHODS[number]["id"];
 
 export default function PaymentsModule() {
   const [tab, setTab] = useState<"pending" | "history">("pending");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [payables, setPayables] = useState<Payable[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [search, setSearch] = useState("");
@@ -87,7 +88,8 @@ export default function PaymentsModule() {
   };
 
   useEffect(() => {
-    const u1 = onSnapshot(collection(db, "payables"), (snap) => {
+    const u1 = onSnapshot(query(collection(db, "payables"), limit(1000)), (snap) => {
+      setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "payables"])] : v.filter(x => x !== "payables"));
       const list: Payable[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Payable));
       list.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -95,8 +97,9 @@ export default function PaymentsModule() {
     }, (err) => console.warn("Payables listener:", err));
 
     const u2 = onSnapshot(
-      query(collection(db, "payments"), orderBy("paidAt", "desc")),
+      query(collection(db, "payments"), orderBy("paidAt", "desc"), limit(1000)),
       (snap) => {
+        setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "payments"])] : v.filter(x => x !== "payments"));
         const list: Payment[] = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Payment));
         setPayments(list);
@@ -191,6 +194,7 @@ export default function PaymentsModule() {
 
   return (
     <div className="space-y-4">
+      {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados: {limitedSources.join(", ")}. Contas e pagamentos antigos podem não aparecer; a paginação completa ainda está pendente.</p>}
       <form onSubmit={savePaymentConfig} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>

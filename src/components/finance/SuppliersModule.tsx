@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, limit, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query } from "firebase/firestore";
 import { db } from "../../firebase";
 import { Plus, Trash2, Edit, Search, Building2, Loader2, Download } from "lucide-react";
 import { lookupCNPJ, cnpjToSupplier, cleanCNPJ } from "../../utils/cnpjLookup";
@@ -19,6 +19,7 @@ const emptyForm: Supplier = { name: "", nif: "", email: "", phone: "", address: 
 
 export default function SuppliersModule() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [purchaseRecords, setPurchaseRecords] = useState<any[]>([]);
   const [payableRecords, setPayableRecords] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -30,14 +31,15 @@ export default function SuppliersModule() {
   const [lookupSuccess, setLookupSuccess] = useState(false);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "suppliers"), (snap) => {
+    const unsub = onSnapshot(query(collection(db, "suppliers"), limit(500)), (snap) => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "suppliers"])] : v.filter(x => x !== "suppliers"));
       const list: Supplier[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Supplier));
       list.sort((a, b) => a.name.localeCompare(b.name));
       setSuppliers(list);
     }, (err) => console.warn("Suppliers listener:", err));
-    const u2 = onSnapshot(collection(db, "purchase_orders"), snap => setPurchaseRecords(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u3 = onSnapshot(collection(db, "payables"), snap => setPayableRecords(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u2 = onSnapshot(query(collection(db, "purchase_orders"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "purchase_orders"])] : v.filter(x => x !== "purchase_orders")); setPurchaseRecords(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
+    const u3 = onSnapshot(query(collection(db, "payables"), limit(1000)), snap => { setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "payables"])] : v.filter(x => x !== "payables")); setPayableRecords(snap.docs.map(d => ({ id: d.id, ...d.data() }))); });
     return () => { unsub(); u2(); u3(); };
   }, []);
 
@@ -98,6 +100,7 @@ export default function SuppliersModule() {
 
   return (
     <div className="space-y-4">
+      {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados: {limitedSources.join(", ")}. Listas e totais podem estar parciais; a paginação completa ainda está pendente.</p>}
       {/* BLOCO 1: BUSCAR CNPJ NA RECEITA */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-2xl border border-blue-200 dark:border-blue-900 p-5">
         <h3 className="font-black text-slate-900 dark:text-white flex items-center gap-2 mb-1">
