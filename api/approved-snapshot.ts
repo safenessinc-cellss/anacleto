@@ -4,7 +4,9 @@ import { AI_CONFIG } from "../src/server/ai-config.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
 import { hasConfirmedCatalogPrice } from "../src/utils/catalog-price-validation.js";
-import { isUnconfirmedPriceSource } from "../src/utils/quote-price-validation.js";
+import { isUnconfirmedPriceSource, requiresCatalogPriceVerification } from "../src/utils/quote-price-validation.js";
+import { isTechnicalVisitPending } from "../src/utils/budget-workflow.js";
+import { calculateApprovedQuoteTotals } from "../src/utils/quote-totals.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
 import { hasAIRole } from "../src/server/ai-roles.js";
@@ -256,6 +258,7 @@ export default async function handler(req: any, res: any) {
       if (!["draft","pending","pendente","borrador","accepted","approved","aprovado"].includes(String(source.status || "").toLowerCase())) {
         return send(res, 409, { error: "Somente orçamentos em rascunho ou pendentes podem ser aprovados." });
       }
+      if (isTechnicalVisitPending(source)) return send(res, 409, { error: "A visita técnica ainda está pendente. Registre a visita e confirme medidas/condições antes da aprovação final e da liberação para produção." });
       if (!Array.isArray(source.items) || source.items.length === 0 || source.items.length > 150) return send(res, 422, { error: "O orçamento deve possuir entre 1 e 150 itens." });
       const catalog = await loadCatalogFromFirestore(req);
       const reviewedItems = source.items.map((item: any) => {
@@ -264,7 +267,7 @@ export default async function handler(req: any, res: any) {
         const price = Number(item.unitPrice);
         if (!Number.isFinite(price) || price < 0 || price > 1000000000) throw new Error("Preço inválido no orçamento.");
         const match = catalogMatch(item, catalog);
-        if (item.catalogItemId || item.sku || item.itemId) {
+        if (requiresCatalogPriceVerification(item)) {
           if (!match) throw new Error("SKU/ID sem correspondência no catálogo: " + (item.sku || item.catalogItemId || item.itemId));
           const catalogPrice = Number(match.price);
           if (!hasConfirmedCatalogPrice(match)) throw new Error("O preço do catálogo ainda não foi validado. Solicite a revisão do preço antes de aprovar.");
@@ -277,19 +280,14 @@ export default async function handler(req: any, res: any) {
         if (!canApproveManualPrice(user)) throw new Error("Somente direção/Financeiro pode aprovar manualmente preços sem SKU cadastrado.");
         return { ...item, quantity, subtotal: Number((quantity * price).toFixed(2)), priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
-      const subtotal = Number(reviewedItems.reduce((sum: number, item: any) => sum + item.quantity * item.unitPrice, 0).toFixed(2));
-      const discountRate = Number(source.discountRate || 0);
-      const taxRate = Number(source.taxRate || 0);
-      if (![discountRate, taxRate].every(value => Number.isFinite(value) && value >= 0 && value <= 100)) return send(res, 422, { error: "Impostos ou descontos inválidos." });
-      const discountAmount = Number((subtotal * discountRate / 100).toFixed(2));
-      const taxAmount = Number((Math.max(0, subtotal - discountAmount) * taxRate / 100).toFixed(2));
-      const total = Number((subtotal - discountAmount + taxAmount).toFixed(2));
+      const totals = calculateApprovedQuoteTotals(source, reviewedItems);
+      const { subtotal, labor, laborRate, margin, marginRate, freight, discountRate, discountAmount, taxRate, taxAmount, total } = totals;
       const { pdfDataUri: _pdfDataUri, pdfFileName: _pdfFileName, pdfGeneratedAt: _pdfGeneratedAt, pdfFileSizeKb: _pdfFileSizeKb, ...sourceWithoutPdf } = source;
       const approvedAt = new Date().toISOString();
       snapshot = {
         schemaVersion: 1, type: "quote", documentId, documentNumber: source.number || "", status: "approved",
         approvedAt, approvedBy: { uid: user.uid, email: user.email, role: user.role },
-        document: { ...sourceWithoutPdf, items: reviewedItems, subtotal, discountAmount, taxAmount, total, status: "approved", approvedAt, senderSnapshot },
+        document: { ...sourceWithoutPdf, items: reviewedItems, subtotal, labor, laborRate, margin, marginRate, freight, discountRate, discountAmount, taxRate, taxAmount, total, status: "approved", approvedAt, senderSnapshot },
         senderSnapshot,
         modelSignatures: {
           provider: "Vercel AI Gateway", model: AI_CONFIG.quote.model, capability: "quote",
@@ -320,7 +318,7 @@ export default async function handler(req: any, res: any) {
       snapshot.budgetSnapshot = createBudgetSnapshot({
         documentId, documentNumber: String(source.number || ""), approvedAt,
         approvedBy: snapshot.approvedBy, currency: String(source.currency || "BRL"),
-        lines: reviewedItems, subtotal, discountAmount, taxAmount, total,
+        lines: reviewedItems, subtotal, labor, laborRate, margin, marginRate, freight, discountRate, discountAmount, taxRate, taxAmount, total,
         technicalDrawing: source.technicalDrawing || null,
         modelSignature: snapshot.modelSignatures,
       });
@@ -335,7 +333,7 @@ export default async function handler(req: any, res: any) {
         if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento técnico.");
         if (isUnconfirmedPriceSource(item.priceSource)) throw new Error("O desenho contém preços estimados ou pendentes; confirme os valores antes da aprovação final.");
         const match = catalogMatch(item, catalog);
-        if (item.catalogItemId || item.sku) {
+        if (requiresCatalogPriceVerification(item)) {
           if (!match) throw new Error("SKU/ID do orçamento técnico não existe no catálogo.");
           const catalogPrice = Number(match.price);
           if (!hasConfirmedCatalogPrice(match)) throw new Error("O preço do catálogo ainda não foi validado. Solicite a revisão do preço antes de aprovar.");
