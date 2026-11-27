@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { collection, onSnapshot, doc, deleteDoc, addDoc, getDocs } from "firebase/firestore";
+import { collection, limit, onSnapshot, query, doc, deleteDoc, addDoc, getDocs } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage } from "../../firebase";
 import { CheckCircle, XCircle, FileText, Loader2, AlertTriangle, Search, Camera, Upload, Save, ExternalLink } from "lucide-react";
@@ -46,7 +46,7 @@ export default function PendingBoletosModule() {
   const cameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "pending_boletos"), (snap) => {
+    const unsub = onSnapshot(query(collection(db, "pending_boletos"), limit(500)), (snap) => {
       const list: PendingBoleto[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as PendingBoleto));
       list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
@@ -227,6 +227,7 @@ export default function PendingBoletosModule() {
 
   return (
     <div className="space-y-4">
+      {pending.length>=500&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Exibindo até 500 boletos importados. O histórico completo requer paginação.</p>}
       <section className="rounded-xl border bg-white p-4 dark:bg-slate-900 space-y-3">
         <div>
           <h3 className="font-bold flex items-center gap-2"><Search className="w-4 h-4" /> Buscar boletos da Anacleto</h3>
