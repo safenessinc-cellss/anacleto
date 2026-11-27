@@ -19,6 +19,10 @@ import generateBomHandler from "./src/server/supplier-api/generate-bom.js";
 import compareBomHandler from "./src/server/supplier-api/compare-bom.js";
 import marketResearchHandler from "./src/server/supplier-api/market-research.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
+import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
+import { hasAIRole } from "./src/server/ai-roles.js";
+import { getAIRateLimit } from "./src/server/ai-limits.js";
+import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
 import { hasConfirmedCatalogPrice } from "./src/utils/catalog-price-validation.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
@@ -46,61 +50,38 @@ const PORT = 3000;
 
 // Vercel AI Gateway supplies authentication in previews and deployments.
 
-const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
-const ownerEmail = "safeness.c.a@gmail.com";
-
 const requireFirebaseAuth: express.RequestHandler = async (req, res, next) => {
-  const authorization = req.headers.authorization || "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-  if (!token) return res.status(401).json({ error: "Autenticação obrigatória." });
-  if (!firebaseApiKey) return res.status(503).json({ error: "A verificação de autenticação não está configurada no servidor." });
-
   try {
-    const identityResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken: token }),
-    });
-    if (!identityResponse.ok) return res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
-    const identity = await identityResponse.json() as { users?: Array<{ localId?: string; email?: string }> };
-    const user = identity.users?.[0];
-    if (!user?.localId || !user.email) return res.status(401).json({ error: "Conta autenticada inválida." });
-
-    const email = user.email.toLowerCase();
-    if (email === ownerEmail) {
-      res.locals.firebaseUser = { uid: user.localId, email, role: "super_admin" };
-      return next();
-    }
-
-    const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
-    const documentId = encodeURIComponent(email);
-    const roleUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${databaseId}/documents/admins/${documentId}`;
-    const roleResponse = await fetch(roleUrl, { headers: { Authorization: `Bearer ${token}` } });
-    if (!roleResponse.ok) return res.status(403).json({ error: "Acesso pendente de aprovação ou perfil não autorizado." });
-    const roleDocument = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
-    const role = roleDocument.fields?.role?.stringValue;
-    if (!role) return res.status(403).json({ error: "Perfil de acesso não encontrado." });
-    res.locals.firebaseUser = { uid: user.localId, email, role };
+    const user = await authenticateFirebaseRequest(req);
+    if (!user) return res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente.", code: "INVALID_SESSION" });
+    res.locals.firebaseUser = user;
     return next();
-  } catch (error) {
-    console.error("Firebase API authentication error:", error);
-    return res.status(503).json({ error: "Não foi possível validar a sessão no momento." });
+  } catch (error: any) {
+    const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
+    const status = Number(error?.statusCode || (timedOut ? 503 : 503));
+    console.error("[FIREBASE_AUTH] validation failed", {
+      code: timedOut ? "FIREBASE_AUTH_TIMEOUT" : "FIREBASE_AUTH_UNAVAILABLE",
+      status,
+      message: String(error?.message || error).slice(0, 500),
+    });
+    return res.status(status >= 400 && status < 600 ? status : 503).json({
+      error: "Não foi possível validar a sessão no momento.",
+      code: timedOut ? "FIREBASE_AUTH_TIMEOUT" : "FIREBASE_AUTH_UNAVAILABLE",
+    });
   }
 };
 
 const requireQuoteRole: express.RequestHandler = (_req, res, next) => {
   const user = res.locals.firebaseUser as { role?: string } | undefined;
-  if (user && ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"].includes(user.role || "")) return next();
+  if (user && hasAIRole(user.role, "budget")) return next();
   return res.status(403).json({ error: "Seu perfil não tem autorização para operações comerciais e orçamentos." });
 };
 
 const requireFinanceRole: express.RequestHandler = (_req, res, next) => {
   const user = res.locals.firebaseUser as { role?: string } | undefined;
-  if (user && ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role || "")) return next();
+  if (user && hasAIRole(user.role, "financial")) return next();
   return res.status(403).json({ error: "Seu perfil não tem autorização para operações financeiras." });
 };
-
-const requestWindows = new Map<string, { startedAt: number; count: number }>();
 
 function compactFinancialRows(rows: any[], fields: string[]) {
   return rows.slice(0, 120).map(row => Object.fromEntries(fields.filter(key => row[key] !== undefined).map(key => [key, row[key]])));
@@ -180,28 +161,29 @@ Pergunta: ${question}`,
   }
 });
 
-function rateLimitByUser(bucket: string, limit: number, windowMs: number): express.RequestHandler {
+function rateLimitByUser(bucket: string, _limit: number, _windowMs: number): express.RequestHandler {
   return (req, res, next) => {
     const user = res.locals.firebaseUser as { uid?: string } | undefined;
-    const key = `${bucket}:${user?.uid || req.ip}`;
-    const now = Date.now();
-    if (requestWindows.size > 5000) {
-      for (const [entry, window] of requestWindows) {
-        if (now - window.startedAt >= windowMs) requestWindows.delete(entry);
-      }
+    const identifier = user?.uid || getClientIp(req);
+    let policy;
+    try { policy = getAIRateLimit(bucket); }
+    catch (error) {
+      console.error("[AI_RATE_LIMIT] missing policy", { bucket, message: String((error as Error)?.message || error) });
+      return res.status(500).json({ error: "Política de limite de IA não configurada.", code: "AI_RATE_LIMIT_POLICY_MISSING" });
     }
-    const current = requestWindows.get(key);
-    if (!current && requestWindows.size >= 10000) return res.status(429).json({ error: "Limite temporário de solicitações atingido. Tente novamente em instantes." });
-    if (!current || now - current.startedAt >= windowMs) {
-      requestWindows.set(key, { startedAt: now, count: 1 });
-      return next();
-    }
-    if (current.count >= limit) return res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente." });
-    current.count += 1;
-    return next();
+    void consumeRateLimit(bucket, identifier, policy.limit, policy.windowMs)
+      .then(allowed => allowed
+        ? next()
+        : res.status(429).json({ error: "Muitas solicitações. Aguarde um momento e tente novamente.", code: "AI_RATE_LIMIT_EXCEEDED" }))
+      .catch(error => {
+        console.error("[AI_RATE_LIMIT] service unavailable", {
+          bucket,
+          message: String((error as Error)?.message || error).slice(0, 500),
+        });
+        return res.status(503).json({ error: "O controle de solicitações está indisponível. Tente novamente.", code: "AI_RATE_LIMIT_UNAVAILABLE" });
+      });
   };
 }
-
 
 // ----------------------------------------------------
 // 1. General AI Chat Proxy
