@@ -125,16 +125,10 @@ export default function BudgetModal({
       const user = auth.currentUser;
       if (!user) throw new Error("Entre na sua conta para gerar o orçamento com IA.");
       const idToken = await user.getIdToken();
-      const sourceNames = ["catalog", "supplier_catalog", "registry_items", "price_table"];
-      const snapshots = await Promise.all(sourceNames.map((name) => getDocs(collection(db, name))));
-      const catalog = snapshots.flatMap((snapshot, index) => snapshot.docs.map((item) => {
-        const data = item.data();
-        return { id: item.id, name: data.name || data.description || "", sku: data.sku || data.code || "", category: data.category || "", unit: data.unit || "un", price: Number(data.price ?? 0), source: sourceNames[index] };
-      })).filter((item) => item.name);
       const response = await fetch("/api/ai/budget-items", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + idToken },
-        body: JSON.stringify({ prompt: aiPrompt, language: documentLanguage, catalog }),
+        body: JSON.stringify({ prompt: aiPrompt, language: documentLanguage }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error || "Falha ao gerar orçamento (" + response.status + ").");
@@ -146,7 +140,7 @@ export default function BudgetModal({
         unitPrice: Number(item.price),
         sku: String(item.sku || ""),
         catalogItemId: String(item.catalogItemId || ""),
-        catalogSource: item.catalogItemId ? "supplier_catalog" : "",
+        catalogSource: String(item.catalogSource || ""),
         priceSource: item.priceSource === "catalog" ? "catalog" : "pending",
         notes: [String(item.notes || ""), item.priceSource === "pending" ? "Preço pendente de confirmação no catálogo." : "Preço vinculado ao registro do catálogo."].filter(Boolean).join(" "),
       }));
