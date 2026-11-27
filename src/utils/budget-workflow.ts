@@ -109,7 +109,7 @@ export function buildCommercialQuoteDraft(
     sourceBudgetId: sourceId,
     sourceBudgetWorkflow: workflow,
     requiresTechnicalVisit,
-    technicalVisitStatus: requiresTechnicalVisit ? "pending" : "not_required",
+    technicalVisitStatus: requiresTechnicalVisit ? (source.technicalVisitStatus === "completed" ? "completed" : "pending") : "not_required",
     preliminaryOnly: requiresTechnicalVisit,
   };
 }
