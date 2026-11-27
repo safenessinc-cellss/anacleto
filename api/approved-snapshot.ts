@@ -356,7 +356,7 @@ export default async function handler(req: any, res: any) {
         if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento técnico.");
         if (isUnconfirmedPriceSource(item.priceSource)) throw new Error("O desenho contém preços estimados ou pendentes; confirme os valores antes da aprovação final.");
         const match = catalogMatch(item, catalog);
-        if (item.catalogItemId || item.sku) {
+        if (requiresCatalogPriceVerification(item)) {
           if (!match) throw new Error("SKU/ID do orçamento técnico não existe no catálogo.");
           const catalogPrice = Number(match.price);
           if (!hasConfirmedCatalogPrice(match)) throw new Error("O preço do catálogo ainda não foi validado. Solicite a revisão do preço antes de aprovar.");
