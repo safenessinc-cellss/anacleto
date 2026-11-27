@@ -576,8 +576,8 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       showToast("Salve as alterações do orçamento antes de aprová-lo.", "warning");
       return;
     }
-    if (selectedQuote.items.some((item) => item.priceSource === "pending")) {
-      showToast("Confirme os preços pendentes do orçamento antes de aprová-lo.", "warning");
+    if (selectedQuote.items.some((item) => item.priceSource === "pending" || item.priceSource === "estimated")) {
+      showToast("Confirme os preços estimados/pendentes no catálogo ou informe um preço manual para validação da direção/Financeiro antes de aprovar.", "warning");
       return;
     }
     setIsQuoteActionLoading(true);
@@ -1073,6 +1073,11 @@ const handleAddItem = () => {
     const updatedItems = selectedQuote.items.map((it) => {
       if (it.id === id) {
         const next = { ...it, [field]: val };
+        if (field === "unitPrice") {
+          next.priceSource = "manual";
+          next.priceValidation = "MANUAL_ENTRY_PENDING_AUTHORIZATION";
+          next.notes = "Preço informado manualmente. A aprovação final exige validação por direção/Financeiro.";
+        }
         next.subtotal = Number((next.quantity * next.unitPrice).toFixed(2));
         return next;
       }
