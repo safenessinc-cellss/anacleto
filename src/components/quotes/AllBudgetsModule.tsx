@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, startAfter, updateDoc, writeBatch } from "firebase/firestore";
 import { FileText, Search, Pencil } from "lucide-react";
 import { auth, db } from "../../firebase";
 import { buildCommercialQuoteDraft } from "../../utils/budget-workflow.js";
@@ -15,30 +15,75 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
   const [notice, setNotice] = useState("");
   const [busyId, setBusyId] = useState("");
   const [limitedSources, setLimitedSources] = useState<string[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const cursorsRef = useRef<Record<string, any>>({});
+  const hasMoreRef = useRef<Record<string, boolean>>({});
+  const pagesLoadedRef = useRef<Record<string, number>>({});
 
+  const collections: Array<{ name: string; workflow: BudgetWorkflow }> = [
+    { name: "quotes", workflow: "standard" },
+    { name: "smart_budgets", workflow: "smart" },
+    { name: "technical_budgets", workflow: "technical" },
+  ];
+  const toRow = (d: any, workflow: BudgetWorkflow): Row => {
+    const data = d.data() as any;
+    return { id: d.id, workflow, number: data.number, clientName: data.clientName || data.customerName || "Cliente não informado", status: data.status || "draft", total: data.total == null && data.subtotal == null ? undefined : Number(data.total ?? data.subtotal), currency: data.currency || "BRL", createdAt: data.createdAt, request: data.request, sourceData: data, canonicalQuoteId: String(data.canonicalQuoteId || ""), technicalVisitStatus: String(data.technicalVisitStatus || "pending"), requiresTechnicalVisit: data.visitRequired === true || data.requiresTechnicalVisit === true || (workflow === "technical" && data.measurementsConfirmed !== true), requiresClientConfirmation: data.requiresClientConfirmation === true || (Array.isArray(data.pendingQuestions) && data.pendingQuestions.length > 0), pendingQuestions: Array.isArray(data.pendingQuestions) ? data.pendingQuestions : [], preliminaryOnly: data.preliminaryOnly === true };
+  };
+  const sortRows = (values: Row[]) => values.sort((a, b) => {
+    const date = (v: any) => v?.toDate ? v.toDate().getTime() : new Date(v || 0).getTime();
+    return date(b.createdAt) - date(a.createdAt);
+  });
   useEffect(() => {
-    const collections: Array<{ name: string; workflow: BudgetWorkflow }> = [
-      { name: "quotes", workflow: "standard" },
-      { name: "smart_budgets", workflow: "smart" },
-      { name: "technical_budgets", workflow: "technical" },
-    ];
     const snapshots = new Map<string, Row[]>();
+    cursorsRef.current = {};
+    hasMoreRef.current = {};
+    pagesLoadedRef.current = {};
     const unsubscribers = collections.map(({ name, workflow }) =>
       onSnapshot(query(collection(db, name), orderBy("createdAt", "desc"), limit(300)), (snap) => {
-        setLimitedSources((current) => snap.size >= 300 ? [...new Set([...current, name])] : current.filter((item) => item !== name));
-        snapshots.set(name, snap.docs.slice(0, 300).filter((d) => !(workflow === "standard" && d.data().sourceBudgetCollection && d.data().sourceBudgetId)).map((d) => {
-          const data = d.data() as any;
-          return { id: d.id, workflow, number: data.number, clientName: data.clientName || data.customerName || "Cliente não informado", status: data.status || "draft", total: data.total == null && data.subtotal == null ? undefined : Number(data.total ?? data.subtotal), currency: data.currency || "BRL", createdAt: data.createdAt, request: data.request, sourceData: data, canonicalQuoteId: String(data.canonicalQuoteId || ""), technicalVisitStatus: String(data.technicalVisitStatus || "pending"), requiresTechnicalVisit: data.visitRequired === true || data.requiresTechnicalVisit === true || (workflow === "technical" && data.measurementsConfirmed !== true), requiresClientConfirmation: data.requiresClientConfirmation === true || (Array.isArray(data.pendingQuestions) && data.pendingQuestions.length > 0), pendingQuestions: Array.isArray(data.pendingQuestions) ? data.pendingQuestions : [], preliminaryOnly: data.preliminaryOnly === true };
-        }));
-        setRows(collections.flatMap((entry) => snapshots.get(entry.name) || []).sort((a, b) => {
-          const date = (v: any) => v?.toDate ? v.toDate().getTime() : new Date(v || 0).getTime();
-          return date(b.createdAt) - date(a.createdAt);
-        }));
+        if (!pagesLoadedRef.current[name]) {
+          cursorsRef.current[name] = snap.docs[snap.docs.length - 1] || null;
+          hasMoreRef.current[name] = snap.size >= 300;
+          pagesLoadedRef.current[name] = 1;
+        }
+        snapshots.set(name, snap.docs.map((d) => toRow(d, workflow)));
+        const incoming = collections.flatMap((entry) => snapshots.get(entry.name) || []);
+        setRows((current) => {
+          const merged = new Map(current.map((row) => [row.workflow + ":" + row.id, row]));
+          incoming.forEach((row) => merged.set(row.workflow + ":" + row.id, row));
+          return sortRows([...merged.values()]);
+        });
+        setLimitedSources(collections.filter((entry) => hasMoreRef.current[entry.name]).map((entry) => entry.name));
         setError("");
       }, (e) => setError("Não foi possível carregar todos os orçamentos: " + e.message))
     );
     return () => unsubscribers.forEach((unsub) => unsub());
   }, []);
+
+  const loadMore = async () => {
+    if (loadingMore) return;
+    const pending = collections.filter((entry) => hasMoreRef.current[entry.name] && cursorsRef.current[entry.name]);
+    if (!pending.length) { setLimitedSources([]); return; }
+    setLoadingMore(true);
+    setError("");
+    try {
+      const pages = await Promise.all(pending.map(async (entry) => {
+        const snap = await getDocs(query(collection(db, entry.name), orderBy("createdAt", "desc"), startAfter(cursorsRef.current[entry.name]), limit(300)));
+        if (snap.docs.length) cursorsRef.current[entry.name] = snap.docs[snap.docs.length - 1];
+        hasMoreRef.current[entry.name] = snap.size >= 300;
+        pagesLoadedRef.current[entry.name] = (pagesLoadedRef.current[entry.name] || 1) + 1;
+        return snap.docs.map((d) => toRow(d, entry.workflow));
+      }));
+      const incoming = pages.flat();
+      setRows((current) => {
+        const merged = new Map(current.map((row) => [row.workflow + ":" + row.id, row]));
+        incoming.forEach((row) => merged.set(row.workflow + ":" + row.id, row));
+        return sortRows([...merged.values()]);
+      });
+      setLimitedSources(collections.filter((entry) => hasMoreRef.current[entry.name]).map((entry) => entry.name));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível carregar mais orçamentos.");
+    } finally { setLoadingMore(false); }
+  };
 
   const filtered = useMemo(() => rows.filter((row) => {
     const term = search.trim().toLowerCase();
@@ -137,7 +182,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
   };
 
   return <main className="space-y-5">
-    {limitedSources.length > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado aos 300 registros mais recentes por modalidade: {limitedSources.join(", ")}. A paginação histórica ainda precisa ser concluída.</p>}
+    {limitedSources.length > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Há registros anteriores em: {limitedSources.join(", ")}. Carregue mais para consultar o histórico completo.</p>}
     <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <h1 className="text-xl font-bold text-slate-900 dark:text-white">Todos os Orçamentos</h1>
       <p className="mt-1 text-sm text-slate-500">Histórico unificado. A edição sempre abre no fluxo em que o orçamento foi criado.</p>
@@ -146,7 +191,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
         <select value={status} onChange={(e)=>setStatus(e.target.value)} className="rounded-xl border px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="all">Todos os status</option><option value="draft">Rascunho</option><option value="pending">Pendente</option><option value="approved">Aprovado</option><option value="rejected">Rejeitado</option></select>
       </div>
     </header>
-    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado a 300 registros por modalidade ({limitedSources.join(", ")}). A paginação do acervo completo ainda está pendente.</p>}
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Há registros anteriores em: {limitedSources.join(", ")}. Carregue mais para consultar o histórico completo.</p>}
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     {notice && <p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-blue-800">{notice}</p>}
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -159,5 +204,6 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
         <div className="flex flex-wrap items-center gap-2"><strong className="text-sm tabular-nums text-slate-900 dark:text-white">{row.total == null ? "Valor pendente" : Number(row.total).toLocaleString("pt-BR", { style: "currency", currency: row.currency || "BRL" })}</strong>{row.workflow !== "standard" && <button type="button" disabled={!!busyId} onClick={()=>void prepareCommercialQuote(row)} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50">{busyId===row.workflow+":"+row.id?"Integrando...":"Preparar orçamento comercial"}</button>}{row.requiresTechnicalVisit && row.canonicalQuoteId && row.technicalVisitStatus !== "completed" && <button type="button" disabled={!!busyId} onClick={()=>void confirmTechnicalVisit(row)} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Confirmar visita técnica</button>}{row.requiresClientConfirmation && row.canonicalQuoteId && <button type="button" disabled={!!busyId} onClick={()=>void confirmClientQuestions(row)} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Confirmar informações</button>}{row.requiresTechnicalVisit && row.canonicalQuoteId && row.technicalVisitStatus === "completed" && <span className="text-xs font-semibold text-emerald-700">Visita concluída</span>}<button type="button" onClick={()=>onOpen(row.workflow,row.id)} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Pencil className="h-3.5 w-3.5"/>Editar</button></div>
       </article>)}
     </section>
+    {limitedSources.length>0&&<div className="flex justify-center"><button type="button" onClick={loadMore} disabled={loadingMore} className="rounded-lg border px-5 py-2.5 text-sm font-semibold disabled:opacity-50">{loadingMore?"Carregando...":"Carregar mais orçamentos"}</button></div>}
   </main>;
 }
