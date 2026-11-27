@@ -112,7 +112,7 @@ export default function SmartBudgetModule({ initialBudgetId, hideHistory = false
     try {
       const user = auth.currentUser;
       if (!user) throw Error("Sessão expirada.");
-      const payload = { clientName: client.trim() || "Cliente não informado", request, language, productType, items, subtotal, confirmedSubtotal, estimatedSubtotal, pendingQuestions, visitRequired, requiresTechnicalVisit: visitRequired, visitReason, notes: aiNotes, laborPercent, laborAmount, labor: { description: "Mão de obra", percentage: laborPercent, basis: "materials", amount: laborAmount, priceSource: "estimated" }, total, preliminaryTotal: total, currency: "BRL", status: "draft", pricingStatus: "provisional", workflow: "smart_ai", updatedAt: serverTimestamp() };
+      const payload = { clientName: client.trim() || "Cliente não informado", request, language, productType, items, subtotal, confirmedSubtotal, estimatedSubtotal, pendingQuestions, visitRequired, requiresTechnicalVisit: visitRequired, visitReason, notes: aiNotes, laborPercent, laborAmount, labor: { description: "Mão de obra", percentage: laborPercent, basis: "materials", amount: laborAmount, priceSource: "estimated" }, total, preliminaryTotal: total, currency: "BRL", status: "draft", pricingStatus: provisional ? "provisional" : "confirmed", workflow: "smart_ai", updatedAt: serverTimestamp() };
       if (editingId) await updateDoc(doc(db, "smart_budgets", editingId), payload);
       else await addDoc(collection(db, "smart_budgets"), { ...payload, createdBy: user.uid, createdAt: serverTimestamp() });
       setEditingId(null); setItems([]); setRequest(""); setClient(""); setLaborPercent(100); setPendingQuestions([]); setVisitRequired(false); setVisitReason(""); setAiNotes("");
