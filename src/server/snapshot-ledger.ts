@@ -28,7 +28,14 @@ export interface BudgetSnapshot {
   currency: string;
   lines: SnapshotBudgetLine[];
   subtotal: number;
+  labor: number;
+  laborRate: number;
+  margin: number;
+  marginRate: number;
+  freight: number;
+  discountRate: number;
   discountAmount: number;
+  taxRate: number;
   taxAmount: number;
   total: number;
   dimensions: SnapshotDimension | null;
@@ -56,7 +63,14 @@ export interface BuildBudgetSnapshotInput {
   currency: string;
   lines: Array<Record<string, unknown>>;
   subtotal: number;
+  labor?: number;
+  laborRate?: number;
+  margin?: number;
+  marginRate?: number;
+  freight?: number;
+  discountRate?: number;
   discountAmount: number;
+  taxRate?: number;
   taxAmount: number;
   total: number;
   technicalDrawing?: Record<string, any> | null;
@@ -125,7 +139,14 @@ export function createBudgetSnapshot(input: BuildBudgetSnapshotInput): BudgetSna
     currency: input.currency,
     lines,
     subtotal: input.subtotal,
+    labor: input.labor || 0,
+    laborRate: input.laborRate || 0,
+    margin: input.margin || 0,
+    marginRate: input.marginRate || 0,
+    freight: input.freight || 0,
+    discountRate: input.discountRate || 0,
     discountAmount: input.discountAmount,
+    taxRate: input.taxRate || 0,
     taxAmount: input.taxAmount,
     total: input.total,
     dimensions: drawingDimensions,
