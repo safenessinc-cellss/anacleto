@@ -122,7 +122,7 @@ export function buildCommercialQuoteDraft(
     visitRequired: requiresTechnicalVisit,
     visitReason: String(source.visitReason || ""),
     technicalVisitStatus: requiresTechnicalVisit ? (source.technicalVisitStatus === "completed" ? "completed" : "pending") : "not_required",
-    preliminaryOnly: requiresTechnicalVisit || requiresClientConfirmation || items.some(item => item.quantityPending || ["pending", "estimated"].includes(String(item.priceSource || ""))),
+    preliminaryOnly: requiresTechnicalVisit || requiresClientConfirmation || items.some(item => item.quantityPending || ["pending", "estimated", "manual"].includes(String(item.priceSource || ""))),
   };
 }
 
