@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
 import { Calculator, Plus, Save, Trash2, LockKeyhole, AlertTriangle, Copy } from "lucide-react";
 import { auth, db } from "../../firebase";
 import type { Quote } from "../../types";
@@ -60,13 +60,16 @@ export default function InternalQuoteCostsModule() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
 
   useEffect(() => {
-    const stopQuotes = onSnapshot(query(collection(db, "quotes"), orderBy("createdAt", "desc")), snap => {
+    const stopQuotes = onSnapshot(query(collection(db, "quotes"), orderBy("createdAt", "desc"), limit(300)), snap => {
+      setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "quotes"])] : v.filter(x => x !== "quotes"));
       setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as Quote)));
       setLoading(false);
     }, err => { setError("Não foi possível carregar os orçamentos: " + err.message); setLoading(false); });
-    const stopSheets = onSnapshot(query(collection(db, "internal_quote_costs"), orderBy("updatedAt", "desc")), snap => {
+    const stopSheets = onSnapshot(query(collection(db, "internal_quote_costs"), orderBy("updatedAt", "desc"), limit(500)), snap => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "internal_quote_costs"])] : v.filter(x => x !== "internal_quote_costs"));
       setSheets(snap.docs.map(d => ({ id: d.id, ...d.data() } as CostSheet)));
     }, err => setError("Acesso à base de custos não autorizado ou indisponível: " + err.message));
     return () => { stopQuotes(); stopSheets(); };
@@ -154,6 +157,7 @@ export default function InternalQuoteCostsModule() {
   };
 
   return <div className="space-y-5">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados: {limitedSources.join(", ")}. Custos internos e orçamentos antigos podem não aparecer; a paginação completa ainda está pendente.</p>}
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="flex items-center gap-2"><LockKeyhole className="text-amber-600" size={20}/><h2 className="text-xl font-bold text-slate-900 dark:text-white">Orçamentos Internos de Custos</h2></div>
