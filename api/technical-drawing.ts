@@ -4,15 +4,15 @@ import { AI_CONFIG, getAIModel } from "../src/server/ai-config.js";
 import { parseAIJson } from "../src/server/ai-json.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { recordAIAudit } from "../src/server/ai-audit.js";
+import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
+import { hasAIRole } from "../src/server/ai-roles.js";
+import { consumeRateLimit } from "../src/server/rate-limit.js";
+import { getAIRateLimit } from "../src/server/ai-limits.js";
 import { withDraftVectorWatermark } from "../src/server/drawing-vector.js";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec, type AluminumTipologia, type ParametricWindowSpec } from "../src/utils/parametricCad.js";
 import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
 
 type DrawingRequest = { prompt?: string; catalog?: unknown[]; images?: string[]; currentDrawing?: Record<string, unknown> };
-type WindowEntry = { startedAt: number; count: number };
-const windows = new Map<string, WindowEntry>();
-const OWNER_EMAIL = "safeness.c.a@gmail.com";
-
 const drawingResponseSchema = {
   type: Type.OBJECT,
   properties: {
@@ -186,51 +186,8 @@ async function readDrawingJob(req: any, jobId: string): Promise<Record<string, a
   return Object.fromEntries(Object.entries(raw.fields || {}).map(([key, value]) => [key, decodeFirestoreValue(value)]));
 }
 
-async function authenticate(req: any): Promise<{ uid: string; email: string; role: string } | null> {
-  const authorization = String(req.headers.authorization || "");
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-  const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
-  if (!token || !apiKey) return null;
-
-  const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken: token }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!response.ok) return null;
-  const data = await response.json() as { users?: Array<{ localId?: string; email?: string }> };
-  const user = data.users?.[0];
-  if (!user?.localId || !user.email) return null;
-
-  const email = user.email.toLowerCase();
-  let role = "owner";
-  if (email !== OWNER_EMAIL) {
-    const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
-    const documentId = encodeURIComponent(email);
-    const roleUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${databaseId}/documents/admins/${documentId}`;
-    const roleResponse = await fetch(roleUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!roleResponse.ok) return null;
-    const roleData = await roleResponse.json() as { fields?: { role?: { stringValue?: string } } };
-    if (!roleData.fields?.role?.stringValue) return null;
-    role = roleData.fields.role.stringValue;
-  }
-  return { uid: user.localId, email, role };
-}
-
-function allowRequest(uid: string): boolean {
-  const now = Date.now();
-  const current = windows.get(uid);
-  if (!current || now - current.startedAt >= 60_000) {
-    windows.set(uid, { startedAt: now, count: 1 });
-    return true;
-  }
-  if (current.count >= 12) return false;
-  current.count += 1;
-  return true;
+async function authenticate(req: any) {
+  return authenticateFirebaseRequest(req);
 }
 
 function normalizeName(value: unknown): string {
@@ -426,13 +383,19 @@ export default async function handler(req: any, res: any) {
     }
     authenticated = true;
     actorUid = user.uid;
-    if (!["owner","super_admin","super_usuario","ceo","admin","supervisor","colaborador","qualidade","producao"].includes(user.role)) {
+    if (!hasAIRole(user.role, "technicalDrawing")) {
       return json(res, 403, { error: "Seu perfil não possui permissão para operações de desenho técnico.", code: "ROLE_FORBIDDEN" });
     }
     stage = "catalog_loading";
     catalog = (await loadCatalogFromFirestore(req)).slice(0, 200);
-    if (!allowRequest(user.uid)) {
-      return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
+    try {
+      const policy = getAIRateLimit("technical-drawing");
+      if (!(await consumeRateLimit("technical-drawing", user.uid, policy.limit, policy.windowMs))) {
+        return json(res, 429, { error: "Limite de 12 gerações por minuto. Aguarde e tente novamente.", code: "RATE_LIMITED" });
+      }
+    } catch (rateLimitError: any) {
+      console.error("[TECHNICAL_DRAWING_RATE_LIMIT_UNAVAILABLE]", String(rateLimitError?.message || rateLimitError).slice(0, 500));
+      return json(res, 503, { error: "O controle de uso está temporariamente indisponível.", code: "RATE_LIMIT_UNAVAILABLE", requestId });
     }
     if (isAluminumPrompt(prompt)) {
       stage = "parametric_spec_extraction";
