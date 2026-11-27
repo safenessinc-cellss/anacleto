@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp, limit, query } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, X, XCircle } from "lucide-react";
 import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
@@ -59,22 +59,22 @@ export default function PayablesModule() {
   const [form, setForm] = useState<Omit<Payable, "id">>(emptyForm);
 
   useEffect(() => {
-    const u1 = onSnapshot(collection(db, "suppliers"), (snap) => {
+    const u1 = onSnapshot(query(collection(db, "suppliers"), limit(1000)), (snap) => {
       const list: Supplier[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Supplier));
       setSuppliers(list);
     });
-    const u2 = onSnapshot(collection(db, "payables"), (snap) => {
+    const u2 = onSnapshot(query(collection(db, "payables"), limit(1000)), (snap) => {
       const list: Payable[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Payable));
       list.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
       setItems(list);
     });
-    const u3 = onSnapshot(collection(db, "payments"), (snap) => setHistory((current) => {
+    const u3 = onSnapshot(query(collection(db, "payments"), limit(1000)), (snap) => setHistory((current) => {
       const transactions = current.filter((row) => row.sourceType === "transaction");
       return [...transactions, ...snap.docs.map((d) => ({ id: d.id, ...d.data() } as HistoricalPayment))];
     }), (reason) => setHistoryError(`Falha ao carregar pagamentos históricos: ${reason.message}`));
-    const u4 = onSnapshot(collection(db, "transactions"), (snap) => setHistory((current) => {
+    const u4 = onSnapshot(query(collection(db, "transactions"), limit(1000)), (snap) => setHistory((current) => {
       const payments = current.filter((row) => row.sourceType !== "transaction");
       return [...payments, ...snap.docs.map((d) => ({ id: d.id, ...d.data(), sourceType: "transaction" } as HistoricalPayment))];
     }), (reason) => setHistoryError(`Falha ao carregar transações históricas: ${reason.message}`));
