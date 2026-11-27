@@ -10,6 +10,8 @@ export const AI_RATE_LIMITS: Readonly<Record<string, AIRateLimitPolicy>> = Objec
   "purchase-ai": { limit: 8, windowMs: WINDOW_MINUTE },
   "payment-pix": { limit: 5, windowMs: WINDOW_MINUTE },
   "payment-link": { limit: 5, windowMs: WINDOW_MINUTE },
+  "technical-drawing": { limit: 12, windowMs: WINDOW_MINUTE },
+  "approved-snapshot": { limit: 6, windowMs: WINDOW_MINUTE },
 });
 export function getAIRateLimit(bucket: string): AIRateLimitPolicy {
   const policy = AI_RATE_LIMITS[bucket];
