@@ -13,7 +13,7 @@ export default async function handler(req:any,res:any){
  if(req.method!=="POST"){res.setHeader?.("Allow","POST");return res.status(405).json({error:"Método não permitido."});}
  const quota=getAIRateLimit("architectural-visualization");
  try {
-  if(!(await consumeRateLimit("architectural-visualization",getClientIp(req),quota.limit,quota.windowMs)) {
+  if(!(await consumeRateLimit("architectural-visualization",getClientIp(req),quota.limit,quota.windowMs))) {
    return res.status(429).json({error:"Limite temporário atingido. Tente novamente em um minuto.",code:"RATE_LIMITED"});
   }
  } catch(rateError:any) {
