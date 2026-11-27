@@ -23,6 +23,9 @@ function getToken(request: any): string {
   return authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
 }
 
+type CatalogCache = { expiresAt: number; rows: any[] };
+let catalogCache: CatalogCache | null = null;
+
 function collectionUrl(collection: string, pageToken?: string) {
   const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
   const base = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${databaseId}/documents/${collection}?pageSize=1000`;
@@ -30,9 +33,16 @@ function collectionUrl(collection: string, pageToken?: string) {
 }
 
 /** Load authoritative rows from every collection exposed in the quote/catalog UI. */
-export async function loadCatalogFromFirestore(request: any): Promise<any[]> {
+export async function loadCatalogFromFirestore(
+  request: any,
+  options: { cacheTtlMs?: number } = {},
+): Promise<any[]> {
   const token = getToken(request);
   if (!token) throw new Error("Autenticação necessária para consultar o catálogo oficial.");
+  const cacheTtlMs = Math.max(0, Math.min(60_000, Number(options.cacheTtlMs || 0)));
+  if (cacheTtlMs > 0 && catalogCache && catalogCache.expiresAt > Date.now()) {
+    return catalogCache.rows.map((row) => ({ ...row }));
+  }
   const collectionNames = ["catalog", "supplier_catalog", "registry_items", "price_table"];
   const collections = await Promise.all(collectionNames.map(async (collectionName) => {
     const rows: any[] = [];
@@ -64,7 +74,72 @@ export async function loadCatalogFromFirestore(request: any): Promise<any[]> {
     } while (pageToken);
     return rows;
   }));
-  return collections.flat();
+  const rows = collections.flat();
+  if (cacheTtlMs > 0) catalogCache = { expiresAt: Date.now() + cacheTtlMs, rows };
+  return rows;
+}
+
+export async function refreshCatalogMatchesFromFirestore(
+  request: any,
+  catalog: any[],
+  generatedItems: any[],
+): Promise<any[]> {
+  const token = getToken(request);
+  if (!token) throw new Error("Autenticação necessária para confirmar os preços do catálogo.");
+  const allowed = new Set(["catalog", "supplier_catalog", "registry_items", "price_table"]);
+  const references = new Map<string, { source: string; id: string }>();
+  for (const item of Array.isArray(generatedItems) ? generatedItems.slice(0, 150) : []) {
+    const id = String(item?.catalogItemId || item?.itemId || "").trim();
+    const candidate = catalog.find((row) =>
+      (id && String(row.id || "") === id) ||
+      (item?.sku && String(row.sku || row.code || "") === String(item.sku))
+    );
+    const source = String(item?.catalogSource || candidate?.source || "").trim();
+    const resolvedId = id || String(candidate?.id || "");
+    if (!resolvedId || resolvedId.includes("/") || !allowed.has(source)) continue;
+    references.set(`${source}/${resolvedId}`, { source, id: resolvedId });
+  }
+  if (!references.size) return catalog;
+
+  const database = firebaseConfig.firestoreDatabaseId || "(default)";
+  const databaseId = encodeURIComponent(database);
+  const endpoint = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${databaseId}/documents:batchGet`;
+  const documents = Array.from(references.values()).map(({ source, id }) =>
+    `projects/${firebaseConfig.projectId}/databases/${database}/documents/${source}/${id}`
+  );
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ documents }),
+    signal: AbortSignal.timeout(7_000),
+  });
+  if (!response.ok) throw new Error(`Não foi possível confirmar os preços atuais do catálogo (HTTP ${response.status}).`);
+  const raw = await response.text();
+  const fresh = new Map<string, any>();
+  for (const line of raw.split(/\\r?\\n/).filter(Boolean)) {
+    let payload: any;
+    try { payload = JSON.parse(line); } catch { continue; }
+    const document = payload?.found;
+    if (!document?.name) continue;
+    const parts = String(document.name).split("/documents/").pop()?.split("/") || [];
+    const source = parts[0] || "";
+    const id = parts[1] || "";
+    if (!source || !id) continue;
+    const data = decodeFields(document.fields || {});
+    fresh.set(`${source}/${id}`, {
+      ...data,
+      id,
+      name: String(data.name || data.description || "").trim(),
+      sku: String(data.sku || data.code || "").trim(),
+      source,
+    });
+  }
+  return catalog.map((row) => {
+    const key = `${String(row.source || "")}/${String(row.id || "")}`;
+    if (!references.has(key)) return row;
+    const current = fresh.get(key);
+    return current || { ...row, price: 0, reviewStatus: "rejected", status: "rejected", verified: false };
+  });
 }
 
 export async function loadQuoteFromFirestore(request: any, quoteId: unknown): Promise<any | null> {
