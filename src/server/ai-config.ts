@@ -32,7 +32,7 @@ export const AI_CONFIG = {
     model: process.env.ANACLETO_BUDGET_MODEL || DEFAULT_MODEL,
     temperature: 0.1,
     maxOutputTokens: 5000,
-    timeoutMs: 24_000,
+    timeoutMs: 45_000,
     retries: 1,
   },
   projectIntake: {
