@@ -404,7 +404,7 @@ export default async function handler(req: any, res: any) {
     if (isAluminumPrompt(prompt)) {
       stage = "parametric_spec_extraction";
       const aiStartedAt = Date.now();
-      const system = `Extraia somente dados técnicos explícitos de uma esquadria de alumínio. Não calcule nem devolva coordenadas, linhas, geometrias, lista de peças ou orçamento. Devolva JSON estrito com exatamente as chaves tipologia, linha_aluminio, cor_perfil, largura_mm, altura_mm, folhas, modulo_fixo, tipo_vidro, espessura_mm, abertura. Tipologias permitidas: janela_correr, porta_correr, porta_giro, porta_pivotante, maxim_ar, basculante, box_banheiro. Converta dimensões explicitamente fornecidas para milímetros. Use valores vazios ou zero quando não forem informados; não invente linha, cor, tipo de vidro ou espessura. folhas deve ser 2/3/4 para correr e 1 para os demais. modulo_fixo é booleano.`;
+      const system = `Extraia somente dados técnicos explícitos de uma esquadria de alumínio. Não calcule nem devolva coordenadas, linhas, geometrias, lista de peças ou orçamento. Devolva JSON estrito com exatamente as chaves tipologia, linha_aluminio, cor_perfil, largura_mm, altura_mm, folhas, modulo_fixo, tipo_vidro, espessura_mm, abertura. Tipologias permitidas: janela_correr, porta_correr, porta_giro, porta_pivotante, maxim_ar, basculante, box_banheiro. Converta dimensões explicitamente fornecidas para milímetros. Use valores vazios ou zero quando não forem informados; não invente linha, cor, tipo de vidro ou espessura. Use folhas=0 quando a quantidade não estiver explicitamente informada; nunca deduza folhas pela tipologia. Não invente espessura, linha, acabamento, vidro, abertura ou módulo fixo. modulo_fixo é booleano e só deve ser true quando explicitamente informado.`;
       const extracted = await generateDrawingJson({
         system,
         prompt: `${prompt}${drawingContext ? `\nContexto técnico existente: ${drawingContext}` : ""}`,
@@ -431,14 +431,14 @@ export default async function handler(req: any, res: any) {
             parametricResponseSchema.required.some((key) => !(key in value)) ||
             !validTypes.includes(value.tipologia) || typeof value.linha_aluminio !== "string" ||
             typeof value.cor_perfil !== "string" || !Number.isFinite(value.largura_mm) || value.largura_mm < 0 ||
-            !Number.isFinite(value.altura_mm) || value.altura_mm < 0 || !Number.isInteger(value.folhas) ||
+            !Number.isFinite(value.altura_mm) || value.altura_mm < 0 || !Number.isInteger(value.folhas) || value.folhas < 0 || value.folhas > 8 ||
             typeof value.modulo_fixo !== "boolean" || typeof value.tipo_vidro !== "string" ||
             !Number.isFinite(value.espessura_mm) || value.espessura_mm < 0 || typeof value.abertura !== "string") {
           throw new Error("A extração não retornou o schema paramétrico de esquadrias válido.");
         }
-        if ((value.tipologia === "janela_correr" && ![2, 3, 4].includes(value.folhas)) ||
+        if (value.folhas > 0 && ((value.tipologia === "janela_correr" && ![2, 3, 4].includes(value.folhas)) ||
             (value.tipologia === "porta_correr" && ![2, 4].includes(value.folhas)) ||
-            (!["janela_correr", "porta_correr"].includes(value.tipologia) && value.folhas !== 1)) {
+            (!["janela_correr", "porta_correr"].includes(value.tipologia) && value.folhas !== 1))) {
           throw new Error("Quantidade de folhas incompatível com a tipologia.");
         }
         if (value.largura_mm > 20_000 || value.altura_mm > 20_000 || value.espessura_mm > 100) {
@@ -446,11 +446,27 @@ export default async function handler(req: any, res: any) {
         }
         return value;
       });
-      if (spec.largura_mm <= 0 || spec.altura_mm <= 0) {
+      const grounded = localParametricSpec(prompt);
+      const groundedSpec: ParametricWindowSpec = {
+        ...spec,
+        tipologia: grounded.tipologia,
+        linha_aluminio: grounded.linha_aluminio,
+        cor_perfil: grounded.cor_perfil,
+        cor_vidro: grounded.cor_vidro,
+        largura_mm: grounded.largura_mm,
+        altura_mm: grounded.altura_mm,
+        folhas: grounded.folhas,
+        modulo_fixo: grounded.modulo_fixo,
+        tipo_vidro: grounded.tipo_vidro,
+        espessura_mm: grounded.espessura_mm,
+        abertura: grounded.abertura,
+        pendencias: grounded.pendencias,
+      };
+      if (groundedSpec.largura_mm <= 0 || groundedSpec.altura_mm <= 0 || groundedSpec.folhas <= 0) {
         const fallback: any = localTechnicalFallback(prompt, catalog);
         return json(res, 200, withDraftVectorWatermark(fallback));
       }
-      const responseDrawing = withDraftVectorWatermark(buildParametricDrawing(spec, prompt, catalog));
+      const responseDrawing = withDraftVectorWatermark(buildParametricDrawing(groundedSpec, prompt, catalog));
       return json(res, 200, responseDrawing);
     }
     stage = "ai_generation";
