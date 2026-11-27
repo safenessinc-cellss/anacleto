@@ -9,6 +9,30 @@ function send(res: any, status: number, payload: unknown) {
   return res.status(status).json(payload);
 }
 
+function buildLocalPublicEstimate(prompt: string) {
+  const text = prompt.toLowerCase();
+  const questions: string[] = [];
+  const hasDimensions = /\\d+(?:[.,]\\d+)?\\s*(?:mm|cm|m)\\b/i.test(prompt);
+  const hasQuantity = /\\b\\d+\\s*(?:un(?:idades?)?|peças?|folhas?|pain[eé]is|m²|metros?)\\b/i.test(prompt);
+  const hasMaterial = /alum[ií]nio|vidro|madeira|aço|aço inox|concreto|pedra|porcelanato|gesso|tijolo|PVC/i.test(prompt);
+  const hasFinish = /branco|preto|bronze|natural|anodiz|pintura|fosco|brilhante|amadeirado/i.test(prompt);
+  if (!hasDimensions) questions.push("Informar as medidas de cada item em altura × largura, com unidade (mm, cm ou m).");
+  if (!hasQuantity) questions.push("Confirmar a quantidade de unidades, vãos ou áreas.");
+  if (!hasMaterial) questions.push("Definir o material e o sistema construtivo de cada serviço.");
+  if (!hasFinish) questions.push("Definir acabamento, cor e padrão visual.");
+  const needsVisit = /reforma|piscina|churrasqueira|lareira|chimenea|pergolado|estrutura|constru[cç][aã]o|terreno|instala[cç][aã]o|esquadria|janela|porta|box/i.test(prompt);
+  if (needsVisit) questions.push("Agendar visita técnica para medir e avaliar acesso, estrutura e condições existentes.");
+  if (questions.length === 0) questions.push("Confirmar escopo final e condições de instalação antes de emitir proposta vinculante.");
+  return {
+    scopeSummary: "Rascunho provisório baseado somente na descrição recebida: " + prompt.slice(0, 700),
+    detectedDimensions: [],
+    questions,
+    visitRequired: needsVisit,
+    visitReason: needsVisit ? "A descrição envolve medição/inspeção presencial antes de definir quantidades e condições de execução." : "",
+    disclaimer: "Pré-avaliação de contingência: não contém preço, quantidade presumida nem especificação executiva. Validar os dados com a equipe técnica.",
+  };
+}
+
 export default async function handler(req: any, res: any) {
   const requestStartedAt = Date.now();
   let auditPrompt = "";
@@ -82,6 +106,12 @@ export default async function handler(req: any, res: any) {
       } catch (auditError) { console.error("[PUBLIC_QUOTE_FAILURE_AUDIT]", auditError); }
     }
     console.error("[PUBLIC_QUOTE_ESTIMATE]", error);
-    return send(res, 503, { error: "Pré-avaliação temporariamente indisponível." });
+    return send(res, 200, {
+      type: "NON_BINDING_PRE_ESTIMATE",
+      fallback: true,
+      code: "AI_PROVIDER_FALLBACK",
+      estimate: buildLocalPublicEstimate(auditPrompt),
+      disclaimer: "A IA está temporariamente indisponível. Este rascunho foi organizado localmente e não contém preços nem medidas presumidas.",
+    });
   }
 }
