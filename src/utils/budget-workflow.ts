@@ -131,7 +131,7 @@ export function isTechnicalVisitPending(quote: Record<string, any>): boolean {
 }
 
 export function hasPendingBudgetApprovalData(quote: Record<string, any>): boolean {
-  if (isTechnicalVisitPending(quote)) return true;
+  if (isTechnicalVisitPending(quote) || quote.visitRequired === true) return true;
   if (Array.isArray(quote.pendingQuestions) && quote.pendingQuestions.length > 0) return true;
   if (quote.requiresClientConfirmation === true && String(quote.clientConfirmationStatus || "pending") !== "completed") return true;
   const items = Array.isArray(quote.items) ? quote.items : [];
