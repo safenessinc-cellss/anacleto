@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { Quote, QuoteItem, Company, SenderConfig, Invoice } from "../../types";
 import { exportQuotePdf, exportInvoicePdf, buildQuotePdf, buildInvoicePdf } from "../../utils/pdfExport";
-import { collection, deleteField, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { collection, deleteField, doc, getDoc, getDocs, limit, setDoc, deleteDoc, onSnapshot, query, orderBy, runTransaction, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { useToast } from "../ToastContext";
 import PdfViewerModal from "../common/PdfViewerModal";
@@ -62,28 +62,28 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // Cargar catálogo
   useEffect(() => {
     const unsubs = [
-      onSnapshot(collection(db, "catalog"), (snap) => {
+      onSnapshot(query(collection(db, "catalog"), limit(500)), (snap) => {
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, name: data.name || data.description || "Item sem nome", sku: data.sku || data.code || "", price: Number(data.price || 0), source: "catalog" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "catalog"), ...list]);
       }, (err) => {
         console.error("Catalog listener (quotes):", err);
         showToast("Não foi possível carregar o catálogo de produtos.", "error");
       }),
-      onSnapshot(collection(db, "supplier_catalog"), (snap) => {
+      onSnapshot(query(collection(db, "supplier_catalog"), limit(500)), (snap) => {
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), supplier: data.supplier || "", category: data.category || "", unit: data.unit || "un", source: "supplier_catalog" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...list]);
       }, (err) => {
         console.error("Supplier catalog listener (quotes):", err);
         showToast("Não foi possível carregar o catálogo de fornecedores.", "error");
       }),
-      onSnapshot(collection(db, "registry_items"), (snap) => {
+      onSnapshot(query(collection(db, "registry_items"), limit(500)), (snap) => {
         const list = snap.docs.map((d) => { const data = d.data(); return { ...data, id: d.id, itemId: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", width: data.width || 0, height: data.height || 0, depth: data.depth || 0, itemPhotoUrls: data.itemPhotoUrls || [], source: "registry_items" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "registry_items"), ...list]);
       }, (err) => {
         console.error("Items registry listener (quotes):", err);
         showToast("Não foi possível carregar os itens cadastrados.", "error");
       }),
-      onSnapshot(collection(db, "price_table"), (snap) => {
+      onSnapshot(query(collection(db, "price_table"), limit(500)), (snap) => {
         const list = snap.docs.map((d) => { const data = d.data(); return { id: d.id, name: data.name || data.description || "Item sem nome", sku: data.code || data.sku || "", price: Number(data.price || 0), category: data.category || "", unit: data.unit || "un", supplier: data.priceSupplier || data.supplier || "", source: "price_table" }; });
         setCatalogItems((current) => [...current.filter((item) => item.source !== "price_table"), ...list]);
       }, (err) => {
