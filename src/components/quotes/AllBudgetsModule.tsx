@@ -99,22 +99,14 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
       const batch = writeBatch(db);
       const now = serverTimestamp();
       batch.update(doc(db, "quotes", row.canonicalQuoteId), {
-        technicalVisitStatus: "completed",
-        visitRequired: false,
-        measurementsConfirmed: true,
+        technicalVisitStatus: "completed", visitRequired: false, measurementsConfirmed: true,
         technicalVisitNotes: confirmationNotes.trim(),
-        technicalVisitCompletedAt: now,
-        technicalVisitCompletedBy: auth.currentUser.uid,
-        updatedAt: now,
+        technicalVisitCompletedAt: now, technicalVisitCompletedBy: auth.currentUser.uid, updatedAt: now,
       });
       batch.update(doc(db, row.workflow === "technical" ? "technical_budgets" : "smart_budgets", row.id), {
-        technicalVisitStatus: "completed",
-        visitRequired: false,
-        measurementsConfirmed: true,
+        technicalVisitStatus: "completed", visitRequired: false, measurementsConfirmed: true,
         technicalVisitNotes: confirmationNotes.trim(),
-        technicalVisitCompletedAt: now,
-        technicalVisitCompletedBy: auth.currentUser.uid,
-        updatedAt: now,
+        technicalVisitCompletedAt: now, technicalVisitCompletedBy: auth.currentUser.uid, updatedAt: now,
       });
       await batch.commit();
       setNotice("Visita técnica registrada. O orçamento comercial poderá seguir para aprovação após a revisão dos preços.");
