@@ -26,7 +26,6 @@ export default async function handler(req:Request,res:any){
       console.error("[GENERATE_3D_RENDER_RATE_LIMIT]",String(rateError?.message||rateError).slice(0,500));
       return send(res,503,{image:fallbackFor(description),fallback:true,code:"RATE_LIMIT_UNAVAILABLE",message:"Controle de uso indisponível. Exibindo render técnico local."});
     }
-  try{
     const apiKey=process.env.AI_GATEWAY_API_KEY;
     const oidc=process.env.VERCEL_OIDC_TOKEN;
     if(!apiKey&&!oidc)return send(res,200,{image:fallbackFor(description),fallback:true,message:"Provedor de IA não configurado. Exibindo render técnico local."});
