@@ -69,15 +69,16 @@ service cloud.firestore {
 }
     // Orçamentos inteligentes possuem coleção e histórico independentes.
     match /smart_budgets/{id} {
-      allow read: if canManageCommercial() || canManageFinance();
+      allow read: if canManageCommercial() || canManageFinance() || (canManageProduction() && resource.data.status in ['approved','aprovado']);
       allow create: if canManageCommercial();
-      allow update: if canManageCommercial();
+      allow update: if canManageCommercial() || (canManageProduction() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['productionOrderId','productionStatus','updatedAt']));
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
     // Orçamentos técnicos de esquadrias: coleção própria, editável apenas pelo Comercial/Financeiro.
     match /technical_budgets/{id} {
-      allow read: if canManageCommercial() || canManageFinance();
-      allow create, update: if canManageCommercial();
+      allow read: if canManageCommercial() || canManageFinance() || (canManageProduction() && resource.data.status in ['approved','aprovado']);
+      allow create: if canManageCommercial();
+      allow update: if canManageCommercial() || (canManageProduction() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['productionOrderId','productionStatus','updatedAt']));
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
     match /quotes/{id} {
@@ -91,6 +92,10 @@ service cloud.firestore {
       ) || (
         canManageQuality() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'productionStatus','qualityStatus','qualityRecordId','qualityInspectedAt','updatedAt'
+        ])
+      ) || (
+        canManageProduction() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'productionStatus','productionOrderId','updatedAt'
         ])
       ) || (
         (canManageCommercial() || canManageFinance())
