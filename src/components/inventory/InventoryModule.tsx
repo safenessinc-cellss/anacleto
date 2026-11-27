@@ -82,6 +82,8 @@ export default function InventoryModule() {
   };
 
   return <div className="space-y-5">
+    {items.length >= 1000 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Exibindo até 1.000 materiais. A paginação do estoque completo ainda precisa ser concluída.</p>}
+    <p className="text-xs text-slate-500">O histórico abaixo mostra as 100 movimentações mais recentes.</p>
     <div className="flex justify-end"><button type="button" onClick={() => void removeNonStockItems()} disabled={cleaning} className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50">{cleaning ? "Limpando..." : "Limpar itens que não pertencem ao estoque"}</button></div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs text-slate-500">Materiais cadastrados</p><p className="text-2xl font-bold">{productionItems.length}</p></div>
