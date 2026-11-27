@@ -510,17 +510,19 @@ Preencha pendingQuestions com perguntas curtas e específicas sempre que faltare
         aiUsage.outputTokens += Number(usage?.outputTokens ?? usage?.completionTokens ?? 0);
       },
       validate: (value: any) => {
-        if (!Array.isArray(value?.items) || !value.items.length || value.items.length > 150) throw new Error("A IA não retornou uma lista válida de itens.");
+        if (!Array.isArray(value?.items) || value.items.length > 150) throw new Error("A IA não retornou uma lista válida de itens.");
+        const pendingQuestions = Array.isArray(value.pendingQuestions) ? value.pendingQuestions.map((q: any) => String(q || "").trim()).filter(Boolean).slice(0, 20) : [];
+        const visitRequired = value.visitRequired === true;
+        if (!value.items.length && !pendingQuestions.length && !visitRequired) throw new Error("A IA não identificou itens nem pendências que justifiquem um rascunho.");
         for (const item of value.items) {
           const qty = Number(item?.qty);
-          if (!String(item?.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
+          if (!String(item?.description || "").trim() || !Number.isFinite(qty) || qty < 0) throw new Error("Linha inválida retornada pela IA.");
         }
-        const pendingQuestions = Array.isArray(value.pendingQuestions) ? value.pendingQuestions.map((q: any) => String(q || "").trim()).filter(Boolean).slice(0, 20) : [];
         return {
           ...value,
           notes: String(value.notes || "").slice(0, 4000),
           pendingQuestions,
-          visitRequired: value.visitRequired === true,
+          visitRequired,
           visitReason: String(value.visitReason || "").slice(0, 1000),
         };
       },
@@ -539,7 +541,7 @@ Preencha pendingQuestions com perguntas curtas e específicas sempre que faltare
     });
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
-      if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
+      if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty < 0) throw new Error("Linha inválida retornada pela IA.");
       const match = findExactCatalogItem(item, catalog);
       const catalogPrice = match ? Number(match.price) : 0;
       const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice > 0;
