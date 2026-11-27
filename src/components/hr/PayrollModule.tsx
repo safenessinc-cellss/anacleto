@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Users, Clock3, Wallet, Calculator, FileSpreadsheet, Pencil, ShieldCheck, Trash2 } from "lucide-react";
@@ -97,6 +97,7 @@ export default function PayrollModule() {
   const [activeTab, setActiveTab] = useState<"employees" | "outsourced" | "report">("employees");
   const [outsourcedSummary, setOutsourcedSummary] = useState({ total: 0, paid: 0, pending: 0, records: 0 });
   const [error, setError] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState("");
@@ -112,12 +113,12 @@ export default function PayrollModule() {
   const [savingSalary, setSavingSalary] = useState(false);
   const [deletingEmployeeId, setDeletingEmployeeId] = useState("");
   useEffect(() => {
-    const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc")), s => setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))), err => setError("Não foi possível carregar os apontamentos: " + err.message));
-    const p = onSnapshot(collection(db, "employee_payments"), s => setPayments(s.docs.map(d => ({ id:d.id, ...d.data() } as EmployeePayment))), err => setError("Não foi possível carregar os pagamentos: " + err.message));
-    const a = onSnapshot(query(collection(db, "payroll_adjustments"), orderBy("date", "desc")), s => setAdjustments(s.docs.map(d => ({ id:d.id, ...d.data() } as PayrollAdjustment))), err => setError("Não foi possível carregar adiantamentos, vales e empréstimos: " + err.message));
-    const employeeAdvances = onSnapshot(collection(db, "employee_advances"), s => setAdvanceRecords(current => [...current.filter(row => row.source !== "employee_advances"), ...s.docs.map(d => ({ id:d.id, source:"employee_advances" as const, data:d.data() }))]), err => setError("Não foi possível carregar employee_advances: " + err.message));
-    const advances = onSnapshot(collection(db, "advances"), s => setAdvanceRecords(current => [...current.filter(row => row.source !== "advances"), ...s.docs.map(d => ({ id:d.id, source:"advances" as const, data:d.data() }))]), err => setError("Não foi possível carregar advances: " + err.message));
-    const ledger = onSnapshot(query(collection(db, "ledger_entries"), where("category", "in", ["employee_advance", "payroll"])), s => setAdvanceRecords(current => [...current.filter(row => row.source !== "ledger_entries"), ...s.docs.map(d => ({ id:d.id, source:"ledger_entries" as const, data:d.data() }))]), err => setError("Não foi possível carregar vales do livro-caixa: " + err.message));
+    const t = onSnapshot(query(collection(db, "time_entries"), orderBy("date", "desc"), limit(1000)), s => { setLimitedSources(v => s.size >= 1000 ? [...new Set([...v, "time_entries"])] : v.filter(x => x !== "time_entries")); setEntries(s.docs.map(d => ({ id:d.id, ...d.data() } as TimeEntry))); }, err => setError("Não foi possível carregar os apontamentos: " + err.message));
+    const p = onSnapshot(query(collection(db, "employee_payments"), limit(1000)), s => { setLimitedSources(v => s.size >= 1000 ? [...new Set([...v, "employee_payments"])] : v.filter(x => x !== "employee_payments")); setPayments(s.docs.map(d => ({ id:d.id, ...d.data() } as EmployeePayment))); }, err => setError("Não foi possível carregar os pagamentos: " + err.message));
+    const a = onSnapshot(query(collection(db, "payroll_adjustments"), orderBy("date", "desc"), limit(1000)), s => { setLimitedSources(v => s.size >= 1000 ? [...new Set([...v, "payroll_adjustments"])] : v.filter(x => x !== "payroll_adjustments")); setAdjustments(s.docs.map(d => ({ id:d.id, ...d.data() } as PayrollAdjustment))); }, err => setError("Não foi possível carregar adiantamentos, vales e empréstimos: " + err.message));
+    const employeeAdvances = onSnapshot(query(collection(db, "employee_advances"), limit(1000)), s => { setLimitedSources(v => s.size >= 1000 ? [...new Set([...v, "employee_advances"])] : v.filter(x => x !== "employee_advances")); setAdvanceRecords(current => [...current.filter(row => row.source !== "employee_advances"), ...s.docs.map(d => ({ id:d.id, source:"employee_advances" as const, data:d.data() }))]); }, err => setError("Não foi possível carregar employee_advances: " + err.message));
+    const advances = onSnapshot(query(collection(db, "advances"), limit(1000)), s => { setLimitedSources(v => s.size >= 1000 ? [...new Set([...v, "advances"])] : v.filter(x => x !== "advances")); setAdvanceRecords(current => [...current.filter(row => row.source !== "advances"), ...s.docs.map(d => ({ id:d.id, source:"advances" as const, data:d.data() }))]); }, err => setError("Não foi possível carregar advances: " + err.message));
+    const ledger = onSnapshot(query(collection(db, "ledger_entries"), where("category", "in", ["employee_advance", "payroll"]), limit(1000)), s => setAdvanceRecords(current => [...current.filter(row => row.source !== "ledger_entries"), ...s.docs.map(d => ({ id:d.id, source:"ledger_entries" as const, data:d.data() }))]), err => setError("Não foi possível carregar vales do livro-caixa: " + err.message));
     return () => { t(); p(); a(); employeeAdvances(); advances(); ledger(); };
   }, []);
 
@@ -461,6 +462,7 @@ export default function PayrollModule() {
     } catch (e) { setError("Falha ao registrar apontamento: " + (e as Error).message); }
   };
   return <div className="space-y-6 text-slate-800 dark:text-slate-100">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados: {limitedSources.join(", ")}. Cálculos de folha e histórico podem estar parciais; a paginação completa ainda está pendente.</p>}
     <header className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-blue-600">Gestão de pessoas</p><h1 className="text-3xl font-black tracking-tight">Folha de pagamento</h1><p className="mt-1 text-sm text-slate-500">Cadastro funcional, jornada, adicionais e apuração mensal estimada.</p></div><label className="text-sm font-semibold">Competência <input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="ml-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:bg-slate-800"/></label></header>
     <nav className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900" aria-label="Seções da folha de pagamento">
       <button type="button" onClick={() => setActiveTab("employees")} className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${activeTab === "employees" ? "bg-blue-100 text-blue-800 shadow-sm dark:bg-slate-700 dark:text-blue-100" : "text-slate-600 hover:bg-blue-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}>Funcionários</button>
