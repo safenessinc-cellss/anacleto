@@ -20,6 +20,7 @@ export default async function handler(req:any,res:any){
   console.error("[ARCHITECTURAL_VISUALIZATION_RATE_LIMIT]",String(rateError?.message||rateError).slice(0,500));
   return res.status(503).json({error:"Controle de uso indisponível no momento.",code:"RATE_LIMIT_UNAVAILABLE"});
  }
+ try {
  const body=(typeof req.body==="string"?JSON.parse(req.body):req.body||{}) as WindowRequest;
   const description=String(body.description||"").trim().slice(0,1800);
   if(description.length<8)return res.status(400).json({error:"Descreva o ambiente e a esquadria desejada."});
