@@ -9,6 +9,7 @@ test("accepts a positive price with explicit verified price review", () => {
 
 test("does not treat legacy active catalog prices as confirmed", () => {
   assert.equal(hasConfirmedCatalogPrice({ price: 125.5, status: "Ativo" }), false);
+  assert.equal(hasConfirmedCatalogPrice({ price: 125.5, status: "verified" }), false);
   assert.equal(hasConfirmedCatalogPrice({ price: 125.5 }), false);
 });
 
