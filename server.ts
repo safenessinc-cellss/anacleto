@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "./src/server/ai-config.js";
 import { generateValidatedJson, parseAIJson } from "./src/server/ai-json.js";
-import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore } from "./src/server/firestore-data.js";
+import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore, refreshCatalogMatchesFromFirestore } from "./src/server/firestore-data.js";
 import technicalDrawingHandler from "./api/technical-drawing.js";
 import approvedSnapshotHandler from "./api/approved-snapshot.js";
 import supplierCatalogVisionHandler from "./api/supplier-catalog-vision.js";
@@ -490,9 +490,9 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
     const requestId = String(req.headers["x-request-id"] || req.headers["x-vercel-id"] || "");
     const catalogStartedAt = Date.now();
-    const fullCatalog = await loadCatalogFromFirestore(req);
+    const fullCatalog = await loadCatalogFromFirestore(req, { cacheTtlMs: 20_000 });
     const catalogLoadMs = Date.now() - catalogStartedAt;
-    const catalog = selectRelevantBudgetCatalog(prompt, fullCatalog, 450);
+    let catalog = selectRelevantBudgetCatalog(prompt, fullCatalog, 450);
     console.info("[BUDGET_ITEMS_AI] catalog_loaded", { requestId, catalogLoadMs, totalCatalogRows: fullCatalog.length, selectedCatalogRows: catalog.length });
     const generationStartedAt = Date.now();
     const parsed = await generateValidatedJson({
@@ -517,7 +517,10 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         return value;
       },
     });
-    console.info("[BUDGET_ITEMS_AI] generation_completed", { requestId, generationMs: Date.now() - generationStartedAt, catalogLoadMs, totalMs: Date.now() - aiStartedAt, generatedItems: parsed.items.length });
+    const catalogRefreshStartedAt = Date.now();
+    catalog = await refreshCatalogMatchesFromFirestore(req, catalog, parsed.items);
+    const catalogRefreshMs = Date.now() - catalogRefreshStartedAt;
+    console.info("[BUDGET_ITEMS_AI] generation_completed", { requestId, generationMs: Date.now() - generationStartedAt, catalogLoadMs, catalogRefreshMs, totalMs: Date.now() - aiStartedAt, generatedItems: parsed.items.length });
     await recordAIAudit({
       serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
       input: { prompt, language, catalogCount: catalog.length },
