@@ -6,6 +6,7 @@ import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
 import { hasConfirmedCatalogPrice } from "../src/utils/catalog-price-validation.js";
 import { isUnconfirmedPriceSource, requiresCatalogPriceVerification } from "../src/utils/quote-price-validation.js";
 import { isTechnicalVisitPending } from "../src/utils/budget-workflow.js";
+import { calculateApprovedQuoteTotals } from "../src/utils/quote-totals.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 
 type AuthUser = { uid: string; email: string; role: string };
@@ -302,25 +303,8 @@ export default async function handler(req: any, res: any) {
         if (!canApproveManualPrice(user)) throw new Error("Somente direção/Financeiro pode aprovar manualmente preços sem SKU cadastrado.");
         return { ...item, quantity, subtotal: Number((quantity * price).toFixed(2)), priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
-      const roundMoney = (value: unknown) => Number((Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0).toFixed(2));
-      const subtotal = roundMoney(reviewedItems.reduce((sum: number, item: any) => sum + item.quantity * item.unitPrice, 0));
-      const laborRate = Number(source.laborRate ?? source.labor?.percentage ?? 0);
-      const explicitLabor = typeof source.labor === "object" ? source.labor?.amount : source.labor;
-      const labor = roundMoney(laborRate > 0 ? subtotal * laborRate / 100 : (source.laborAmount ?? explicitLabor ?? 0));
-      const marginRate = Number(source.marginRate || 0);
-      const explicitMargin = Number(source.margin || 0);
-      const margin = roundMoney(marginRate > 0 ? (subtotal + labor) * marginRate / 100 : explicitMargin);
-      const freight = roundMoney(source.freight || 0);
-      const discountRate = Number(source.discountRate || 0);
-      const taxRate = Number(source.taxRate || 0);
-      if (![laborRate, marginRate, discountRate, taxRate].every(value => Number.isFinite(value) && value >= 0 && value <= 300) || discountRate > 100 || taxRate > 100) {
-        return send(res, 422, { error: "Mão de obra, margem, impostos ou descontos inválidos." });
-      }
-      const grossBase = roundMoney(subtotal + labor + margin + freight);
-      const discountAmount = discountRate > 0 ? roundMoney(grossBase * discountRate / 100) : roundMoney(source.discountAmount || 0);
-      const taxableBase = roundMoney(Math.max(0, grossBase - discountAmount));
-      const taxAmount = taxRate > 0 ? roundMoney(taxableBase * taxRate / 100) : roundMoney(source.taxAmount || 0);
-      const total = roundMoney(taxableBase + taxAmount);
+      const totals = calculateApprovedQuoteTotals(source, reviewedItems);
+      const { subtotal, labor, laborRate, margin, marginRate, freight, discountRate, discountAmount, taxRate, taxAmount, total } = totals;
       const { pdfDataUri: _pdfDataUri, pdfFileName: _pdfFileName, pdfGeneratedAt: _pdfGeneratedAt, pdfFileSizeKb: _pdfFileSizeKb, ...sourceWithoutPdf } = source;
       const approvedAt = new Date().toISOString();
       snapshot = {
