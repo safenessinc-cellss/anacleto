@@ -74,7 +74,8 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   const thickness = text.match(/(?:vidro\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\s+)?(?:de\s*)?|espessura\s*(?:de\s*)?)(\d+(?:[.,]\d+)?)\s*mm/)?.[1]
     || text.match(/(\d+(?:[.,]\d+)?)\s*mm\s*(?:de\s*)?(?:vidro|espessura)\b/)?.[1];
   const fixedModuleMatch = text.match(/m[oó]dulo fixo\s*(?:=|:)?\s*(sim|n[aã]o|true|false)/i);
-  const fixedModule = /sem\s+(?:m[oó]dulo fixo|fix[oa])/.test(text) ? false
+  const noFixedModule = /(?:sem|não\s+(?:tem|existe|possui))\s+(?:m[oó]dulo fixo|fix[oa])/.test(text);
+  const fixedModule = noFixedModule ? false
     : fixedModuleMatch ? /^(?:sim|true)$/i.test(fixedModuleMatch[1])
     : /m[oó]dulo fixo/.test(text) ? true : null;
   const pendencias: string[] = [];
@@ -88,7 +89,6 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   if (!glassType) pendencias.push("Definir o tipo de vidro.");
   if (!thickness) pendencias.push("Confirmar a espessura do vidro.");
   if (!/esquerda|direita/.test(text)) pendencias.push("Confirmar o sentido de abertura.");
-  if (!/fix[oa]|m[oó]dulo fixo|sem m[oó]dulo fixo/.test(text)) pendencias.push("Confirmar se existe módulo fixo.");
   return {
     tipologia,
     linha_aluminio: namedLine ? `Linha ${namedLine.replace(/\b\w/g, (letter) => letter.toUpperCase())}` : "Linha a definir",
