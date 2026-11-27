@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
 import { Sparkles, Trash2, Save, FileText, Loader2 } from "lucide-react";
 import { auth, db } from "../../firebase";
 import { useToast } from "../ToastContext";
@@ -33,7 +33,7 @@ export default function SmartBudgetModule({ initialBudgetId, hideHistory = false
   const [visitRequired, setVisitRequired] = useState(false);
   const [visitReason, setVisitReason] = useState("");
 
-  useEffect(() => onSnapshot(query(collection(db, "smart_budgets"), orderBy("createdAt", "desc")), (snap) => setHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Saved))), (e) => setError("Não foi possível carregar o histórico: " + e.message)), []);
+  useEffect(() => onSnapshot(query(collection(db, "smart_budgets"), orderBy("createdAt", "desc"), limit(200)), (snap) => setHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Saved))), (e) => setError("Não foi possível carregar o histórico: " + e.message)), []);
   useEffect(() => {
     if (!initialBudgetId) return;
     let active = true;
