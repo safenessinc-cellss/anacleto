@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, limit, onSnapshot, query, runTransaction, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
 
@@ -15,6 +15,7 @@ export default function ClientAdvancesModule() {
   const [advances, setAdvances] = useState<Advance[]>([]);
   const [budgets, setBudgets] = useState<QuoteRow[]>([]);
   const [ledger, setLedger] = useState<LedgerRow[]>([]);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [quoteId, setQuoteId] = useState("");
   const [amount, setAmount] = useState("");
   const [releasePercent, setReleasePercent] = useState("40");
@@ -24,10 +25,10 @@ export default function ClientAdvancesModule() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const stopQuotes = onSnapshot(collection(db, "quotes"), (snap) => setQuotes(snap.docs.map((item) => ({ id: item.id, ...item.data() } as QuoteRow))), (reason) => setError(`Falha ao carregar orçamentos: ${reason.message}`));
-    const stopBudgets = onSnapshot(collection(db, "budgets"), (snap) => setBudgets(snap.docs.map((item) => ({ id: item.id, ...item.data() } as QuoteRow))), (reason) => setError(`Falha ao carregar orçamentos históricos: ${reason.message}`));
-    const stopAdvances = onSnapshot(collection(db, "client_advances"), (snap) => setAdvances(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Advance))), (reason) => setError(`Falha ao carregar sinais de clientes: ${reason.message}`));
-    const stopLedger = onSnapshot(collection(db, "ledger_entries"), (snap) => setLedger(snap.docs.map((item) => ({ id: item.id, ...item.data() } as LedgerRow))), (reason) => setError(`Falha ao carregar recebimentos históricos: ${reason.message}`));
+    const stopQuotes = onSnapshot(query(collection(db, "quotes"), limit(300)), (snap) => { setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "quotes"])] : v.filter(x => x !== "quotes")); setQuotes(snap.docs.map((item) => ({ id: item.id, ...item.data() } as QuoteRow))); }, (reason) => setError(`Falha ao carregar orçamentos: ${reason.message}`));
+    const stopBudgets = onSnapshot(query(collection(db, "budgets"), limit(300)), (snap) => { setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "budgets"])] : v.filter(x => x !== "budgets")); setBudgets(snap.docs.map((item) => ({ id: item.id, ...item.data() } as QuoteRow))); }, (reason) => setError(`Falha ao carregar orçamentos históricos: ${reason.message}`));
+    const stopAdvances = onSnapshot(query(collection(db, "client_advances"), limit(1000)), (snap) => { setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "client_advances"])] : v.filter(x => x !== "client_advances")); setAdvances(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Advance))); }, (reason) => setError(`Falha ao carregar sinais de clientes: ${reason.message}`));
+    const stopLedger = onSnapshot(query(collection(db, "ledger_entries"), limit(1000)), (snap) => { setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "ledger_entries"])] : v.filter(x => x !== "ledger_entries")); setLedger(snap.docs.map((item) => ({ id: item.id, ...item.data() } as LedgerRow))); }, (reason) => setError(`Falha ao carregar recebimentos históricos: ${reason.message}`));
     return () => { stopQuotes(); stopBudgets(); stopAdvances(); stopLedger(); };
   }, []);
 
@@ -153,6 +154,7 @@ export default function ClientAdvancesModule() {
   };
 
   return <section className="space-y-5">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados: {limitedSources.join(", ")}. Sinais e saldos podem estar parciais; a paginação completa ainda está pendente.</p>}
     <header><p className="text-xs font-bold uppercase tracking-widest text-emerald-700">Sinal vinculado à obra</p><h2 className="text-2xl font-black">Adiantamentos de Clientes</h2><p className="mt-1 text-sm text-slate-500">O sinal é registrado no caixa e reduz o saldo do orçamento. Ao atingir o percentual combinado, a obra é liberada para produção.</p></header>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     <form onSubmit={save} className="grid gap-3 rounded-2xl border bg-white p-5 dark:bg-slate-900 sm:grid-cols-2">
