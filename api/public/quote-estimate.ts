@@ -4,6 +4,11 @@ import { recordAIAudit } from "../../src/server/ai-audit.js";
 import { consumeRateLimit, getClientIp } from "../../src/server/rate-limit.js";
 import { getAIRateLimit } from "../../src/server/ai-limits.js";
 
+function send(res: any, status: number, payload: unknown) {
+  res.setHeader?.("Cache-Control", "no-store");
+  return res.status(status).json(payload);
+}
+
 export default async function handler(req: any, res: any) {
   const requestStartedAt = Date.now();
   let auditPrompt = "";
@@ -29,7 +34,6 @@ export default async function handler(req: any, res: any) {
     auditPrompt = prompt;
     if (prompt.length < 12 || prompt.length > 3000) return send(res, 400, { error: "Descreva o projeto em 12 a 3000 caracteres." });
     const aiStartedAt = Date.now();
-    let generatedText = "";
     let generatedUsage: any = undefined;
     const estimate = await generateValidatedJson({
       capability: "publicEstimate",
@@ -49,7 +53,6 @@ export default async function handler(req: any, res: any) {
         return value as Record<string, unknown>;
       },
       onGeneration: (event) => {
-        generatedText = event.text;
         generatedUsage = event.usage;
       },
     });
