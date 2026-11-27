@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { FileText, Search, Pencil } from "lucide-react";
 import { db } from "../../firebase";
 
@@ -20,7 +20,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
     ];
     const snapshots = new Map<string, Row[]>();
     const unsubscribers = collections.map(({ name, workflow }) =>
-      onSnapshot(query(collection(db, name), orderBy("createdAt", "desc")), (snap) => {
+      onSnapshot(query(collection(db, name), orderBy("createdAt", "desc"), limit(300)), (snap) => {
         snapshots.set(name, snap.docs.map((d) => {
           const data = d.data() as any;
           return { id: d.id, workflow, number: data.number, clientName: data.clientName || data.customerName || "Cliente não informado", status: data.status || "draft", total: data.total == null && data.subtotal == null ? undefined : Number(data.total ?? data.subtotal), currency: data.currency || "BRL", createdAt: data.createdAt, request: data.request };
@@ -48,7 +48,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
   return <main className="space-y-5">
     <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <h1 className="text-xl font-bold text-slate-900 dark:text-white">Todos os Orçamentos</h1>
-      <p className="mt-1 text-sm text-slate-500">Histórico unificado. A edição sempre abre no fluxo em que o orçamento foi criado.</p>
+      <p className="mt-1 text-sm text-slate-500">Histórico unificado. A edição sempre abre no fluxo em que o orçamento foi criado. Exibindo os 300 registros mais recentes de cada modalidade.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]">
         <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Buscar por cliente, número ou pedido" className="w-full rounded-xl border py-2.5 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-950"/></div>
         <select value={status} onChange={(e)=>setStatus(e.target.value)} className="rounded-xl border px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="all">Todos os status</option><option value="draft">Rascunho</option><option value="pending">Pendente</option><option value="approved">Aprovado</option><option value="rejected">Rejeitado</option></select>
