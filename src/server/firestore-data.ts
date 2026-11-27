@@ -116,7 +116,7 @@ export async function refreshCatalogMatchesFromFirestore(
   if (!response.ok) throw new Error(`Não foi possível confirmar os preços atuais do catálogo (HTTP ${response.status}).`);
   const raw = await response.text();
   const fresh = new Map<string, any>();
-  for (const line of raw.split(/\\r?\\n/).filter(Boolean)) {
+  for (const line of raw.split(/\r?\n/).filter(Boolean)) {
     let payload: any;
     try { payload = JSON.parse(line); } catch { continue; }
     const document = payload?.found;
