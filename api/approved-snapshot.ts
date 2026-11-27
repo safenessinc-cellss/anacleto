@@ -3,6 +3,7 @@ import firebaseConfig from "../firebase-applet-config.json" with { type: "json" 
 import { AI_CONFIG } from "../src/server/ai-config.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
+import { hasConfirmedCatalogPrice } from "../src/utils/catalog-price-validation.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 
 type AuthUser = { uid: string; email: string; role: string };
@@ -286,6 +287,7 @@ export default async function handler(req: any, res: any) {
         if (item.catalogItemId || item.sku || item.itemId) {
           if (!match) throw new Error("SKU/ID sem correspondência no catálogo: " + (item.sku || item.catalogItemId || item.itemId));
           const catalogPrice = Number(match.price);
+          if (!hasConfirmedCatalogPrice(match)) throw new Error("O preço do catálogo ainda não foi validado. Solicite a revisão do preço antes de aprovar.");
           if (match.price === undefined || match.price === null || String(match.price).trim() === "" || !Number.isFinite(catalogPrice) || catalogPrice < 0 || catalogPrice !== price) {
             throw new Error("Preço não corresponde ao catálogo atual para " + (item.sku || match.id) + ".");
           }
@@ -356,6 +358,7 @@ export default async function handler(req: any, res: any) {
         if (item.catalogItemId || item.sku) {
           if (!match) throw new Error("SKU/ID do orçamento técnico não existe no catálogo.");
           const catalogPrice = Number(match.price);
+          if (!hasConfirmedCatalogPrice(match)) throw new Error("O preço do catálogo ainda não foi validado. Solicite a revisão do preço antes de aprovar.");
           if (match.price === undefined || match.price === null || !Number.isFinite(catalogPrice) || catalogPrice < 0 || catalogPrice !== Number(item.unitPrice)) {
             throw new Error("Preço do orçamento técnico não corresponde ao catálogo.");
           }
