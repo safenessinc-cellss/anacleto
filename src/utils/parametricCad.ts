@@ -54,10 +54,10 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
     : "janela_correr";
   const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is)/)?.[1] || 0);
   const leaves = requestedLeaves > 0 ? Math.min(8, requestedLeaves) : 0;
-  const widthMatch = prompt.match(/largura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)/i);
-  const heightMatch = prompt.match(/altura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)/i);
+  const widthMatch = prompt.match(/largura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)(?:\s*(mm|cm|m))?/i);
+  const heightMatch = prompt.match(/altura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)(?:\s*(mm|cm|m))?/i);
   // Unlabelled dimensions follow the requested convention: ALTURA × LARGURA.
-  const sharedUnit = match?.[4] || match?.[2];
+  const sharedUnit = heightMatch?.[2] || widthMatch?.[2] || match?.[4] || match?.[2];
   const height = toMm(heightMatch?.[1] || match?.[1], heightMatch?.[2] || sharedUnit);
   const width = toMm(widthMatch?.[1] || match?.[3], widthMatch?.[2] || sharedUnit);
   const namedLine = prompt.match(/\blinha\s+(suprema|gold|\d+)\b/i)?.[1] || prompt.match(/\b(suprema|gold)\b/i)?.[1];
