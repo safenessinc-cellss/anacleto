@@ -39,7 +39,7 @@ export function buildBudgetAIFallback(prompt: string): BudgetAIFallback {
   return {
     items: [{
       description: "Rascunho provisório — pedido recebido: " + text.slice(0, 500),
-      qty: 0,
+      qty: quantity,
       price: 0,
       sku: "",
       catalogItemId: "",
