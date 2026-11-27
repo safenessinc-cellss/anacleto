@@ -166,6 +166,11 @@ export async function generateValidatedJson<T>(options: {
             continue;
           }
           const aborted = /this operation was aborted|aborterror|aborted/i.test(providerMessage(error));
+          if (aborted && openAIKey) {
+            // Do not spend the remaining budget retrying Gemini after a transport abort.
+            modelIndex = modelCandidates.length;
+            break;
+          }
           if (attempt === 0 && !aborted && isRetryableProviderError(error) && Date.now() + 500 < deadline) {
             await new Promise(resolve => setTimeout(resolve, 350));
             continue;
