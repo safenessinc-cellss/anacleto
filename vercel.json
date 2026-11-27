@@ -8,7 +8,10 @@
       "includeFiles": "node_modules/@google/genai/**",
       "maxDuration": 60
     },
-    "api/ai/budget-items.ts": {\n      "includeFiles": "node_modules/@google/genai/**",\n      "maxDuration": 60\n    },\n    "api/technical-drawing.ts": {
+    "api/ai/budget-items.ts": {
+      "includeFiles": "node_modules/@google/genai/**",
+      "maxDuration": 60
+    },\n    "api/technical-drawing.ts": {
       "maxDuration": 60
     },
     "api/approved-snapshot.ts": {
