@@ -165,6 +165,7 @@ export default function TechnicalCatalogCards() {
   }), [documents, profiles, hardware, rules, prices, supplierProducts]);
 
   return <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Para evitar travamentos, a biblioteca carrega até 300 registros por coleção nesta etapa. A busca atua sobre os registros carregados; a paginação do acervo completo ainda precisa ser concluída.</p>
     <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-wider text-blue-600">Biblioteca técnica conectada</p><h2 className="text-xl font-bold text-slate-900 dark:text-white">Catálogo visual de produtos e componentes</h2><p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">Consulta os mesmos registros da Biblioteca Técnica, sem copiar nem duplicar dados. Cada ficha mantém fabricante, linha, código, especificações, origem e estado de validação.</p></div>
       <div className="text-xs text-slate-500">{consolidatedCards.length} fichas consolidadas</div>
