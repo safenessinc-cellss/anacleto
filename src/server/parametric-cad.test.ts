@@ -42,3 +42,12 @@ test("parametric drawing with missing data has no fabricated geometry, BOM or cu
   assert.ok((drawing.assumptions || []).length > 0);
   assert.ok(drawing.visualElements?.some((element: any) => String(element.text || "").includes("Geometria pendente")));
 });
+
+test("does not route wood doors or wood windows into the aluminum parametric CAD", async () => {
+  const { isAluminumPrompt } = await import("../utils/parametricCad.js");
+  assert.equal(isAluminumPrompt("porta de madeira maciça"), false);
+  assert.equal(isAluminumPrompt("janela de madeira"), false);
+  assert.equal(isAluminumPrompt("porta de alumínio"), true);
+  assert.equal(isAluminumPrompt("janela de alumínio 1500 x 1200 mm"), true);
+  assert.equal(isAluminumPrompt("box de banho em vidro temperado"), true);
+});
