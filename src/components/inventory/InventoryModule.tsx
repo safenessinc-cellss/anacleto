@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, query, runTransaction, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, writeBatch } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { ArrowDownToLine, ArrowUpFromLine, Boxes, Loader2, PackagePlus, Search } from "lucide-react";
 
@@ -27,8 +27,8 @@ export default function InventoryModule() {
   const [manualEntryConfirmed, setManualEntryConfirmed] = useState(false);
 
   useEffect(() => {
-    const a = onSnapshot(collection(db, "inventory_items"), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem))), e => console.error("Inventory items:", e));
-    const b = onSnapshot(query(collection(db, "inventory_movements")), snap => {
+    const a = onSnapshot(query(collection(db, "inventory_items"), limit(1000)), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem))), e => console.error("Inventory items:", e));
+    const b = onSnapshot(query(collection(db, "inventory_movements"), orderBy("createdAt", "desc"), limit(100)), snap => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() } as Movement));
       rows.sort((x, y) => String(y.createdAt?.toDate?.() || y.createdAt || "").localeCompare(String(x.createdAt?.toDate?.() || x.createdAt || "")));
       setMovements(rows.slice(0, 100));
