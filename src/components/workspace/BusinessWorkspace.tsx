@@ -8,7 +8,7 @@ import ProjectAssetsPanel from "../projects/ProjectAssetsPanel";
 import ProjectIntakePanel from "../projects/ProjectIntakePanel";
 import ProjectProductionWorkflow from "../projects/ProjectProductionWorkflow";
 
-type RecordItem = { id: string; name: string; code?: string; category?: string; status?: string; notes?: string; client?: string; width?: number; height?: number; quantity?: number; price?: number; createdAt?: string; updatedAt?: string };
+type RecordItem = { id: string; name: string; code?: string; category?: string; status?: string; notes?: string; client?: string; width?: number; height?: number; quantity?: number; quantityPending?: boolean; price?: number; createdAt?: string; updatedAt?: string };
 type Props = { kind: "reports" | "tipologias" | "projects" | "profile" | "suggestions"; quotes?: Quote[]; invoices?: Invoice[] };
 const money = (v:number) => v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const collectionByKind = { tipologias:"tipologias", projects:"projects", suggestions:"user_suggestions" } as const;
