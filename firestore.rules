@@ -107,7 +107,7 @@ service cloud.firestore {
       ) || (
         canReviewCatalogPrices() && resource.data.requiresTechnicalVisit == true
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'technicalVisitStatus','technicalVisitCompletedAt','technicalVisitCompletedBy','updatedAt'
+          'technicalVisitStatus','technicalVisitCompletedAt','technicalVisitCompletedBy','visitRequired','measurementsConfirmed','technicalVisitNotes','updatedAt'
         ])
       ) || (
         canManageQuality() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
