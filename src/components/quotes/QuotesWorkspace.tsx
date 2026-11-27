@@ -1,10 +1,16 @@
-import React, { useState } from "react";
+import React, { lazy, Suspense, useState } from "react";
 import { Calculator, FileText, Sparkles } from "lucide-react";
 import type { Company, SenderConfig } from "../../types";
-import QuotesModule from "./QuotesModule";
-import SmartBudgetModule from "./SmartBudgetModule";
-import TechnicalCalculatorModule from "../TechnicalCalculatorModule";
-import AllBudgetsModule, { type BudgetWorkflow } from "./AllBudgetsModule";
+import type { BudgetWorkflow } from "./AllBudgetsModule";
+const QuotesModule = lazy(() => import("./QuotesModule"));
+const SmartBudgetModule = lazy(() => import("./SmartBudgetModule"));
+const TechnicalCalculatorModule = lazy(() => import("../TechnicalCalculatorModule"));
+const AllBudgetsModule = lazy(() => import("./AllBudgetsModule"));
+
+
+
+
+
 
 type BudgetTab = "all" | "standard" | "smart" | "technical";
 
@@ -34,8 +40,10 @@ export default function QuotesWorkspace({
   language = "pt",
 }: QuotesWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<BudgetTab>("all");
+  const [visitedTabs, setVisitedTabs] = useState<Set<BudgetTab>>(() => new Set(["all"]));
   const [editingIds, setEditingIds] = useState<{ standard?: string; smart?: string; technical?: string }>({});
-  const openBudget = (workflow: BudgetWorkflow, id: string) => { setEditingIds((current) => ({ ...current, [workflow]: id })); setActiveTab(workflow); };
+  const selectTab = (tab: BudgetTab) => { setActiveTab(tab); setVisitedTabs((current) => new Set([...current, tab])); };
+  const openBudget = (workflow: BudgetWorkflow, id: string) => { setEditingIds((current) => ({ ...current, [workflow]: id })); selectTab(workflow); };
 
   return (
     <section className="space-y-5">
@@ -62,7 +70,7 @@ export default function QuotesWorkspace({
                 id={`budget-tab-${id}`}
                 aria-selected={selected}
                 aria-controls={`budget-panel-${id}`}
-                onClick={() => setActiveTab(id)}
+                onClick={() => selectTab(id)}
                 className={`flex min-h-16 items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${selected
                   ? "border-blue-300 bg-blue-50 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200"
                   : "border-transparent bg-slate-50 text-slate-600 hover:border-slate-200 hover:bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-slate-700"}`}
@@ -78,41 +86,18 @@ export default function QuotesWorkspace({
         </nav>
       </header>
 
-      {activeTab === "all" && <AllBudgetsModule onOpen={openBudget} />}
-
-      <div
-        id="budget-panel-standard"
-        role="tabpanel"
-        aria-labelledby="budget-tab-standard"
-        hidden={activeTab !== "standard"}
-      >
-        <QuotesModule
-          language={language}
-          senderConfig={senderConfig}
-          companies={companies}
-          onConvertToInvoice={onConvertToInvoice}
-          initialQuoteId={editingIds.standard}
-          hideHistory
-        />
-      </div>
-
-      <div
-        id="budget-panel-smart"
-        role="tabpanel"
-        aria-labelledby="budget-tab-smart"
-        hidden={activeTab !== "smart"}
-      >
-        <SmartBudgetModule initialBudgetId={editingIds.smart} hideHistory />
-      </div>
-
-      <div
-        id="budget-panel-technical"
-        role="tabpanel"
-        aria-labelledby="budget-tab-technical"
-        hidden={activeTab !== "technical"}
-      >
-        <TechnicalCalculatorModule initialBudgetId={editingIds.technical} />
-      </div>
+      <Suspense fallback={<div className="flex min-h-48 items-center justify-center text-sm text-slate-500">Carregando modalidade de orçamento...</div>}>
+        {visitedTabs.has("all") && <div id="budget-panel-all" role="tabpanel" hidden={activeTab !== "all"}><AllBudgetsModule onOpen={openBudget} /></div>}
+        {visitedTabs.has("standard") && <div id="budget-panel-standard" role="tabpanel" aria-labelledby="budget-tab-standard" hidden={activeTab !== "standard"}>
+          <QuotesModule language={language} senderConfig={senderConfig} companies={companies} onConvertToInvoice={onConvertToInvoice} initialQuoteId={editingIds.standard} hideHistory />
+        </div>}
+        {visitedTabs.has("smart") && <div id="budget-panel-smart" role="tabpanel" aria-labelledby="budget-tab-smart" hidden={activeTab !== "smart"}>
+          <SmartBudgetModule initialBudgetId={editingIds.smart} hideHistory />
+        </div>}
+        {visitedTabs.has("technical") && <div id="budget-panel-technical" role="tabpanel" aria-labelledby="budget-tab-technical" hidden={activeTab !== "technical"}>
+          <TechnicalCalculatorModule initialBudgetId={editingIds.technical} />
+        </div>}
+      </Suspense>
     </section>
   );
 }
