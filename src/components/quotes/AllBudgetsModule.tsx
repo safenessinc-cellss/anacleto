@@ -5,7 +5,7 @@ import { auth, db } from "../../firebase";
 import { buildCommercialQuoteDraft } from "../../utils/budget-workflow.js";
 
 export type BudgetWorkflow = "standard" | "smart" | "technical";
-type Row = { id: string; workflow: BudgetWorkflow; number?: string; clientName?: string; status?: string; total?: number; currency?: string; createdAt?: any; request?: string; sourceData?: Record<string, any>; canonicalQuoteId?: string; technicalVisitStatus?: string; requiresTechnicalVisit?: boolean };
+type Row = { id: string; workflow: BudgetWorkflow; number?: string; clientName?: string; status?: string; total?: number; currency?: string; createdAt?: any; request?: string; sourceData?: Record<string, any>; canonicalQuoteId?: string; technicalVisitStatus?: string; requiresTechnicalVisit?: boolean; requiresClientConfirmation?: boolean; pendingQuestions?: string[]; preliminaryOnly?: boolean };
 
 export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: BudgetWorkflow, id: string) => void }) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -26,9 +26,9 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
     const unsubscribers = collections.map(({ name, workflow }) =>
       onSnapshot(query(collection(db, name), orderBy("createdAt", "desc"), limit(301)), (snap) => {
         setLimitedSources((current) => snap.size > 300 ? [...new Set([...current, name])] : current.filter((item) => item !== name));
-        snapshots.set(name, snap.docs.map((d) => {
+        snapshots.set(name, snap.docs.slice(0, 300).filter((d) => !(workflow === "standard" && d.data().sourceBudgetCollection && d.data().sourceBudgetId)).map((d) => {
           const data = d.data() as any;
-          return { id: d.id, workflow, number: data.number, clientName: data.clientName || data.customerName || "Cliente não informado", status: data.status || "draft", total: data.total == null && data.subtotal == null ? undefined : Number(data.total ?? data.subtotal), currency: data.currency || "BRL", createdAt: data.createdAt, request: data.request, sourceData: data, canonicalQuoteId: String(data.canonicalQuoteId || ""), technicalVisitStatus: String(data.technicalVisitStatus || "pending"), requiresTechnicalVisit: data.visitRequired === true || data.requiresTechnicalVisit === true || workflow === "technical" };
+          return { id: d.id, workflow, number: data.number, clientName: data.clientName || data.customerName || "Cliente não informado", status: data.status || "draft", total: data.total == null && data.subtotal == null ? undefined : Number(data.total ?? data.subtotal), currency: data.currency || "BRL", createdAt: data.createdAt, request: data.request, sourceData: data, canonicalQuoteId: String(data.canonicalQuoteId || ""), technicalVisitStatus: String(data.technicalVisitStatus || "pending"), requiresTechnicalVisit: data.visitRequired === true || data.requiresTechnicalVisit === true || (workflow === "technical" && data.measurementsConfirmed !== true), requiresClientConfirmation: data.requiresClientConfirmation === true || (Array.isArray(data.pendingQuestions) && data.pendingQuestions.length > 0), pendingQuestions: Array.isArray(data.pendingQuestions) ? data.pendingQuestions : [], preliminaryOnly: data.preliminaryOnly === true };
         }));
         setRows(collections.flatMap((entry) => snapshots.get(entry.name) || []).sort((a, b) => {
           const date = (v: any) => v?.toDate ? v.toDate().getTime() : new Date(v || 0).getTime();
@@ -92,22 +92,21 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
   const confirmTechnicalVisit = async (row: Row) => {
     if (row.workflow === "standard" || !row.requiresTechnicalVisit || !row.canonicalQuoteId) return;
     if (!auth.currentUser) { setError("Sessão expirada. Entre novamente."); return; }
-    if (!window.confirm("Confirma que a visita técnica foi realizada e as medidas/condições foram verificadas?")) return;
+    const confirmationNotes = window.prompt("Registre as medidas e condições verificadas na visita técnica:");
+    if (!confirmationNotes?.trim()) { setError("Registre um resumo da visita para concluir esta etapa."); return; }
     setBusyId(row.workflow + ":" + row.id); setError(""); setNotice("");
     try {
       const batch = writeBatch(db);
       const now = serverTimestamp();
       batch.update(doc(db, "quotes", row.canonicalQuoteId), {
-        technicalVisitStatus: "completed",
-        technicalVisitCompletedAt: now,
-        technicalVisitCompletedBy: auth.currentUser.uid,
-        updatedAt: now,
+        technicalVisitStatus: "completed", visitRequired: false, measurementsConfirmed: true,
+        technicalVisitNotes: confirmationNotes.trim(),
+        technicalVisitCompletedAt: now, technicalVisitCompletedBy: auth.currentUser.uid, updatedAt: now,
       });
       batch.update(doc(db, row.workflow === "technical" ? "technical_budgets" : "smart_budgets", row.id), {
-        technicalVisitStatus: "completed",
-        technicalVisitCompletedAt: now,
-        technicalVisitCompletedBy: auth.currentUser.uid,
-        updatedAt: now,
+        technicalVisitStatus: "completed", visitRequired: false, measurementsConfirmed: true,
+        technicalVisitNotes: confirmationNotes.trim(),
+        technicalVisitCompletedAt: now, technicalVisitCompletedBy: auth.currentUser.uid, updatedAt: now,
       });
       await batch.commit();
       setNotice("Visita técnica registrada. O orçamento comercial poderá seguir para aprovação após a revisão dos preços.");
@@ -118,7 +117,27 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
 
   const workflowLabel = (workflow: BudgetWorkflow) => workflow === "smart" ? "Inteligente · IA" : workflow === "technical" ? "Esquadrias · Técnico" : "Tradicional";
 
+  const confirmClientQuestions = async (row: Row) => {
+    if (row.workflow === "standard" || !row.canonicalQuoteId || !row.pendingQuestions?.length) return;
+    if (!auth.currentUser) { setError("Sessão expirada. Entre novamente."); return; }
+    const notes = window.prompt("Registre as respostas confirmadas pelo cliente ou responsável técnico:");
+    if (!notes?.trim()) { setError("Registre as respostas confirmadas antes de concluir as pendências."); return; }
+    setBusyId(row.workflow + ":" + row.id); setError(""); setNotice("");
+    try {
+      const batch = writeBatch(db);
+      const now = serverTimestamp();
+      const confirmation = { pendingQuestions: [], requiresClientConfirmation: false, clientConfirmationStatus: "completed", clientConfirmationNotes: notes.trim(), clientConfirmationAt: now, clientConfirmationBy: auth.currentUser.uid, updatedAt: now };
+      batch.update(doc(db, "quotes", row.canonicalQuoteId), confirmation);
+      batch.update(doc(db, row.workflow === "smart" ? "smart_budgets" : "technical_budgets", row.id), confirmation);
+      await batch.commit();
+      setNotice("Respostas registradas. Revise quantidades e preços na proposta comercial antes da aprovação final.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível registrar as respostas pendentes.");
+    } finally { setBusyId(""); }
+  };
+
   return <main className="space-y-5">
+    {limitedSources.length > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado aos 300 registros mais recentes por modalidade: {limitedSources.join(", ")}. A paginação histórica ainda precisa ser concluída.</p>}
     <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <h1 className="text-xl font-bold text-slate-900 dark:text-white">Todos os Orçamentos</h1>
       <p className="mt-1 text-sm text-slate-500">Histórico unificado. A edição sempre abre no fluxo em que o orçamento foi criado.</p>
@@ -137,7 +156,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{row.clientName}{row.number ? " · " + row.number : ""}</p>
           <p className="mt-1 text-xs text-slate-500">{row.createdAt?.toDate ? row.createdAt.toDate().toLocaleDateString("pt-BR") : row.createdAt ? new Date(row.createdAt).toLocaleDateString("pt-BR") : "Data não informada"}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2"><strong className="text-sm tabular-nums text-slate-900 dark:text-white">{row.total == null ? "Valor pendente" : Number(row.total).toLocaleString("pt-BR", { style: "currency", currency: row.currency || "BRL" })}</strong>{row.workflow !== "standard" && <button type="button" disabled={!!busyId} onClick={()=>void prepareCommercialQuote(row)} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50">{busyId===row.workflow+":"+row.id?"Integrando...":"Preparar orçamento comercial"}</button>}{row.requiresTechnicalVisit && row.canonicalQuoteId && row.technicalVisitStatus !== "completed" && <button type="button" disabled={!!busyId} onClick={()=>void confirmTechnicalVisit(row)} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Confirmar visita técnica</button>}{row.requiresTechnicalVisit && row.canonicalQuoteId && row.technicalVisitStatus === "completed" && <span className="text-xs font-semibold text-emerald-700">Visita concluída</span>}<button type="button" onClick={()=>onOpen(row.workflow,row.id)} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Pencil className="h-3.5 w-3.5"/>Editar</button></div>
+        <div className="flex flex-wrap items-center gap-2"><strong className="text-sm tabular-nums text-slate-900 dark:text-white">{row.total == null ? "Valor pendente" : Number(row.total).toLocaleString("pt-BR", { style: "currency", currency: row.currency || "BRL" })}</strong>{row.workflow !== "standard" && <button type="button" disabled={!!busyId} onClick={()=>void prepareCommercialQuote(row)} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50">{busyId===row.workflow+":"+row.id?"Integrando...":"Preparar orçamento comercial"}</button>}{row.requiresTechnicalVisit && row.canonicalQuoteId && row.technicalVisitStatus !== "completed" && <button type="button" disabled={!!busyId} onClick={()=>void confirmTechnicalVisit(row)} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Confirmar visita técnica</button>}{row.requiresClientConfirmation && row.canonicalQuoteId && <button type="button" disabled={!!busyId} onClick={()=>void confirmClientQuestions(row)} className="inline-flex items-center gap-2 rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Confirmar informações</button>}{row.requiresTechnicalVisit && row.canonicalQuoteId && row.technicalVisitStatus === "completed" && <span className="text-xs font-semibold text-emerald-700">Visita concluída</span>}<button type="button" onClick={()=>onOpen(row.workflow,row.id)} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"><Pencil className="h-3.5 w-3.5"/>Editar</button></div>
       </article>)}
     </section>
   </main>;
