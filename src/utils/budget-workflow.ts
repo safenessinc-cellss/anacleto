@@ -15,7 +15,9 @@ export function buildCommercialQuoteDraft(
   const validUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let items: Array<Record<string, any>> = [];
   let freight = money(source.freight);
-  const requiresTechnicalVisit = workflow === "technical" || source.visitRequired === true || source.requiresTechnicalVisit === true;
+  const pendingQuestions = Array.isArray(source.pendingQuestions) ? source.pendingQuestions.map((question: unknown) => String(question || "").trim()).filter(Boolean).slice(0, 30) : [];
+  const requiresTechnicalVisit = source.visitRequired === true || source.requiresTechnicalVisit === true || (workflow === "technical" && source.measurementsConfirmed !== true);
+  const requiresClientConfirmation = pendingQuestions.length > 0;
 
   if (workflow === "smart") {
     items = (Array.isArray(source.items) ? source.items : []).map((item: any, index: number) => {
@@ -25,7 +27,8 @@ export function buildCommercialQuoteDraft(
       return {
         id: String(item.id || ("smart-" + (index + 1))),
         description: String(item.description || "").trim(),
-        quantity: Number(item.quantity),
+        quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 0,
+        quantityPending: item.quantityPending === true || !(Number(item.quantity) > 0),
         unitPrice: money(item.unitPrice),
         sku: String(item.sku || ""),
         catalogItemId: catalogPrice ? String(item.catalogItemId) : "",
@@ -48,7 +51,8 @@ export function buildCommercialQuoteDraft(
       return {
         id: String(part.id || ("technical-" + (index + 1))),
         description: String(part.description || "").trim(),
-        quantity: Number(line?.quantityToBuy || part.quantity),
+        quantity: Number(line?.quantityToBuy || part.quantity) > 0 ? Number(line?.quantityToBuy || part.quantity) : 0,
+        quantityPending: !(Number(line?.quantityToBuy || part.quantity) > 0),
         unitPrice,
         sku: "",
         catalogItemId: "",
@@ -65,8 +69,8 @@ export function buildCommercialQuoteDraft(
   }
 
   if (!items.length) throw new Error("O orçamento não contém itens válidos para integrar ao fluxo comercial.");
-  if (items.some(item => !item.description || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
-    throw new Error("Há itens sem descrição ou quantidade válida. Corrija o orçamento original antes de integrar.");
+  if (items.some(item => !item.description || !Number.isFinite(item.quantity) || item.quantity < 0 || (item.quantity === 0 && item.quantityPending !== true))) {
+    throw new Error("Há itens sem descrição ou com quantidade inválida. Corrija o orçamento original antes de integrar.");
   }
 
   const subtotal = items.reduce((sum, item) => sum + money(item.unitPrice) * Number(item.quantity), 0);
@@ -76,10 +80,10 @@ export function buildCommercialQuoteDraft(
   const notes = [
     String(source.request || "").trim(),
     String(source.notes || "").trim(),
-    ...(Array.isArray(source.pendingQuestions) && source.pendingQuestions.length ? ["Pendências para confirmar: " + source.pendingQuestions.map((question: unknown) => String(question)).join(" | ")] : []),
+    ...(pendingQuestions.length ? ["Pendências para confirmar: " + pendingQuestions.join(" | ")] : []),
     source.visitReason ? "Motivo da visita técnica: " + String(source.visitReason) : "",
     workflow === "technical"
-      ? "ORÇAMENTO PRELIMINAR TÉCNICO. Visita técnica pendente. Total calculado no fluxo técnico de origem: R$ " + originalTechnicalTotal.toFixed(2) + ". Preços de fornecedor permanecem estimados até validação comercial."
+      ? "ORÇAMENTO PRELIMINAR TÉCNICO. " + (requiresTechnicalVisit ? "Visita técnica pendente. " : "Medidas confirmadas. ") + "Total calculado no fluxo técnico de origem: R$ " + originalTechnicalTotal.toFixed(2) + ". Preços de fornecedor permanecem estimados até validação comercial."
       : "Convertido do Orçamento Inteligente. Revise itens, preços, condições e dados do cliente antes de enviar.",
   ].filter(Boolean).join("\n\n");
 
@@ -110,9 +114,15 @@ export function buildCommercialQuoteDraft(
     sourceBudgetCollection: workflow === "smart" ? "smart_budgets" : "technical_budgets",
     sourceBudgetId: sourceId,
     sourceBudgetWorkflow: workflow,
+    pendingQuestions,
+    requiresClientConfirmation,
+    clientConfirmationStatus: requiresClientConfirmation ? (source.clientConfirmationStatus === "completed" ? "completed" : "pending") : "not_required",
+    clientConfirmationNotes: String(source.clientConfirmationNotes || ""),
     requiresTechnicalVisit,
+    visitRequired: requiresTechnicalVisit,
+    visitReason: String(source.visitReason || ""),
     technicalVisitStatus: requiresTechnicalVisit ? (source.technicalVisitStatus === "completed" ? "completed" : "pending") : "not_required",
-    preliminaryOnly: requiresTechnicalVisit,
+    preliminaryOnly: requiresTechnicalVisit || requiresClientConfirmation || items.some(item => item.quantityPending || ["pending", "estimated"].includes(String(item.priceSource || ""))),
   };
 }
 
