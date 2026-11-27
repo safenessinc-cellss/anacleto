@@ -17,7 +17,7 @@ export function buildCommercialQuoteDraft(
   let freight = money(source.freight);
   const pendingQuestions = Array.isArray(source.pendingQuestions) ? source.pendingQuestions.map((question: unknown) => String(question || "").trim()).filter(Boolean).slice(0, 30) : [];
   const requiresTechnicalVisit = source.visitRequired === true || source.requiresTechnicalVisit === true || (workflow === "technical" && source.measurementsConfirmed !== true);
-  const requiresClientConfirmation = pendingQuestions.length > 0;
+  const requiresClientConfirmation = pendingQuestions.length > 0 || source.requiresClientConfirmation === true;
 
   if (workflow === "smart") {
     items = (Array.isArray(source.items) ? source.items : []).map((item: any, index: number) => {
