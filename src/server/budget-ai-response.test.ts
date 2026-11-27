@@ -41,3 +41,15 @@ test("rejects negative or non-finite quantities and prices", () => {
     pendingQuestions: [], visitRequired: false,
   }), /Linha inválida/);
 });
+
+test("adds a quantity question even when other questions are already present", () => {
+  const result = normalizeBudgetAIDraftResponse({
+    items: [{ description: "Piscina", qty: 0, price: 0 }],
+    notes: "Projeto preliminar.",
+    pendingQuestions: ["Qual o revestimento desejado?"],
+    visitRequired: true,
+    visitReason: "Inspecionar terreno e acesso.",
+  });
+  assert.equal(result.pendingQuestions.length, 2);
+  assert.ok(result.pendingQuestions.some(question => /quantidade e as medidas/.test(question)));
+});
