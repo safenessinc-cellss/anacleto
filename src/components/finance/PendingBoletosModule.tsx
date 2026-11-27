@@ -35,6 +35,7 @@ export default function PendingBoletosModule() {
   const [searching, setSearching] = useState(false);
   const [matches, setMatches] = useState<PendingBoleto[]>([]);
   const [searchMessage, setSearchMessage] = useState("");
+  const [searchLimited, setSearchLimited] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadedStorage, setUploadedStorage] = useState<{ path: string; url: string } | null>(null);
   const [extracting, setExtracting] = useState(false);
@@ -150,9 +151,10 @@ export default function PendingBoletosModule() {
     setSearching(true); setSearchMessage("");
     try {
       const [pendingSnap, payableSnap] = await Promise.all([
-        getDocs(collection(db, "pending_boletos")),
-        getDocs(collection(db, "payables"))
+        getDocs(query(collection(db, "pending_boletos"), limit(1000))),
+        getDocs(query(collection(db, "payables"), limit(1000)))
       ]);
+      setSearchLimited(pendingSnap.size >= 1000 || payableSnap.size >= 1000);
       const q = searchTerm.trim().toLocaleLowerCase("pt-BR");
       const docs: PendingBoleto[] = [];
       pendingSnap.forEach((d) => {
@@ -228,6 +230,7 @@ export default function PendingBoletosModule() {
   return (
     <div className="space-y-4">
       {pending.length>=500&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Exibindo até 500 boletos importados. O histórico completo requer paginação.</p>}
+      {searchLimited&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">A busca consultou até 1.000 boletos e 1.000 contas a pagar. Resultados antigos podem não aparecer; refine a busca ou consulte o histórico completo paginado.</p>}
       <section className="rounded-xl border bg-white p-4 dark:bg-slate-900 space-y-3">
         <div>
           <h3 className="font-bold flex items-center gap-2"><Search className="w-4 h-4" /> Buscar boletos da Anacleto</h3>
