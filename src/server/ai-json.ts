@@ -58,7 +58,7 @@ function providerMessage(error: any): string {
 function isRetryableProviderError(error: any): boolean {
   const status = providerStatus(error);
   return [408, 409, 425, 429, 500, 502, 503, 504].includes(status)
-    || /high demand|temporarily unavailable|overloaded|rate.?limit|resource exhausted/i.test(providerMessage(error));
+    || /high demand|temporarily unavailable|overloaded|rate.?limit|resource exhausted|this operation was aborted|aborterror|aborted/i.test(providerMessage(error));
 }
 function geminiModelName(value: string): string {
   return value.replace(/^google\//, "").replace(/^models\//, "");
@@ -116,7 +116,7 @@ export async function generateValidatedJson<T>(options: {
   const configuredModel = String(config.model || "google/gemini-3.8-flash");
   const modelCandidates = [...new Set([
     geminiModelName(configuredModel),
-    "gemini-3.8-flash",
+    geminiModelName(process.env.ANACLETO_AI_FALLBACK_MODEL || "google/gemini-3.5-flash-lite"),
   ])];
   let lastError: unknown;
   let raw = "";
@@ -134,6 +134,8 @@ export async function generateValidatedJson<T>(options: {
         const remaining = deadline - Date.now();
         if (remaining < 1_500) break;
         try {
+          const isBudget = options.capability === "budget";
+          const firstAttemptBudgetMs = isBudget ? 11_000 : Math.max(5_000, remaining - 1_500);
           const result = await client.models.generateContent({
             model,
             contents: [{ role: "user", parts: [{ text: activePrompt }] }],
@@ -143,7 +145,7 @@ export async function generateValidatedJson<T>(options: {
               ...(options.responseSchema ? { responseSchema: options.responseSchema } : {}),
               temperature: options.temperature ?? config.temperature,
               maxOutputTokens: options.maxOutputTokens ?? config.maxOutputTokens,
-              abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? Math.max(5_000, remaining - 1_500) : remaining)),
+              abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? firstAttemptBudgetMs : (isBudget ? 6_000 : remaining))),
             },
           });
           raw = result.text || "";
@@ -163,7 +165,8 @@ export async function generateValidatedJson<T>(options: {
               + providerMessage(error) + "\\nResposta original:\\n" + raw.slice(0, 20_000);
             continue;
           }
-          if (attempt === 0 && isRetryableProviderError(error) && Date.now() + 500 < deadline) {
+          const aborted = /this operation was aborted|aborterror|aborted/i.test(providerMessage(error));
+          if (attempt === 0 && !aborted && isRetryableProviderError(error) && Date.now() + 500 < deadline) {
             await new Promise(resolve => setTimeout(resolve, 350));
             continue;
           }
