@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, doc, deleteDoc, setDoc, query, orderBy } from "firebase/firestore";
+import { collection, limit, onSnapshot, doc, deleteDoc, setDoc, query, orderBy } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { CheckCircle, Clock, Mail, Plus, Shield, Trash2, User, UserCog, X, XCircle, SlidersHorizontal } from "lucide-react";
 import { Perfile, ROLES, SUPER_ADMIN_EMAIL, getAssignablePerfiles, getPerfileConfig } from "../../utils/roles";
@@ -29,6 +29,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [newAdminPerfile, setNewAdminPerfile] = useState<Perfile>("colaborador");
   const [loading, setLoading] = useState(true);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [permissionUser, setPermissionUser] = useState<AdminUser | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<string[]>([]);
   const permissionModules = [{id:"dashboard",label:"Início"},{id:"crm",label:"Clientes / CRM"},{id:"quotes",label:"Orçamentos"},{id:"invoices",label:"Faturas"},{id:"technical_drawing",label:"Desenho técnico"},{id:"agenda",label:"Agenda"},{id:"catalog",label:"Catálogo / Itens"},{id:"finance",label:"Financeiro"},{id:"financial_ai",label:"IA financeira"},{id:"payroll",label:"Folha de pagamento"},{id:"reports",label:"Relatórios"},{id:"tipologias",label:"Tipologias"},{id:"projects",label:"Projetos"},{id:"settings",label:"Configurações"},{id:"theme",label:"Aparência"},{id:"suggestions",label:"Sugestões"}];
@@ -37,8 +38,9 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
 
   useEffect(() => {
     const u1 = onSnapshot(
-      query(collection(db, "pending_users"), orderBy("requestedAt", "desc")),
+      query(collection(db, "pending_users"), orderBy("requestedAt", "desc"), limit(500)),
       (snap) => {
+        setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "pending_users"])] : v.filter(x => x !== "pending_users"));
         const list: PendingUser[] = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() } as PendingUser));
         setPending(list);
@@ -47,7 +49,8 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
       (err) => { console.warn("Pending listener:", err); setLoading(false); }
     );
 
-    const u2 = onSnapshot(collection(db, "admins"), (snap) => {
+    const u2 = onSnapshot(query(collection(db, "admins"), limit(500)), (snap) => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "admins"])] : v.filter(x => x !== "admins"));
       const list: AdminUser[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as AdminUser));
       // Excluir al super admin de la lista (se detecta por email)
@@ -150,6 +153,7 @@ export default function AdminModule({ currentPerfile }: { currentPerfile: Perfil
 
   return (
     <div className="space-y-6">
+      {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Lista administrativa limitada: {limitedSources.join(", ")}. Usuários antigos podem não aparecer; a paginação completa ainda está pendente.</p>}
       <div>
         <h2 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
           <Shield className="w-6 h-6 text-indigo-600" /> Administração de usuários e perfis
