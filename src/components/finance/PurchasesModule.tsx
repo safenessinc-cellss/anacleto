@@ -369,10 +369,58 @@ export default function PurchasesModule() {
       } else {
         // Compatibilidade com compras antigas que ainda não possuem lançamentos prévios.
         const rows = purchase.installments?.length ? purchase.installments : [{ id: "single", number: "", digitableLine: "", amount: purchase.total, dueDate: purchase.dueDate || today(), documentUrl: purchase.documentUrl || "", documentName: purchase.documentName || "" }];
-        const payableRefs = rows.map(() => doc(collection(db, "payables")));
+        const digits = (value: unknown) => String(value || "").replace(/\D/g, "");
+        const keyedRows = rows.map((row, index) => ({
+          row,
+          index,
+          key: digits(row.digitableLine) || digits(row.number),
+          rawLine: String(row.digitableLine || "").trim(),
+          rawNumber: String(row.number || "").trim(),
+        }));
+        const keys = keyedRows.map(entry => entry.key).filter(Boolean);
+        if (new Set(keys).size !== keys.length) throw new Error("A compra contém boletos repetidos. Corrija as parcelas antes de aprovar.");
+        const uniqueChunks = (values: string[]) => {
+          const unique = [...new Set(values.map(value => String(value || "").trim()).filter(Boolean))];
+          const chunks: string[][] = [];
+          for (let i = 0; i < unique.length; i += 30) chunks.push(unique.slice(i, i + 30));
+          return chunks;
+        };
+        const lineValues = uniqueChunks(keyedRows.flatMap(entry => [entry.rawLine, digits(entry.rawLine)]));
+        const numberValues = uniqueChunks(keyedRows.flatMap(entry => [entry.rawNumber, digits(entry.rawNumber)]));
+        const queryIn = (collectionName: string, field: string, chunks: string[][]) => Promise.all(
+          chunks.map(values => getDocs(query(collection(db, collectionName), where(field, "in", values), limit(100))))
+        );
+        const [pendingGroups, payableLineGroups, payableNumberGroups] = await Promise.all([
+          Promise.all([queryIn("pending_boletos", "digitableLine", lineValues), queryIn("pending_boletos", "number", numberValues)]),
+          queryIn("payables", "digitableLine", lineValues),
+          queryIn("payables", "boletoNumber", numberValues),
+        ]);
+        const existingBoletoKeys = new Set<string>();
+        pendingGroups.flatMap(group => group.flatMap(snapshot => snapshot.docs)).forEach(snapshot => {
+          const data = snapshot.data();
+          const key = digits(data.digitableLine) || digits(data.number);
+          if (key) existingBoletoKeys.add(key);
+        });
+        [...payableLineGroups, ...payableNumberGroups].flatMap(group => group.docs).forEach(snapshot => {
+          const data = snapshot.data();
+          const key = digits(data.digitableLine) || digits(data.boletoNumber);
+          if (key) existingBoletoKeys.add(key);
+        });
+        const duplicateInPurchase = purchases.some(other => other.id !== purchase.id && (other.installments || []).some(row => {
+          const key = digits(row.digitableLine) || digits(row.number);
+          return key && keys.includes(key);
+        }));
+        if (duplicateInPurchase || keys.some(key => existingBoletoKeys.has(key))) {
+          throw new Error("Um ou mais boletos já estão vinculados a outra compra, Boletos a Revisar ou Contas a Pagar. Nenhum lançamento foi criado.");
+        }
+        const payableRefs = keyedRows.map(entry => entry.key
+          ? doc(db, "payables", "boleto_" + entry.key)
+          : doc(collection(db, "payables")));
         await runTransaction(db, async tx => {
           const current = await tx.get(purchaseRef);
           if (!current.exists() || current.data().status !== "pending") throw new Error("Esta compra já foi processada ou não está pendente.");
+          const existingPayables = await Promise.all(payableRefs.map(ref => tx.get(ref)));
+          if (existingPayables.some(snapshot => snapshot.exists())) throw new Error("Um boleto já foi lançado em Contas a Pagar. Atualize a tela e revise antes de aprovar.");
           rows.forEach((row, index) => {
             tx.set(payableRefs[index], {
               supplierId: purchase.supplierId, supplierName: purchase.supplierName, supplierCnpj: purchase.supplierCnpj || "",
