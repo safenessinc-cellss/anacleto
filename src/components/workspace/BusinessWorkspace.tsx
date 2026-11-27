@@ -60,7 +60,7 @@ export default function BusinessWorkspace({kind,quotes=[],invoices=[]}:Props) {
   if(!form.name.trim()){setError("Informe um nome ou título.");return;}
   setSaving(true);setError("");
   const payload={...form,width:Number(form.width)||0,height:Number(form.height)||0,quantity:Number(form.quantity)>0?Number(form.quantity):0,quantityPending:!(Number(form.quantity)>0),price:Number(form.price)>0?Number(form.price):0,ownerUid:uid,updatedAt:new Date().toISOString()};
-  try{const col=collectionByKind[kind as keyof typeof collectionByKind]; if(editing)await updateDoc(doc(db,col,editing),payload);else await addDoc(collection(db,col),{...payload,createdAt:new Date().toISOString()});setEditing(null);setForm({name:"",code:"",category:kind==="tipologias"?"Janela":"Projeto",status:"Em andamento",notes:"",client:"",width:"",height:"",quantity:"",price:""});}
+  try{const col=collectionByKind[kind as keyof typeof collectionByKind]; if(editing){await updateDoc(doc(db,col,editing),payload);setRows(current=>current.map(row=>row.id===editing?{...row,...payload}:row));}else await addDoc(collection(db,col),{...payload,createdAt:new Date().toISOString()});setEditing(null);setForm({name:"",code:"",category:kind==="tipologias"?"Janela":"Projeto",status:"Em andamento",notes:"",client:"",width:"",height:"",quantity:"",price:""});}
   catch(e){setError(e instanceof Error?e.message:"Falha ao salvar.");}finally{setSaving(false);}
  };
  const remove=async(id:string)=>{if(!confirm("Excluir este registro?"))return;try{await deleteDoc(doc(db,collectionByKind[kind as keyof typeof collectionByKind],id));setRows(current=>current.filter(row=>row.id!==id));}catch(e){setError(e instanceof Error?e.message:"Falha ao excluir.");}};
