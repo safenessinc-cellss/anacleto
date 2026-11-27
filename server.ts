@@ -532,7 +532,7 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
     const items = parsed.items.map((item: any) => {
       const qty = Number(item.qty);
       if (!String(item.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
-      const match = findExactCatalogItem(item, fullCatalog);
+      const match = findExactCatalogItem(item, catalog);
       const catalogPrice = match ? Number(match.price) : 0;
       const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice > 0;
       const identity = match || null;
