@@ -24,11 +24,13 @@ export default function InventoryModule() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [cleaning, setCleaning] = useState(false);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [manualEntryConfirmed, setManualEntryConfirmed] = useState(false);
 
   useEffect(() => {
-    const a = onSnapshot(query(collection(db, "inventory_items"), limit(1000)), snap => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem))), e => console.error("Inventory items:", e));
+    const a = onSnapshot(query(collection(db, "inventory_items"), limit(1000)), snap => { setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "inventory_items"])] : v.filter(x => x !== "inventory_items")); setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem))); }, e => console.error("Inventory items:", e));
     const b = onSnapshot(query(collection(db, "inventory_movements"), orderBy("createdAt", "desc"), limit(100)), snap => {
+      setLimitedSources(v => snap.size >= 100 ? [...new Set([...v, "inventory_movements"])] : v.filter(x => x !== "inventory_movements"));
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() } as Movement));
       rows.sort((x, y) => String(y.createdAt?.toDate?.() || y.createdAt || "").localeCompare(String(x.createdAt?.toDate?.() || x.createdAt || "")));
       setMovements(rows.slice(0, 100));
@@ -82,6 +84,7 @@ export default function InventoryModule() {
   };
 
   return <div className="space-y-5">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Inventário limitado: {limitedSources.join(", ")}. Estoque ou movimentos antigos podem não aparecer; o histórico completo ainda requer paginação.</p>}
     {items.length >= 1000 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Exibindo até 1.000 materiais. A paginação do estoque completo ainda precisa ser concluída.</p>}
     <p className="text-xs text-slate-500">O histórico abaixo mostra as 100 movimentações mais recentes.</p>
     <div className="flex justify-end"><button type="button" onClick={() => void removeNonStockItems()} disabled={cleaning} className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50">{cleaning ? "Limpando..." : "Limpar itens que não pertencem ao estoque"}</button></div>
