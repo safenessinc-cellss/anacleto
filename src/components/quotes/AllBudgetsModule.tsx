@@ -60,6 +60,12 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
       const quoteRef = doc(db, "quotes", quoteId);
       const existing = await getDoc(quoteRef);
       if (existing.exists()) {
+        await updateDoc(sourceRef, {
+          canonicalQuoteId: quoteId,
+          workflowStatus: "converted_to_quote",
+          ...(row.workflow === "technical" ? { technicalVisitStatus: String(existing.data().technicalVisitStatus || "pending") } : {}),
+          updatedAt: serverTimestamp(),
+        });
         onOpen("standard", quoteId);
         setNotice("Este orçamento já possui uma proposta comercial vinculada. Abrindo o registro existente sem sobrescrever suas edições.");
         return;
