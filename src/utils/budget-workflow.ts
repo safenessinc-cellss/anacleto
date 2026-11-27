@@ -14,6 +14,7 @@ export function buildCommercialQuoteDraft(
   const date = now.toISOString().slice(0, 10);
   const validUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let items: Array<Record<string, any>> = [];
+  let freight = money(source.freight);
   const requiresTechnicalVisit = workflow === "technical";
 
   if (workflow === "smart") {
@@ -39,6 +40,7 @@ export function buildCommercialQuoteDraft(
     const selected = comparisons.find((entry: any) => entry.supplier === source.bestSupplier) ||
       comparisons.find((entry: any) => entry.complete === true && entry.verified === true);
     const lines = Array.isArray(selected?.lines) ? selected.lines : [];
+    freight = money(selected?.shippingCost);
     items = bom.map((part: any, index: number) => {
       const line = lines.find((entry: any) => entry.itemId === part.id);
       const hasOfferPrice = line?.status === "priced" && money(line.unitPrice) > 0;
@@ -70,7 +72,7 @@ export function buildCommercialQuoteDraft(
   const subtotal = items.reduce((sum, item) => sum + money(item.unitPrice) * Number(item.quantity), 0);
   const labor = money(source.laborAmount ?? source.labor?.amount);
   const originalTechnicalTotal = workflow === "technical" ? money(source.total) : 0;
-  const total = subtotal + labor;
+  const total = subtotal + labor + freight;
   const notes = [
     String(source.request || "").trim(),
     String(source.notes || "").trim(),
@@ -92,7 +94,7 @@ export function buildCommercialQuoteDraft(
     labor,
     laborRate: money(source.laborPercent ?? source.laborRate ?? source.labor?.percentage),
     marginRate: 0,
-    freight: 0,
+    freight,
     taxRate: 0,
     taxAmount: 0,
     discountRate: 0,
