@@ -54,6 +54,7 @@ export default function SmartBudgetModule({ initialBudgetId, hideHistory = false
   const total = subtotal + laborAmount;
   const pendingPriceCount = items.filter((item) => item.priceSource !== "catalog" && item.priceSource !== "manual" && item.unitPrice <= 0).length;
   const generate = async () => {
+    if (busy) return;
     if (!request.trim()) { setError("Descreva o pedido do cliente."); return; }
     setBusy(true); setError("");
     try {
