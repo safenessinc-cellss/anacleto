@@ -24,6 +24,7 @@ import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
 import { hasAIRole } from "./src/server/ai-roles.js";
 import { getAIRateLimit } from "./src/server/ai-limits.js";
 import { normalizeNonNegativeQuantity } from "./src/server/quantity.js";
+import { buildBudgetAIFallback } from "./src/server/budget-fallback.js";
 import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
 import { hasConfirmedCatalogPrice } from "./src/utils/catalog-price-validation.js";
 import { google } from "googleapis";
@@ -557,6 +558,11 @@ Preencha pendingQuestions com perguntas curtas e específicas sempre que faltare
     const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
     const status = Number(err?.statusCode || err?.status || 502);
     console.error("[BUDGET_ITEMS_AI] failed", { requestId, code: err?.code || "BUDGET_AI_UNAVAILABLE", status, message: String(err?.message || err).slice(0, 1200), stack: err?.stack });
+    const fallbackPrompt = String(req.body?.prompt || "").trim().slice(0, 6000);
+    if (fallbackPrompt.length >= 5) {
+      const fallback = buildBudgetAIFallback(fallbackPrompt);
+      return res.status(200).json({ ...fallback, requestId });
+    }
     return res.status(status >= 400 && status < 600 ? status : 502).json({ error: String(err?.message || "Falha ao gerar os itens do orçamento."), code: err?.code || "BUDGET_AI_UNAVAILABLE", requestId });
   }
 });
