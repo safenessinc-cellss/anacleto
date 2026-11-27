@@ -20,8 +20,11 @@ export function buildBudgetAIFallback(prompt: string): BudgetAIFallback {
   const text = String(prompt || "").trim();
   const hasDimensions =
     /altura\s*(?:de|:|=)?\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b[\s\S]{0,80}largura\s*(?:de|:|=)?\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b/i.test(text) ||
-    /\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)?\b/i.test(text);
-  const hasQuantity = /\b\d+\s*(?:un(?:idades?)?|peças?|portas?|janelas?|boxes?|m²|metros?)\b/i.test(text);
+    /\d+(?:[.,]\d+)?\s*(?:mm|cm|m)?\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b/i.test(text) ||
+    /\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\s*[x×]\s*\d+(?:[.,]\d+)?\b/i.test(text);
+  const quantityMatch = text.match(/\b(\d+)\s*(?:un(?:idades?)?|peças?|portas?|janelas?|boxes?|m²|metros?)\b/i);
+  const quantity = quantityMatch ? Number(quantityMatch[1]) : 0;
+  const hasQuantity = quantity > 0;
   const hasMaterial = /alum[ií]nio|vidro|madeira|aço|concreto|pedra|porcelanato|gesso|tijolo|pvc|ferro/i.test(text);
   const hasFinish = /branco|preto|bronze|natural|anodiz|pintura|fosco|brilhante|amadeirado/i.test(text);
   const pendingQuestions: string[] = [];
