@@ -19,6 +19,7 @@ import generateBomHandler from "./src/server/supplier-api/generate-bom.js";
 import compareBomHandler from "./src/server/supplier-api/compare-bom.js";
 import marketResearchHandler from "./src/server/supplier-api/market-research.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
+import { hasConfirmedCatalogPrice } from "./src/utils/catalog-price-validation.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -286,15 +287,7 @@ function findExactCatalogItem(item: any, catalog: any[]) {
   });
 }
 function hasVerifiedCatalogPrice(row: any): boolean {
-  if (!row || row.price === undefined || row.price === null || String(row.price).trim() === "") return false;
-  const price = Number(row.price);
-  // Legacy master-catalog rows without review fields retain their historical behaviour.
-  // Once either review field exists, every supplied state must be explicitly verified.
-  const reviewStates = [row.status, row.priceStatus]
-    .filter((value: unknown) => value !== undefined && value !== null && String(value).trim() !== "")
-    .map((value: unknown) => String(value).trim().toLowerCase());
-  const reviewApproved = reviewStates.every((state: string) => state === "verified");
-  return Number.isFinite(price) && price > 0 && reviewApproved;
+  return hasConfirmedCatalogPrice(row);
 }
 function selectRelevantBudgetCatalog(prompt: string, catalog: any[], limit = 450) {
   const tokens = normalizeCatalogName(prompt).split(/\s+/).filter((token: string) => token.length >= 3);
