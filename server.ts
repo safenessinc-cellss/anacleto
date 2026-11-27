@@ -23,6 +23,7 @@ import { recordAIAudit } from "./src/server/ai-audit.js";
 import { authenticateFirebaseRequest } from "./src/server/firebase-auth.js";
 import { hasAIRole } from "./src/server/ai-roles.js";
 import { getAIRateLimit } from "./src/server/ai-limits.js";
+import { normalizeNonNegativeQuantity } from "./src/server/quantity.js";
 import { consumeRateLimit, getClientIp } from "./src/server/rate-limit.js";
 import { hasConfirmedCatalogPrice } from "./src/utils/catalog-price-validation.js";
 import { google } from "googleapis";
@@ -565,15 +566,16 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
   const rawItems = Array.isArray(rawBudget?.items) ? rawBudget.items : pieces.map((piece: any) => ({
     pieceId: piece.id,
     description: piece.name || piece.material || "Componente técnico",
-    quantity: Math.max(1, Number(piece.quantity) || 1),
+    quantity: normalizeNonNegativeQuantity(piece.quantity).quantity,
   }));
   // Preços do orçamento técnico só podem vir de uma correspondência exata no catálogo.
   // Nunca aceitar preço estimado pela IA nem associação por palavras parcialmente coincidentes.
   const items = rawItems.map((item: any, index: number) => {
-    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const normalizedQuantity = normalizeNonNegativeQuantity(item.quantity);
+    const quantity = normalizedQuantity.quantity;
     const match = findExactCatalogItem(item, catalogRows);
     const catalogPrice = match ? Number(match.price) : 0;
-    const confirmed = hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice >= 0;
+    const confirmed = quantity > 0 && hasVerifiedCatalogPrice(match) && Number.isFinite(catalogPrice) && catalogPrice > 0;
     const unitPrice = confirmed ? catalogPrice : 0;
     return {
       ...item,
@@ -581,9 +583,11 @@ function normalizeTechnicalBudget(rawBudget: any, pieces: any[], catalog: any[])
       sku: confirmed ? String(match.sku || match.code || "") : String(item.sku || ""),
       catalogItemId: confirmed ? String(match.id || "") : "",
       quantity,
+      quantityPending: normalizedQuantity.pending,
       unitPrice,
       subtotal: quantity * unitPrice,
       priceSource: confirmed ? "catalogo" : "pendente",
+      notes: [item.notes, normalizedQuantity.pending ? "Quantidade pendente de medição; não usar para fabricação." : ""].filter(Boolean).join(" · "),
     };
   });
   const subtotal = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
