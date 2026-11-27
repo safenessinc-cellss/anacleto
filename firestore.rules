@@ -327,6 +327,11 @@ service cloud.firestore {
               && request.resource.data.reviewedBy is string && request.resource.data.reviewedAt is string)));
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
+    match /price_history/{id} {
+      allow read: if canManageCommercial() || canManageFinance();
+      allow create: if canManageCommercial() || canManageFinance();
+      allow update, delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
+    }
     match /supplier_offer_price_history/{id} {
       allow read: if canOperate() || canManageFinance();
       allow create: if (canManageCommercial() || canManageFinance())
