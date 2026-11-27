@@ -90,11 +90,11 @@ export async function refreshCatalogMatchesFromFirestore(
   const references = new Map<string, { source: string; id: string }>();
   for (const item of Array.isArray(generatedItems) ? generatedItems.slice(0, 150) : []) {
     const id = String(item?.catalogItemId || item?.itemId || "").trim();
-    const description = String(item?.description || "").trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+    const description = String(item?.description || "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const candidate = catalog.find((row) =>
       (id && String(row.id || "") === id) ||
       (item?.sku && String(row.sku || row.code || "") === String(item.sku)) ||
-      (description && String(row.name || row.description || "").trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase() === description)
+      (description && String(row.name || row.description || "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === description)
     );
     const source = String(item?.catalogSource || candidate?.source || "").trim();
     const resolvedId = id || String(candidate?.id || "");
