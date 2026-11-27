@@ -187,6 +187,7 @@ export default function PayablesModule() {
 
   return (
     <div className="space-y-4">
+      {(items.length>=1000||suppliers.length>=1000||history.length>=2000)&&<p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Esta tela carrega até 1.000 registros por origem para preservar o desempenho. Se o limite for atingido, os totais e o histórico podem estar incompletos; a paginação do histórico completo ainda está pendente.</p>}
       {historyError && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{historyError}</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
