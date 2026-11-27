@@ -9,6 +9,14 @@ type ExtractedDocument = { documentType?: string; supplierName?: string; supplie
 type InvoiceBoleto = { id: string; number: string; digitableLine: string; amount: number; dueDate: string };
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value) || 0);
+const normalizeDocumentType = (value: unknown): "nfe" | "nfce" | "boleto" | "receipt" | "other" => {
+  const normalized = String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (/\b(nfe|nf e|danfe|modelo 55)\b/.test(normalized) || normalized.includes("nota fiscal eletronica")) return "nfe";
+  if (/\b(nfce|nf ce|modelo 65)\b/.test(normalized) || normalized.includes("nota fiscal consumidor")) return "nfce";
+  if (normalized.includes("boleto")) return "boleto";
+  if (normalized.includes("recibo")) return "receipt";
+  return "other";
+};
 
 export default function FinancialAI({ language = "pt" }: { language?: string }) {
   const [file, setFile] = useState<File | null>(null);
@@ -16,6 +24,8 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<ExtractedDocument | null>(null);
+  const [documentType, setDocumentType] = useState<"nfe" | "nfce" | "boleto" | "receipt" | "other">("other");
+  const [expenseCategory, setExpenseCategory] = useState("outros");
   const [supplierName, setSupplierName] = useState("");
   const [supplierCnpj, setSupplierCnpj] = useState("");
   const [documentNumber, setDocumentNumber] = useState("");
@@ -86,7 +96,7 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
       const parsed = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(parsed.error || "A IA não conseguiu interpretar o documento.");
       if (!Number(parsed.total) || Number(parsed.total) <= 0) throw new Error("A IA não identificou um valor total válido. Tente uma imagem mais nítida ou preencha manualmente em Compras Gerais.");
-      setResult(parsed); setSupplierName(String(parsed.supplierName || "")); setSupplierCnpj(String(parsed.supplierCnpj || ""));
+      setResult(parsed); setDocumentType(normalizeDocumentType(parsed.documentType)); setExpenseCategory("outros"); setSupplierName(String(parsed.supplierName || "")); setSupplierCnpj(String(parsed.supplierCnpj || ""));
       setDocumentNumber(String(parsed.documentNumber || "")); setDescription(String(parsed.description || parsed.documentType || "Documento financeiro"));
       setIssueDate(String(parsed.issueDate || today())); setDueDate(String(parsed.dueDate || today()));
       setTotal(String(Number(parsed.total).toFixed(2))); setTax(String(Number(parsed.tax || 0).toFixed(2)));
@@ -177,19 +187,19 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
       const storagePath = uploadedDocument.path;
       const documentUrl = uploadedDocument.url;
       const subtotal = Math.round((amount - taxes + Number.EPSILON) * 100) / 100;
-      const items = extractedItems.length ? extractedItems : [{ description: description.trim() || "Total do documento", sku: "", quantity: 1, unit: "un", unitPrice: subtotal, total: subtotal }];
+      const items = extractedItems;
       const number = "CMP-" + new Date().getFullYear() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
       await addDoc(collection(db, "purchase_orders"), {
         number, supplierId: "", supplierName: supplierName.trim(), supplierCnpj: supplierCnpj.replace(/\D/g, "").slice(0, 14),
         documentNumber: documentNumber.trim(), accessKey: String(result.accessKey || "").replace(/\D/g, "").slice(0, 44),
-        description: description.trim() || "Documento financeiro", expenseCategory: "materiais", items, subtotal, tax: taxes,
+        description: description.trim() || "Documento financeiro", expenseCategory, items, subtotal, tax: taxes,
         total: Math.round((amount + Number.EPSILON) * 100) / 100, issueDate, dueDate, status: "pending",
-        documentType: result.documentType || "other", documentName: file.name, documentUrl, documentPath: storagePath, installments: normalizedBoletos,
+        documentType, documentName: file.name, documentUrl, documentPath: storagePath, installments: normalizedBoletos,
         extractionConfidence: result.confidence || "", extractionWarnings: result.warnings || [], notes: notes.trim(),
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdBy: user.email || "", source: "financial-ai"
       });
       setMessage("Documento enviado para Compras Gerais, aguardando aprovação. Os boletos vinculados serão lançados separadamente em Contas a Pagar.");
-      setFile(null); setResult(null); setUploadedDocument(null); setNotes(""); setBoletos([]); if (fileRef.current) fileRef.current.value = "";
+      setFile(null); setResult(null); setUploadedDocument(null); setNotes(""); setBoletos([]); setDocumentType("other"); setExpenseCategory("outros"); if (fileRef.current) fileRef.current.value = "";
     } catch (e) { setError((e as Error).message || "Não foi possível enviar o documento ao Financeiro."); }
     finally { setSaving(false); }
   };
@@ -223,7 +233,9 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
     {result && <section className="space-y-4 rounded-2xl border border-emerald-200 bg-white p-5 dark:bg-slate-900">
       <div className="flex items-center gap-2"><CheckCircle className="h-5 w-5 text-emerald-600"/><h3 className="font-bold">Dados identificados — revise antes de salvar</h3></div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-xs font-semibold text-slate-500">Fornecedor / emitente<input value={supplierName} onChange={e => setSupplierName(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
+        <label className="text-xs font-semibold text-slate-500">Tipo do documento<select value={documentType} onChange={e => setDocumentType(e.target.value as typeof documentType)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"><option value="nfe">NF-e / DANFE — pode gerar entrada no estoque</option><option value="nfce">NFC-e</option><option value="boleto">Boleto</option><option value="receipt">Recibo</option><option value="other">Outro documento</option></select></label>
+         <label className="text-xs font-semibold text-slate-500">Categoria da despesa<select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"><option value="materiais">Compra de materiais — habilita estoque após recebimento</option><option value="gastos_diarios">Gastos diários</option><option value="servicos">Serviços contratados</option><option value="administrativas">Despesas administrativas</option><option value="manutencao">Manutenção</option><option value="frete">Frete e transporte</option><option value="impostos">Impostos e taxas</option><option value="outros">Outras despesas</option></select></label>
+         <label className="text-xs font-semibold text-slate-500">Fornecedor / emitente<input value={supplierName} onChange={e => setSupplierName(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold text-slate-500">CNPJ / CPF<input value={supplierCnpj} onChange={e => setSupplierCnpj(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold text-slate-500">Número do documento<input value={documentNumber} onChange={e => setDocumentNumber(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold text-slate-500">Descrição<input value={description} onChange={e => setDescription(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
@@ -232,7 +244,8 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
         <label className="text-xs font-semibold text-slate-500">Valor total (R$)<input type="number" min="0.01" step="0.01" value={total} onChange={e => setTotal(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
         <label className="text-xs font-semibold text-slate-500">Tributos destacados (R$)<input type="number" min="0" step="0.01" value={tax} onChange={e => setTax(e.target.value)} className="mt-1 w-full rounded-lg border p-2.5 text-sm dark:bg-slate-800"/></label>
       </div>
-      {Array.isArray(result.warnings) && result.warnings.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800"><AlertTriangle className="mr-1 inline h-4 w-4"/> Confira os alertas da IA: {result.warnings.join(" · ")}</div>}
+      {expenseCategory === "materiais" && (!Array.isArray(result.items) || result.items.length === 0) && <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">A nota não contém itens discriminados. Você pode registrar a compra, mas o recebimento no estoque ficará bloqueado até cadastrar os materiais em Compras Gerais.</p>}
+       {Array.isArray(result.warnings) && result.warnings.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800"><AlertTriangle className="mr-1 inline h-4 w-4"/> Confira os alertas da IA: {result.warnings.join(" · ")}</div>}
       <section className="space-y-2 rounded-xl border bg-white p-4 dark:bg-slate-800">
         <div><h4 className="text-sm font-bold">Produtos identificados na nota fiscal</h4><p className="text-xs text-slate-500">Ao salvar, o sistema procura os itens no catálogo deste fornecedor por código ou nome exato. A correspondência pode ser corrigida em Compras Gerais antes da aprovação.</p></div>
         {Array.isArray(result.items) && result.items.length > 0 ? <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr className="border-b text-slate-500"><th className="p-2">Produto da nota</th><th className="p-2">Código</th><th className="p-2 text-right">Qtd.</th><th className="p-2 text-right">Valor unit.</th></tr></thead><tbody>{result.items.map((item,index)=><tr key={index} className="border-b last:border-0"><td className="p-2 font-medium">{item.description}</td><td className="p-2">{item.sku || "—"}</td><td className="p-2 text-right">{Number(item.quantity || 0).toLocaleString("pt-BR")} {item.unit || "un"}</td><td className="p-2 text-right">{money(Number(item.unitPrice || 0))}</td></tr>)}</tbody></table></div> : <p className="text-xs text-amber-700">A IA não identificou os itens individualmente. Eles poderão ser cadastrados ou corrigidos em Compras Gerais.</p>}
