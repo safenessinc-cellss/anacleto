@@ -1,3 +1,4 @@
+import { GoogleGenAI } from "@google/genai";
 import { consumeRateLimit, getClientIp } from "../src/server/rate-limit.js";
 import { getAIRateLimit } from "../src/server/ai-limits.js";
 type Request = { method?: string; headers?: Record<string, string | string[] | undefined>; body?: unknown; socket?: { remoteAddress?: string } };
@@ -26,25 +27,27 @@ export default async function handler(req:Request,res:any){
       console.error("[GENERATE_3D_RENDER_RATE_LIMIT]",String(rateError?.message||rateError).slice(0,500));
       return send(res,503,{image:fallbackFor(description),fallback:true,code:"RATE_LIMIT_UNAVAILABLE",message:"Controle de uso indisponível. Exibindo render técnico local."});
     }
-    const apiKey=process.env.AI_GATEWAY_API_KEY;
-    const oidc=process.env.VERCEL_OIDC_TOKEN;
-    if(!apiKey&&!oidc)return send(res,200,{image:fallbackFor(description),fallback:true,message:"Provedor de IA não configurado. Exibindo render técnico local."});
+    const apiKey=process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY;
+    if(!apiKey)return send(res,200,{image:fallbackFor(description),fallback:true,code:"IMAGE_PROVIDER_NOT_CONFIGURED",message:"GEMINI_API_KEY não configurada. Exibindo render técnico local."});
     try{
-      const {generateText}=await import("ai");
-      const result=await generateText({
-        model:"google/gemini-3.1-flash-image-preview",
-        prompt:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`,
-        maxOutputTokens:1200,
-        abortSignal:AbortSignal.timeout(45_000),
+      const client=new GoogleGenAI({apiKey});
+      const result=await client.models.generateContent({
+        model:process.env.ANACLETO_3D_IMAGE_MODEL||"gemini-3.1-flash-image-preview",
+        contents:[{role:"user",parts:[{text:`${MASTER_PROMPT}\n\nPRODUCT BRIEF FROM USER: ${description}`}]}],
+        config:{responseModalities:["IMAGE","TEXT"],imageConfig:{aspectRatio:"3:2"},abortSignal:AbortSignal.timeout(45_000)},
       });
-      const generated=(result as any).files?.find((file:any)=>String(file.mediaType||"").startsWith("image/"));
-      if(generated?.uint8Array){
-        if(generated.uint8Array.byteLength > 8 * 1024 * 1024) return send(res,200,{image:fallbackFor(description),fallback:true,code:"IMAGE_TOO_LARGE",message:"A imagem gerada excedeu o limite de resposta. Exibindo render técnico local."});
-        const mime=String(generated.mediaType||"image/png");
-        if(!["image/png","image/jpeg","image/webp"].includes(mime)) return send(res,200,{image:fallbackFor(description),fallback:true,code:"IMAGE_FORMAT_UNSUPPORTED",message:"Formato de imagem não suportado. Exibindo render técnico local."});
-        return send(res,200,{image:`data:${mime};base64,${Buffer.from(generated.uint8Array).toString("base64")}`,fallback:false});
+      const generated=result.candidates?.flatMap((candidate:any)=>candidate.content?.parts||[]).find((part:any)=>part.inlineData?.data&&String(part.inlineData.mimeType||"").startsWith("image/"));
+      if(generated?.inlineData?.data){
+        const mime=String(generated.inlineData.mimeType||"image/png");
+        const imageData=String(generated.inlineData.data);
+        if(Buffer.byteLength(imageData,"base64")>8*1024*1024)return send(res,200,{image:fallbackFor(description),fallback:true,code:"IMAGE_TOO_LARGE",message:"A imagem gerada excedeu o limite de resposta. Exibindo render técnico local."});
+        if(!["image/png","image/jpeg","image/webp"].includes(mime))return send(res,200,{image:fallbackFor(description),fallback:true,code:"IMAGE_FORMAT_UNSUPPORTED",message:"Formato de imagem não suportado. Exibindo render técnico local."});
+        return send(res,200,{image:`data:${mime};base64,${imageData}`,fallback:false,provider:"gemini-direct"});
       }
-      return send(res,200,{image:fallbackFor(description),fallback:true,message:"A IA não retornou uma imagem nesta tentativa. Exibindo render técnico local."});
-    }catch(error){console.error("[GENERATE_3D_RENDER]",error);return send(res,200,{image:fallbackFor(description),fallback:true,message:"Geração indisponível no momento. Exibindo render técnico local."});}
+      return send(res,200,{image:fallbackFor(description),fallback:true,code:"IMAGE_NOT_RETURNED",message:"A IA não retornou uma imagem nesta tentativa. Exibindo render técnico local."});
+    }catch(error:any){
+      console.error("[GENERATE_3D_RENDER]",{name:error?.name,status:error?.status||error?.statusCode,message:String(error?.message||error).slice(0,1000)});
+      return send(res,200,{image:fallbackFor(description),fallback:true,code:error?.name==="TimeoutError"?"IMAGE_GENERATION_TIMEOUT":"IMAGE_GENERATION_FAILED",message:"Geração indisponível no momento. Exibindo render técnico local."});
+    }
   }catch(error){console.error("[GENERATE_3D_RENDER_REQUEST]",error);return send(res,200,{image:FALLBACKS["suprema-2"],fallback:true,message:"Não foi possível processar o pedido. Exibindo render técnico local."});}
 }
