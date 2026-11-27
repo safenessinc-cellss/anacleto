@@ -4,6 +4,7 @@ import { AI_CONFIG } from "../src/server/ai-config.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
 import { hasConfirmedCatalogPrice } from "../src/utils/catalog-price-validation.js";
+import { isUnconfirmedPriceSource } from "../src/utils/quote-price-validation.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 
 type AuthUser = { uid: string; email: string; role: string };
@@ -295,7 +296,7 @@ export default async function handler(req: any, res: any) {
           }
           return { ...item, quantity, unitPrice: catalogPrice, subtotal: Number((quantity * catalogPrice).toFixed(2)), priceValidation: "CATALOG_VERIFIED", catalogPriceAtApproval: catalogPrice, catalogItemId: match.id, sku: String(match.sku || match.code || item.sku || "") };
         }
-        if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O item " + item.description + " tem preço pendente.");
+        if (isUnconfirmedPriceSource(item.priceSource)) throw new Error("O item " + item.description + " tem preço estimado ou pendente. Confirme o valor real ou vincule um preço de catálogo validado antes da aprovação final.");
         if (!canApproveManualPrice(user)) throw new Error("Somente direção/Financeiro pode aprovar manualmente preços sem SKU cadastrado.");
         return { ...item, quantity, subtotal: Number((quantity * price).toFixed(2)), priceValidation: "MANUALLY_APPROVED_BY_AUTHORIZED_USER" };
       });
@@ -355,7 +356,7 @@ export default async function handler(req: any, res: any) {
       const reviewedBudgetItems = budgetItems.map((item: any) => {
         const quantity = Number(item.quantity);
         if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) throw new Error("Quantidade inválida no orçamento técnico.");
-        if (["pending","pendente"].includes(String(item.priceSource || "").toLowerCase())) throw new Error("O desenho contém preços pendentes; revise antes de aprovar.");
+        if (isUnconfirmedPriceSource(item.priceSource)) throw new Error("O desenho contém preços estimados ou pendentes; confirme os valores antes da aprovação final.");
         const match = catalogMatch(item, catalog);
         if (item.catalogItemId || item.sku) {
           if (!match) throw new Error("SKU/ID do orçamento técnico não existe no catálogo.");
