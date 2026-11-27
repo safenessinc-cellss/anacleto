@@ -101,6 +101,7 @@ export default function PostSaleModule() {
   };
 
   return <div className="space-y-6">
+    <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Para manter a tela responsiva, o módulo carrega até 300 registros recentes de pós-venda e até 300 orçamentos nas etapas de qualidade. O histórico mais antigo ainda precisa de paginação.</p>
     <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Relacionamento com o cliente</p><h1 className="text-2xl font-black text-slate-900 dark:text-white">Pós-venda</h1><p className="mt-1 text-sm text-slate-500">Qualidade do produto, satisfação e continuidade do atendimento.</p></div>
       <button onClick={() => setOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4"/> Novo registro</button>
