@@ -32,7 +32,10 @@ const glassFill = "#38bdf8";
 const glassStroke = "#bae6fd";
 
 export function isAluminumPrompt(prompt: string): boolean {
-  return /alum[ií]nio|aluminum|esquadria|perfil\s+de\s+alum[ií]nio|linha\s+(?:suprema|gold)|box(?:\s+de\s+(?:banho|banheiro))?/i.test(prompt);
+  const hasOpening = /esquadria|janela|ventana|porta|puerta/i.test(prompt);
+  const hasAluminumSystem = /alum[ií]nio|aluminum|linha\s+(?:suprema|gold)|perfil\s+de\s+alum[ií]nio/i.test(prompt);
+  const isBathBox = /box(?:\s+de\s+(?:banho|banheiro))?/i.test(prompt);
+  return isBathBox || (hasOpening && hasAluminumSystem);
 }
 
 export function localParametricSpec(prompt: string): ParametricWindowSpec {
