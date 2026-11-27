@@ -383,7 +383,16 @@ export default async function handler(req: any, res: any) {
       ...(collection === "quotes" ? { productionOrderId: snapshot.document.productionOrderId } : {}),
     });
   } catch (error: any) {
-    console.error("Approved snapshot operation failed:", error?.message || error);
-    return send(res, 422, { error: error?.message || "Não foi possível aprovar e congelar o documento." });
+    const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
+    const status = Number(error?.statusCode || (timedOut ? 504 : 422));
+    const requestId = String(req.headers?.["x-vercel-id"] || req.headers?.["x-request-id"] || "");
+    console.error("[APPROVED_SNAPSHOT] operation failed", {
+      requestId, status, code: error?.code || "APPROVED_SNAPSHOT_FAILED",
+      message: String(error?.message || error).slice(0, 1000), stack: error?.stack,
+    });
+    return send(res, status >= 400 && status < 600 ? status : 422, {
+      error: status >= 500 ? "Serviço temporariamente indisponível. Tente novamente." : error?.message || "Não foi possível aprovar e congelar o documento.",
+      code: error?.code || "APPROVED_SNAPSHOT_FAILED", requestId,
+    });
   }
 }
