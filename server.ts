@@ -117,7 +117,7 @@ app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole,
     const names = ["quotes", "invoices", "inventory_items", "inventory_movements", "ledger_entries", "payables", "receivables", "purchase_orders"];
     const [loaded, catalogRows] = await Promise.all([
       Promise.all(names.map(name => loadCollectionFromFirestore(req, name, 250))),
-      loadCatalogFromFirestore(req),
+      loadCatalogFromFirestore(req, { cacheTtlMs: 20_000, cacheKey: String(res.locals.firebaseUser?.uid || "") }),
     ]);
     const data = Object.fromEntries(names.map((name, index) => [name, loaded[index]]));
     const catalog = catalogRows.slice(0, 250).map(row => ({
@@ -341,7 +341,7 @@ app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimit
     const currentQuote = { ...storedQuote, id: quoteId };
     const storedQuoteItems = Array.isArray(storedQuote.items) ? storedQuote.items : [];
     if (!message) return res.status(400).json({ error: "Mensagem obrigatória." });
-    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 1000);
+    let catalog = (await loadCatalogFromFirestore(req, { cacheTtlMs: 20_000, cacheKey: String(res.locals.firebaseUser?.uid || "") })).slice(0, 1000);
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((entry: any) => ({
       role: entry?.role === "assistant" ? "assistant" : "user",
       text: String(entry?.text || "").slice(0, 2000),
@@ -385,6 +385,7 @@ Solicitação atual: ${message}`,
         return value;
       },
     });
+    catalog = await refreshCatalogMatchesFromFirestore(req, catalog, parsed.items);
     await recordAIAudit({
       serviceName: "BUDGET", modelUsed: AI_CONFIG.quote.model,
       input: { message, history, currentQuote },
