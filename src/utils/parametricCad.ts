@@ -7,7 +7,8 @@ export type AluminumTipologia =
   | "porta_pivotante"
   | "maxim_ar"
   | "basculante"
-  | "box_banheiro";
+  | "box_banheiro"
+  | "a_definir";
 
 export interface ParametricWindowSpec {
   tipologia: AluminumTipologia;
@@ -48,13 +49,18 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
     const factor = normalizedUnit === "m" ? 1000 : normalizedUnit === "cm" ? 10 : 1;
     return Number.isFinite(number) && number > 0 ? Math.round(number * factor) : 0;
   };
+  const isDoor = /porta/.test(text);
+  const isWindow = /janela/.test(text);
+  const hasSlidingOpening = /correr|corredi[cç]a|deslizante/.test(text);
+  const hasSwingOpening = /giro|abrir|dobradi[cç]a/.test(text);
   const tipologia: AluminumTipologia = /box/.test(text) ? "box_banheiro"
     : /maxim[\s-]?ar/.test(text) ? "maxim_ar"
     : /basculante/.test(text) ? "basculante"
     : /pivot/.test(text) ? "porta_pivotante"
-    : /porta/.test(text) && /giro|abrir|dobradi[cç]a/.test(text) ? "porta_giro"
-    : /porta/.test(text) ? "porta_correr"
-    : "janela_correr";
+    : isDoor && hasSwingOpening ? "porta_giro"
+    : isDoor && hasSlidingOpening ? "porta_correr"
+    : isWindow && hasSlidingOpening ? "janela_correr"
+    : "a_definir";
   const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is)/)?.[1] || 0);
   const leaves = requestedLeaves > 0 ? Math.min(8, requestedLeaves) : 0;
   const widthMatch = prompt.match(/largura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)(?:\s*(mm|cm|m))?/i);
@@ -70,6 +76,7 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   const fixedModule = /m[oó]dulo fixo|fix[oa]/.test(text) && !/sem\s+(?:m[oó]dulo fixo|fix[oa])/.test(text);
   const pendencias: string[] = [];
   if (!(width > 0) || !(height > 0)) pendencias.push("Informar largura e altura com unidade explícita (mm, cm ou m), confirmando a ordem altura × largura.");
+  if (tipologia === "a_definir") pendencias.push("Confirmar a tipologia e o sistema de abertura; não foi presumido correr ou giro.");
   if (!(leaves > 0)) pendencias.push("Confirmar a quantidade de folhas/painéis.");
   if (!namedLine) pendencias.push("Definir fabricante e linha do perfil.");
   if (!/(bronze|natural|prata|anodiz|preto|branco)/.test(text)) pendencias.push("Definir acabamento/cor do perfil.");
@@ -110,8 +117,8 @@ function text(elements: CadElement[], x: number, y: number, value: string, fill 
 
 function buildElevation(spec: ParametricWindowSpec): CadElement[] {
   const elements: CadElement[] = [];
-  if (!(spec.largura_mm > 0) || !(spec.altura_mm > 0) || !(spec.folhas > 0)) {
-    text(elements, 500, 430, "Geometria pendente — informe altura, largura e folhas", "#fbbf24", 22);
+  if (spec.tipologia === "a_definir" || !(spec.largura_mm > 0) || !(spec.altura_mm > 0) || !(spec.folhas > 0)) {
+    text(elements, 500, 430, spec.tipologia === "a_definir" ? "Geometria pendente — confirme tipologia, abertura, altura, largura e folhas" : "Geometria pendente — informe altura, largura e folhas", "#fbbf24", 22);
     return elements;
   }
   const { tipologia, largura_mm: width, altura_mm: height, folhas, modulo_fixo: fixed, cor_perfil: color } = spec;
@@ -193,7 +200,7 @@ function buildElevation(spec: ParametricWindowSpec): CadElement[] {
 export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: string, _catalog: any[] = []): TechnicalDrawing {
   const width = Number.isFinite(spec.largura_mm) && spec.largura_mm > 0 ? spec.largura_mm : 0;
   const height = Number.isFinite(spec.altura_mm) && spec.altura_mm > 0 ? spec.altura_mm : 0;
-  const dimensionsKnown = width > 0 && height > 0 && spec.folhas > 0;
+  const dimensionsKnown = width > 0 && height > 0 && spec.folhas > 0 && spec.tipologia !== "a_definir";
   const isDoor = spec.tipologia.startsWith("porta");
   const isBox = spec.tipologia === "box_banheiro";
   const assumptions = [
