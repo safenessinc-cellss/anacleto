@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, getDocs, where, writeBatch, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, getDocs, where, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Award, ClipboardCheck, MessageSquareHeart, Plus, Search, Trash2, Wrench, X } from "lucide-react";
@@ -34,8 +34,8 @@ export default function PostSaleModule() {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => onSnapshot(query(collection(db, "post_sale_records"), orderBy("createdAt", "desc")), snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Entry))), err => console.error("Erro ao carregar pós-venda:", err)), []);
-  useEffect(() => onSnapshot(collection(db, "quotes"), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Erro ao carregar orçamentos para qualidade:", err)), []);
+  useEffect(() => onSnapshot(query(collection(db, "post_sale_records"), orderBy("createdAt", "desc"), limit(300)), snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Entry))), err => console.error("Erro ao carregar pós-venda:", err)), []);
+  useEffect(() => onSnapshot(query(collection(db, "quotes"), where("productionStatus", "in", ["awaiting_quality", "quality_hold", "delivered"]), limit(300)), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Erro ao carregar orçamentos para qualidade:", err)), []);
   const qualityQuotes = quotes.filter(quote => ["awaiting_quality", "quality_hold", "delivered"].includes(String(quote.productionStatus || "")));
   const selectedQualityQuote = quotes.find(quote => quote.id === qualityQuoteId);
   const visible = useMemo(() => entries.filter(e => (filter === "all" || e.kind === filter) && [e.customer, e.orderNumber, e.product, e.title].join(" ").toLowerCase().includes(search.toLowerCase())), [entries, filter, search]);
