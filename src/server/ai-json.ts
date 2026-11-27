@@ -1,5 +1,6 @@
 import { generateText } from "ai";
 import { GoogleGenAI } from "@google/genai";
+import { shouldAttemptGatewayFallback } from "../utils/ai-provider-routing.js";
 import { AI_CONFIG, getAIModel } from "./ai-config.js";
 
 export class AIJsonError extends Error {
@@ -202,7 +203,7 @@ export async function generateValidatedJson<T>(options: {
 
   // Gateway is a last resort only. A 403 customer-verification/billing error is
   // not retried and is surfaced clearly instead of being mislabeled as timeout.
-  if (!geminiKey && !openAIKey && gatewayConfigured && Date.now() < deadline) {
+  if (shouldAttemptGatewayFallback(gatewayConfigured, deadline - Date.now())) {
     try {
       const result = await generateText({
         model: getAIModel(options.capability), system: options.system, prompt: options.prompt,
