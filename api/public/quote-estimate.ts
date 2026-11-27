@@ -1,6 +1,5 @@
-import { generateText } from "ai";
-import { AI_CONFIG, getAIModel } from "../../src/server/ai-config.js";
-import { parseAIJson } from "../../src/server/ai-json.js";
+import { AI_CONFIG } from "../../src/server/ai-config.js";
+import { generateValidatedJson } from "../../src/server/ai-json.js";
 import { recordAIAudit } from "../../src/server/ai-audit.js";
 import { consumeRateLimit, getClientIp } from "../../src/server/rate-limit.js";
 import { getAIRateLimit } from "../../src/server/ai-limits.js";
@@ -30,37 +29,36 @@ export default async function handler(req: any, res: any) {
     auditPrompt = prompt;
     if (prompt.length < 12 || prompt.length > 3000) return send(res, 400, { error: "Descreva o projeto em 12 a 3000 caracteres." });
     const aiStartedAt = Date.now();
-    const result = await generateText({
-      model: getAIModel("publicEstimate"),
-      system: "Você é um assistente de pré-atendimento comercial. Resuma escopo, tipologia provável, medidas mencionadas e perguntas faltantes. NÃO invente preços, SKUs, prazos ou disponibilidade. NÃO produza orçamento vinculante nem preço comercial. Responda em português do Brasil, JSON válido com scopeSummary, detectedDimensions, questions, disclaimer.",
+    let generatedText = "";
+    let generatedUsage: any = undefined;
+    const estimate = await generateValidatedJson({
+      capability: "publicEstimate",
+      system: "Você é um assistente de pré-atendimento comercial. Resuma escopo, tipologia provável, medidas mencionadas e perguntas faltantes. NÃO invente preços, SKUs, prazos ou disponibilidade. NÃO produza orçamento vinculante nem preço comercial. Responda em português do Brasil, JSON válido com scopeSummary, detectedDimensions, questions, disclaimer. Nunca inclua price, total, cost, sku ou valores monetários.",
       prompt,
       temperature: AI_CONFIG.publicEstimate.temperature,
       maxOutputTokens: AI_CONFIG.publicEstimate.maxOutputTokens,
-      abortSignal: AbortSignal.timeout(AI_CONFIG.publicEstimate.timeoutMs),
-    });
-    let estimate: Record<string, unknown>;
-    try {
-      estimate = parseAIJson(result.text, (value: any) => {
+      validate: (value: any) => {
         if (!value || typeof value !== "object" || Array.isArray(value) ||
             typeof value.scopeSummary !== "string" || !Array.isArray(value.questions) ||
-            typeof value.disclaimer !== "string") throw new Error("Invalid public estimate response schema.");
+            !value.questions.every((item: unknown) => typeof item === "string") ||
+            typeof value.disclaimer !== "string" ||
+            (value.detectedDimensions !== undefined && !Array.isArray(value.detectedDimensions)) ||
+            ["price", "total", "cost", "sku", "amount"].some((key) => Object.prototype.hasOwnProperty.call(value, key))) {
+          throw new Error("Invalid or unsafe public estimate response schema.");
+        }
         return value as Record<string, unknown>;
-      });
-    } catch (parseError) {
-      await recordAIAudit({
-        serviceName: "BUDGET", modelUsed: AI_CONFIG.publicEstimate.model,
-        input: { description: prompt, channel: "public" }, output: result.text,
-        usage: result.usage as any, error: parseError, startedAt: aiStartedAt,
-        requestId: String(req.headers?.["x-request-id"] || ""),
-      });
-      return send(res, 502, { error: "Não foi possível estruturar a pré-avaliação. Tente novamente." });
-    }
+      },
+      onGeneration: (event) => {
+        generatedText = event.text;
+        generatedUsage = event.usage;
+      },
+    });
     await recordAIAudit({
       serviceName: "BUDGET",
       modelUsed: AI_CONFIG.publicEstimate.model,
       input: { description: prompt, channel: "public" },
       output: estimate,
-      usage: result.usage as any,
+      usage: generatedUsage,
       requestId: String(req.headers?.["x-request-id"] || ""),
       startedAt: aiStartedAt,
     });
