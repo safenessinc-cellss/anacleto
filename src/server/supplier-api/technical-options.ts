@@ -1,4 +1,7 @@
 import firebaseConfig from "../../../firebase-applet-config.json" with { type: "json" };
+import { authenticateFirebaseRequest } from "../firebase-auth.js";
+import { hasAIRole } from "../ai-roles.js";
+import { stripBearerPrefix } from "../auth-token.js";
 
 type FirestoreValue = Record<string, any>;
 
@@ -26,7 +29,7 @@ async function readCollection(name: string, token: string, fieldPaths: string[])
 
   const response = await fetch(url, {
     headers: { Authorization: "Bearer " + token },
-    signal: AbortSignal.timeout(3000),
+    signal: AbortSignal.timeout(8000),
   });
 
   if (!response.ok) {
@@ -54,26 +57,14 @@ export default async function handler(req: any, res: any) {
 
   let stage = "request_validation";
   try {
-    const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
-    if (!token) return res.status(401).json({ error: "Autenticação obrigatória." });
-
-    const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
-    if (!apiKey || !firebaseConfig.projectId) {
-      stage = "server_configuration";
-      throw new Error("Configuração Firebase ausente no servidor.");
-    }
+    const token = stripBearerPrefix(req.headers.authorization);
+    if (!token) return res.status(401).json({ error: "Autenticação obrigatória.", code: "UNAUTHORIZED" });
+    if (!firebaseConfig.projectId) throw Object.assign(new Error("Configuração Firebase ausente no servidor."), { statusCode: 503 });
 
     stage = "firebase_authentication";
-    const auth = await fetch(
-      "https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + encodeURIComponent(apiKey),
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: token }),
-        signal: AbortSignal.timeout(3000),
-      },
-    );
-    if (!auth.ok) return res.status(401).json({ error: "Sessão inválida." });
+    const user = await authenticateFirebaseRequest(req);
+    if (!user) return res.status(401).json({ error: "Sessão inválida.", code: "INVALID_SESSION" });
+    if (!hasAIRole(user.role, "technicalDrawing")) return res.status(403).json({ error: "Perfil sem permissão para consultar opções técnicas.", code: "ROLE_FORBIDDEN" });
 
     stage = "firestore_read";
     const [profiles, rules] = await Promise.all([
