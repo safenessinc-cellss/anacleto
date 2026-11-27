@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "./src/server/ai-config.js";
 import { generateValidatedJson, parseAIJson } from "./src/server/ai-json.js";
-import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore } from "./src/server/firestore-data.js";
+import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore, refreshCatalogMatchesFromFirestore } from "./src/server/firestore-data.js";
 import technicalDrawingHandler from "./api/technical-drawing.js";
 import approvedSnapshotHandler from "./api/approved-snapshot.js";
 import supplierCatalogVisionHandler from "./api/supplier-catalog-vision.js";
@@ -487,9 +487,14 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
   try {
     const prompt = String(req.body?.prompt || "").trim().slice(0, 6000);
     const language = String(req.body?.language || "pt").slice(0, 8);
-    const fullCatalog = await loadCatalogFromFirestore(req);
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
-    const catalog = selectRelevantBudgetCatalog(prompt, fullCatalog, 450);
+    const requestId = String(req.headers["x-request-id"] || req.headers["x-vercel-id"] || "");
+    const catalogStartedAt = Date.now();
+    const fullCatalog = await loadCatalogFromFirestore(req, { cacheTtlMs: 20_000, cacheKey: String(res.locals.firebaseUser?.uid || "") });
+    const catalogLoadMs = Date.now() - catalogStartedAt;
+    let catalog = selectRelevantBudgetCatalog(prompt, fullCatalog, 450);
+    console.info("[BUDGET_ITEMS_AI] catalog_loaded", { requestId, catalogLoadMs, totalCatalogRows: fullCatalog.length, selectedCatalogRows: catalog.length });
+    const generationStartedAt = Date.now();
     const parsed = await generateValidatedJson({
       capability: "budget",
       system: `Você é o engenheiro orçamentista da Anacleto Esquadrias, especialista em sistemas de janelas e portas de alumínio, vidro, ferragens, acessórios, vedação, fixação e fabricação/instalação. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","supplier":"","category":"","variant":"","side":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real relevante: ${JSON.stringify(catalog)}.
@@ -512,6 +517,10 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         return value;
       },
     });
+    const catalogRefreshStartedAt = Date.now();
+    catalog = await refreshCatalogMatchesFromFirestore(req, catalog, parsed.items);
+    const catalogRefreshMs = Date.now() - catalogRefreshStartedAt;
+    console.info("[BUDGET_ITEMS_AI] generation_completed", { requestId, generationMs: Date.now() - generationStartedAt, catalogLoadMs, catalogRefreshMs, totalMs: Date.now() - aiStartedAt, generatedItems: parsed.items.length });
     await recordAIAudit({
       serviceName: "BUDGET", modelUsed: AI_CONFIG.budget.model,
       input: { prompt, language, catalogCount: catalog.length },
