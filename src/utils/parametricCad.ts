@@ -32,7 +32,7 @@ const glassFill = "#38bdf8";
 const glassStroke = "#bae6fd";
 
 export function isAluminumPrompt(prompt: string): boolean {
-  return /janela|ventana|porta|puerta|esquadria|\bbox\b|maxim[\s-]?ar|basculante|pivotante/i.test(prompt);
+  return /alum[ií]nio|aluminum|esquadria|perfil\s+de\s+alum[ií]nio|linha\s+(?:suprema|gold)|box(?:\s+de\s+(?:banho|banheiro))?/i.test(prompt);
 }
 
 export function localParametricSpec(prompt: string): ParametricWindowSpec {
