@@ -550,6 +550,19 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
       showToast("Salve as alterações do orçamento antes de aprová-lo.", "warning");
       return;
     }
+    const approvalState = selectedQuote as any;
+    if (approvalState.requiresTechnicalVisit === true && String(approvalState.technicalVisitStatus || "pending") !== "completed") {
+      showToast("Registre a visita técnica e confirme as medidas antes da aprovação final.", "warning");
+      return;
+    }
+    if ((Array.isArray(approvalState.pendingQuestions) && approvalState.pendingQuestions.length > 0) || (approvalState.requiresClientConfirmation === true && String(approvalState.clientConfirmationStatus || "pending") !== "completed")) {
+      showToast("Resolva e registre as respostas às perguntas pendentes antes da aprovação final.", "warning");
+      return;
+    }
+    if (selectedQuote.items.some((item: any) => item.quantityPending === true || !(Number(item.quantity) > 0))) {
+      showToast("Informe e confirme as quantidades pendentes antes da aprovação final.", "warning");
+      return;
+    }
     if (selectedQuote.items.some((item) => item.priceSource === "pending" || item.priceSource === "estimated")) {
       showToast("Confirme os preços estimados/pendentes no catálogo ou informe um preço manual para validação da direção/Financeiro antes de aprovar.", "warning");
       return;
@@ -1046,7 +1059,8 @@ const handleAddItem = () => {
     if (!selectedQuote) return;
     const updatedItems = selectedQuote.items.map((it) => {
       if (it.id === id) {
-        const next = { ...it, [field]: val };
+        const next: any = { ...it, [field]: val };
+        if (field === "quantity") next.quantityPending = !(Number(val) > 0);
         if (field === "unitPrice") {
           next.priceSource = "manual";
           next.priceValidation = "MANUAL_ENTRY_PENDING_AUTHORIZATION";
@@ -1072,6 +1086,7 @@ const handleAddItem = () => {
 
   return (
     <div className="space-y-6">
+      {selectedQuote && !selectedQuote.approvedSnapshotId && (((selectedQuote as any).preliminaryOnly === true) || (Array.isArray((selectedQuote as any).pendingQuestions) && (selectedQuote as any).pendingQuestions.length > 0) || (selectedQuote as any).requiresTechnicalVisit === true || selectedQuote.items.some((item: any) => item.quantityPending === true || item.priceSource === "estimated" || item.priceSource === "pending" || item.priceSource === "manual")) && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><b>Proposta preliminar — aprovação bloqueada enquanto houver pendências.</b>{(selectedQuote as any).requiresTechnicalVisit && <p className="mt-1">Visita técnica: {String((selectedQuote as any).technicalVisitStatus || "pending") === "completed" ? "concluída" : "pendente"}.</p>}{Array.isArray((selectedQuote as any).pendingQuestions) && (selectedQuote as any).pendingQuestions.length > 0 && <ul className="mt-1 list-disc pl-5">{(selectedQuote as any).pendingQuestions.map((question: string,index: number)=><li key={index}>{question}</li>)}</ul>}</div>}
       {limitedSources.includes("quotes")&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado aos 300 orçamentos mais recentes. Orçamentos antigos não aparecem nesta lista; use o histórico unificado para consultar os registros disponíveis.</p>}
       {limitedCatalogSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Catálogo limitado a 500 registros por origem ({limitedCatalogSources.join(", ")}). Alguns itens antigos podem não aparecer na seleção; a paginação do catálogo ainda está pendente.</p>}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-2xl">
@@ -1378,11 +1393,12 @@ const handleAddItem = () => {
                         <div className="flex items-center gap-2 w-full sm:w-auto">
                           <div className="flex items-center gap-1">
                             <span className="text-[10px] text-slate-500">Qtd.:</span>
+                            {(item.quantityPending === true || !(Number(item.quantity) > 0)) && <span className="text-[9px] font-semibold text-amber-300">A confirmar</span>}
                             <input
                               type="number"
-                              min="1"
+                              min="0"
                               value={item.quantity}
-                              onChange={(e) => handleUpdateItem(item.id, "quantity", Number(e.target.value) || 1)}
+                              onChange={(e) => handleUpdateItem(item.id, "quantity", Number(e.target.value) || 0)}
                               className="w-16 px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white font-mono text-center outline-none"
                             />
                           </div>
