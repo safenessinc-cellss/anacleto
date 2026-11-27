@@ -13,4 +13,7 @@ test("all AI routes have explicit finite quotas", () => {
 test("unknown quota buckets are rejected", () => {
   assert.throws(() => getAIRateLimit("unregistered-route"), /No AI rate-limit policy/);
   assert.deepEqual(getAIRateLimit("payment-pix"), { limit: 5, windowMs: 60_000 });
+  assert.deepEqual(getAIRateLimit("generate-3d-render"), { limit: 3, windowMs: 60_000 });
+  assert.deepEqual(getAIRateLimit("architectural-visualization"), { limit: 3, windowMs: 60_000 });
+  assert.deepEqual(getAIRateLimit("public-quote-estimate"), { limit: 3, windowMs: 3_600_000 });
 });
