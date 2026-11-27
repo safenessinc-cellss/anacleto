@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "./src/server/ai-config.js";
 import { generateValidatedJson, parseAIJson } from "./src/server/ai-json.js";
+import { normalizeBudgetAIDraftResponse } from "./src/server/budget-ai-response.js";
 import { loadCatalogFromFirestore, loadQuoteFromFirestore, loadCollectionFromFirestore, refreshCatalogMatchesFromFirestore } from "./src/server/firestore-data.js";
 import technicalDrawingHandler from "./api/technical-drawing.js";
 import approvedSnapshotHandler from "./api/approved-snapshot.js";
@@ -491,21 +492,7 @@ Preencha pendingQuestions com perguntas curtas e específicas sempre que faltare
         aiUsage.inputTokens += Number(usage?.inputTokens ?? usage?.promptTokens ?? 0);
         aiUsage.outputTokens += Number(usage?.outputTokens ?? usage?.completionTokens ?? 0);
       },
-      validate: (value: any) => {
-        if (!Array.isArray(value?.items) || !value.items.length || value.items.length > 150) throw new Error("A IA não retornou uma lista válida de itens.");
-        for (const item of value.items) {
-          const qty = Number(item?.qty);
-          if (!String(item?.description || "").trim() || !Number.isFinite(qty) || qty < 0) throw new Error("Linha inválida retornada pela IA.");
-        }
-        const pendingQuestions = Array.isArray(value.pendingQuestions) ? value.pendingQuestions.map((q: any) => String(q || "").trim()).filter(Boolean).slice(0, 20) : [];
-        return {
-          ...value,
-          notes: String(value.notes || "").slice(0, 4000),
-          pendingQuestions,
-          visitRequired: value.visitRequired === true,
-          visitReason: String(value.visitReason || "").slice(0, 1000),
-        };
-      },
+      validate: normalizeBudgetAIDraftResponse,
     });
     const catalogRefreshStartedAt = Date.now();
     catalog = await refreshCatalogMatchesFromFirestore(req, catalog, parsed.items);
