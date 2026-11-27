@@ -4,7 +4,7 @@ import { AI_CONFIG } from "../src/server/ai-config.js";
 import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
 import { hasConfirmedCatalogPrice } from "../src/utils/catalog-price-validation.js";
-import { isUnconfirmedPriceSource } from "../src/utils/quote-price-validation.js";
+import { isUnconfirmedPriceSource, requiresCatalogPriceVerification } from "../src/utils/quote-price-validation.js";
 import { isTechnicalVisitPending } from "../src/utils/budget-workflow.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 
@@ -289,7 +289,7 @@ export default async function handler(req: any, res: any) {
         const price = Number(item.unitPrice);
         if (!Number.isFinite(price) || price < 0 || price > 1000000000) throw new Error("Preço inválido no orçamento.");
         const match = catalogMatch(item, catalog);
-        if (item.catalogItemId || item.sku || item.itemId) {
+        if (requiresCatalogPriceVerification(item)) {
           if (!match) throw new Error("SKU/ID sem correspondência no catálogo: " + (item.sku || item.catalogItemId || item.itemId));
           const catalogPrice = Number(match.price);
           if (!hasConfirmedCatalogPrice(match)) throw new Error("O preço do catálogo ainda não foi validado. Solicite a revisão do preço antes de aprovar.");
