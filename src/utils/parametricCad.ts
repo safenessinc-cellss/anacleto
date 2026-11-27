@@ -37,7 +37,7 @@ export function isAluminumPrompt(prompt: string): boolean {
 
 export function localParametricSpec(prompt: string): ParametricWindowSpec {
   const text = prompt.toLowerCase();
-  const match = prompt.match(/(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)?\\s*[x×]\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)?/i);
+  const match = prompt.match(/(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
   const toMm = (value: string | undefined, unit: string | undefined) => {
     if (!value || !unit) return 0;
     const number = Number(value.replace(",", "."));
@@ -46,25 +46,25 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
     return Number.isFinite(number) && number > 0 ? Math.round(number * factor) : 0;
   };
   const tipologia: AluminumTipologia = /box/.test(text) ? "box_banheiro"
-    : /maxim[\\s-]?ar/.test(text) ? "maxim_ar"
+    : /maxim[\s-]?ar/.test(text) ? "maxim_ar"
     : /basculante/.test(text) ? "basculante"
     : /pivot/.test(text) ? "porta_pivotante"
     : /porta/.test(text) && /giro|abrir|dobradi[cç]a/.test(text) ? "porta_giro"
     : /porta/.test(text) ? "porta_correr"
     : "janela_correr";
-  const requestedLeaves = Number(text.match(/(\\d{1,2})\\s*(?:folhas?|pain[eé]is)/)?.[1] || 0);
+  const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is)/)?.[1] || 0);
   const leaves = requestedLeaves > 0 ? Math.min(8, requestedLeaves) : 0;
-  const widthMatch = prompt.match(/largura\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)/i);
-  const heightMatch = prompt.match(/altura\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)/i);
+  const widthMatch = prompt.match(/largura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)/i);
+  const heightMatch = prompt.match(/altura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)/i);
   // Unlabelled dimensions follow the requested convention: ALTURA × LARGURA.
   const sharedUnit = match?.[4] || match?.[2];
   const height = toMm(heightMatch?.[1] || match?.[1], heightMatch?.[2] || sharedUnit);
   const width = toMm(widthMatch?.[1] || match?.[3], widthMatch?.[2] || sharedUnit);
-  const namedLine = prompt.match(/\\blinha\\s+(suprema|gold|\\d+)\\b/i)?.[1] || prompt.match(/\\b(suprema|gold)\\b/i)?.[1];
-  const glassType = text.match(/\\b(duplo|laminado|temperado|insulado|comum|float)\\b/)?.[1];
-  const thickness = text.match(/(?:vidro\\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\\s+)?(?:de\\s*)?|espessura\\s*(?:de\\s*)?)(\\d+(?:[.,]\\d+)?)\\s*mm/)?.[1]
-    || text.match(/(\\d+(?:[.,]\\d+)?)\\s*mm\\s*(?:de\\s*)?(?:vidro|espessura)\\b/)?.[1];
-  const fixedModule = /m[oó]dulo fixo|fix[oa]/.test(text) && !/sem\\s+(?:m[oó]dulo fixo|fix[oa])/.test(text);
+  const namedLine = prompt.match(/\blinha\s+(suprema|gold|\d+)\b/i)?.[1] || prompt.match(/\b(suprema|gold)\b/i)?.[1];
+  const glassType = text.match(/\b(duplo|laminado|temperado|insulado|comum|float)\b/)?.[1];
+  const thickness = text.match(/(?:vidro\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\s+)?(?:de\s*)?|espessura\s*(?:de\s*)?)(\d+(?:[.,]\d+)?)\s*mm/)?.[1]
+    || text.match(/(\d+(?:[.,]\d+)?)\s*mm\s*(?:de\s*)?(?:vidro|espessura)\b/)?.[1];
+  const fixedModule = /m[oó]dulo fixo|fix[oa]/.test(text) && !/sem\s+(?:m[oó]dulo fixo|fix[oa])/.test(text);
   const pendencias: string[] = [];
   if (!(width > 0) || !(height > 0)) pendencias.push("Informar largura e altura com unidade explícita (mm, cm ou m), confirmando a ordem altura × largura.");
   if (!(leaves > 0)) pendencias.push("Confirmar a quantidade de folhas/painéis.");
@@ -77,13 +77,13 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   if (!/fix[oa]|m[oó]dulo fixo|sem m[oó]dulo fixo/.test(text)) pendencias.push("Confirmar se existe módulo fixo.");
   return {
     tipologia,
-    linha_aluminio: namedLine ? `Linha ${namedLine.replace(/\\b\\w/g, (letter) => letter.toUpperCase())}` : "Linha a definir",
+    linha_aluminio: namedLine ? `Linha ${namedLine.replace(/\b\w/g, (letter) => letter.toUpperCase())}` : "Linha a definir",
     cor_perfil: /bronze/.test(text) ? "#80552f"
       : /anodiz|natural|prata/.test(text) ? "#9da8ae"
       : /preto/.test(text) ? "#1f2937"
       : /branco/.test(text) ? "#f8fafc"
       : "a definir",
-    cor_vidro: text.match(/\\b(incolor|bronze|verde|fum[eê]|cinza)\\b/i)?.[1]?.toLowerCase() || "a definir",
+    cor_vidro: text.match(/\b(incolor|bronze|verde|fum[eê]|cinza)\b/i)?.[1]?.toLowerCase() || "a definir",
     largura_mm: width,
     altura_mm: height,
     folhas: leaves,
