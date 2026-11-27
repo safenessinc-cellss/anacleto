@@ -54,16 +54,17 @@ export default function PurchasesModule() {
   const [filter, setFilter] = useState("all");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const a = onSnapshot(collection(db, "suppliers"), snap => setSuppliers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier))));
-    const catalogUnsub = onSnapshot(collection(db, "supplier_catalog"), snap => setSupplierCatalog(snap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierCatalogItem))), err => setError("Falha ao carregar catálogo dos fornecedores: " + err.message));
-    const productsCatalogUnsub = onSnapshot(collection(db, "catalog"), snap => setProductCatalog(current => [...current.filter(row => row.supplier === "__registry_products__" || row.supplier === "__registry_items__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), supplier: String(d.data().supplier || "Catálogo de produtos") } as SupplierCatalogItem))]), err => setError("Falha ao carregar o cadastro de produtos: " + err.message));
-    const registryProductsUnsub = onSnapshot(collection(db, "registry_products"), snap => setProductCatalog(current => [...current.filter(row => row.supplier !== "__registry_products__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), code: String(d.data().code || ""), supplier: "__registry_products__" } as SupplierCatalogItem))]), err => setError("Falha ao carregar produtos cadastrados: " + err.message));
-    const registryItemsUnsub = onSnapshot(collection(db, "registry_items"), snap => setProductCatalog(current => [...current.filter(row => row.supplier !== "__registry_items__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), code: String(d.data().code || ""), supplier: "__registry_items__" } as SupplierCatalogItem))]), err => setError("Falha ao carregar itens cadastrados: " + err.message));
-    const b = onSnapshot(collection(db, "purchase_orders"), snap => {
+    const a = onSnapshot(query(collection(db, "suppliers"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "suppliers"])] : v.filter(x => x !== "suppliers")); setSuppliers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Supplier))); });
+    const catalogUnsub = onSnapshot(query(collection(db, "supplier_catalog"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "supplier_catalog"])] : v.filter(x => x !== "supplier_catalog")); setSupplierCatalog(snap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierCatalogItem))); }, err => setError("Falha ao carregar catálogo dos fornecedores: " + err.message));
+    const productsCatalogUnsub = onSnapshot(query(collection(db, "catalog"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "catalog"])] : v.filter(x => x !== "catalog")); setProductCatalog(current => [...current.filter(row => row.supplier === "__registry_products__" || row.supplier === "__registry_items__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), supplier: String(d.data().supplier || "Catálogo de produtos") } as SupplierCatalogItem))]); }, err => setError("Falha ao carregar o cadastro de produtos: " + err.message));
+    const registryProductsUnsub = onSnapshot(query(collection(db, "registry_products"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "registry_products"])] : v.filter(x => x !== "registry_products")); setProductCatalog(current => [...current.filter(row => row.supplier !== "__registry_products__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), code: String(d.data().code || ""), supplier: "__registry_products__" } as SupplierCatalogItem))]); }, err => setError("Falha ao carregar produtos cadastrados: " + err.message));
+    const registryItemsUnsub = onSnapshot(query(collection(db, "registry_items"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "registry_items"])] : v.filter(x => x !== "registry_items")); setProductCatalog(current => [...current.filter(row => row.supplier !== "__registry_items__"), ...snap.docs.map(d => ({ id: d.id, ...d.data(), code: String(d.data().code || ""), supplier: "__registry_items__" } as SupplierCatalogItem))]); }, err => setError("Falha ao carregar itens cadastrados: " + err.message));
+    const b = onSnapshot(query(collection(db, "purchase_orders"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "purchase_orders"])] : v.filter(x => x !== "purchase_orders"));
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() } as Purchase));
       rows.sort((x, y) => (y.createdAt || "").localeCompare(x.createdAt || ""));
       setPurchases(rows);
@@ -488,6 +489,7 @@ export default function PurchasesModule() {
   const statusClass: Record<string, string> = { pending: "bg-amber-50 text-amber-700", approved: "bg-blue-50 text-blue-700", received: "bg-emerald-50 text-emerald-700", cancelled: "bg-slate-100 text-slate-500", draft: "bg-slate-100 text-slate-600" };
 
   return <div className="space-y-5">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Leitura limitada: {limitedSources.join(", ")}. Até 500 registros por origem são exibidos; os totais de compras e o catálogo podem estar parciais. A paginação completa ainda está pendente.</p>}
     <div className="grid gap-3 sm:grid-cols-3">
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Compras e despesas registradas</p><p className="mt-1 text-2xl font-black">{purchases.length}</p></div>
       <div className="rounded-xl border bg-white p-4 dark:bg-slate-900"><p className="text-xs font-bold uppercase text-slate-500">Em aprovação · compromisso</p><p className="mt-1 text-2xl font-black">{money(pendingTotal)}</p></div>
