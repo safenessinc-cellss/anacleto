@@ -14,7 +14,7 @@ function buildLocalPublicEstimate(prompt: string) {
   const questions: string[] = [];
   const hasDimensions = /altura\s*(?:de|:|=)?\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b[\s\S]{0,80}largura\s*(?:de|:|=)?\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b/i.test(prompt)
     || /\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)?\b/i.test(prompt);
-  const hasQuantity = /\b\d+\s*(?:un(?:idades?)?|peças?|folhas?|pain[eé]is|portas?|janelas?|boxes?|m²|metros?)\b/i.test(prompt);
+  const hasQuantity = /\b\d+\s*(?:un(?:idades?)?|peças?|portas?|janelas?|boxes?|m²|metros?)\b/i.test(prompt);
   const hasMaterial = /alum[ií]nio|vidro|madeira|aço|aço inox|concreto|pedra|porcelanato|gesso|tijolo|PVC/i.test(prompt);
   const hasFinish = /branco|preto|bronze|natural|anodiz|pintura|fosco|brilhante|amadeirado/i.test(prompt);
   if (!hasDimensions) questions.push("Informar as medidas de cada item em altura × largura, com unidade (mm, cm ou m).");
