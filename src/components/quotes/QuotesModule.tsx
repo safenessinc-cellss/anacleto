@@ -349,7 +349,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     const widthMm = spec ? spec.largura_mm : (dimensionMatch ? dimensionToMm(dimensionMatch[3], dimensionMatch[4] || sharedUnit) : 0);
     if (spec) {
       const size = widthMm > 0 && heightMm > 0 ? `${heightMm} × ${widthMm} mm (altura × largura)` : "";
-      const typology = spec.tipologia.replaceAll("_", " ");
+      const typology = spec.tipologia === "a_definir" ? text.trim() : spec.tipologia.replaceAll("_", " ");
       const line = spec.linha_aluminio !== "Linha a definir" ? spec.linha_aluminio : "";
       const description = [typology, line, size].filter(Boolean).join(" · ") || text.trim();
       const pendingDetails = (spec.pendencias || []).join(" ");
