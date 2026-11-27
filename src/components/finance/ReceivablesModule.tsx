@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, limit, onSnapshot, query, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, TrendingUp, X, XCircle } from "lucide-react";
 
@@ -43,6 +43,7 @@ const METHODS = [
 
 export default function ReceivablesModule() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [items, setItems] = useState<Receivable[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "partial" | "received" | "overdue">("all");
@@ -53,12 +54,14 @@ export default function ReceivablesModule() {
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    const u1 = onSnapshot(collection(db, "companies"), (snap) => {
+    const u1 = onSnapshot(query(collection(db, "companies"), limit(500)), (snap) => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "companies"])] : v.filter(x => x !== "companies"));
       const list: Client[] = [];
       snap.forEach((d) => list.push({ id: d.id, name: d.data().name || d.data().companyName || "Sem nome" }));
       setClients(list);
     });
-    const u2 = onSnapshot(collection(db, "receivables"), (snap) => {
+    const u2 = onSnapshot(query(collection(db, "receivables"), limit(1000)), (snap) => {
+      setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "receivables"])] : v.filter(x => x !== "receivables"));
       const list: Receivable[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Receivable));
       list.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -200,6 +203,7 @@ export default function ReceivablesModule() {
 
   return (
     <div className="space-y-4">
+      {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados: {limitedSources.join(", ")}. Os totais a receber podem estar parciais; a paginação completa ainda está pendente.</p>}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
           <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500"><Clock className="w-3.5 h-3.5" /> A Receber</div>
