@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, limit, onSnapshot, query } from "firebase/firestore";
 import { db } from "../../firebase";
 import { Boxes, Image as ImageIcon, Search } from "lucide-react";
 
@@ -51,12 +51,12 @@ export default function TechnicalCatalogCards() {
 
   useEffect(() => {
     const subscriptions = [
-      onSnapshot(collection(db, "technical_documents"), snap => setDocuments(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(collection(db, "aluminum_profiles"), snap => setProfiles(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(collection(db, "hardware_catalog"), snap => setHardware(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(collection(db, "cutting_rules"), snap => setRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(collection(db, "supplier_prices"), snap => setPrices(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(collection(db, "supplier_catalog"), snap => setSupplierProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
+      onSnapshot(query(collection(db, "technical_documents"), limit(300)), snap => setDocuments(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
+      onSnapshot(query(collection(db, "aluminum_profiles"), limit(300)), snap => setProfiles(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
+      onSnapshot(query(collection(db, "hardware_catalog"), limit(300)), snap => setHardware(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
+      onSnapshot(query(collection(db, "cutting_rules"), limit(300)), snap => setRules(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
+      onSnapshot(query(collection(db, "supplier_prices"), limit(300)), snap => setPrices(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
+      onSnapshot(query(collection(db, "supplier_catalog"), limit(300)), snap => setSupplierProducts(snap.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
     ];
     return () => subscriptions.forEach(unsubscribe => unsubscribe());
   }, []);
