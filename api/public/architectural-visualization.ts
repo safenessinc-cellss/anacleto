@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
+import { consumeRateLimit, getClientIp } from "../../src/server/rate-limit.js";
+import { getAIRateLimit } from "../../src/server/ai-limits.js";
 
 type WindowRequest = { description?: string; referenceImage?: string };
-const buckets = new Map<string,{count:number;reset:number}>();
 const fallbackSvg = (description:string) => {
  const safe=description.replace(/[<>&"]/g," ").slice(0,120);
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800"><defs><linearGradient id="g"><stop stop-color="#27313a"/><stop offset=".5" stop-color="#9baab5"/><stop offset="1" stop-color="#26313a"/></linearGradient><linearGradient id="v"><stop stop-color="#a8c9d9" stop-opacity=".8"/><stop offset="1" stop-color="#eaf5fa" stop-opacity=".25"/></linearGradient></defs><rect width="1200" height="800" fill="#e9ecef"/><rect x="70" y="60" width="1060" height="680" rx="18" fill="#dce1e5"/><path d="M310 145h580v510H310z" fill="url(#g)"/><path d="M335 170h255v460H335zM610 170h255v460H610z" fill="url(#v)" stroke="#dbe5eb" stroke-width="10"/><path d="M600 170v460" stroke="#52616c" stroke-width="14"/><path d="M170 655h860" stroke="#aab3ba" stroke-width="8"/><text x="600" y="710" text-anchor="middle" font-family="Arial" font-size="18" fill="#53616c">PRÉVIA DE REFERÊNCIA · NÃO É UM RENDER IA</text><text x="600" y="770" text-anchor="middle" font-family="Arial" font-size="13" fill="#53616c">${safe}</text></svg>`;
@@ -10,10 +11,16 @@ const fallbackSvg = (description:string) => {
 export default async function handler(req:any,res:any){
  res.setHeader?.("Cache-Control","no-store");
  if(req.method!=="POST"){res.setHeader?.("Allow","POST");return res.status(405).json({error:"Método não permitido."});}
- const ip=String(req.headers?.["x-real-ip"]||req.headers?.["x-forwarded-for"]||req.socket?.remoteAddress||"unknown").split(",")[0].trim();
- const now=Date.now(),bucket=buckets.get(ip);if(!bucket||now>bucket.reset)buckets.set(ip,{count:1,reset:now+60000});else if(bucket.count>=3)return res.status(429).json({error:"Limite temporário atingido. Tente novamente em um minuto."});else bucket.count++;
- try{
-  const body=(typeof req.body==="string"?JSON.parse(req.body):req.body||{}) as WindowRequest;
+ const quota=getAIRateLimit("architectural-visualization");
+ try {
+  if(!(await consumeRateLimit("architectural-visualization",getClientIp(req),quota.limit,quota.windowMs)) {
+   return res.status(429).json({error:"Limite temporário atingido. Tente novamente em um minuto.",code:"RATE_LIMITED"});
+  }
+ } catch(rateError:any) {
+  console.error("[ARCHITECTURAL_VISUALIZATION_RATE_LIMIT]",String(rateError?.message||rateError).slice(0,500));
+  return res.status(503).json({error:"Controle de uso indisponível no momento.",code:"RATE_LIMIT_UNAVAILABLE"});
+ }
+ const body=(typeof req.body==="string"?JSON.parse(req.body):req.body||{}) as WindowRequest;
   const description=String(body.description||"").trim().slice(0,1800);
   if(description.length<8)return res.status(400).json({error:"Descreva o ambiente e a esquadria desejada."});
   let image:string|undefined;
