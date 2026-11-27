@@ -250,12 +250,18 @@ const QUOTE_AGENT_SCHEMA = {
 };
 const BUDGET_ITEMS_SCHEMA = {
   type:"OBJECT",
-  properties:{items:{type:"ARRAY",items:{type:"OBJECT",properties:{
-    description:{type:"STRING"},qty:{type:"NUMBER"},price:{type:"NUMBER"},sku:{type:"STRING"},
-    catalogItemId:{type:"STRING"},supplier:{type:"STRING"},category:{type:"STRING"},
-    variant:{type:"STRING"},side:{type:"STRING"},priceSource:{type:"STRING",enum:["catalog","pending"]}
-  },required:["description","qty","price"]}},notes:{type:"STRING"}},
-  required:["items","notes"]
+  properties:{
+    items:{type:"ARRAY",items:{type:"OBJECT",properties:{
+      description:{type:"STRING"},qty:{type:"NUMBER"},price:{type:"NUMBER"},sku:{type:"STRING"},
+      catalogItemId:{type:"STRING"},supplier:{type:"STRING"},category:{type:"STRING"},
+      variant:{type:"STRING"},side:{type:"STRING"},priceSource:{type:"STRING",enum:["catalog","pending"]}
+    },required:["description","qty","price"]}},
+    notes:{type:"STRING"},
+    pendingQuestions:{type:"ARRAY",items:{type:"STRING"}},
+    visitRequired:{type:"BOOLEAN"},
+    visitReason:{type:"STRING"}
+  },
+  required:["items","notes","pendingQuestions","visitRequired","visitReason"]
 };
 const FINANCIAL_ASSISTANT_SCHEMA = {
   type:"OBJECT",
@@ -491,11 +497,12 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
     const generationStartedAt = Date.now();
     const parsed = await generateValidatedJson({
       capability: "budget",
-      system: `Você é o engenheiro orçamentista da Anacleto Esquadrias, especialista em sistemas de janelas e portas de alumínio, vidro, ferragens, acessórios, vedação, fixação e fabricação/instalação. Responda somente JSON: {"items":[{"description":"...","qty":1,"price":0,"sku":"","catalogItemId":"","supplier":"","category":"","variant":"","side":"","priceSource":"catalog|pending"}],"notes":"..."}. Idioma: ${language}. Catálogo real relevante: ${JSON.stringify(catalog)}.
+      system: `Você é o engenheiro orçamentista da Anacleto Esquadrias. Responda somente JSON com items, notes, pendingQuestions (perguntas objetivas que faltam para fechar o orçamento), visitRequired (boolean) e visitReason (motivo da visita, ou string vazia). Idioma: ${language}. Catálogo real relevante: ${JSON.stringify(catalog)}.
 Interprete o conceito comercial informado (por exemplo janela/porta de correr, abrir, maxim-ar, box, linha Lux, Gold ou outro nome comercial) e identifique no catálogo o sistema/linha compatível. Monte uma lista de materiais completa para fabricar e instalar o conjunto: perfis específicos do sistema, travessas/montantes, folhas/marcos, roldanas, fechos/fechaduras, puxadores, escovas, borrachas/juntas, parafusos, cantoneiras, baguetes, acessórios e vidro conforme a tipologia. Inclua somente componentes aplicáveis à tipologia; não acrescente peças genéricas sem justificativa.
 Procure primeiro no catálogo pelos campos de sistema/linha/modelo/família, compatibilidade, categoria, SKU/código e variante. Use o registro real mais específico e retorne o SKU e catalogItemId EXATOS do registro escolhido. Quando houver opções esquerda/direita, cor, acabamento, dimensão ou variante, selecione somente se o pedido ou os dados técnicos determinarem; caso contrário, crie linha pendente e explique a escolha necessária em notes. Nunca confunda peças parecidas ou lados diferentes.
 Não invente medidas, quantidade de folhas, perímetros, cortes, consumo, códigos nem compatibilidade. Se faltarem medidas ou configuração necessárias para calcular quantidades, apresente as linhas como estimativas de levantamento/pendentes e explique exatamente quais medidas/configurações o usuário precisa informar. Quantidades só podem ser calculadas quando deriváveis de medidas e regras técnicas existentes no catálogo; não presuma dimensões padrão.
-O preço será substituído pelo servidor pelo valor registrado. Só informe sku/catalogItemId de um registro real do catálogo. Se não houver correspondência inequívoca, deixe sku/catalogItemId vazios, price=0 e priceSource="pending". Preço ausente, zero ou não verificado deve permanecer pendente. Nunca invente preço, custo, imposto, margem ou valor.`,
+O preço será substituído pelo servidor pelo valor registrado. Só informe sku/catalogItemId de um registro real do catálogo. Se não houver correspondência inequívoca, deixe sku/catalogItemId vazios, price=0 e priceSource="pending". Preço ausente, zero ou não verificado deve permanecer pendente. Nunca invente preço, custo, imposto, margem ou valor.
+Preencha pendingQuestions com perguntas curtas e específicas sempre que faltarem medidas, tipologia, acabamento, quantidade, acesso, condições do local ou decisões do cliente. Não faça perguntas genéricas se puder identificar exatamente o dado ausente. Use visitRequired=true quando a execução depender de medição presencial, inspeção do terreno/estrutura, avaliação de acesso, instalações existentes ou condições locais; explique o motivo em visitReason. Para trabalhos como reformas residenciais/comerciais, piscinas, lareiras, churrasqueiras, pergolados, estruturas de madeira ou madeira laminada colada (MLC) e construção civil, não presuma condições do local: gere orçamento preliminar e sinalize avaliação presencial quando necessária. Se não houver pendências reais, retorne array vazio, visitRequired=false e visitReason vazio.`,
       prompt,
       responseSchema: BUDGET_ITEMS_SCHEMA,
       onGeneration: ({ usage }) => {
@@ -508,7 +515,14 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
           const qty = Number(item?.qty);
           if (!String(item?.description || "").trim() || !Number.isFinite(qty) || qty <= 0) throw new Error("Linha inválida retornada pela IA.");
         }
-        return value;
+        const pendingQuestions = Array.isArray(value.pendingQuestions) ? value.pendingQuestions.map((q: any) => String(q || "").trim()).filter(Boolean).slice(0, 20) : [];
+        return {
+          ...value,
+          notes: String(value.notes || "").slice(0, 4000),
+          pendingQuestions,
+          visitRequired: value.visitRequired === true,
+          visitReason: String(value.visitReason || "").slice(0, 1000),
+        };
       },
     });
     const catalogRefreshStartedAt = Date.now();
@@ -552,7 +566,13 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         notes: details,
       };
     });
-    return res.json({ items, notes: String(parsed.notes || "") });
+    return res.json({
+      items,
+      notes: String(parsed.notes || ""),
+      pendingQuestions: Array.isArray(parsed.pendingQuestions) ? parsed.pendingQuestions : [],
+      visitRequired: parsed.visitRequired === true,
+      visitReason: String(parsed.visitReason || ""),
+    });
   } catch (err: any) {
     try {
       await recordAIAudit({
