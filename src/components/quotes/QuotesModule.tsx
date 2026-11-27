@@ -37,6 +37,7 @@ import PdfViewerModal from "../common/PdfViewerModal";
 import ImageLightbox from "../common/ImageLightbox";
 import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
 import { estimatedCatalogPrice, readAluminumPricePerKg } from "../../utils/catalogPricing";
+import { hasConfirmedCatalogPrice } from "../../utils/catalog-price-validation.js";
 import { compactApprovalSenderSnapshot, compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
 import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 import ManufacturingRoute from "../production/ManufacturingRoute";
@@ -420,8 +421,10 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     const line = lineMatch ? lineMatch[1].replace(/^linha\s*/i, "Linha ") : spec && spec.linha_aluminio !== "Linha a definir" ? spec.linha_aluminio : "";
     const glass = glassMatch ? `vidro ${glassMatch[1].toLowerCase()}${glassColorMatch ? ` ${glassColorMatch[1].toLowerCase()}` : ""}${spec ? ` ${spec.espessura_mm} mm` : ""}` : "";
     const freeDescription = [typology, size, line, glass].filter(Boolean).join(" · ") || text.trim();
-    const estimated = match ? estimatedCatalogPrice(match, aluminumPricePerKg, Math.max(widthMm, heightMm) || undefined) : undefined;
-    const unitPrice = Number(match?.price || 0) > 0 ? Number(match.price) : estimated || 0;
+    const confirmedCatalogPrice = hasConfirmedCatalogPrice(match);
+    const confirmedPrice = confirmedCatalogPrice ? Number(match?.price) : 0;
+    const estimated = match ? estimatedCatalogPrice({ ...match, price: confirmedCatalogPrice ? match.price : 0 }, aluminumPricePerKg, Math.max(widthMm, heightMm) || undefined) : undefined;
+    const unitPrice = confirmedPrice > 0 ? confirmedPrice : estimated || 0;
     const item: QuoteItem = {
       id: `local_${crypto.randomUUID()}`,
       description: match ? `${match.name || match.description} · ${freeDescription}` : freeDescription,
@@ -434,12 +437,12 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         sku: match.sku || match.code || undefined,
         itemCategory: match.category || undefined,
       } : {}),
-      priceSource: unitPrice > 0 ? (Number(match?.price || 0) > 0 ? "catalog" : "estimated") : "pending",
-      notes: unitPrice > 0
-        ? estimated && Number(match?.price || 0) <= 0
+      priceSource: confirmedPrice > 0 ? "catalog" : estimated && estimated > 0 ? "estimated" : "pending",
+      notes: confirmedPrice > 0
+        ? "Preço confirmado em registro de catálogo revisado."
+        : estimated && estimated > 0
           ? `Estimativa a partir do peso kg/m e R$ ${Number(aluminumPricePerKg).toFixed(2)}/kg; validar a composição antes de aprovar.`
-          : "Item associado ao catálogo de fornecedores pelo assistente local."
-        : "Referência local sem preço confirmado; informar o preço antes de aprovar.",
+          : "Preço sem validação ou fórmula de estimativa disponível; informar e confirmar antes de aprovar.",
       ...(size ? { itemDimensions: size } : {}),
     };
     return recalculateQuote({ ...updated, items: [...updated.items, item] });

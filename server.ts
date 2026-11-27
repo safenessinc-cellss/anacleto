@@ -19,6 +19,7 @@ import generateBomHandler from "./src/server/supplier-api/generate-bom.js";
 import compareBomHandler from "./src/server/supplier-api/compare-bom.js";
 import marketResearchHandler from "./src/server/supplier-api/market-research.js";
 import { recordAIAudit } from "./src/server/ai-audit.js";
+import { hasConfirmedCatalogPrice } from "./src/utils/catalog-price-validation.js";
 import { google } from "googleapis";
 import { GoogleGenAI } from "@google/genai";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
@@ -116,7 +117,7 @@ app.post("/api/ai/financial-assistant", requireFirebaseAuth, requireFinanceRole,
     const names = ["quotes", "invoices", "inventory_items", "inventory_movements", "ledger_entries", "payables", "receivables", "purchase_orders"];
     const [loaded, catalogRows] = await Promise.all([
       Promise.all(names.map(name => loadCollectionFromFirestore(req, name, 250))),
-      loadCatalogFromFirestore(req),
+      loadCatalogFromFirestore(req, { cacheTtlMs: 20_000, cacheKey: String(res.locals.firebaseUser?.uid || "") }),
     ]);
     const data = Object.fromEntries(names.map((name, index) => [name, loaded[index]]));
     const catalog = catalogRows.slice(0, 250).map(row => ({
@@ -286,15 +287,7 @@ function findExactCatalogItem(item: any, catalog: any[]) {
   });
 }
 function hasVerifiedCatalogPrice(row: any): boolean {
-  if (!row || row.price === undefined || row.price === null || String(row.price).trim() === "") return false;
-  const price = Number(row.price);
-  // Legacy master-catalog rows without review fields retain their historical behaviour.
-  // Once either review field exists, every supplied state must be explicitly verified.
-  const reviewStates = [row.status, row.priceStatus]
-    .filter((value: unknown) => value !== undefined && value !== null && String(value).trim() !== "")
-    .map((value: unknown) => String(value).trim().toLowerCase());
-  const reviewApproved = reviewStates.every((state: string) => state === "verified");
-  return Number.isFinite(price) && price > 0 && reviewApproved;
+  return hasConfirmedCatalogPrice(row);
 }
 function selectRelevantBudgetCatalog(prompt: string, catalog: any[], limit = 450) {
   const tokens = normalizeCatalogName(prompt).split(/\s+/).filter((token: string) => token.length >= 3);
@@ -322,8 +315,8 @@ function selectRelevantBudgetCatalog(prompt: string, catalog: any[], limit = 450
     id: String(row.id || ""), name: String(row.name || row.description || ""),
     sku: String(row.sku || row.code || ""), code: String(row.code || row.sku || ""),
     category: String(row.category || ""), supplier: String(row.supplier || ""),
-    unit: String(row.unit || "un"), price: row.price ?? null,
-    priceStatus: String(row.priceStatus || (Number(row.price) > 0 ? "registered_unverified" : "pending")),
+    unit: String(row.unit || "un"), price: hasVerifiedCatalogPrice(row) ? row.price : null,
+    priceStatus: hasVerifiedCatalogPrice(row) ? "verified" : (Number(row.price) > 0 ? "registered_unverified" : "pending"),
     system: String(row.system || row.systemName || row.model || row.modelName || row.line || row.family || ""),
     variant: String(row.variant || row.variantName || ""), side: String(row.side || row.hand || ""),
     material: String(row.material || ""), color: String(row.color || ""),
@@ -348,7 +341,7 @@ app.post("/api/ai/quote-agent", requireFirebaseAuth, requireQuoteRole, rateLimit
     const currentQuote = { ...storedQuote, id: quoteId };
     const storedQuoteItems = Array.isArray(storedQuote.items) ? storedQuote.items : [];
     if (!message) return res.status(400).json({ error: "Mensagem obrigatória." });
-    const catalog = (await loadCatalogFromFirestore(req)).slice(0, 1000);
+    let catalog = (await loadCatalogFromFirestore(req, { cacheTtlMs: 20_000, cacheKey: String(res.locals.firebaseUser?.uid || "") })).slice(0, 1000);
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-10).map((entry: any) => ({
       role: entry?.role === "assistant" ? "assistant" : "user",
       text: String(entry?.text || "").slice(0, 2000),
@@ -392,6 +385,7 @@ Solicitação atual: ${message}`,
         return value;
       },
     });
+    catalog = await refreshCatalogMatchesFromFirestore(req, catalog, parsed.items);
     await recordAIAudit({
       serviceName: "BUDGET", modelUsed: AI_CONFIG.quote.model,
       input: { message, history, currentQuote },
@@ -549,6 +543,7 @@ O preço será substituído pelo servidor pelo valor registrado. Só informe sku
         price: confirmed ? catalogPrice : 0,
         sku: confirmed ? String(identity.sku || identity.code || "") : String(item.sku || ""),
         catalogItemId: confirmed ? String(identity.id || "") : "",
+        catalogSource: confirmed ? String(identity.source || "") : "",
         supplier: confirmed ? String(identity.supplier || "") : String(item.supplier || ""),
         category: confirmed ? String(identity.category || "") : String(item.category || ""),
         variant: String(item.variant || identity?.variant || ""),
