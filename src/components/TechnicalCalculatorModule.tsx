@@ -17,15 +17,16 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
   const [bomForm, setBomForm] = useState({
     manufacturer: "",
     line: "",
-    typology: "Janela de correr 2 folhas",
-    configuration: "2 folhas",
-    widthMm: "1500",
-    heightMm: "1200",
-    quantity: "1",
-    finish: "Branco",
+    typology: "",
+    configuration: "",
+    widthMm: "",
+    heightMm: "",
+    quantity: "",
+    finish: "",
   });
   const [bomData, setBomData] = useState<any>(null);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [measurementsConfirmed, setMeasurementsConfirmed] = useState(false);
   const [budgetClientName, setBudgetClientName] = useState("");
   const [isSavingBudget, setIsSavingBudget] = useState(false);
   const [technicalOptions, setTechnicalOptions] = useState<TechnicalOption[]>([]);
@@ -90,6 +91,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
       const data = snap.data() as any;
       setBomForm(data.bomForm || bomForm);
       setBomData(data.bomData || null);
+      setMeasurementsConfirmed(data.measurementsConfirmed === true);
       setAluminumPricePerKg(data.aluminumPricePerKg || "");
       setLaborRate(Number.isFinite(Number(data.laborRate)) ? Number(data.laborRate) : 100);
       setBudgetClientName(data.clientName || "");
@@ -106,7 +108,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Entre na sua conta para salvar o orçamento.");
-      const payload = { clientName: budgetClientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, comparisons, bestSupplier, laborRate, laborAmount, labor: { description: "Mão de obra", percentage: laborRate, basis: "materials", amount: laborAmount }, total: technicalTotal, currency: "BRL", status: "draft", workflow: "technical_esquadrias", updatedAt: serverTimestamp() };
+      const payload = { clientName: budgetClientName.trim() || "Cliente não informado", bomForm, bomData, aluminumPricePerKg, comparisons, bestSupplier, laborRate, laborAmount, labor: { description: "Mão de obra", percentage: laborRate, basis: "materials", amount: laborAmount }, total: technicalTotal, currency: "BRL", status: "draft", pricingStatus: bomData?.complete === true && !!bestSupplier ? "confirmed" : "provisional", measurementsConfirmed, visitRequired: !measurementsConfirmed, visitReason: measurementsConfirmed ? "" : "Medidas precisam ser confirmadas pelo cliente ou em visita técnica.", workflow: "technical_esquadrias", updatedAt: serverTimestamp() };
       if (editingBudgetId) await updateDoc(doc(db, "technical_budgets", editingBudgetId), payload);
       else await addDoc(collection(db, "technical_budgets"), { ...payload, createdBy: user.uid, createdAt: serverTimestamp() });
       showToast(editingBudgetId ? "Orçamento de esquadrias atualizado." : "Orçamento de esquadrias salvo.", "success");
@@ -137,6 +139,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
 
   const updateField = (key: keyof typeof bomForm, value: string) => {
     setBomForm((current) => ({ ...current, [key]: value }));
+    setMeasurementsConfirmed(false);
     setBomData(null);
     setComparisons([]);
     setBestSupplier(null);
@@ -144,6 +147,12 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
   };
 
   const handleGenerateBom = async () => {
+    const requiredFields = ["manufacturer", "line", "typology", "configuration", "widthMm", "heightMm", "quantity", "finish"] as const;
+    const missingFields = requiredFields.filter((key) => !String(bomForm[key] || "").trim() || ((["widthMm", "heightMm", "quantity"] as string[]).includes(key) && !(Number(bomForm[key]) > 0)));
+    if (missingFields.length) {
+      setBomError("Preencha fabricante, linha, tipologia, configuração, largura, altura, quantidade e acabamento antes de calcular.");
+      return;
+    }
     setIsGeneratingBom(true);
     setBomError("");
     setBomData(null);
@@ -374,6 +383,10 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
         <datalist id="calc-typologies">{filteredTypologies.map((value) => <option key={value} value={value} />)}</datalist>
         <datalist id="calc-configurations">{filteredConfigurations.map((value) => <option key={value} value={value} />)}</datalist>
         <datalist id="calc-finishes">{finishes.map((value) => <option key={value} value={value} />)}</datalist>
+        <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+          <input type="checkbox" checked={measurementsConfirmed} onChange={(event) => setMeasurementsConfirmed(event.target.checked)} className="mt-0.5" />
+          <span><b>Medidas confirmadas pelo cliente ou em visita técnica.</b> Se não marcar, o orçamento fica preliminar e a visita/medição permanece pendente.</span>
+        </label>
         <label className="mt-3 block text-xs font-semibold text-slate-700 dark:text-slate-200">Cliente (opcional)
           <input value={budgetClientName} onChange={(event) => setBudgetClientName(event.target.value)} placeholder="Nome do cliente" className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950" />
         </label>
