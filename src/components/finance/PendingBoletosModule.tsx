@@ -148,7 +148,7 @@ export default function PendingBoletosModule() {
   const searchCompanyBoletos = async () => {
     const cnpj = cleanCNPJ(companyCnpj);
     if (cnpj.length !== 14) { setSearchMessage("Informe o CNPJ da Anacleto para filtrar os boletos."); return; }
-    setSearching(true); setSearchMessage("");
+    setSearching(true); setSearchMessage(""); setSearchLimited(false);
     try {
       const [pendingSnap, payableSnap] = await Promise.all([
         getDocs(query(collection(db, "pending_boletos"), limit(1000))),
