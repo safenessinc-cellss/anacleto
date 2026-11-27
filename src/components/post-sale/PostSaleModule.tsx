@@ -33,9 +33,10 @@ export default function PostSaleModule() {
   const [resolution, setResolution] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
 
-  useEffect(() => onSnapshot(query(collection(db, "post_sale_records"), orderBy("createdAt", "desc"), limit(300)), snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Entry))), err => console.error("Erro ao carregar pós-venda:", err)), []);
-  useEffect(() => onSnapshot(query(collection(db, "quotes"), where("productionStatus", "in", ["awaiting_quality", "quality_hold", "delivered"]), limit(300)), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Erro ao carregar orçamentos para qualidade:", err)), []);
+  useEffect(() => onSnapshot(query(collection(db, "post_sale_records"), orderBy("createdAt", "desc"), limit(300)), snap => { setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "post_sale_records"])] : v.filter(x => x !== "post_sale_records")); setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Entry))); }, err => console.error("Erro ao carregar pós-venda:", err)), []);
+  useEffect(() => onSnapshot(query(collection(db, "quotes"), where("productionStatus", "in", ["awaiting_quality", "quality_hold", "delivered"]), limit(300)), snap => { setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "quality_quotes"])] : v.filter(x => x !== "quality_quotes")); setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); }, err => console.error("Erro ao carregar orçamentos para qualidade:", err)), []);
   const qualityQuotes = quotes.filter(quote => ["awaiting_quality", "quality_hold", "delivered"].includes(String(quote.productionStatus || "")));
   const selectedQualityQuote = quotes.find(quote => quote.id === qualityQuoteId);
   const visible = useMemo(() => entries.filter(e => (filter === "all" || e.kind === filter) && [e.customer, e.orderNumber, e.product, e.title].join(" ").toLowerCase().includes(search.toLowerCase())), [entries, filter, search]);
@@ -101,6 +102,7 @@ export default function PostSaleModule() {
   };
 
   return <div className="space-y-6">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Pós-venda limitado: {limitedSources.join(", ")}. Registros de qualidade e atendimentos antigos podem não aparecer; a paginação completa ainda está pendente.</p>}
     <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Para manter a tela responsiva, o módulo carrega até 300 registros recentes de pós-venda e até 300 orçamentos nas etapas de qualidade. O histórico mais antigo ainda precisa de paginação.</p>
     <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Relacionamento com o cliente</p><h1 className="text-2xl font-black text-slate-900 dark:text-white">Pós-venda</h1><p className="mt-1 text-sm text-slate-500">Qualidade do produto, satisfação e continuidade do atendimento.</p></div>
