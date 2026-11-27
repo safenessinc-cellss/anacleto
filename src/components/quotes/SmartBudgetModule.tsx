@@ -13,6 +13,7 @@ const PRODUCT_TYPE_GROUPS = [
   { label: "Banheiros", options: ["Box de banheiro frontal", "Box de banheiro de canto", "Box de banheiro articulado", "Box de banheiro até o teto", "Espelho com estrutura de alumínio"] },
   { label: "Fachadas e divisórias", options: ["Fachada de vidro", "Pele de vidro", "Fachada glazing", "Divisória de ambiente", "Fechamento de varanda", "Envidraçamento de sacada", "Vitrine comercial"] },
   { label: "Estruturas e áreas externas", options: ["Guarda-corpo", "Corrimão", "Cobertura de vidro", "Pergolado de alumínio", "Portão de alumínio", "Grade de alumínio", "Cerca de alumínio"] },
+  { label: "Reformas e construção", options: ["Reforma residencial", "Reforma comercial", "Construção civil", "Piscina", "Churrasqueira", "Lareira e chaminé", "Pergolado de madeira", "Estrutura de madeira", "Madeira laminada colada (MLC)", "Deck e área externa", "Cobertura e telhado", "Muros e calçadas", "Projeto completo sob medida"] },
   { label: "Complementos", options: ["Tela mosquiteira", "Persiana integrada", "Brise", "Painel ripado de alumínio", " Veneziana fixa", "Estrutura especial sob medida"] },
 ] as const;
 
