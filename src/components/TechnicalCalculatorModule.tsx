@@ -139,7 +139,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
 
   const updateField = (key: keyof typeof bomForm, value: string) => {
     setBomForm((current) => ({ ...current, [key]: value }));
-    if (key === "widthMm" || key === "heightMm") setMeasurementsConfirmed(false);
+    setMeasurementsConfirmed(false);
     setBomData(null);
     setComparisons([]);
     setBestSupplier(null);
@@ -148,7 +148,7 @@ export default function TechnicalCalculatorModule({ initialBudgetId }: { initial
 
   const handleGenerateBom = async () => {
     const requiredFields = ["manufacturer", "line", "typology", "configuration", "widthMm", "heightMm", "quantity", "finish"] as const;
-    const missingFields = requiredFields.filter((key) => !String(bomForm[key] || "").trim() || (["widthMm", "heightMm", "quantity"].includes(key) && !(Number(bomForm[key]) > 0)));
+    const missingFields = requiredFields.filter((key) => !String(bomForm[key] || "").trim() || ((["widthMm", "heightMm", "quantity"] as string[]).includes(key) && !(Number(bomForm[key]) > 0)));
     if (missingFields.length) {
       setBomError("Preencha fabricante, linha, tipologia, configuração, largura, altura, quantidade e acabamento antes de calcular.");
       return;
