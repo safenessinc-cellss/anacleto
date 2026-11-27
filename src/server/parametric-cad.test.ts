@@ -51,3 +51,12 @@ test("does not route wood doors or wood windows into the aluminum parametric CAD
   assert.equal(isAluminumPrompt("janela de alumínio 1500 x 1200 mm"), true);
   assert.equal(isAluminumPrompt("box de banho em vidro temperado"), true);
 });
+
+test("routes only explicit aluminum openings to parametric CAD, not generic aluminum construction", async () => {
+  const { isAluminumPrompt } = await import("../utils/parametricCad.js");
+  assert.equal(isAluminumPrompt("estrutura de alumínio para pergolado"), false);
+  assert.equal(isAluminumPrompt("perfil de alumínio"), false);
+  assert.equal(isAluminumPrompt("linha Suprema para pergolado"), false);
+  assert.equal(isAluminumPrompt("janela linha Suprema"), true);
+  assert.equal(isAluminumPrompt("porta de alumínio"), true);
+});
