@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, runTransaction, serverTimestamp, limit, query } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { AlertCircle, CheckCircle, Clock, DollarSign, Edit, Plus, Search, Trash2, X, XCircle } from "lucide-react";
 import { sanitizeFirestoreData } from "../../utils/firestorePayloads";
@@ -59,22 +59,22 @@ export default function PayablesModule() {
   const [form, setForm] = useState<Omit<Payable, "id">>(emptyForm);
 
   useEffect(() => {
-    const u1 = onSnapshot(collection(db, "suppliers"), (snap) => {
+    const u1 = onSnapshot(query(collection(db, "suppliers"), limit(1000)), (snap) => {
       const list: Supplier[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Supplier));
       setSuppliers(list);
     });
-    const u2 = onSnapshot(collection(db, "payables"), (snap) => {
+    const u2 = onSnapshot(query(collection(db, "payables"), limit(1000)), (snap) => {
       const list: Payable[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Payable));
       list.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
       setItems(list);
     });
-    const u3 = onSnapshot(collection(db, "payments"), (snap) => setHistory((current) => {
+    const u3 = onSnapshot(query(collection(db, "payments"), limit(1000)), (snap) => setHistory((current) => {
       const transactions = current.filter((row) => row.sourceType === "transaction");
       return [...transactions, ...snap.docs.map((d) => ({ id: d.id, ...d.data() } as HistoricalPayment))];
     }), (reason) => setHistoryError(`Falha ao carregar pagamentos históricos: ${reason.message}`));
-    const u4 = onSnapshot(collection(db, "transactions"), (snap) => setHistory((current) => {
+    const u4 = onSnapshot(query(collection(db, "transactions"), limit(1000)), (snap) => setHistory((current) => {
       const payments = current.filter((row) => row.sourceType !== "transaction");
       return [...payments, ...snap.docs.map((d) => ({ id: d.id, ...d.data(), sourceType: "transaction" } as HistoricalPayment))];
     }), (reason) => setHistoryError(`Falha ao carregar transações históricas: ${reason.message}`));
@@ -187,6 +187,7 @@ export default function PayablesModule() {
 
   return (
     <div className="space-y-4">
+      {(items.length>=1000||suppliers.length>=1000||history.length>=2000)&&<p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Esta tela carrega até 1.000 registros por origem para preservar o desempenho. Se o limite for atingido, os totais e o histórico podem estar incompletos; a paginação do histórico completo ainda está pendente.</p>}
       {historyError && <p role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{historyError}</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-slate-900 rounded-xl border p-4">
