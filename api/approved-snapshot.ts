@@ -5,6 +5,7 @@ import { loadCatalogFromFirestore } from "../src/server/firestore-data.js";
 import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
 import { hasConfirmedCatalogPrice } from "../src/utils/catalog-price-validation.js";
 import { isUnconfirmedPriceSource } from "../src/utils/quote-price-validation.js";
+import { isTechnicalVisitPending } from "../src/utils/budget-workflow.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
 
 type AuthUser = { uid: string; email: string; role: string };
@@ -279,6 +280,7 @@ export default async function handler(req: any, res: any) {
       if (!["draft","pending","pendente","borrador","accepted","approved","aprovado"].includes(String(source.status || "").toLowerCase())) {
         return send(res, 409, { error: "Somente orçamentos em rascunho ou pendentes podem ser aprovados." });
       }
+      if (isTechnicalVisitPending(source)) return send(res, 409, { error: "A visita técnica ainda está pendente. Registre a visita e confirme medidas/condições antes da aprovação final e da liberação para produção." });
       if (!Array.isArray(source.items) || source.items.length === 0 || source.items.length > 150) return send(res, 422, { error: "O orçamento deve possuir entre 1 e 150 itens." });
       const catalog = await loadCatalogFromFirestore(req);
       const reviewedItems = source.items.map((item: any) => {
