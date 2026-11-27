@@ -25,5 +25,5 @@ test("explicit dimensions and quantity are not asked again, but no prices are in
   assert.ok(!result.pendingQuestions.some((question) => question.includes("medidas")));
   assert.ok(!result.pendingQuestions.some((question) => question.includes("quantidade")));
   assert.equal(result.items[0].price, 0);
-  assert.equal(result.items[0].qty, 0);
+  assert.equal(result.items[0].qty, 2);
 });
