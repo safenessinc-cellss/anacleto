@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Sparkles, Upload, CheckCircle, Loader2, FileText, Save, AlertTriangle, MessageCircle, Send } from "lucide-react";
-import { addDoc, collection, getDocs } from "firebase/firestore";
+import { addDoc, collection, getDocs, limit, query, where } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, auth, storage } from "../../firebase";
 
@@ -110,30 +110,55 @@ export default function FinancialAI({ language = "pt" }: { language?: string }) 
       const keys = normalizedBoletos.map(b => b.digitableLine.replace(/\D/g, "") || b.number.replace(/\D/g, "")).filter(Boolean);
       if (normalizedBoletos.length && Math.abs(normalizedBoletos.reduce((sum, row) => sum + row.amount, 0) - amount) > 0.02) throw new Error("A soma dos boletos precisa corresponder ao valor total da nota fiscal.");
       if (new Set(keys).size !== keys.length) throw new Error("Há boletos repetidos nesta nota fiscal. Corrija os números ou linhas digitáveis.");
-      const [existing, pendingBoletoDocs, payableDocs, catalogDocs] = await Promise.all([
-        getDocs(collection(db, "purchase_orders")),
-        getDocs(collection(db, "pending_boletos")),
-        getDocs(collection(db, "payables")),
-        getDocs(collection(db, "supplier_catalog"))
+      const invoiceKey = String(result.accessKey || "").replace(/\D/g, "");
+      const normalizedCnpj = supplierCnpj.replace(/\D/g, "");
+      const invoiceLookup = invoiceKey
+        ? getDocs(query(collection(db, "purchase_orders"), where("accessKey", "==", invoiceKey), limit(5)))
+        : documentNumber.trim()
+          ? getDocs(query(collection(db, "purchase_orders"), where("documentNumber", "==", documentNumber.trim()), limit(50)))
+          : Promise.resolve(null);
+      const supplierPurchaseQueries = normalizedBoletos.length ? [
+        ...(supplierCnpj.trim() ? [getDocs(query(collection(db, "purchase_orders"), where("supplierCnpj", "==", supplierCnpj.trim()), limit(250)))] : []),
+        ...(normalizedCnpj && normalizedCnpj !== supplierCnpj.trim() ? [getDocs(query(collection(db, "purchase_orders"), where("supplierCnpj", "==", normalizedCnpj), limit(250)))] : []),
+        getDocs(query(collection(db, "purchase_orders"), where("supplierName", "==", supplierName.trim()), limit(250)))
+      ] : [];
+      const uniqueChunks = (values: string[]) => {
+        const unique = [...new Set(values.map(value => String(value || "").trim()).filter(Boolean))];
+        const chunks: string[][] = [];
+        for (let i = 0; i < unique.length; i += 30) chunks.push(unique.slice(i, i + 30));
+        return chunks;
+      };
+      const digitableValues = uniqueChunks(normalizedBoletos.flatMap(row => [row.digitableLine, row.digitableLine.replace(/\D/g, "")]));
+      const numberValues = uniqueChunks(normalizedBoletos.flatMap(row => [row.number, row.number.replace(/\D/g, "")]));
+      const queryIn = (collectionName: string, field: string, chunks: string[][]) => Promise.all(chunks.map(values => getDocs(query(collection(db, collectionName), where(field, "in", values), limit(100)))));
+      const [invoiceSnap, supplierPurchaseSnaps, pendingBoletoSnaps, payableSnaps, catalogSnap] = await Promise.all([
+        invoiceLookup,
+        Promise.all(supplierPurchaseQueries),
+        Promise.all([...queryIn("pending_boletos", "digitableLine", digitableValues), ...queryIn("pending_boletos", "number", numberValues)]),
+        Promise.all([...queryIn("payables", "digitableLine", digitableValues), ...queryIn("payables", "boletoNumber", numberValues)]),
+        getDocs(query(collection(db, "supplier_catalog"), where("supplier", "==", supplierName.trim()), limit(500)))
       ]);
-      const invoiceKey = String(result.accessKey || "").replace(/\\D/g, "");
-      const duplicateInvoice = existing.docs.find(d => {
+      const duplicateInvoice = invoiceSnap?.docs.find(d => {
         const p = d.data();
-        return (invoiceKey && String(p.accessKey || "").replace(/\\D/g, "") === invoiceKey) ||
-          (!invoiceKey && documentNumber.trim() && String(p.supplierCnpj || "").replace(/\\D/g, "") === supplierCnpj.replace(/\\D/g, "") && String(p.documentNumber || "").trim() === documentNumber.trim());
+        return invoiceKey
+          ? String(p.accessKey || "").replace(/\D/g, "") === invoiceKey
+          : String(p.supplierCnpj || "").replace(/\D/g, "") === normalizedCnpj && String(p.documentNumber || "").trim() === documentNumber.trim();
       });
       if (duplicateInvoice) throw new Error("Esta nota fiscal já está cadastrada no Financeiro. Abra Compras Gerais para corrigir o registro existente.");
-      const boletoKeys = normalizedBoletos.map(row => row.digitableLine.replace(/\\D/g, "") || row.number.replace(/\\D/g, "")).filter(Boolean);
+      const supplierPurchaseDocs = [...new Map(supplierPurchaseSnaps.flatMap(s => s.docs).map(d => [d.id, d])).values()];
+      const pendingBoletoDocs = pendingBoletoSnaps.flatMap(s => s.docs);
+      const payableDocs = payableSnaps.flatMap(s => s.docs);
+      const boletoKeys = normalizedBoletos.map(row => row.digitableLine.replace(/\D/g, "") || row.number.replace(/\D/g, "")).filter(Boolean);
       const existingBoletoKeys = new Set<string>();
-      existing.docs.forEach(d => (d.data().installments || []).forEach((row: any) => {
-        const key = String(row.digitableLine || "").replace(/\\D/g, "") || String(row.number || "").replace(/\\D/g, "");
+      supplierPurchaseDocs.forEach(d => (d.data().installments || []).forEach((row: any) => {
+        const key = String(row.digitableLine || "").replace(/\D/g, "") || String(row.number || "").replace(/\D/g, "");
         if (key) existingBoletoKeys.add(key);
       }));
-      pendingBoletoDocs.docs.forEach(d => { const key = String(d.data().digitableLine || "").replace(/\\D/g, ""); if (key) existingBoletoKeys.add(key); });
-      payableDocs.docs.forEach(d => { const row = d.data(); const key = String(row.digitableLine || "").replace(/\\D/g, "") || String(row.boletoNumber || "").replace(/\\D/g, ""); if (key) existingBoletoKeys.add(key); });
+      pendingBoletoDocs.forEach(d => { const row = d.data(); const key = String(row.digitableLine || "").replace(/\D/g, "") || String(row.number || "").replace(/\D/g, ""); if (key) existingBoletoKeys.add(key); });
+      payableDocs.forEach(d => { const row = d.data(); const key = String(row.digitableLine || "").replace(/\D/g, "") || String(row.boletoNumber || "").replace(/\D/g, ""); if (key) existingBoletoKeys.add(key); });
       if (boletoKeys.some(key => existingBoletoKeys.has(key))) throw new Error("Um ou mais boletos já estão cadastrados em Compras, Boletos a Revisar ou Contas a Pagar. Não será criado um lançamento duplicado.");
-      const normalize = (value: string) => String(value || "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const supplierCatalog = catalogDocs.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(row => normalize(row.supplier) === normalize(supplierName));
+      const normalize = (value: string) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const supplierCatalog = catalogSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
       const extractedItems = Array.isArray(result.items) ? result.items.filter(item => String(item.description || "").trim() && Number(item.quantity) > 0).map(item => {
         const code = normalize(String(item.sku || ""));
         const name = normalize(String(item.description || ""));
