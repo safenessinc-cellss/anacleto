@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { arrayRemove, arrayUnion, collection, onSnapshot, query, where, updateDoc, doc } from "firebase/firestore";
+import { arrayRemove, arrayUnion, collection, limit, onSnapshot, query, where, updateDoc, doc } from "firebase/firestore";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { ExternalLink, FileText, ImagePlus, Link2, Trash2, UploadCloud } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
@@ -37,7 +37,7 @@ export default function ProjectAssetsPanel({ projectId, projectName, assets = []
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
-    const q = query(collection(db, "technical_drawings"), where("projectId", "==", projectId));
+    const q = query(collection(db, "technical_drawings"), where("projectId", "==", projectId), limit(200));
     return onSnapshot(q, snap => setDrawings(snap.docs.map(d => ({ id: d.id, ...d.data() } as TechnicalDrawing)).sort((a,b) => b.createdAt.localeCompare(a.createdAt))), err => {
       console.warn("Project drawings load:", err);
     });
