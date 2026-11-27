@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, getDocs, where, writeBatch, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, getDocs, where, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import logoImg from "../../assets/images/anacleto-logo-premium.svg";
 import { Award, ClipboardCheck, MessageSquareHeart, Plus, Search, Trash2, Wrench, X } from "lucide-react";
@@ -34,8 +34,8 @@ export default function PostSaleModule() {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => onSnapshot(query(collection(db, "post_sale_records"), orderBy("createdAt", "desc")), snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Entry))), err => console.error("Erro ao carregar pós-venda:", err)), []);
-  useEffect(() => onSnapshot(collection(db, "quotes"), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Erro ao carregar orçamentos para qualidade:", err)), []);
+  useEffect(() => onSnapshot(query(collection(db, "post_sale_records"), orderBy("createdAt", "desc"), limit(300)), snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Entry))), err => console.error("Erro ao carregar pós-venda:", err)), []);
+  useEffect(() => onSnapshot(query(collection(db, "quotes"), where("productionStatus", "in", ["awaiting_quality", "quality_hold", "delivered"]), limit(300)), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Erro ao carregar orçamentos para qualidade:", err)), []);
   const qualityQuotes = quotes.filter(quote => ["awaiting_quality", "quality_hold", "delivered"].includes(String(quote.productionStatus || "")));
   const selectedQualityQuote = quotes.find(quote => quote.id === qualityQuoteId);
   const visible = useMemo(() => entries.filter(e => (filter === "all" || e.kind === filter) && [e.customer, e.orderNumber, e.product, e.title].join(" ").toLowerCase().includes(search.toLowerCase())), [entries, filter, search]);
@@ -101,6 +101,7 @@ export default function PostSaleModule() {
   };
 
   return <div className="space-y-6">
+    <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Para manter a tela responsiva, o módulo carrega até 300 registros recentes de pós-venda e até 300 orçamentos nas etapas de qualidade. O histórico mais antigo ainda precisa de paginação.</p>
     <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Relacionamento com o cliente</p><h1 className="text-2xl font-black text-slate-900 dark:text-white">Pós-venda</h1><p className="mt-1 text-sm text-slate-500">Qualidade do produto, satisfação e continuidade do atendimento.</p></div>
       <button onClick={() => setOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4"/> Novo registro</button>

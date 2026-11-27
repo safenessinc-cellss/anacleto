@@ -29,7 +29,7 @@ import DrawingThreePreview from "./DrawingThreePreview";
 import ManufacturingRoute from "../production/ManufacturingRoute";
 import { exportArchitecturalSheetPdf, exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, doc, limit, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
@@ -363,14 +363,14 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   useEffect(() => {
     if (!authReady) return;
-    return onSnapshot(query(collection(db, "projects"), orderBy("createdAt", "desc")), (snap) => {
+    return onSnapshot(query(collection(db, "projects"), orderBy("createdAt", "desc"), limit(300)), (snap) => {
       setProjects(snap.docs.map((item) => ({ id: item.id, name: String(item.data().name || "Projeto sem nome") })));
     }, (err) => console.warn("Projects list load notice:", err));
   }, [authReady]);
 
   useEffect(() => {
     if (!authReady) return;
-    return onSnapshot(collection(db, "catalog"), (snap) => {
+    return onSnapshot(query(collection(db, "catalog"), limit(500)), (snap) => {
       const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), source: "catalog" }));
       setCatalogItems(loaded);
       setSupplierCatalog((current) => [...current.filter((item) => item.source !== "catalog"), ...loaded]);
@@ -379,7 +379,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   useEffect(() => {
     if (!authReady) return;
-    return onSnapshot(collection(db, "supplier_catalog"), (snap) => {
+    return onSnapshot(query(collection(db, "supplier_catalog"), limit(500)), (snap) => {
       const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), source: "supplier_catalog" }));
       setSupplierCatalog((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...loaded]);
     }, (err) => {
@@ -390,7 +390,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   useEffect(() => {
     if (!authReady) return;
-    return onSnapshot(collection(db, "registry_items"), (snap) => {
+    return onSnapshot(query(collection(db, "registry_items"), limit(500)), (snap) => {
       const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), name: item.data().name || item.data().description || "Item sem nome", source: "registry_items" }));
       setSupplierCatalog((current) => [...current.filter((item) => item.source !== "registry_items"), ...loaded]);
     }, (err) => {
@@ -604,7 +604,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       return;
     }
     const unsub = onSnapshot(
-      collection(db, "technical_drawings"),
+      query(collection(db, "technical_drawings"), orderBy("createdAt", "desc"), limit(300)),
       (snap) => {
         const list: TechnicalDrawing[] = [];
         snap.forEach((d) => list.push({ id: d.id, ...d.data() } as TechnicalDrawing));
@@ -1121,6 +1121,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   return (
     <div className="space-y-6">
+      <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">O CAD carrega até 300 projetos, 300 desenhos e 500 registros por coleção de catálogo para evitar travamentos. A paginação do acervo completo ainda precisa ser concluída.</p>
       <nav aria-label="Projetos e Oficina CAD" className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
         <button
           type="button"
