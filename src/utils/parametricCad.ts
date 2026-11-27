@@ -57,17 +57,20 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   const widthMatch = prompt.match(/largura\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)/i);
   const heightMatch = prompt.match(/altura\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)/i);
   // Unlabelled dimensions follow the requested convention: ALTURA × LARGURA.
-  const height = toMm(heightMatch?.[1] || match?.[1], heightMatch?.[2] || match?.[2]);
-  const width = toMm(widthMatch?.[1] || match?.[3], widthMatch?.[2] || match?.[4]);
+  const sharedUnit = match?.[4] || match?.[2];
+  const height = toMm(heightMatch?.[1] || match?.[1], heightMatch?.[2] || sharedUnit);
+  const width = toMm(widthMatch?.[1] || match?.[3], widthMatch?.[2] || sharedUnit);
   const namedLine = prompt.match(/\\blinha\\s+(suprema|gold|\\d+)\\b/i)?.[1] || prompt.match(/\\b(suprema|gold)\\b/i)?.[1];
   const glassType = text.match(/\\b(duplo|laminado|temperado|insulado|comum|float)\\b/)?.[1];
   const thickness = text.match(/(?:vidro\\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\\s+)?(?:de\\s*)?|espessura\\s*(?:de\\s*)?)(\\d+(?:[.,]\\d+)?)\\s*mm/)?.[1]
     || text.match(/(\\d+(?:[.,]\\d+)?)\\s*mm\\s*(?:de\\s*)?(?:vidro|espessura)\\b/)?.[1];
+  const fixedModule = /m[oó]dulo fixo|fix[oa]/.test(text) && !/sem\\s+(?:m[oó]dulo fixo|fix[oa])/.test(text);
   const pendencias: string[] = [];
   if (!(width > 0) || !(height > 0)) pendencias.push("Informar largura e altura com unidade explícita (mm, cm ou m), confirmando a ordem altura × largura.");
   if (!(leaves > 0)) pendencias.push("Confirmar a quantidade de folhas/painéis.");
   if (!namedLine) pendencias.push("Definir fabricante e linha do perfil.");
   if (!/(bronze|natural|prata|anodiz|preto|branco)/.test(text)) pendencias.push("Definir acabamento/cor do perfil.");
+  if (/(janela|porta)/.test(text) && !/(correr|corredi[cç]a|deslizante|giro|abrir|dobradi[cç]a|pivotante)/.test(text)) pendencias.push("Confirmar o sistema de abertura da esquadria.");
   if (!glassType) pendencias.push("Definir o tipo de vidro.");
   if (!thickness) pendencias.push("Confirmar a espessura do vidro.");
   if (!/esquerda|direita/.test(text)) pendencias.push("Confirmar o sentido de abertura.");
@@ -84,7 +87,7 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
     largura_mm: width,
     altura_mm: height,
     folhas: leaves,
-    modulo_fixo: /fix[oa]|m[oó]dulo fixo/.test(text),
+    modulo_fixo: fixedModule,
     tipo_vidro: glassType ? glassType.toLowerCase() : "a definir",
     espessura_mm: Number(thickness?.replace(",", ".")) || 0,
     abertura: /esquerda/.test(text) ? "esquerda" : /direita/.test(text) ? "direita" : "a definir",
