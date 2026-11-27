@@ -50,7 +50,7 @@ const drawingResponseSchema = {
 const parametricResponseSchema = {
   type: Type.OBJECT,
   properties: {
-    tipologia: { type: Type.STRING, enum: ["janela_correr", "porta_correr", "porta_giro", "porta_pivotante", "maxim_ar", "basculante", "box_banheiro"] },
+    tipologia: { type: Type.STRING, enum: ["janela_correr", "porta_correr", "porta_giro", "porta_pivotante", "maxim_ar", "basculante", "box_banheiro", "a_definir"] },
     linha_aluminio: { type: Type.STRING },
     cor_perfil: { type: Type.STRING },
     largura_mm: { type: Type.NUMBER },
@@ -404,7 +404,7 @@ export default async function handler(req: any, res: any) {
     if (isAluminumPrompt(prompt)) {
       stage = "parametric_spec_extraction";
       const aiStartedAt = Date.now();
-      const system = `Extraia somente dados técnicos explícitos de uma esquadria de alumínio. Não calcule nem devolva coordenadas, linhas, geometrias, lista de peças ou orçamento. Devolva JSON estrito com exatamente as chaves tipologia, linha_aluminio, cor_perfil, largura_mm, altura_mm, folhas, modulo_fixo, tipo_vidro, espessura_mm, abertura. Tipologias permitidas: janela_correr, porta_correr, porta_giro, porta_pivotante, maxim_ar, basculante, box_banheiro. Converta dimensões explicitamente fornecidas para milímetros. Use valores vazios ou zero quando não forem informados; não invente linha, cor, tipo de vidro ou espessura. Use folhas=0 quando a quantidade não estiver explicitamente informada; nunca deduza folhas pela tipologia. Não invente espessura, linha, acabamento, vidro, abertura ou módulo fixo. modulo_fixo é booleano e só deve ser true quando explicitamente informado.`;
+      const system = `Extraia somente dados técnicos explícitos de uma esquadria de alumínio. Não calcule nem devolva coordenadas, linhas, geometrias, lista de peças ou orçamento. Devolva JSON estrito com exatamente as chaves tipologia, linha_aluminio, cor_perfil, largura_mm, altura_mm, folhas, modulo_fixo, tipo_vidro, espessura_mm, abertura. Tipologias permitidas: janela_correr, porta_correr, porta_giro, porta_pivotante, maxim_ar, basculante, box_banheiro, a_definir. Use a_definir se o sistema de abertura não estiver explicitamente informado; nunca presuma janela ou porta de correr. Converta dimensões explicitamente fornecidas para milímetros. Use valores vazios ou zero quando não forem informados; não invente linha, cor, tipo de vidro ou espessura. Use folhas=0 quando a quantidade não estiver explicitamente informada; nunca deduza folhas pela tipologia. Não invente espessura, linha, acabamento, vidro, abertura ou módulo fixo. modulo_fixo é booleano e só deve ser true quando explicitamente informado.`;
       const extracted = await generateDrawingJson({
         system,
         prompt: `${prompt}${drawingContext ? `\nContexto técnico existente: ${drawingContext}` : ""}`,
@@ -436,7 +436,7 @@ export default async function handler(req: any, res: any) {
             !Number.isFinite(value.espessura_mm) || value.espessura_mm < 0 || typeof value.abertura !== "string") {
           throw new Error("A extração não retornou o schema paramétrico de esquadrias válido.");
         }
-        if (value.folhas > 0 && ((value.tipologia === "janela_correr" && ![2, 3, 4].includes(value.folhas)) ||
+        if (value.folhas > 0 && value.tipologia !== "a_definir" && ((value.tipologia === "janela_correr" && ![2, 3, 4].includes(value.folhas)) ||
             (value.tipologia === "porta_correr" && ![2, 4].includes(value.folhas)) ||
             (!["janela_correr", "porta_correr"].includes(value.tipologia) && value.folhas !== 1))) {
           throw new Error("Quantidade de folhas incompatível com a tipologia.");
