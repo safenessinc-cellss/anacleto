@@ -60,3 +60,9 @@ test("routes only explicit aluminum openings to parametric CAD, not generic alum
   assert.equal(isAluminumPrompt("janela linha Suprema"), true);
   assert.equal(isAluminumPrompt("porta de alumínio"), true);
 });
+
+test("does not assume sliding opening when the aluminum opening system is not specified", () => {
+  const spec = localParametricSpec("janela de alumínio");
+  assert.equal(spec.tipologia, "a_definir");
+  assert.ok((spec.pendencias || []).some((item) => item.includes("tipologia")));
+});
