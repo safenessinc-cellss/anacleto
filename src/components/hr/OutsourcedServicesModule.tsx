@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, updateDoc, setDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, limit, onSnapshot, query, serverTimestamp, updateDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { Plus, Trash2, Pencil, BriefcaseBusiness } from "lucide-react";
 
@@ -28,9 +28,10 @@ export default function OutsourcedServicesModule({ competence, onCompetenceChang
   const [editingId, setEditingId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
 
   useEffect(() => {
-    const stop = onSnapshot(collection(db, "payroll_outsourced_services"), snap => setRecords(snap.docs.map(row => ({ id: row.id, ...row.data() } as OutsourcedRecord))), reason => setError("Não foi possível carregar os serviços terceirizados: " + reason.message));
+    const stop = onSnapshot(query(collection(db, "payroll_outsourced_services"), limit(1000)), snap => { setLimitedSources(snap.size >= 1000 ? ["payroll_outsourced_services"] : []); setRecords(snap.docs.map(row => ({ id: row.id, ...row.data() } as OutsourcedRecord))); }, reason => setError("Não foi possível carregar os serviços terceirizados: " + reason.message));
     return () => stop();
   }, []);
 
@@ -104,6 +105,7 @@ export default function OutsourcedServicesModule({ competence, onCompetenceChang
   };
 
   return <section className="space-y-4 rounded-2xl border border-violet-200 bg-violet-50/50 p-5 dark:border-slate-700 dark:bg-slate-900">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado a 1.000 serviços terceirizados; o total mensal pode estar parcial. A paginação completa ainda está pendente.</p>}
     <header className="flex items-start gap-3"><div className="rounded-xl bg-violet-100 p-3 text-violet-700"><BriefcaseBusiness/></div><div><p className="text-xs font-bold uppercase tracking-widest text-violet-700">Prestadores por obra</p><h2 className="text-xl font-black">Funcionários terceirizados</h2><p className="mt-1 text-sm text-slate-500">Cadastre o prestador e detalhe os serviços por obra. Cada adiantamento fica registrado separadamente com sua própria data; o saldo pendente é calculado automaticamente.</p></div></header>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
     <div className="grid gap-3 sm:grid-cols-4"><div className="rounded-xl border bg-white p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">Lançamentos na competência</p><strong className="text-xl">{monthRecords.length}</strong></div><div className="rounded-xl border bg-white p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">Total contratado</p><strong className="text-xl">{money(monthTotal)}</strong></div><div className="rounded-xl border bg-white p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">Total adiantado / pago</p><strong className="text-xl text-emerald-700">{money(monthPaid)}</strong></div><div className="rounded-xl border bg-white p-3 dark:bg-slate-800"><p className="text-xs text-slate-500">Saldo pendente</p><strong className="text-xl text-amber-700">{money(Math.max(0, monthTotal - monthPaid))}</strong></div></div>
