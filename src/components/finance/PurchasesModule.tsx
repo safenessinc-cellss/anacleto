@@ -410,6 +410,7 @@ export default function PurchasesModule() {
         aggregates.set(identity, existing ? { ...existing, quantity: existing.quantity + Number(item.quantity), total: existing.total + Number(item.total || 0) } : { ...item, description: stockName, sku: item.sku?.trim() || identity, quantity: Number(item.quantity) });
       });
       const entries = [...aggregates.entries()];
+      if (!entries.length) throw new Error("Entrada bloqueada: a compra não contém itens com descrição e quantidade válidas. Cadastre os materiais em Compras Gerais antes de receber no estoque.");
       const inventorySnapshot = await getDocs(collection(db, "inventory_items"));
       const stockRefs = entries.map(([key, item]) => {
         const match = inventorySnapshot.docs.find(d => {
