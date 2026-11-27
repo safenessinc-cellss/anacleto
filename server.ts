@@ -490,7 +490,7 @@ app.post("/api/ai/budget-items", requireFirebaseAuth, requireQuoteRole, rateLimi
     if (prompt.length < 5) return res.status(400).json({ error: "Descreva o serviço ou produto para orçar." });
     const requestId = String(req.headers["x-request-id"] || req.headers["x-vercel-id"] || "");
     const catalogStartedAt = Date.now();
-    const fullCatalog = await loadCatalogFromFirestore(req, { cacheTtlMs: 20_000 });
+    const fullCatalog = await loadCatalogFromFirestore(req, { cacheTtlMs: 20_000, cacheKey: String(res.locals.firebaseUser?.uid || "") });
     const catalogLoadMs = Date.now() - catalogStartedAt;
     let catalog = selectRelevantBudgetCatalog(prompt, fullCatalog, 450);
     console.info("[BUDGET_ITEMS_AI] catalog_loaded", { requestId, catalogLoadMs, totalCatalogRows: fullCatalog.length, selectedCatalogRows: catalog.length });
