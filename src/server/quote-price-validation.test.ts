@@ -13,3 +13,10 @@ test("does not block explicitly manual or catalog-confirmed prices", () => {
     assert.equal(isUnconfirmedPriceSource(value), false, String(value));
   }
 });
+
+test("manual price can be reviewed by an authorized approver without catalog match", async () => {
+  const { requiresCatalogPriceVerification } = await import("../utils/quote-price-validation.js");
+  assert.equal(requiresCatalogPriceVerification({ sku: "CUSTOM-01", priceSource: "manual" }), false);
+  assert.equal(requiresCatalogPriceVerification({ sku: "CAT-01", priceSource: "estimated" }), true);
+  assert.equal(requiresCatalogPriceVerification({ catalogItemId: "item-1", priceSource: "manual" }), true);
+});
