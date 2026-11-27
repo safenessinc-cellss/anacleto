@@ -20,9 +20,9 @@ export function buildCommercialQuoteDraft(
     items = (Array.isArray(source.items) ? source.items : []).map((item: any, index: number) => {
       const requestedSource = String(item.priceSource || "pending").toLowerCase();
       const priceSource = ["catalog", "manual", "existing", "estimated", "pending"].includes(requestedSource) ? requestedSource : "pending";
-      const catalogPrice = priceSource === "catalog" && money(item.unitPrice) > 0 && String(item.catalogItemId || "").trim();
+      const catalogPrice = Boolean(priceSource === "catalog" && money(item.unitPrice) > 0 && String(item.catalogItemId || "").trim());
       return {
-        id: String(item.id || \`smart-\${index + 1}\`),
+        id: String(item.id || ("smart-" + (index + 1))),
         description: String(item.description || "").trim(),
         quantity: Number(item.quantity),
         unitPrice: money(item.unitPrice),
@@ -44,7 +44,7 @@ export function buildCommercialQuoteDraft(
       const hasOfferPrice = line?.status === "priced" && money(line.unitPrice) > 0;
       const unitPrice = hasOfferPrice ? money(line.unitPrice) : 0;
       return {
-        id: String(part.id || \`technical-\${index + 1}\`),
+        id: String(part.id || ("technical-" + (index + 1))),
         description: String(part.description || "").trim(),
         quantity: Number(line?.quantityToBuy || part.quantity),
         unitPrice,
@@ -52,10 +52,10 @@ export function buildCommercialQuoteDraft(
         catalogItemId: "",
         priceSource: hasOfferPrice ? "estimated" : "pending",
         notes: [
-          part.code ? \`Código técnico: \${part.code}\` : "",
-          part.unit ? \`Unidade: \${part.unit}\` : "",
-          selected?.supplier ? \`Fornecedor de referência: \${selected.supplier}\` : "Fornecedor ainda não definido",
-          line?.offerId ? \`Oferta de referência: \${line.offerId}\` : "Preço/oferta precisa de validação comercial",
+          part.code ? "Código técnico: " + part.code : "",
+          part.unit ? "Unidade: " + part.unit : "",
+          selected?.supplier ? "Fornecedor de referência: " + selected.supplier : "Fornecedor ainda não definido",
+          line?.offerId ? "Oferta de referência: " + line.offerId : "Preço/oferta precisa de validação comercial",
           "Valor preliminar; não confirmado para aprovação ou fabricação.",
         ].filter(Boolean).join(" · "),
       };
@@ -75,12 +75,12 @@ export function buildCommercialQuoteDraft(
     String(source.request || "").trim(),
     String(source.notes || "").trim(),
     workflow === "technical"
-      ? \`ORÇAMENTO PRELIMINAR TÉCNICO. Visita técnica pendente. Total calculado no fluxo técnico de origem: R$ \${originalTechnicalTotal.toFixed(2)}. Preços de fornecedor permanecem estimados até validação comercial.\`
+      ? "ORÇAMENTO PRELIMINAR TÉCNICO. Visita técnica pendente. Total calculado no fluxo técnico de origem: R$ " + originalTechnicalTotal.toFixed(2) + ". Preços de fornecedor permanecem estimados até validação comercial."
       : "Convertido do Orçamento Inteligente. Revise itens, preços, condições e dados do cliente antes de enviar.",
   ].filter(Boolean).join("\n\n");
 
   return {
-    number: \`ORC-\${workflow === "smart" ? "IA" : "TEC"}-\${sourceId.slice(0, 8).toUpperCase()}\`,
+    number: "ORC-" + (workflow === "smart" ? "IA" : "TEC") + "-" + sourceId.slice(0, 8).toUpperCase(),
     clientName: String(source.clientName || source.customerName || "Cliente não informado"),
     clientEmail: String(source.clientEmail || ""),
     clientTaxId: String(source.clientTaxId || source.clientCnpj || ""),
