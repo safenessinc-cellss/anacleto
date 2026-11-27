@@ -22,6 +22,7 @@ export interface ParametricWindowSpec {
   tipo_vidro: string;
   espessura_mm: number;
   abertura: string;
+  pendencias?: string[];
 }
 
 export type CadElement = Record<string, string | number | boolean | Array<{ x: number; y: number }>>;
@@ -37,50 +38,58 @@ export function isAluminumPrompt(prompt: string): boolean {
 
 export function localParametricSpec(prompt: string): ParametricWindowSpec {
   const text = prompt.toLowerCase();
-  const match = prompt.match(/(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
-  const toMm = (value: string | undefined, unit: string | undefined, fallback: number) => {
-    const number = value ? Number(value.replace(",", ".")) : fallback;
-    const normalizedUnit = unit?.toLowerCase();
-    const factor = normalizedUnit === "m" || (!normalizedUnit && number > 0 && number < 10)
-      ? 1000
-      : normalizedUnit === "cm" || (!normalizedUnit && number >= 10 && number < 100)
-        ? 10
-        : 1;
-    return Math.max(0, Math.round(number * factor));
+  const match = prompt.match(/(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)?\\s*[x×]\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)?/i);
+  const toMm = (value: string | undefined, unit: string | undefined) => {
+    if (!value || !unit) return 0;
+    const number = Number(value.replace(",", "."));
+    const normalizedUnit = unit.toLowerCase();
+    const factor = normalizedUnit === "m" ? 1000 : normalizedUnit === "cm" ? 10 : 1;
+    return Number.isFinite(number) && number > 0 ? Math.round(number * factor) : 0;
   };
   const tipologia: AluminumTipologia = /box/.test(text) ? "box_banheiro"
-    : /maxim[\s-]?ar/.test(text) ? "maxim_ar"
+    : /maxim[\\s-]?ar/.test(text) ? "maxim_ar"
     : /basculante/.test(text) ? "basculante"
     : /pivot/.test(text) ? "porta_pivotante"
     : /porta/.test(text) && /giro|abrir|dobradi[cç]a/.test(text) ? "porta_giro"
     : /porta/.test(text) ? "porta_correr"
     : "janela_correr";
-  const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is)/)?.[1] || (tipologia === "box_banheiro" ? 2 : 1));
-  const leaves = Math.min(8, Math.max(tipologia === "box_banheiro" ? 2 : 1, requestedLeaves));
-  const widthMatch = prompt.match(/largura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
-  const heightMatch = prompt.match(/altura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
-  const width = toMm(widthMatch?.[1] || match?.[1], widthMatch?.[2] || match?.[2], 0);
-  const height = toMm(heightMatch?.[1] || match?.[3], heightMatch?.[2] || match?.[4], 0);
-  const namedLine = prompt.match(/\blinha\s+(suprema|gold|\d+)\b/i)?.[1] || prompt.match(/\b(suprema|gold)\b/i)?.[1];
-  const glassType = text.match(/\b(duplo|laminado|temperado|insulado|comum|float)\b/)?.[1];
-  const thickness = text.match(/(?:vidro\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\s+)?(?:de\s*)?|espessura\s*(?:de\s*)?)(\d+(?:[.,]\d+)?)\s*mm/)?.[1]
-    || text.match(/(\d+(?:[.,]\d+)?)\s*mm\s*(?:de\s*)?(?:vidro|espessura)\b/)?.[1];
+  const requestedLeaves = Number(text.match(/(\\d{1,2})\\s*(?:folhas?|pain[eé]is)/)?.[1] || 0);
+  const leaves = requestedLeaves > 0 ? Math.min(8, requestedLeaves) : 0;
+  const widthMatch = prompt.match(/largura\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)/i);
+  const heightMatch = prompt.match(/altura\\s*(?:de|:|=)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m)/i);
+  // Unlabelled dimensions follow the requested convention: ALTURA × LARGURA.
+  const height = toMm(heightMatch?.[1] || match?.[1], heightMatch?.[2] || match?.[2]);
+  const width = toMm(widthMatch?.[1] || match?.[3], widthMatch?.[2] || match?.[4]);
+  const namedLine = prompt.match(/\\blinha\\s+(suprema|gold|\\d+)\\b/i)?.[1] || prompt.match(/\\b(suprema|gold)\\b/i)?.[1];
+  const glassType = text.match(/\\b(duplo|laminado|temperado|insulado|comum|float)\\b/)?.[1];
+  const thickness = text.match(/(?:vidro\\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\\s+)?(?:de\\s*)?|espessura\\s*(?:de\\s*)?)(\\d+(?:[.,]\\d+)?)\\s*mm/)?.[1]
+    || text.match(/(\\d+(?:[.,]\\d+)?)\\s*mm\\s*(?:de\\s*)?(?:vidro|espessura)\\b/)?.[1];
+  const pendencias: string[] = [];
+  if (!(width > 0) || !(height > 0)) pendencias.push("Informar largura e altura com unidade explícita (mm, cm ou m), confirmando a ordem altura × largura.");
+  if (!(leaves > 0)) pendencias.push("Confirmar a quantidade de folhas/painéis.");
+  if (!namedLine) pendencias.push("Definir fabricante e linha do perfil.");
+  if (!/(bronze|natural|prata|anodiz|preto|branco)/.test(text)) pendencias.push("Definir acabamento/cor do perfil.");
+  if (!glassType) pendencias.push("Definir o tipo de vidro.");
+  if (!thickness) pendencias.push("Confirmar a espessura do vidro.");
+  if (!/esquerda|direita/.test(text)) pendencias.push("Confirmar o sentido de abertura.");
+  if (!/fix[oa]|m[oó]dulo fixo|sem m[oó]dulo fixo/.test(text)) pendencias.push("Confirmar se existe módulo fixo.");
   return {
     tipologia,
-    linha_aluminio: namedLine ? `Linha ${namedLine.replace(/\b\w/g, (letter) => letter.toUpperCase())}` : "Linha a definir",
+    linha_aluminio: namedLine ? `Linha ${namedLine.replace(/\\b\\w/g, (letter) => letter.toUpperCase())}` : "Linha a definir",
     cor_perfil: /bronze/.test(text) ? "#80552f"
       : /anodiz|natural|prata/.test(text) ? "#9da8ae"
       : /preto/.test(text) ? "#1f2937"
       : /branco/.test(text) ? "#f8fafc"
-      : "#94a3b8",
-    cor_vidro: text.match(/\b(incolor|bronze|verde|fum[eê]|cinza)\b/i)?.[1]?.toLowerCase() || "a definir",
+      : "a definir",
+    cor_vidro: text.match(/\\b(incolor|bronze|verde|fum[eê]|cinza)\\b/i)?.[1]?.toLowerCase() || "a definir",
     largura_mm: width,
     altura_mm: height,
     folhas: leaves,
     modulo_fixo: /fix[oa]|m[oó]dulo fixo/.test(text),
     tipo_vidro: glassType ? glassType.toLowerCase() : "a definir",
-    espessura_mm: Number(thickness?.replace(",", ".")) || 8,
-    abertura: /esquerda/.test(text) ? "esquerda" : /direita/.test(text) ? "direita" : tipologia === "maxim_ar" ? "projetante" : tipologia === "basculante" ? "basculante" : "central",
+    espessura_mm: Number(thickness?.replace(",", ".")) || 0,
+    abertura: /esquerda/.test(text) ? "esquerda" : /direita/.test(text) ? "direita" : "a definir",
+    pendencias,
   };
 }
 
@@ -96,6 +105,10 @@ function text(elements: CadElement[], x: number, y: number, value: string, fill 
 
 function buildElevation(spec: ParametricWindowSpec): CadElement[] {
   const elements: CadElement[] = [];
+  if (!(spec.largura_mm > 0) || !(spec.altura_mm > 0) || !(spec.folhas > 0)) {
+    text(elements, 500, 430, "Geometria pendente — informe altura, largura e folhas", "#fbbf24", 22);
+    return elements;
+  }
   const { tipologia, largura_mm: width, altura_mm: height, folhas, modulo_fixo: fixed, cor_perfil: color } = spec;
   const x = 120, y = 130, w = 760, h = 620;
   const framePx = Math.max(15, Math.min(34, 30 * Math.min(width / height, 1.5)));
@@ -173,13 +186,14 @@ function buildElevation(spec: ParametricWindowSpec): CadElement[] {
 }
 
 export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: string, catalog: any[] = []): TechnicalDrawing {
-  const width = spec.largura_mm, height = spec.altura_mm, frameDepth = 60;
+  const width = spec.largura_mm, height = spec.altura_mm, frameDepth = 0;
   const isDoor = spec.tipologia.startsWith("porta");
   const isBox = spec.tipologia === "box_banheiro";
-  const pieceRows: Array<{ name: string; quantity: number; lengthMm: number; sectionMm: number }> = [
-    { name: "Marco · montantes laterais", quantity: 2, lengthMm: height, sectionMm: 40 },
-    { name: "Marco · travessas superior/inferior", quantity: 2, lengthMm: width, sectionMm: 40 },
-  ];
+  const dimensionsKnown = width > 0 && height > 0 && spec.folhas > 0;
+  const pieceRows: Array<{ name: string; quantity: number; lengthMm: number; sectionMm: number }> = dimensionsKnown ? [
+    { name: "Marco · montantes laterais", quantity: 2, lengthMm: height, sectionMm: 0 },
+    { name: "Marco · travessas superior/inferior", quantity: 2, lengthMm: width, sectionMm: 0 },
+  ] : [];
   if (spec.tipologia === "janela_correr" || spec.tipologia === "porta_correr") {
     pieceRows.push({ name: "Folha corrediza · perfis verticais", quantity: spec.folhas * 2, lengthMm: Math.max(1, height - 80), sectionMm: 35 });
     pieceRows.push({ name: "Folha corrediza · perfis horizontais", quantity: spec.folhas * 2, lengthMm: Math.max(1, width / spec.folhas - 50), sectionMm: 35 });
@@ -190,7 +204,7 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
     pieceRows.push({ name: "Folha / painel", quantity: 1, lengthMm: height, sectionMm: Math.max(1, width - 80) });
   }
   const profileColor = /^#[0-9a-f]{3,8}$/i.test(spec.cor_perfil) ? spec.cor_perfil : /branc/i.test(spec.cor_perfil) ? "#cbd5e1" : /pret/i.test(spec.cor_perfil) ? "#334155" : "#94a3b8";
-  const pieces: TechnicalPiece[] = pieceRows.map((row, index) => ({
+  const pieces: TechnicalPiece[] = dimensionsKnown ? pieceRows.map((row, index) => ({
     id: `p${index + 1}`,
     pieceNumber: index + 1,
     name: row.name,
@@ -199,8 +213,8 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
     material: /vidro/.test(row.name) ? `${spec.tipo_vidro} ${spec.espessura_mm} mm` : `${spec.linha_aluminio} · ${spec.cor_perfil}`,
     color: profileColor,
     cutAngle: "90° · confirmar tabela do fabricante",
-    notes: "Dimensão nominal gerada por template paramétrico. Validar folgas e corte conforme a linha de alumínio selecionada.",
-  }));
+    notes: "Despiece conceitual preliminar. Seções, folgas e cortes não foram validados por tabela oficial do fabricante; não liberar fabricação.",
+  })) : [];
   const catalogText = (row: any) => `${row.name || ""} ${row.description || ""} ${row.code || ""} ${row.sku || ""} ${row.category || ""}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const lineKey = spec.linha_aluminio.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/^linha\s+/, "");
   const profileWords = /perfil|alumin|marco|montante|travessa|folha|trilho|esquadria/;
@@ -220,7 +234,7 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
       return { row, score };
     }).sort((a, b) => b.score - a.score)[0]?.row;
   };
-  const budgetItems: NonNullable<TechnicalDrawing["budget"]>["items"] = pieces.map((piece) => {
+  const budgetItems: NonNullable<TechnicalDrawing["budget"]>["items"] = dimensionsKnown ? pieces.map((piece) => {
     const catalogItem = catalogMatch("profile");
     const unitPrice = catalogItem ? estimatedCatalogPrice(catalogItem, readAluminumPricePerKg(), piece.dimensions.width) || 0 : 0;
     return {
@@ -235,7 +249,7 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
       subtotal: Number((piece.quantity * unitPrice).toFixed(2)),
       cutLengthMm: piece.dimensions.width,
       imageUrl: catalogItem?.thumbnailDataUrl || catalogItem?.imageUrl || "",
-      priceSource: catalogItem && unitPrice > 0 ? (Number(catalogItem.price || 0) > 0 ? "catalog" : "estimated") : "pending",
+      priceSource: catalogItem && unitPrice > 0 ? (hasConfirmedCatalogPrice(catalogItem) ? "catalog" : "estimated") : "pending",
     };
   });
   const glassItem = catalogMatch("glass");
@@ -249,12 +263,12 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
       catalogSource: String(glassItem.source || ""),
       sku: String(glassItem.code || glassItem.sku || ""),
       description: `${spec.tipo_vidro} ${spec.espessura_mm} mm ${spec.cor_vidro || ""}`.trim(),
-      quantity: 1,
-      unitPrice,
-      subtotal: unitPrice,
+      quantity: dimensionsKnown ? 1 : 0,
+      unitPrice: dimensionsKnown ? unitPrice : 0,
+      subtotal: dimensionsKnown ? unitPrice : 0,
       cutLengthMm: width,
       imageUrl: String(glassItem.thumbnailDataUrl || glassItem.imageUrl || ""),
-      priceSource: unitPrice > 0 ? "catalog" : "pending",
+      priceSource: unitPrice > 0 ? (hasConfirmedCatalogPrice(glassItem) ? "catalog" : "estimated") : "pending",
     });
   }
   const accessoryItem = catalogMatch("accessory");
@@ -266,12 +280,12 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
       catalogSource: String(accessoryItem.source || ""),
       sku: String(accessoryItem.code || accessoryItem.sku || ""),
       description: `Ferragens e acessórios · ${spec.folhas} folha(s)`,
-      quantity: 1,
+      quantity: dimensionsKnown && spec.folhas > 0 ? 1 : 0,
       unitPrice,
       subtotal: unitPrice,
       cutLengthMm: 0,
       imageUrl: String(accessoryItem.thumbnailDataUrl || accessoryItem.imageUrl || ""),
-      priceSource: unitPrice > 0 ? "catalog" : "pending",
+      priceSource: unitPrice > 0 ? (hasConfirmedCatalogPrice(accessoryItem) ? "catalog" : "estimated") : "pending",
     });
   }
   const subtotal = Number(budgetItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2));
@@ -297,6 +311,7 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
     parametricSpec: spec,
     vidro: spec.cor_vidro,
     visualElements: buildElevation(spec),
+    assumptions: [...(spec.pendencias || []), "Despiece e cortes são conceituais; validar tabela e folgas oficiais do fabricante antes de fabricar."],
     dimensionLines: [
       { id: "width", label: `LARGURA TOTAL: ${width} mm`, value: width, unit: "mm", orientation: "horizontal", start: { x: 120, y: 100 }, end: { x: 880, y: 100 } },
       { id: "height", label: `ALTURA TOTAL: ${height} mm`, value: height, unit: "mm", orientation: "vertical", start: { x: 95, y: 130 }, end: { x: 95, y: 750 } },
@@ -305,7 +320,7 @@ export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: strin
     assemblyInstructions: steps.map((step) => step.description),
     steps,
     currentStep: 1,
-    cuttingPlan: pieces.map((piece) => ({ pieceNumber: piece.pieceNumber, name: piece.name, material: piece.material, quantity: piece.quantity, length: piece.dimensions.width, width: piece.dimensions.height, unit: "mm", cutAngle: piece.cutAngle, notes: piece.notes })),
+    cuttingPlan: dimensionsKnown ? pieces.map((piece) => ({ pieceNumber: piece.pieceNumber, name: piece.name, material: piece.material, quantity: piece.quantity, length: piece.dimensions.width, width: piece.dimensions.height, unit: "mm", cutAngle: piece.cutAngle, notes: piece.notes })) : [],
     budget: { currency: "BRL", items: budgetItems, subtotal, labor: 0, marginRate: 0, taxRate: 0, freight: 0, total: subtotal },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
