@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { CheckCircle2, Clock3, CreditCard, Users } from "lucide-react";
 import EmployeeDirectoryActions from "./EmployeeDirectoryActions";
@@ -45,6 +45,7 @@ export default function EmployeePaymentsModule() {
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [editName, setEditName] = useState("");
@@ -60,8 +61,10 @@ export default function EmployeePaymentsModule() {
   const [savingEmployee, setSavingEmployee] = useState(false);
 
   useEffect(() => {
-    const stopPayments = onSnapshot(query(collection(db, "employee_payments"), orderBy("paymentDate", "desc")), snap =>
-      setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() } as EmployeePayment))),
+    const stopPayments = onSnapshot(query(collection(db, "employee_payments"), orderBy("paymentDate", "desc"), limit(1000)), snap => {
+      setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "employee_payments"])] : v.filter(x => x !== "employee_payments"));
+      setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() } as EmployeePayment)));
+    },
       err => setError("Não foi possível carregar pagamentos: " + err.message)
     );
     return () => stopPayments();
@@ -135,6 +138,7 @@ export default function EmployeePaymentsModule() {
   };
 
   return <div className="space-y-5 text-slate-800 dark:text-slate-100">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado: {limitedSources.join(", ")}. Pagamentos anteriores podem não aparecer; a paginação completa ainda está pendente.</p>}
     <header><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Folha de pagamento vinculada</p><h2 className="text-2xl font-black">Pagamento funcionário</h2><p className="mt-1 text-sm text-slate-500">Registre os valores efetivamente pagos aos funcionários cadastrados na Folha de Pagamento. O registro fica vinculado ao funcionário e à competência.</p></header>
     <EmployeeDirectoryActions onSync={() => { void sync(); }} syncing={syncing}/>
     {(error || directoryError) && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error || directoryError}</div>}
