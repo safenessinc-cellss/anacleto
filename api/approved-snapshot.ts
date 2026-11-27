@@ -6,18 +6,13 @@ import { createBudgetSnapshot } from "../src/server/snapshot-ledger.js";
 import { hasConfirmedCatalogPrice } from "../src/utils/catalog-price-validation.js";
 import { isUnconfirmedPriceSource } from "../src/utils/quote-price-validation.js";
 import { buildDrawingVectorPayload } from "../src/server/drawing-vector.js";
+import { authenticateFirebaseRequest } from "../src/server/firebase-auth.js";
+import { hasAIRole } from "../src/server/ai-roles.js";
+import { stripBearerPrefix } from "../src/server/auth-token.js";
+import { consumeRateLimit } from "../src/server/rate-limit.js";
+import { getAIRateLimit } from "../src/server/ai-limits.js";
 
 type AuthUser = { uid: string; email: string; role: string };
-const OWNER_EMAIL = "safeness.c.a@gmail.com";
-const requestWindows = new Map<string, { startedAt: number; count: number }>();
-function withinRateLimit(uid: string) {
-  const now = Date.now();
-  const current = requestWindows.get(uid);
-  if (!current || now - current.startedAt >= 60000) { requestWindows.set(uid, { startedAt: now, count: 1 }); return true; }
-  if (current.count >= 6) return false;
-  current.count += 1;
-  return true;
-}
 const base = () => {
   const databaseId = encodeURIComponent(firebaseConfig.firestoreDatabaseId || "(default)");
   return "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/" + databaseId + "/documents";
@@ -30,30 +25,10 @@ function send(res: any, status: number, body: unknown) {
   return res.status(status).json(body);
 }
 function tokenOf(req: any) {
-  const value = String(req.headers?.authorization || "");
-  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
+  return stripBearerPrefix(req?.headers?.authorization);
 }
 async function authenticate(req: any): Promise<AuthUser | null> {
-  const token = tokenOf(req);
-  const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey;
-  if (!token || !apiKey) return null;
-  const identity = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + apiKey, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: token }),
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!identity.ok) return null;
-  const data = await identity.json() as { users?: Array<{ localId?: string; email?: string }> };
-  const account = data.users?.[0];
-  if (!account?.localId || !account.email) return null;
-  const email = account.email.toLowerCase();
-  if (email === OWNER_EMAIL) return { uid: account.localId, email, role: "owner" };
-  const roleResponse = await fetch(base() + "/admins/" + encodeURIComponent(email), {
-    headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(10000),
-  });
-  if (!roleResponse.ok) return null;
-  const roleDoc = await roleResponse.json() as any;
-  const role = roleDoc.fields?.role?.stringValue;
-  return role ? { uid: account.localId, email, role } : null;
+  return authenticateFirebaseRequest(req);
 }
 function decodeValue(value: any): any {
   if (!value || typeof value !== "object") return value;
@@ -114,19 +89,13 @@ function catalogMatch(item: any, catalog: any[]) {
 }
 
 function canApproveManualPrice(user: AuthUser) {
-  return user.role === "owner" || ["super_admin", "super_usuario", "ceo", "admin", "financeiro"].includes(user.role);
+  return hasAIRole(user.role, "manualPriceApproval");
 }
 function canApprove(user: AuthUser, type: "quote" | "drawing") {
-  if (user.role === "owner") return true;
-  const quoteRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"];
-  const drawingRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "qualidade", "producao"];
-  return (type === "quote" ? quoteRoles : drawingRoles).includes(user.role);
+  return hasAIRole(user.role, type === "quote" ? "snapshotQuote" : "snapshotDrawing");
 }
 function canReadSnapshot(user: AuthUser, type: "quote" | "drawing") {
-  if (user.role === "owner") return true;
-  const quoteRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "financeiro"];
-  const drawingRoles = ["super_admin", "super_usuario", "ceo", "admin", "supervisor", "colaborador", "qualidade", "producao"];
-  return (type === "quote" ? quoteRoles : drawingRoles).includes(user.role);
+  return hasAIRole(user.role, type === "quote" ? "snapshotQuote" : "snapshotDrawing");
 }
 
 async function commitSnapshot(req: any, collection: string, documentId: string, updateTime: string, snapshot: any) {
@@ -212,7 +181,15 @@ export default async function handler(req: any, res: any) {
   try {
     const user = await authenticate(req);
     if (!user) return send(res, 401, { error: "Autenticação obrigatória ou sessão expirada." });
-    if (!withinRateLimit(user.uid)) return send(res, 429, { error: "Limite de aprovações e consultas atingido. Aguarde um minuto." });
+    try {
+      const policy = getAIRateLimit("approved-snapshot");
+      if (!(await consumeRateLimit("approved-snapshot", user.uid, policy.limit, policy.windowMs))) {
+        return send(res, 429, { error: "Limite de aprovações e consultas atingido. Aguarde um minuto.", code: "RATE_LIMITED" });
+      }
+    } catch (rateLimitError: any) {
+      console.error("[APPROVED_SNAPSHOT_RATE_LIMIT_UNAVAILABLE]", String(rateLimitError?.message || rateLimitError).slice(0, 500));
+      return send(res, 503, { error: "O controle de uso está temporariamente indisponível.", code: "RATE_LIMIT_UNAVAILABLE" });
+    }
     if (req.method === "GET") {
       const snapshotId = String(req.query?.snapshotId || "").trim();
       if (!snapshotId || snapshotId.length > 300 || snapshotId.includes("/")) return send(res, 400, { error: "snapshotId inválido." });
