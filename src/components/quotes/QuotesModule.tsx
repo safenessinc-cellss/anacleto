@@ -387,7 +387,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     }).sort((a, b) => b.score - a.score)[0];
     const match = supplierMatch && supplierMatch.score > 0 ? supplierMatch.item : undefined;
     const typology = spec?.tipologia.replaceAll("_", " ") || (isAluminumPrompt(text) ? "esquadria de alumínio" : "");
-    const size = widthMm && heightMm ? `${widthMm} × ${heightMm} mm` : "";
+    const size = widthMm && heightMm ? `${heightMm} × ${widthMm} mm (altura × largura)` : "";
     const line = lineMatch ? lineMatch[1].replace(/^linha\s*/i, "Linha ") : spec && spec.linha_aluminio !== "Linha a definir" ? spec.linha_aluminio : "";
     const glass = glassMatch ? `vidro ${glassMatch[1].toLowerCase()}${glassColorMatch ? ` ${glassColorMatch[1].toLowerCase()}` : ""}${spec ? ` ${spec.espessura_mm} mm` : ""}` : "";
     const freeDescription = [typology, size, line, glass].filter(Boolean).join(" · ") || text.trim();
