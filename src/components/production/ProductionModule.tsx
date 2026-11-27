@@ -31,16 +31,18 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [activeTab, setActiveTab] = useState<"orders" | "cutting">("orders");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
 
   useEffect(() => {
-    const a = onSnapshot(query(collection(db, "quotes"), orderBy("createdAt", "desc"), limit(300)), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as QuoteRecord))), e => console.error("Production quotes:", e));
-    const b = onSnapshot(query(collection(db, "inventory_items"), limit(500)), snap => setStock(snap.docs.map(d => ({ id: d.id, ...d.data() } as Material))), e => console.error("Production stock:", e));
+    const a = onSnapshot(query(collection(db, "quotes"), orderBy("createdAt", "desc"), limit(300)), snap => { setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "quotes"])] : v.filter(x => x !== "quotes")); setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as QuoteRecord))); }, e => console.error("Production quotes:", e));
+    const b = onSnapshot(query(collection(db, "inventory_items"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "inventory_items"])] : v.filter(x => x !== "inventory_items")); setStock(snap.docs.map(d => ({ id: d.id, ...d.data() } as Material))); }, e => console.error("Production stock:", e));
     const c = onSnapshot(query(collection(db, "production_orders"), orderBy("createdAt", "desc"), limit(300)), snap => {
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() } as WorkOrder));
       rows.sort((x,y) => String(y.createdAt?.toDate?.() || y.createdAt || "").localeCompare(String(x.createdAt?.toDate?.() || x.createdAt || "")));
+      setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "production_orders"])] : v.filter(x => x !== "production_orders"));
       setOrders(rows);
     }, e => console.error("Production orders:", e));
-    const d = onSnapshot(query(collection(db, "technical_drawings"), limit(200)), snap => setDrawings(snap.docs.map(row => ({ id: row.id, ...row.data() } as TechnicalDrawing))), e => console.error("Production drawings:", e));
+    const d = onSnapshot(query(collection(db, "technical_drawings"), limit(200)), snap => { setLimitedSources(v => snap.size >= 200 ? [...new Set([...v, "technical_drawings"])] : v.filter(x => x !== "technical_drawings")); setDrawings(snap.docs.map(row => ({ id: row.id, ...row.data() } as TechnicalDrawing))); }, e => console.error("Production drawings:", e));
     return () => { a(); b(); c(); d(); };
   }, []);
 
@@ -141,6 +143,7 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
     paid: "Concluída e recebida", cancelled: "Cancelada",
   };
   return <div className="space-y-5">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados por desempenho: {limitedSources.join(", ")}. Os indicadores e listas podem estar parciais; a paginação para consultar o histórico completo ainda está pendente.</p>}
     <nav className="flex gap-2 border-b pb-3">
       <button type="button" onClick={() => setActiveTab("orders")} aria-current={activeTab === "orders" ? "page" : undefined} className={`rounded-lg px-4 py-2 text-sm font-bold ${activeTab === "orders" ? "bg-indigo-600 text-white" : "border"}`}>Ordens de Produção</button>
       <button type="button" onClick={() => setActiveTab("cutting")} aria-current={activeTab === "cutting" ? "page" : undefined} className={`rounded-lg px-4 py-2 text-sm font-bold ${activeTab === "cutting" ? "bg-indigo-600 text-white" : "border"}`}>Plano de Corte 6M</button>

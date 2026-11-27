@@ -58,6 +58,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // Catálogo de productos
   const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [itemPhotoViewer, setItemPhotoViewer] = useState<string[] | null>(null);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
 
   // Cargar catálogo
   useEffect(() => {
@@ -156,12 +157,13 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
   // Load Quotes from Firestore in real-time
   useEffect(() => {
     const unsub = onSnapshot(
-      query(collection(db, "quotes"), orderBy("createdAt", "desc")),
+      query(collection(db, "quotes"), orderBy("createdAt", "desc"), limit(300)),
       (snap) => {
         const loaded: Quote[] = [];
         snap.forEach((docSnap) => {
           loaded.push({ id: docSnap.id, ...docSnap.data() } as Quote);
         });
+        setLimitedSources(snap.size >= 300 ? ["quotes"] : []);
         setQuotes(loaded);
         const selectedId = selectedQuoteIdRef.current;
         const refreshedSelection = selectedId ? loaded.find((quote) => quote.id === selectedId) : undefined;
@@ -1093,6 +1095,7 @@ const handleAddItem = () => {
 
   return (
     <div className="space-y-6">
+      {limitedSources.includes("quotes")&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado aos 300 orçamentos mais recentes. Orçamentos antigos não aparecem nesta lista; use o histórico unificado para consultar os registros disponíveis.</p>}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/80 p-6 rounded-2xl">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
