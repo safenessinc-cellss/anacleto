@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, setDoc, updateDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, setDoc, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../../firebase";
 import { Invoice, Quote } from "../../types";
@@ -30,7 +30,7 @@ export default function BusinessWorkspace({kind,quotes=[],invoices=[]}:Props) {
  useEffect(()=>{
   if(!uid||!isRecord)return;
   const col=collectionByKind[kind as keyof typeof collectionByKind];
-  const unsub=onSnapshot(query(collection(db,col),orderBy("createdAt","desc")),s=>setRows(s.docs.map(d=>({id:d.id,...d.data()} as RecordItem))),e=>setError("Não foi possível carregar os registros: "+e.message));
+  const unsub=onSnapshot(query(collection(db,col),orderBy("createdAt","desc"),limit(500)),s=>setRows(s.docs.map(d=>({id:d.id,...d.data()} as RecordItem))),e=>setError("Não foi possível carregar os registros: "+e.message));
   return ()=>unsub();
  },[uid,kind]);
  const save=async()=>{
