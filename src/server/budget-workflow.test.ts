@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCommercialQuoteDraft, isTechnicalVisitPending } from "../utils/budget-workflow.js";
+import { buildCommercialQuoteDraft, hasPendingBudgetApprovalData, isTechnicalVisitPending } from "../utils/budget-workflow.js";
 
 test("converts smart budgets while preserving confirmed and pending price provenance", () => {
   const quote = buildCommercialQuoteDraft({
@@ -48,10 +48,13 @@ test("carries AI-detected site visit requirements into the commercial quote", ()
   assert.match(quote.notes, /Qual é a altura do vão/);
 });
 
-test("does not convert a provisional item without a defined quantity", () => {
-  assert.throws(() => buildCommercialQuoteDraft({
-    items: [{ description: "Janela", quantity: 0, unitPrice: 0, priceSource: "pending" }],
-  }, "smart", "qtyzero1"), /quantidade válida/);
+test("preserves an unknown quantity as pending instead of inventing a value", () => {
+  const quote = buildCommercialQuoteDraft({
+    items: [{ description: "Janela", quantity: 0, quantityPending: true, unitPrice: 0, priceSource: "pending" }],
+  }, "smart", "qtyzero1");
+  assert.equal(quote.items[0].quantity, 0);
+  assert.equal(quote.items[0].quantityPending, true);
+  assert.equal(quote.preliminaryOnly, true);
 });
 
 test("blocks final approval until a required technical visit is completed", () => {
@@ -59,6 +62,14 @@ test("blocks final approval until a required technical visit is completed", () =
   assert.equal(isTechnicalVisitPending({ requiresTechnicalVisit: true, technicalVisitStatus: "pending" }), true);
   assert.equal(isTechnicalVisitPending({ requiresTechnicalVisit: true, technicalVisitStatus: "completed" }), false);
   assert.equal(isTechnicalVisitPending({ requiresTechnicalVisit: false }), false);
+});
+
+test("blocks final approval while questions, client confirmation, visit or quantity are pending", () => {
+  assert.equal(hasPendingBudgetApprovalData({ pendingQuestions: ["Qual é a largura?"] }), true);
+  assert.equal(hasPendingBudgetApprovalData({ requiresClientConfirmation: true, clientConfirmationStatus: "pending" }), true);
+  assert.equal(hasPendingBudgetApprovalData({ requiresTechnicalVisit: true, technicalVisitStatus: "completed", visitRequired: false }), false);
+  assert.equal(hasPendingBudgetApprovalData({ items: [{ quantity: 0, quantityPending: true }] }), true);
+  assert.equal(hasPendingBudgetApprovalData({ items: [{ quantity: 1, quantityPending: false }] }), false);
 });
 
 test("rejects conversion when no valid items exist", () => {
