@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, where } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { CheckCircle2, Factory, Loader2, PackageCheck, Play, Plus, XCircle } from "lucide-react";
 import CuttingPlanTab from "./CuttingPlanTab";
 import type { TechnicalDrawing } from "../../types";
 
 type QuoteRecord = { id: string; number?: string; clientName?: string; status?: string; productionOrderId?: string; items?: any[]; total?: number; drawingId?: string; technicalDrawing?: { id?: string } };
+type ApprovedBudget = { id: string; budgetKey: string; sourceCollection: "quotes" | "smart_budgets" | "technical_budgets"; budgetKind: string; number?: string; clientName?: string; status?: string; productionOrderId?: string; items: any[]; total?: number; request?: string; bomData?: any; bestSupplier?: string; comparisons?: any[]; visitRequired?: boolean; pendingQuestions?: string[]; pricingStatus?: string };
 type Material = { id: string; name: string; sku?: string; unit?: string; quantity: number; reservedQuantity?: number };
 type ReservedMaterial = { itemId: string; name: string; sku?: string; unit: string; quantity: number };
 type WorkOrder = {
@@ -13,11 +14,13 @@ type WorkOrder = {
   description: string; targetDate: string; assignedTo: string;
   status: "planned" | "in_progress" | "completed" | "delivered" | "quality_approved" | "invoiced" | "paid" | "cancelled";
   workflowStage?: string; nextStep?: string; invoiceId?: string;
-  materials: ReservedMaterial[]; drawingId?: string; quoteItems?: QuoteRecord["items"]; createdAt?: any;
+  materials: ReservedMaterial[]; drawingId?: string; quoteItems?: any[]; sourceCollection?: "quotes" | "smart_budgets" | "technical_budgets"; sourceBudgetId?: string; createdAt?: any;
 };
 
 export default function ProductionModule({ onNavigateDelivery, onNavigateQuality, onNavigateInvoice }: { onNavigateDelivery?: () => void; onNavigateQuality?: () => void; onNavigateInvoice?: () => void } = {}) {
   const [quotes, setQuotes] = useState<QuoteRecord[]>([]);
+  const [smartBudgets, setSmartBudgets] = useState<any[]>([]);
+  const [technicalBudgets, setTechnicalBudgets] = useState<any[]>([]);
   const [drawings, setDrawings] = useState<TechnicalDrawing[]>([]);
   const [stock, setStock] = useState<Material[]>([]);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
@@ -43,10 +46,24 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
       setOrders(rows);
     }, e => console.error("Production orders:", e));
     const d = onSnapshot(query(collection(db, "technical_drawings"), limit(200)), snap => { setLimitedSources(v => snap.size >= 200 ? [...new Set([...v, "technical_drawings"])] : v.filter(x => x !== "technical_drawings")); setDrawings(snap.docs.map(row => ({ id: row.id, ...row.data() } as TechnicalDrawing))); }, e => console.error("Production drawings:", e));
-    return () => { a(); b(); c(); d(); };
+    const e = onSnapshot(query(collection(db, "smart_budgets"), where("status", "in", ["approved", "aprovado"]), limit(300)), snap => setSmartBudgets(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Production smart budgets:", err));
+    const f = onSnapshot(query(collection(db, "technical_budgets"), where("status", "in", ["approved", "aprovado"]), limit(300)), snap => setTechnicalBudgets(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => console.error("Production technical budgets:", err));
+    return () => { a(); b(); c(); d(); e(); f(); };
   }, []);
 
-  const approvedQuotes = useMemo(() => quotes.filter(q => (q.status === "approved" || q.status === "aprovado") && !q.productionOrderId), [quotes]);
+  const approvedBudgets = useMemo<ApprovedBudget[]>(() => {
+    const standard = quotes.filter(q => ["approved", "aprovado"].includes(String(q.status || "").toLowerCase()) && !q.productionOrderId).map(q => ({
+      ...q, budgetKey: "quotes:" + q.id, sourceCollection: "quotes" as const, budgetKind: "Tradicional", items: Array.isArray(q.items) ? q.items : [],
+    }));
+    const smart = smartBudgets.filter(b => !b.productionOrderId && b.pricingStatus === "confirmed" && b.visitRequired !== true && !(Array.isArray(b.pendingQuestions) && b.pendingQuestions.length) && Array.isArray(b.items) && b.items.length > 0 && b.items.every((item: any) => Number(item.quantity) > 0 && Number(item.unitPrice) > 0 && ["catalog", "confirmed_manual"].includes(String(item.priceSource || "")))).map(b => ({
+      ...b, budgetKey: "smart_budgets:" + b.id, sourceCollection: "smart_budgets" as const, budgetKind: "Inteligente · IA", items: b.items || [],
+    }));
+    const technical = technicalBudgets.filter(b => !b.productionOrderId && b.pricingStatus === "confirmed" && b.bomData?.complete === true && !!b.bestSupplier && Array.isArray(b.comparisons) && b.comparisons.some((basket: any) => basket.complete === true && basket.supplier === b.bestSupplier)).map(b => ({
+      ...b, budgetKey: "technical_budgets:" + b.id, sourceCollection: "technical_budgets" as const, budgetKind: "Esquadrias · Técnico",
+      items: (Array.isArray(b.bomData?.bom) ? b.bomData.bom : []).map((part: any) => ({ id: part.id, description: part.description, quantity: Number(part.quantity || 0), sku: part.code || "", unit: part.unit || "un", manufacturer: part.manufacturer || "", system: part.system || "" })),
+    }));
+    return [...standard, ...smart, ...technical];
+  }, [quotes, smartBudgets, technicalBudgets]);
   const selectedStock = stock.find(x => x.id === materialId);
   const addMaterial = () => {
     const qty = Number(materialQty);
@@ -60,15 +77,21 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
 
   const createOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    const quote = approvedQuotes.find(q => q.id === quoteId);
-    if (!quote) { setMessage("Selecione um orçamento aprovado."); return; }
+    const budget = approvedBudgets.find(item => item.budgetKey === quoteId);
+    if (!budget) { setMessage("Selecione um orçamento aprovado e liberado para produção."); return; }
     setSaving(true); setMessage("");
     const orderRef = doc(collection(db, "production_orders"));
     try {
       await runTransaction(db, async tx => {
-        const quoteRef = doc(db, "quotes", quote.id);
-        const quoteSnap = await tx.get(quoteRef);
-        if (!quoteSnap.exists() || !["approved", "aprovado"].includes(String(quoteSnap.data().status))) throw new Error("O orçamento deixou de estar aprovado.");
+        const sourceRef = doc(db, budget.sourceCollection, budget.id);
+        const sourceSnap = await tx.get(sourceRef);
+        if (!sourceSnap.exists() || !["approved", "aprovado"].includes(String(sourceSnap.data().status))) throw new Error("O orçamento deixou de estar aprovado.");
+        const sourceData = sourceSnap.data();
+        if (budget.sourceCollection === "smart_budgets") {
+          const sourceItems = Array.isArray(sourceData.items) ? sourceData.items : [];
+          if (sourceData.pricingStatus !== "confirmed" || sourceData.visitRequired === true || (Array.isArray(sourceData.pendingQuestions) && sourceData.pendingQuestions.length) || sourceItems.some((item: any) => !(Number(item.quantity) > 0) || !(Number(item.unitPrice) > 0) || !["catalog", "confirmed_manual"].includes(String(item.priceSource || "")))) throw new Error("O orçamento inteligente ainda tem preços, quantidades ou avaliação técnica pendentes.");
+        }
+        if (budget.sourceCollection === "technical_budgets" && (sourceData.pricingStatus !== "confirmed" || sourceData.bomData?.complete !== true || !sourceData.bestSupplier || !Array.isArray(sourceData.comparisons) || !sourceData.comparisons.some((basket: any) => basket.complete === true && basket.supplier === sourceData.bestSupplier))) throw new Error("A lista técnica ou os preços de fornecedor ainda não estão confirmados.");
         const materialRefs = materials.map(m => doc(db, "inventory_items", m.itemId));
         const materialSnaps = [];
         for (const ref of materialRefs) materialSnaps.push(await tx.get(ref));
@@ -80,8 +103,10 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
           tx.update(materialRefs[i], { reservedQuantity: Number(data.reservedQuantity || 0) + requested, updatedAt: serverTimestamp() });
         }
         const number = `OP-${new Date().getFullYear()}-${orderRef.id.slice(0, 6).toUpperCase()}`;
-        tx.set(orderRef, { number, quoteId: quote.id, quoteNumber: quote.number || "", clientName: quote.clientName || "Cliente", description: description.trim() || `Produção do orçamento ${quote.number || ""}`, targetDate, assignedTo: assignedTo.trim(), status: "planned", workflowStage: "production", nextStep: "iniciar_producao", materials, quoteItems: quote.items || [], ...(quote.technicalDrawing?.id || quote.drawingId ? { drawingId: quote.technicalDrawing?.id || quote.drawingId } : {}), quoteTotal: Number(quote.total || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
-        tx.update(quoteRef, { productionOrderId: orderRef.id, productionStatus: "planned", updatedAt: serverTimestamp() });
+        const quoteNumber = budget.number || budget.id;
+        const defaultDescription = budget.request || budget.bomForm?.model || budget.bomForm?.system || `Produção do orçamento ${quoteNumber}`;
+        tx.set(orderRef, { number, quoteId: budget.sourceCollection === "quotes" ? budget.id : "", sourceBudgetId: budget.id, sourceCollection: budget.sourceCollection, quoteNumber, clientName: budget.clientName || "Cliente", description: description.trim() || defaultDescription, targetDate, assignedTo: assignedTo.trim(), status: "planned", workflowStage: "production", nextStep: "iniciar_producao", materials, quoteItems: budget.items || [], ...(budget.technicalDrawing?.id || budget.drawingId ? { drawingId: budget.technicalDrawing?.id || budget.drawingId } : {}), quoteTotal: Number(budget.total || 0), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: auth.currentUser?.email || "" });
+        tx.update(sourceRef, { productionOrderId: orderRef.id, productionStatus: "planned", updatedAt: serverTimestamp() });
       });
       setQuoteId(""); setDescription(""); setTargetDate(""); setAssignedTo(""); setMaterials([]); setMessage("Ordem criada. Os materiais foram reservados e vinculados ao orçamento.");
     } catch (err) { setMessage((err as Error).message || "Não foi possível criar a ordem."); }
@@ -97,10 +122,12 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
         const current = snap.data() as any;
         if (action === "start") {
           if (current.status !== "planned") throw new Error("Somente ordens planejadas podem iniciar.");
-          const quoteRef = doc(db, "quotes", order.quoteId);
-          const quoteSnap = await tx.get(quoteRef);
+          const sourceCollection = order.sourceCollection || "quotes";
+          const sourceId = order.sourceBudgetId || order.quoteId;
+          const sourceRef = sourceId ? doc(db, sourceCollection, sourceId) : null;
+          const sourceSnap = sourceRef ? await tx.get(sourceRef) : null;
           tx.update(orderRef, { status: "in_progress", workflowStage: "production", nextStep: "concluir_producao", startedAt: serverTimestamp(), updatedAt: serverTimestamp() });
-          if (quoteSnap.exists()) tx.update(quoteRef, { productionStatus: "in_progress", updatedAt: serverTimestamp() });
+          if (sourceRef && sourceSnap?.exists()) tx.update(sourceRef, { productionStatus: "in_progress", updatedAt: serverTimestamp() });
           return;
         }
         if (!["planned", "in_progress"].includes(current.status)) throw new Error("Esta ordem já foi encerrada.");
@@ -108,8 +135,10 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
         const refs = reserved.map(m => doc(db, "inventory_items", m.itemId));
         const snapshots = [];
         for (const ref of refs) snapshots.push(await tx.get(ref));
-        const quoteRef = doc(db, "quotes", order.quoteId);
-        const quoteSnap = await tx.get(quoteRef);
+        const sourceCollection = order.sourceCollection || "quotes";
+        const sourceId = order.sourceBudgetId || order.quoteId;
+        const sourceRef = sourceId ? doc(db, sourceCollection, sourceId) : null;
+        const sourceSnap = sourceRef ? await tx.get(sourceRef) : null;
         for (let i = 0; i < refs.length; i++) {
           const material = reserved[i]; const stockSnap = snapshots[i];
           if (!stockSnap.exists()) throw new Error(`Material ${material.name} não encontrado.`);
@@ -128,7 +157,7 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
         tx.update(orderRef, action === "complete"
           ? { status: "completed", workflowStage: "delivery", nextStep: "registrar_entrega", completedAt: serverTimestamp(), updatedAt: serverTimestamp() }
           : { status: "cancelled", workflowStage: "cancelled", nextStep: "encerrado", cancelledAt: serverTimestamp(), updatedAt: serverTimestamp() });
-        if (quoteSnap.exists()) tx.update(quoteRef, {
+        if (sourceRef && sourceSnap?.exists()) tx.update(sourceRef, {
           productionStatus: action === "complete" ? "ready_for_delivery" : "cancelled",
           updatedAt: serverTimestamp(),
         });
@@ -157,7 +186,7 @@ export default function ProductionModule({ onNavigateDelivery, onNavigateQuality
     <form onSubmit={createOrder} className="rounded-xl border bg-white p-4 space-y-3 dark:bg-slate-900">
       <div className="flex items-center gap-2"><Factory className="h-5 w-5 text-indigo-600"/><h3 className="font-semibold">Nova ordem de produção</h3></div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <select className="rounded-lg border px-3 py-2" value={quoteId} onChange={e=>setQuoteId(e.target.value)} required><option value="">Selecionar orçamento aprovado</option>{approvedQuotes.map(q=><option key={q.id} value={q.id}>{q.number || q.id} · {q.clientName || "Cliente"}</option>)}</select>
+        <select className="rounded-lg border px-3 py-2" value={quoteId} onChange={e=>setQuoteId(e.target.value)} required><option value="">Selecionar orçamento aprovado</option>{approvedBudgets.map(b=><option key={b.budgetKey} value={b.budgetKey}>[{b.budgetKind}] {b.number || b.id} · {b.clientName || "Cliente"}</option>)}</select>
         <input className="rounded-lg border px-3 py-2" placeholder="Descrição / etapa de fabricação" value={description} onChange={e=>setDescription(e.target.value)}/>
         <input className="rounded-lg border px-3 py-2" type="date" value={targetDate} onChange={e=>setTargetDate(e.target.value)}/>
         <input className="rounded-lg border px-3 py-2" placeholder="Responsável pela produção" value={assignedTo} onChange={e=>setAssignedTo(e.target.value)}/>
