@@ -15,7 +15,7 @@ export function buildCommercialQuoteDraft(
   const validUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let items: Array<Record<string, any>> = [];
   let freight = money(source.freight);
-  const requiresTechnicalVisit = workflow === "technical";
+  const requiresTechnicalVisit = workflow === "technical" || source.visitRequired === true || source.requiresTechnicalVisit === true;
 
   if (workflow === "smart") {
     items = (Array.isArray(source.items) ? source.items : []).map((item: any, index: number) => {
@@ -76,6 +76,8 @@ export function buildCommercialQuoteDraft(
   const notes = [
     String(source.request || "").trim(),
     String(source.notes || "").trim(),
+    ...(Array.isArray(source.pendingQuestions) && source.pendingQuestions.length ? ["Pendências para confirmar: " + source.pendingQuestions.map((question: unknown) => String(question)).join(" | ")] : []),
+    source.visitReason ? "Motivo da visita técnica: " + String(source.visitReason) : "",
     workflow === "technical"
       ? "ORÇAMENTO PRELIMINAR TÉCNICO. Visita técnica pendente. Total calculado no fluxo técnico de origem: R$ " + originalTechnicalTotal.toFixed(2) + ". Preços de fornecedor permanecem estimados até validação comercial."
       : "Convertido do Orçamento Inteligente. Revise itens, preços, condições e dados do cliente antes de enviar.",
