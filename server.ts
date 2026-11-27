@@ -638,12 +638,14 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLi
     }
     const project = await generateValidatedJson({
       capability: "projectIntake",
-      system: "Você é um analista de projetos. Organize os dados informados em JSON estrito. Não invente dimensões, cliente, preço ou código. Use strings vazias e zero quando desconhecidos. Responda somente com {name,code,category,client,summary,width,height,quantity,price}. width e height são milímetros quando explicitamente informados; price é BRL apenas se o usuário informar.",
+      system: "Você é o analista de projetos da Anacleto. Organize o pedido em JSON estrito com name,code,category,client,summary,width,height,quantity,quantityPending,price,workItems,pendingQuestions,visitRequired,visitReason,assumptions. Separe serviços diferentes em workItems (title, category, description, quantity, unit, measurementPending). Inclua reformas, construção civil, esquadrias, vidro, madeira e madeira laminada colada (MLC), estruturas, piscinas, lareiras, churrasqueiras, pergolados e instalações. Não invente dimensões, quantidade, cliente, preço, código, material, condição do terreno ou prazo. Use 0 para números desconhecidos e quantityPending=true quando quantidade não for explícita. width e height são milímetros somente quando informados; price é BRL somente se informado pelo usuário. Liste em pendingQuestions perguntas objetivas necessárias para fechar o escopo. Use visitRequired=true quando exigir medição, inspeção de terreno/estrutura, acesso ou instalações existentes e explique em visitReason. Registre hipóteses não confirmadas em assumptions, sem apresentá-las como fatos. Se não houver pendências, use arrays vazios e visitRequired=false.",
       prompt: JSON.stringify({ name, description, sourceUrl }),
       validate: (value: any) => {
         if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Resposta da IA inválida.");
         for (const field of ["name", "code", "category", "client", "summary"]) if (value[field] !== undefined && typeof value[field] !== "string") throw new Error("Campo textual inválido: " + field);
         for (const field of ["width", "height", "quantity", "price"]) if (value[field] !== undefined && !Number.isFinite(Number(value[field]))) throw new Error("Campo numérico inválido: " + field);
+        for (const field of ["pendingQuestions", "workItems", "assumptions"]) if (value[field] !== undefined && !Array.isArray(value[field])) throw new Error("Campo de lista inválido: " + field);
+        if (value.visitRequired !== undefined && typeof value.visitRequired !== "boolean") throw new Error("Campo visitRequired inválido.");
         return value;
       },
     });
@@ -656,8 +658,21 @@ app.post("/api/ai/project-intake", requireFirebaseAuth, requireQuoteRole, rateLi
       summary: String(project.summary || description).slice(0, 12000),
       width: Number(project.width) > 0 ? Number(project.width) : 0,
       height: Number(project.height) > 0 ? Number(project.height) : 0,
-      quantity: Number(project.quantity) > 0 ? Number(project.quantity) : 1,
-      price: Number(project.price) >= 0 ? Number(project.price) : 0,
+      quantity: Number(project.quantity) > 0 ? Number(project.quantity) : 0,
+      quantityPending: project.quantityPending === true || !(Number(project.quantity) > 0),
+      price: Number(project.price) > 0 ? Number(project.price) : 0,
+      workItems: Array.isArray(project.workItems) ? project.workItems.slice(0, 40).map((item: any) => ({
+        title: String(item?.title || "").slice(0, 180),
+        category: String(item?.category || "Serviço").slice(0, 80),
+        description: String(item?.description || "").slice(0, 2000),
+        quantity: Number(item?.quantity) > 0 ? Number(item.quantity) : 0,
+        unit: String(item?.unit || "").slice(0, 24),
+        measurementPending: item?.measurementPending === true || !(Number(item?.quantity) > 0),
+      })) : [],
+      pendingQuestions: Array.isArray(project.pendingQuestions) ? project.pendingQuestions.map((q: any) => String(q || "").trim()).filter(Boolean).slice(0, 30) : [],
+      visitRequired: project.visitRequired === true,
+      visitReason: String(project.visitReason || "").slice(0, 1000),
+      assumptions: Array.isArray(project.assumptions) ? project.assumptions.map((v: any) => String(v || "").trim()).filter(Boolean).slice(0, 30) : [],
     }});
   } catch (error: any) {
     console.error("Project intake AI error:", error?.message || error);

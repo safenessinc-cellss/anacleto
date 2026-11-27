@@ -121,8 +121,21 @@ export default function ProjectIntakePanel({ onCreated }: Props) {
         notes: [description.trim() || imported.notes || aiData.summary || "", ...textImports].filter(Boolean).join("\n\n").slice(0, 12000),
         width: Number(imported.width || aiData.width) || 0,
         height: Number(imported.height || aiData.height) || 0,
-        quantity: Math.max(1, Number(imported.quantity || aiData.quantity) || 1),
-        price: Math.max(0, Number(imported.price || aiData.price) || 0),
+        quantity: Number(imported.quantity || aiData.quantity) > 0 ? Number(imported.quantity || aiData.quantity) : 0,
+        quantityPending: imported.quantityPending === true || aiData.quantityPending === true || !(Number(imported.quantity || aiData.quantity) > 0),
+        price: Number(imported.price || aiData.price) > 0 ? Number(imported.price || aiData.price) : 0,
+        workItems: Array.isArray(imported.workItems || aiData.workItems) ? (imported.workItems || aiData.workItems).slice(0, 40).map((item: any) => ({
+          title: String(item?.title || "").slice(0, 180),
+          category: String(item?.category || "Serviço").slice(0, 80),
+          description: String(item?.description || "").slice(0, 2000),
+          quantity: Number(item?.quantity) > 0 ? Number(item.quantity) : 0,
+          unit: String(item?.unit || "").slice(0, 24),
+          measurementPending: item?.measurementPending === true || !(Number(item?.quantity) > 0),
+        })) : [],
+        pendingQuestions: Array.isArray(imported.pendingQuestions || aiData.pendingQuestions) ? (imported.pendingQuestions || aiData.pendingQuestions).map((q: unknown) => String(q || "").trim().slice(0, 500)).filter(Boolean).slice(0, 30) : [],
+        visitRequired: imported.visitRequired === true || aiData.visitRequired === true,
+        visitReason: String(imported.visitReason || aiData.visitReason || "").slice(0, 1000),
+        assumptions: Array.isArray(imported.assumptions || aiData.assumptions) ? (imported.assumptions || aiData.assumptions).map((v: unknown) => String(v || "").trim().slice(0, 500)).filter(Boolean).slice(0, 30) : [],
         assets, ownerUid: user.uid, importSource: sourceUrl.trim() ? "browser" : files.length ? "device" : "ai",
         importedAt: now, createdAt: now, updatedAt: now
       };
