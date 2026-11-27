@@ -71,7 +71,14 @@ service cloud.firestore {
     match /smart_budgets/{id} {
       allow read: if canManageCommercial() || canManageFinance();
       allow create: if canManageCommercial();
-      allow update: if canManageCommercial();
+      allow update: if canManageCommercial() && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['technicalVisitStatus','technicalVisitCompletedAt','technicalVisitCompletedBy'])
+        || (
+          request.resource.data.technicalVisitStatus == 'pending'
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['technicalVisitCompletedAt','technicalVisitCompletedBy'])
+        )
+        || canReviewCatalogPrices()
+      );
       allow delete: if hasRole(['super_admin','super_usuario','ceo','admin']);
     }
     // Orçamentos técnicos de esquadrias: coleção própria, editável apenas pelo Comercial/Financeiro.
