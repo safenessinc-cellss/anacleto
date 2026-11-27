@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, limit, onSnapshot, query } from "firebase/firestore";
 import { db } from "../../firebase";
 import { Download, Printer, TrendingDown, TrendingUp, Wallet, Clock, FileText } from "lucide-react";
 import { jsPDF } from "jspdf";
@@ -64,13 +64,14 @@ export default function FinancialReportsModule(){
   const [module,setModule]=useState("all");
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
+  const [limitedSources,setLimitedSources]=useState<string[]>([]);
   useEffect(()=>{
     const stops=[
-      onSnapshot(collection(db,"ledger_entries"),snap=>{const rows=snap.docs.map(d=>normalizeLedger(d.id,d.data())).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="ledger_entries"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar caixa: "+err.message);setLoading(false);}),
-      onSnapshot(collection(db,"receivables"),snap=>{const rows=snap.docs.map(d=>normalizeOpen(d.id,d.data(),"receivables")).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="receivables"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar recebíveis: "+err.message);setLoading(false);}),
-      onSnapshot(collection(db,"payables"),snap=>{const rows=snap.docs.map(d=>normalizeOpen(d.id,d.data(),"payables")).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="payables"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar contas a pagar: "+err.message);setLoading(false);}),
-      onSnapshot(collection(db,"employee_payments"),snap=>{const rows=snap.docs.map(d=>normalizeEmployeePayment(d.id,d.data())).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="employee_payments"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar folha: "+err.message);setLoading(false);}),
-      onSnapshot(collection(db,"purchase_orders"),snap=>{const rows=snap.docs.map(d=>normalizePurchase(d.id,d.data())).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="purchase_orders"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar notas fiscais de compra: "+err.message);setLoading(false);})
+      onSnapshot(query(collection(db,"ledger_entries"),limit(1000)),snap=>{setLimitedSources(c=>snap.size>=1000?[...new Set([...c,"ledger_entries"])]:c.filter(x=>x!=="ledger_entries"));const rows=snap.docs.map(d=>normalizeLedger(d.id,d.data())).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="ledger_entries"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar caixa: "+err.message);setLoading(false);}),
+      onSnapshot(query(collection(db,"receivables"),limit(1000)),snap=>{setLimitedSources(c=>snap.size>=1000?[...new Set([...c,"receivables"])]:c.filter(x=>x!=="receivables"));const rows=snap.docs.map(d=>normalizeOpen(d.id,d.data(),"receivables")).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="receivables"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar recebíveis: "+err.message);setLoading(false);}),
+      onSnapshot(query(collection(db,"payables"),limit(1000)),snap=>{setLimitedSources(c=>snap.size>=1000?[...new Set([...c,"payables"])]:c.filter(x=>x!=="payables"));const rows=snap.docs.map(d=>normalizeOpen(d.id,d.data(),"payables")).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="payables"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar contas a pagar: "+err.message);setLoading(false);}),
+      onSnapshot(query(collection(db,"employee_payments"),limit(1000)),snap=>{setLimitedSources(c=>snap.size>=1000?[...new Set([...c,"employee_payments"])]:c.filter(x=>x!=="employee_payments"));const rows=snap.docs.map(d=>normalizeEmployeePayment(d.id,d.data())).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="employee_payments"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar folha: "+err.message);setLoading(false);}),
+      onSnapshot(query(collection(db,"purchase_orders"),limit(1000)),snap=>{setLimitedSources(c=>snap.size>=1000?[...new Set([...c,"purchase_orders"])]:c.filter(x=>x!=="purchase_orders"));const rows=snap.docs.map(d=>normalizePurchase(d.id,d.data())).filter((x):x is Row=>!!x);setRecords(c=>[...c.filter(x=>x.source!=="purchase_orders"),...rows]);setLoading(false);},err=>{setError("Falha ao carregar notas fiscais de compra: "+err.message);setLoading(false);})
     ];
     return ()=>stops.forEach(stop=>stop());
   },[]);
@@ -112,6 +113,7 @@ export default function FinancialReportsModule(){
     pdf.save(`relatorio-financeiro-${from}-a-${to}.pdf`);
   };
   return <div className="space-y-5">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Leitura limitada a 1.000 registros por origem ({limitedSources.join(", ")}). Os totais e exportações podem estar parciais; a paginação completa ainda está pendente.</p>}
     <header><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Análise financeira · Brasil (R$)</p><h2 className="text-2xl font-black">Relatório financeiro por módulos</h2><p className="text-sm text-slate-500">Entradas e saídas efetivas aparecem no Caixa. Notas fiscais de compras ficam no módulo Compras como custo registrado; boletos ficam em Contas a Pagar. Assim, a nota fiscal não é somada novamente como se fosse um pagamento.</p></header>
     {error&&<div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{error}</div>}
     <div className="grid gap-3 rounded-2xl border bg-white p-4 dark:bg-slate-900 sm:grid-cols-5">
