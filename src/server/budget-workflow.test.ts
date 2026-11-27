@@ -35,6 +35,25 @@ test("converts technical BOM as preliminary, estimates supplier prices and requi
   assert.equal(isTechnicalVisitPending(quote), true);
 });
 
+test("carries AI-detected site visit requirements into the commercial quote", () => {
+  const quote = buildCommercialQuoteDraft({
+    clientName: "Cliente C",
+    visitRequired: true,
+    visitReason: "É necessário medir o vão no local.",
+    pendingQuestions: ["Qual é a altura do vão?"],
+    items: [{ id: "i1", description: "Box", quantity: 1, unitPrice: 0, priceSource: "pending" }],
+  }, "smart", "smart1234", new Date("2026-11-27T12:00:00.000Z"));
+  assert.equal(quote.requiresTechnicalVisit, true);
+  assert.equal(quote.technicalVisitStatus, "pending");
+  assert.match(quote.notes, /Qual é a altura do vão/);
+});
+
+test("does not convert a provisional item without a defined quantity", () => {
+  assert.throws(() => buildCommercialQuoteDraft({
+    items: [{ description: "Janela", quantity: 0, unitPrice: 0, priceSource: "pending" }],
+  }, "smart", "qtyzero1"), /quantidade válida/);
+});
+
 test("blocks final approval until a required technical visit is completed", () => {
   assert.equal(isTechnicalVisitPending({ requiresTechnicalVisit: true }), true);
   assert.equal(isTechnicalVisitPending({ requiresTechnicalVisit: true, technicalVisitStatus: "pending" }), true);
