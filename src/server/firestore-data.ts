@@ -23,7 +23,7 @@ function getToken(request: any): string {
   return authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
 }
 
-type CatalogCache = { expiresAt: number; rows: any[] };
+type CatalogCache = { key: string; expiresAt: number; rows: any[] };
 let catalogCache: CatalogCache | null = null;
 
 function collectionUrl(collection: string, pageToken?: string) {
@@ -35,12 +35,13 @@ function collectionUrl(collection: string, pageToken?: string) {
 /** Load authoritative rows from every collection exposed in the quote/catalog UI. */
 export async function loadCatalogFromFirestore(
   request: any,
-  options: { cacheTtlMs?: number } = {},
+  options: { cacheTtlMs?: number; cacheKey?: string } = {},
 ): Promise<any[]> {
   const token = getToken(request);
   if (!token) throw new Error("Autenticação necessária para consultar o catálogo oficial.");
   const cacheTtlMs = Math.max(0, Math.min(60_000, Number(options.cacheTtlMs || 0)));
-  if (cacheTtlMs > 0 && catalogCache && catalogCache.expiresAt > Date.now()) {
+  const cacheKey = String(options.cacheKey || "");
+  if (cacheTtlMs > 0 && cacheKey && catalogCache?.key === cacheKey && catalogCache.expiresAt > Date.now()) {
     return catalogCache.rows.map((row) => ({ ...row }));
   }
   const collectionNames = ["catalog", "supplier_catalog", "registry_items", "price_table"];
@@ -75,7 +76,7 @@ export async function loadCatalogFromFirestore(
     return rows;
   }));
   const rows = collections.flat();
-  if (cacheTtlMs > 0) catalogCache = { expiresAt: Date.now() + cacheTtlMs, rows };
+  if (cacheTtlMs > 0 && cacheKey) catalogCache = { key: cacheKey, expiresAt: Date.now() + cacheTtlMs, rows };
   return rows;
 }
 
