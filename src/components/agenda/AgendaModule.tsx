@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, limit, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import AgendaCalendar from "./AgendaCalendar";
 import AgendaSlotModal from "./AgendaSlotModal";
@@ -24,14 +24,16 @@ export default function AgendaModule({ language = "pt" }: { language?: string })
   const [visits, setVisits] = useState<Visit[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<any>(null);
   const [defaultSlotDate, setDefaultSlotDate] = useState<string | undefined>(undefined);
   const [filter, setFilter] = useState<"all" | "pendente" | "confirmed" | "concluído">("all");
 
   useEffect(() => {
-    const q = query(collection(db, "visits"), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "visits"), orderBy("createdAt", "desc"), limit(500));
     const unsub = onSnapshot(q, (snap) => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "visits"])] : v.filter(x => x !== "visits"));
       const list: Visit[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Visit));
       setVisits(list);
@@ -40,7 +42,8 @@ export default function AgendaModule({ language = "pt" }: { language?: string })
       console.error("Visits listener error:", err);
       setLoading(false);
     });
-    const unsubSlots = onSnapshot(query(collection(db, "agenda_slots"), orderBy("date", "asc")), (snap) => {
+    const unsubSlots = onSnapshot(query(collection(db, "agenda_slots"), orderBy("date", "asc"), limit(500)), (snap) => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "agenda_slots"])] : v.filter(x => x !== "agenda_slots"));
       const list: any[] = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
       setSlots(list);
@@ -76,6 +79,7 @@ export default function AgendaModule({ language = "pt" }: { language?: string })
 
   return (
     <div className="space-y-6">
+      {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Agenda limitada: {limitedSources.join(", ")}. Visitas e horários antigos podem não aparecer; a paginação completa ainda está pendente.</p>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-black text-slate-900 dark:text-white">Agenda de visitas técnicas</h2>

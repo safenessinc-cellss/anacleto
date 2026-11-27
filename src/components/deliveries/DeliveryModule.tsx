@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { Camera, CameraOff, CheckCircle2, ClipboardCheck, FileText, MapPin, PenLine, Plus, RefreshCw, Trash2, Truck, X } from "lucide-react";
 import { auth, db, storage } from "../../firebase";
@@ -19,6 +19,7 @@ export default function DeliveryModule() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [quoteId, setQuoteId] = useState("");
   const [invoiceId, setInvoiceId] = useState("");
@@ -39,9 +40,9 @@ export default function DeliveryModule() {
 
   useEffect(() => {
     const unsubs = [
-      onSnapshot(query(collection(db, "quotes"), orderBy("createdAt", "desc")), snap => setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as Quote))), err => console.error("Orçamentos:", err)),
-      onSnapshot(query(collection(db, "invoices"), orderBy("createdAt", "desc")), snap => setInvoices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Invoice))), err => console.error("Faturas:", err)),
-      onSnapshot(query(collection(db, "deliveries"), orderBy("createdAt", "desc")), snap => setDeliveries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Delivery))), err => console.error("Entregas:", err))
+      onSnapshot(query(collection(db, "quotes"), orderBy("createdAt", "desc"), limit(300)), snap => { setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "quotes"])] : v.filter(x => x !== "quotes")); setQuotes(snap.docs.map(d => ({ id: d.id, ...d.data() } as Quote))); }, err => console.error("Orçamentos:", err)),
+      onSnapshot(query(collection(db, "invoices"), orderBy("createdAt", "desc"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "invoices"])] : v.filter(x => x !== "invoices")); setInvoices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Invoice))); }, err => console.error("Faturas:", err)),
+      onSnapshot(query(collection(db, "deliveries"), orderBy("createdAt", "desc"), limit(500)), snap => { setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "deliveries"])] : v.filter(x => x !== "deliveries")); setDeliveries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Delivery))); }, err => console.error("Entregas:", err))
     ];
     return () => unsubs.forEach(unsub => unsub());
   }, []);
@@ -207,6 +208,7 @@ export default function DeliveryModule() {
   };
 
   return <div className="space-y-6">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Dados limitados: {limitedSources.join(", ")}. Faturas e entregas antigas podem não aparecer; a paginação completa ainda está pendente.</p>}
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-widest text-blue-600">Operação em campo</p><h1 className="text-2xl font-black text-slate-900 dark:text-white">Entregas e instalações</h1><p className="mt-1 text-sm text-slate-500">Registro fotográfico no local, geolocalização e aceite digital do cliente.</p></div>
       <button onClick={() => setOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4"/> Registrar entrega</button>

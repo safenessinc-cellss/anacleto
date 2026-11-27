@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc
+  addDoc, collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, updateDoc
 } from "firebase/firestore";
 import { auth, db, storage } from "../../firebase";
 import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
@@ -149,15 +149,16 @@ export default function TechnicalLibraryModule() {
   const pdfInputRef = React.useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [form, setForm] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const subscriptions = [
-      onSnapshot(query(collection(db, "technical_documents"), orderBy("createdAt", "desc")), s => setDocuments(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(query(collection(db, "aluminum_profiles"), orderBy("createdAt", "desc")), s => setProfiles(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(query(collection(db, "cutting_rules"), orderBy("createdAt", "desc")), s => setRules(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(query(collection(db, "hardware_catalog"), orderBy("createdAt", "desc")), s => setHardware(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message)),
-      onSnapshot(query(collection(db, "supplier_prices"), orderBy("priceDate", "desc")), s => setPrices(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => setError(e.message))
+      onSnapshot(query(collection(db, "technical_documents"), orderBy("createdAt", "desc"), limit(500)), s => { setLimitedSources(v => s.size >= 500 ? [...new Set([...v, "technical_documents"])] : v.filter(x => x !== "technical_documents")); setDocuments(s.docs.map(d => ({ id: d.id, ...d.data() }))); }, e => setError(e.message)),
+      onSnapshot(query(collection(db, "aluminum_profiles"), orderBy("createdAt", "desc"), limit(500)), s => { setLimitedSources(v => s.size >= 500 ? [...new Set([...v, "aluminum_profiles"])] : v.filter(x => x !== "aluminum_profiles")); setProfiles(s.docs.map(d => ({ id: d.id, ...d.data() }))); }, e => setError(e.message)),
+      onSnapshot(query(collection(db, "cutting_rules"), orderBy("createdAt", "desc"), limit(500)), s => { setLimitedSources(v => s.size >= 500 ? [...new Set([...v, "cutting_rules"])] : v.filter(x => x !== "cutting_rules")); setRules(s.docs.map(d => ({ id: d.id, ...d.data() }))); }, e => setError(e.message)),
+      onSnapshot(query(collection(db, "hardware_catalog"), orderBy("createdAt", "desc"), limit(500)), s => { setLimitedSources(v => s.size >= 500 ? [...new Set([...v, "hardware_catalog"])] : v.filter(x => x !== "hardware_catalog")); setHardware(s.docs.map(d => ({ id: d.id, ...d.data() }))); }, e => setError(e.message)),
+      onSnapshot(query(collection(db, "supplier_prices"), orderBy("priceDate", "desc"), limit(1000)), s => { setLimitedSources(v => s.size >= 1000 ? [...new Set([...v, "supplier_prices"])] : v.filter(x => x !== "supplier_prices")); setPrices(s.docs.map(d => ({ id: d.id, ...d.data() }))); }, e => setError(e.message))
     ];
     return () => subscriptions.forEach(unsub => unsub());
   }, []);
@@ -426,6 +427,7 @@ export default function TechnicalLibraryModule() {
   ];
 
   return <div className="space-y-6">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Biblioteca técnica limitada: {limitedSources.join(", ")}. Documentos, perfis, regras e preços antigos podem não aparecer; a paginação completa ainda está pendente.</p>}
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <div className="flex items-center gap-2 text-blue-700"><BookOpen size={19}/><span className="text-xs font-bold uppercase tracking-wider">Engenharia de esquadrias</span></div>

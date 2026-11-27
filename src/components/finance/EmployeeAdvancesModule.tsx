@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, limit, onSnapshot, query, runTransaction, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import EmployeeDirectoryActions from "./EmployeeDirectoryActions";
 import { useEmployeeDirectory } from "../../hooks/useEmployeeDirectory";
@@ -16,6 +16,7 @@ export default function EmployeeAdvancesModule() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const competence = date.slice(0, 7);
@@ -24,7 +25,7 @@ export default function EmployeeAdvancesModule() {
   const pendingTotal = monthItems.filter((item) => !["deducted", "settled"].includes(String(item.status || "").toLowerCase())).reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   useEffect(() => {
-    const stopAdjustments = onSnapshot(collection(db, "payroll_adjustments"), (snap) => setAdjustments(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Adjustment))), (reason) => setError(`Falha ao carregar adiantamentos de folha: ${reason.message}`));
+    const stopAdjustments = onSnapshot(query(collection(db, "payroll_adjustments"), limit(1000)), (snap) => { setLimitedSources(v => snap.size >= 1000 ? [...new Set([...v, "payroll_adjustments"])] : v.filter(x => x !== "payroll_adjustments")); setAdjustments(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Adjustment))); }, (reason) => setError(`Falha ao carregar adiantamentos de folha: ${reason.message}`));
     return () => stopAdjustments();
   }, []);
 
@@ -67,6 +68,7 @@ export default function EmployeeAdvancesModule() {
   };
 
   return <section className="space-y-5">
+    {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Histórico limitado: {limitedSources.join(", ")}. Adiantamentos antigos podem não aparecer; a paginação completa ainda está pendente.</p>}
     <header><p className="text-xs font-bold uppercase tracking-widest text-amber-700">Vales vinculados à folha</p><h2 className="text-2xl font-black">Adiantamentos de Funcionários</h2><p className="mt-1 text-sm text-slate-500">Cada lançamento reduz automaticamente o líquido da competência correspondente na Folha de Pagamento.</p></header>
     <EmployeeDirectoryActions onSync={() => { void sync(); }} syncing={syncing}/>
     {(error || directoryError) && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error || directoryError}</p>}
