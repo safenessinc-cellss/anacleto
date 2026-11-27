@@ -337,6 +337,7 @@ function buildLocalTechnicalDrawing(input: string): TechnicalDrawing {
 export default function TechnicalDrawingModule({ senderConfig, language = "pt"}: TechnicalDrawingModuleProps) {
   // Aguardar a autenticação antes de iniciar os listeners do Firestore
   const [authReady, setAuthReady] = useState(false);
+  const [limitedSources, setLimitedSources] = useState<string[]>([]);
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setAuthReady(!!u));
     return () => unsub();
@@ -364,6 +365,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   useEffect(() => {
     if (!authReady) return;
     return onSnapshot(query(collection(db, "projects"), orderBy("createdAt", "desc"), limit(300)), (snap) => {
+      setLimitedSources(v => snap.size >= 300 ? [...new Set([...v, "projects"])] : v.filter(x => x !== "projects"));
       setProjects(snap.docs.map((item) => ({ id: item.id, name: String(item.data().name || "Projeto sem nome") })));
     }, (err) => console.warn("Projects list load notice:", err));
   }, [authReady]);
@@ -371,6 +373,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   useEffect(() => {
     if (!authReady) return;
     return onSnapshot(query(collection(db, "catalog"), limit(500)), (snap) => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "catalog"])] : v.filter(x => x !== "catalog"));
       const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), source: "catalog" }));
       setCatalogItems(loaded);
       setSupplierCatalog((current) => [...current.filter((item) => item.source !== "catalog"), ...loaded]);
@@ -380,6 +383,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   useEffect(() => {
     if (!authReady) return;
     return onSnapshot(query(collection(db, "supplier_catalog"), limit(500)), (snap) => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "supplier_catalog"])] : v.filter(x => x !== "supplier_catalog"));
       const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), source: "supplier_catalog" }));
       setSupplierCatalog((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...loaded]);
     }, (err) => {
@@ -391,6 +395,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
   useEffect(() => {
     if (!authReady) return;
     return onSnapshot(query(collection(db, "registry_items"), limit(500)), (snap) => {
+      setLimitedSources(v => snap.size >= 500 ? [...new Set([...v, "registry_items"])] : v.filter(x => x !== "registry_items"));
       const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), name: item.data().name || item.data().description || "Item sem nome", source: "registry_items" }));
       setSupplierCatalog((current) => [...current.filter((item) => item.source !== "registry_items"), ...loaded]);
     }, (err) => {
@@ -1121,6 +1126,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   return (
     <div className="space-y-6">
+      {limitedSources.length>0&&<p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Desenho técnico limitado: {limitedSources.join(", ")}. Projetos e itens antigos podem não aparecer; a paginação completa ainda está pendente.</p>}
       <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">O CAD carrega até 300 projetos, 300 desenhos e 500 registros por coleção de catálogo para evitar travamentos. A paginação do acervo completo ainda precisa ser concluída.</p>
       <nav aria-label="Projetos e Oficina CAD" className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
         <button
