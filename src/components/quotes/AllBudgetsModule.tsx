@@ -59,9 +59,9 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
       const quoteId = String(source.canonicalQuoteId || `from_${row.workflow}_${row.id}`);
       const quoteRef = doc(db, "quotes", quoteId);
       const existing = await getDoc(quoteRef);
-      if (existing.exists() && (existing.data().approvedSnapshotId || existing.data().productionOrderId || ["approved", "accepted", "invoiced"].includes(String(existing.data().status)))) {
+      if (existing.exists()) {
         onOpen("standard", quoteId);
-        setNotice("Este orçamento já foi integrado e aprovado. Abrindo o registro comercial existente.");
+        setNotice("Este orçamento já possui uma proposta comercial vinculada. Abrindo o registro existente sem sobrescrever suas edições.");
         return;
       }
       const draft = buildCommercialQuoteDraft(source, row.workflow, row.id);
