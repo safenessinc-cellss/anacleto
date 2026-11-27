@@ -29,7 +29,7 @@ import DrawingThreePreview from "./DrawingThreePreview";
 import ManufacturingRoute from "../production/ManufacturingRoute";
 import { exportArchitecturalSheetPdf, exportTechnicalDrawingPdf, buildTechnicalDrawingPdf } from "../../utils/pdfExport";
 import { downloadTechnicalDrawingDxf } from "../../utils/dxfExport";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, doc, limit, setDoc, deleteDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
@@ -370,7 +370,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   useEffect(() => {
     if (!authReady) return;
-    return onSnapshot(collection(db, "catalog"), (snap) => {
+    return onSnapshot(query(collection(db, "catalog"), limit(500)), (snap) => {
       const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), source: "catalog" }));
       setCatalogItems(loaded);
       setSupplierCatalog((current) => [...current.filter((item) => item.source !== "catalog"), ...loaded]);
@@ -379,7 +379,7 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
 
   useEffect(() => {
     if (!authReady) return;
-    return onSnapshot(collection(db, "supplier_catalog"), (snap) => {
+    return onSnapshot(query(collection(db, "supplier_catalog"), limit(500)), (snap) => {
       const loaded = snap.docs.map((item) => ({ id: item.id, ...item.data(), source: "supplier_catalog" }));
       setSupplierCatalog((current) => [...current.filter((item) => item.source !== "supplier_catalog"), ...loaded]);
     }, (err) => {
