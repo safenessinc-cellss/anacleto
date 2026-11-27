@@ -39,7 +39,7 @@ import defaultCompanyLogo from "../../assets/images/anacleto-logo-premium.svg";
 import { estimatedCatalogPrice, readAluminumPricePerKg } from "../../utils/catalogPricing";
 import { hasConfirmedCatalogPrice } from "../../utils/catalog-price-validation.js";
 import { compactApprovalSenderSnapshot, compactInvoiceForFirestore, compactQuoteForFirestore, sanitizeFirestoreData } from "../../utils/firestorePayloads";
-import { buildParametricDrawing, isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
+import { isAluminumPrompt, localParametricSpec } from "../../utils/parametricCad";
 import ManufacturingRoute from "../production/ManufacturingRoute";
 
 interface QuotesModuleProps {
@@ -336,77 +336,40 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     const countMatch = text.match(/\b(?:qtd|qtde|quantidade|unidades?)\s*(?:de|:|=)?\s*(\d+)\b/i)
       || text.match(/\b(\d+)\s*(?:x\s*)?(?:un(?:idades?)?\s*(?:de\s*)?)?(?=(?:janelas?|ventanas?|portas?|puertas?|boxes?|box|peças?|pecas?))/i)
       || text.match(/\b(?:janelas?|ventanas?|portas?|puertas?|boxes?|box|peças?|pecas?)\s*(?:x|:)?\s*(\d+)\s*(?:un(?:idades?)?)?\b/i);
-    const quantity = Math.max(1, Number(countMatch?.[1] || 1));
+    const quantity = countMatch ? Number(countMatch[1]) : 0;
     const dimensionMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/i);
     const dimensionToMm = (value: string, unit = "") => {
       const number = Number(value.replace(",", "."));
-      const factor = unit.toLowerCase() === "m" ? 1000 : unit.toLowerCase() === "cm" ? 10 : unit.toLowerCase() === "mm" ? 1 : number < 10 ? 1000 : number < 100 ? 10 : 1;
-      return Math.round(number * factor);
+      const normalizedUnit = unit.toLowerCase();
+      const factor = normalizedUnit === "m" ? 1000 : normalizedUnit === "cm" ? 10 : normalizedUnit === "mm" ? 1 : 0;
+      return factor > 0 && Number.isFinite(number) && number > 0 ? Math.round(number * factor) : 0;
     };
-    const widthMm = spec?.largura_mm || (dimensionMatch ? dimensionToMm(dimensionMatch[1], dimensionMatch[2]) : 0);
-    const heightMm = spec?.altura_mm || (dimensionMatch ? dimensionToMm(dimensionMatch[3], dimensionMatch[4]) : 0);
-    if (spec && widthMm > 0 && heightMm > 0) {
-      const glassColor = text.match(/\b(incolor|bronze|verde|fum[eê]|cinza)\b/i)?.[1]?.toLowerCase();
-      const drawing = buildParametricDrawing(
-        { ...spec, largura_mm: widthMm, altura_mm: heightMm },
-        text,
-        catalogItems.filter((item) => item.source === "supplier_catalog"),
-      );
-      const requestedQuantity = Math.max(1, Number(countMatch?.[1] || 1));
-      const glassWidthMm = Math.max(1, Math.round(widthMm / Math.max(1, spec.folhas) - 50));
-      const glassHeightMm = Math.max(1, Math.round(heightMm - 80));
-      const size = `${widthMm} × ${heightMm} mm`;
-      const budgetItems = drawing.budget?.items || [];
-      const profileItems = budgetItems.filter((item) => {
-        const piece = drawing.pieces.find((candidate) => candidate.id === item.pieceId);
-        return Boolean(piece && !/vidro|glass/i.test(`${piece.name} ${piece.material}`));
-      });
-      const glassItems = budgetItems.filter((item) => !item.pieceId &&
-        (item.id === "budget-glass" || /vidro|glass/i.test(item.description)));
-      const accessoryItems = budgetItems.filter((item) => !item.pieceId && /ferragem|acess[oó]rio/i.test(item.description));
-      const rows = [...profileItems, ...glassItems, ...accessoryItems];
-      if (glassItems.length === 0) {
-        rows.push({
-          id: "local-glass",
-          description: `Vidro ${spec.tipo_vidro} ${spec.espessura_mm} mm${glassColor ? ` ${glassColor}` : ""}`,
-          quantity: 1,
-          unitPrice: 0,
-          subtotal: 0,
-          cutLengthMm: 0,
-          priceSource: "pending",
-        });
-      }
-      const additions: QuoteItem[] = rows.map((budgetItem) => {
-        const piece = drawing.pieces.find((candidate) => candidate.id === budgetItem.pieceId);
-        const matchedCatalogItem = catalogItems.find((candidate) => candidate.id === budgetItem.catalogItemId);
-        const isGlass = budgetItem.id === "budget-glass" || budgetItem.id === "local-glass" ||
-          /vidro|glass/i.test(`${budgetItem.description} ${piece?.material || ""}`);
-        const glassPieces = isGlass ? Math.max(1, spec.folhas) : 1;
-        const quantity = Math.max(1, Number(budgetItem.quantity || 1)) * glassPieces * requestedQuantity;
-        const unitPrice = Number(budgetItem.unitPrice || 0) / glassPieces;
-        const priceSource: QuoteItem["priceSource"] = budgetItem.priceSource === "catalog" || budgetItem.priceSource === "estimated"
-          ? budgetItem.priceSource
-          : unitPrice > 0 ? "estimated" : "pending";
-        return {
-          id: `local_${crypto.randomUUID()}`,
-          description: `${isGlass ? "Vidro " : ""}${budgetItem.description} · ${spec.linha_aluminio} · ${size}${isGlass ? ` · ${spec.tipo_vidro} ${spec.espessura_mm} mm${glassColor ? ` ${glassColor}` : ""}` : ""}`,
-          quantity,
-          unitPrice,
-          subtotal: Number((quantity * unitPrice).toFixed(2)),
-          ...(budgetItem.catalogItemId ? { catalogItemId: budgetItem.catalogItemId } : {}),
-          ...(budgetItem.catalogSource ? { catalogSource: budgetItem.catalogSource } : {}),
-          ...(budgetItem.sku ? { sku: budgetItem.sku } : {}),
-          ...(matchedCatalogItem?.category ? { itemCategory: matchedCatalogItem.category } : {}),
-          priceSource,
-          notes: isGlass
-            ? "Estimativa paramétrica: abatimentos de 50 mm na largura e 80 mm na altura; validar folgas da linha e encaixe da goma EPDM antes do corte."
-            : piece?.notes || "Corte paramétrico preliminar; validar a tabela oficial de descontos da linha antes da fabricação.",
-          ...(isGlass
-            ? { itemDimensions: `${glassWidthMm} × ${glassHeightMm} mm` }
-            : { cutLengthMm: Number(budgetItem.cutLengthMm || 0), cutAngle: piece?.cutAngle || "90°" }),
-        };
-      });
-      return recalculateQuote({ ...updated, items: [...updated.items, ...additions] });
+    const sharedUnit = dimensionMatch?.[4] || dimensionMatch?.[2] || "";
+    const heightMm = spec ? spec.altura_mm : (dimensionMatch ? dimensionToMm(dimensionMatch[1], dimensionMatch[2] || sharedUnit) : 0);
+    const widthMm = spec ? spec.largura_mm : (dimensionMatch ? dimensionToMm(dimensionMatch[3], dimensionMatch[4] || sharedUnit) : 0);
+    if (spec) {
+      const size = widthMm > 0 && heightMm > 0 ? `${heightMm} × ${widthMm} mm (altura × largura)` : "";
+      const typology = spec.tipologia === "a_definir" ? text.trim() : spec.tipologia.replaceAll("_", " ");
+      const line = spec.linha_aluminio !== "Linha a definir" ? spec.linha_aluminio : "";
+      const description = [typology, line, size].filter(Boolean).join(" · ") || text.trim();
+      const pendingDetails = (spec.pendencias || []).join(" ");
+      const visitPending = widthMm <= 0 || heightMm <= 0;
+      const item: QuoteItem = {
+        id: `local_${crypto.randomUUID()}`,
+        description: `Rascunho técnico preliminar · ${description}`,
+        quantity,
+        unitPrice: 0,
+        subtotal: 0,
+        priceSource: "pending",
+        notes: [
+          "Sem BOM, folgas, ferragens e plano de corte validados por tabela oficial do fabricante; não liberar fabricação.",
+          quantity <= 0 ? "Quantidade pendente de confirmação." : "",
+          pendingDetails,
+          visitPending ? "Medição/visita técnica pendente para confirmar o vão e as condições de instalação." : "Confirmar medidas no local antes da liberação executiva.",
+        ].filter(Boolean).join(" "),
+        ...(size ? { itemDimensions: size } : {}),
+      };
+      return recalculateQuote({ ...updated, items: [...updated.items, item] });
     }
 
     const lineMatch = text.match(/\b(suprema|gold|linha\s*(?:25|\d+))\b/i);
@@ -424,14 +387,16 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     }).sort((a, b) => b.score - a.score)[0];
     const match = supplierMatch && supplierMatch.score > 0 ? supplierMatch.item : undefined;
     const typology = spec?.tipologia.replaceAll("_", " ") || (isAluminumPrompt(text) ? "esquadria de alumínio" : "");
-    const size = widthMm && heightMm ? `${widthMm} × ${heightMm} mm` : "";
+    const size = widthMm && heightMm ? `${heightMm} × ${widthMm} mm (altura × largura)` : "";
     const line = lineMatch ? lineMatch[1].replace(/^linha\s*/i, "Linha ") : spec && spec.linha_aluminio !== "Linha a definir" ? spec.linha_aluminio : "";
     const glass = glassMatch ? `vidro ${glassMatch[1].toLowerCase()}${glassColorMatch ? ` ${glassColorMatch[1].toLowerCase()}` : ""}${spec ? ` ${spec.espessura_mm} mm` : ""}` : "";
     const freeDescription = [typology, size, line, glass].filter(Boolean).join(" · ") || text.trim();
-    const confirmedCatalogPrice = hasConfirmedCatalogPrice(match);
-    const confirmedPrice = confirmedCatalogPrice ? Number(match?.price) : 0;
-    const estimated = match ? estimatedCatalogPrice({ ...match, price: confirmedCatalogPrice ? match.price : 0 }, aluminumPricePerKg, Math.max(widthMm, heightMm) || undefined) : undefined;
-    const unitPrice = confirmedPrice > 0 ? confirmedPrice : estimated || 0;
+    const rawCatalogPrice = Number(match?.price);
+    const hasRawCatalogPrice = !!match && Number.isFinite(rawCatalogPrice) && rawCatalogPrice > 0;
+    const confirmedCatalogPrice = hasConfirmedCatalogPrice(match) && hasRawCatalogPrice;
+    const confirmedPrice = confirmedCatalogPrice ? rawCatalogPrice : 0;
+    const estimatedPrice = !confirmedCatalogPrice && hasRawCatalogPrice ? rawCatalogPrice : 0;
+    const unitPrice = confirmedPrice > 0 ? confirmedPrice : estimatedPrice;
     const item: QuoteItem = {
       id: `local_${crypto.randomUUID()}`,
       description: match ? `${match.name || match.description} · ${freeDescription}` : freeDescription,
@@ -444,12 +409,14 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
         sku: match.sku || match.code || undefined,
         itemCategory: match.category || undefined,
       } : {}),
-      priceSource: confirmedPrice > 0 ? "catalog" : estimated && estimated > 0 ? "estimated" : "pending",
-      notes: confirmedPrice > 0
-        ? "Preço confirmado em registro de catálogo revisado."
-        : estimated && estimated > 0
-          ? `Estimativa a partir do peso kg/m e R$ ${Number(aluminumPricePerKg).toFixed(2)}/kg; validar a composição antes de aprovar.`
-          : "Preço sem validação ou fórmula de estimativa disponível; informar e confirmar antes de aprovar.",
+      priceSource: confirmedPrice > 0 ? "catalog" : estimatedPrice > 0 ? "estimated" : "pending",
+      notes: quantity <= 0
+        ? "Quantidade pendente de confirmação; este item não entra no total."
+        : confirmedPrice > 0
+          ? "Preço confirmado em registro de catálogo revisado."
+          : estimatedPrice > 0
+            ? "Preço de registro ainda não verificado; apresentado apenas como estimativa, não como preço confirmado."
+            : "Preço sem validação disponível; informar e confirmar antes de aprovar.",
       ...(size ? { itemDimensions: size } : {}),
     };
     return recalculateQuote({ ...updated, items: [...updated.items, item] });

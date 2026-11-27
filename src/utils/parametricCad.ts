@@ -7,7 +7,8 @@ export type AluminumTipologia =
   | "porta_pivotante"
   | "maxim_ar"
   | "basculante"
-  | "box_banheiro";
+  | "box_banheiro"
+  | "a_definir";
 
 export interface ParametricWindowSpec {
   tipologia: AluminumTipologia;
@@ -17,7 +18,7 @@ export interface ParametricWindowSpec {
   largura_mm: number;
   altura_mm: number;
   folhas: number;
-  modulo_fixo: boolean;
+  modulo_fixo: boolean | null;
   tipo_vidro: string;
   espessura_mm: number;
   abertura: string;
@@ -32,7 +33,10 @@ const glassFill = "#38bdf8";
 const glassStroke = "#bae6fd";
 
 export function isAluminumPrompt(prompt: string): boolean {
-  return /alum[ií]nio|aluminum|esquadria|perfil\s+de\s+alum[ií]nio|linha\s+(?:suprema|gold)|box(?:\s+de\s+(?:banho|banheiro))?/i.test(prompt);
+  const hasOpening = /esquadria|janela|ventana|porta|puerta/i.test(prompt);
+  const hasAluminumSystem = /alum[ií]nio|aluminum|linha\s+(?:suprema|gold)|perfil\s+de\s+alum[ií]nio/i.test(prompt);
+  const isBathBox = /box(?:\s+de\s+(?:banho|banheiro))?/i.test(prompt);
+  return isBathBox || (hasOpening && hasAluminumSystem);
 }
 
 export function localParametricSpec(prompt: string): ParametricWindowSpec {
@@ -45,13 +49,18 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
     const factor = normalizedUnit === "m" ? 1000 : normalizedUnit === "cm" ? 10 : 1;
     return Number.isFinite(number) && number > 0 ? Math.round(number * factor) : 0;
   };
+  const isDoor = /porta/.test(text);
+  const isWindow = /janela/.test(text);
+  const hasSlidingOpening = /correr|corredi[cç]a|deslizante/.test(text);
+  const hasSwingOpening = /giro|abrir|dobradi[cç]a/.test(text);
   const tipologia: AluminumTipologia = /box/.test(text) ? "box_banheiro"
     : /maxim[\s-]?ar/.test(text) ? "maxim_ar"
     : /basculante/.test(text) ? "basculante"
     : /pivot/.test(text) ? "porta_pivotante"
-    : /porta/.test(text) && /giro|abrir|dobradi[cç]a/.test(text) ? "porta_giro"
-    : /porta/.test(text) ? "porta_correr"
-    : "janela_correr";
+    : isDoor && hasSwingOpening ? "porta_giro"
+    : isDoor && hasSlidingOpening ? "porta_correr"
+    : isWindow && hasSlidingOpening ? "janela_correr"
+    : "a_definir";
   const requestedLeaves = Number(text.match(/(\d{1,2})\s*(?:folhas?|pain[eé]is)/)?.[1] || 0);
   const leaves = requestedLeaves > 0 ? Math.min(8, requestedLeaves) : 0;
   const widthMatch = prompt.match(/largura\s*(?:de|:|=)?\s*(\d+(?:[.,]\d+)?)(?:\s*(mm|cm|m))?/i);
@@ -64,17 +73,22 @@ export function localParametricSpec(prompt: string): ParametricWindowSpec {
   const glassType = text.match(/\b(duplo|laminado|temperado|insulado|comum|float)\b/)?.[1];
   const thickness = text.match(/(?:vidro\s+(?:(?:duplo|laminado|temperado|insulado|comum|float)\s+)?(?:de\s*)?|espessura\s*(?:de\s*)?)(\d+(?:[.,]\d+)?)\s*mm/)?.[1]
     || text.match(/(\d+(?:[.,]\d+)?)\s*mm\s*(?:de\s*)?(?:vidro|espessura)\b/)?.[1];
-  const fixedModule = /m[oó]dulo fixo|fix[oa]/.test(text) && !/sem\s+(?:m[oó]dulo fixo|fix[oa])/.test(text);
+  const fixedModuleMatch = text.match(/m[oó]dulo fixo\s*(?:=|:)?\s*(sim|n[aã]o|true|false)/i);
+  const noFixedModule = /(?:sem|não\s+(?:tem|existe|possui))\s+(?:m[oó]dulo fixo|fix[oa])/.test(text);
+  const fixedModule = noFixedModule ? false
+    : fixedModuleMatch ? /^(?:sim|true)$/i.test(fixedModuleMatch[1])
+    : /m[oó]dulo fixo/.test(text) ? true : null;
   const pendencias: string[] = [];
   if (!(width > 0) || !(height > 0)) pendencias.push("Informar largura e altura com unidade explícita (mm, cm ou m), confirmando a ordem altura × largura.");
+  if (tipologia === "a_definir") pendencias.push("Confirmar a tipologia e o sistema de abertura; não foi presumido correr ou giro.");
   if (!(leaves > 0)) pendencias.push("Confirmar a quantidade de folhas/painéis.");
+  if (fixedModule === null) pendencias.push("Confirmar se existe módulo fixo; essa opção não foi presumida.");
   if (!namedLine) pendencias.push("Definir fabricante e linha do perfil.");
   if (!/(bronze|natural|prata|anodiz|preto|branco)/.test(text)) pendencias.push("Definir acabamento/cor do perfil.");
   if (/(janela|porta)/.test(text) && !/(correr|corredi[cç]a|deslizante|giro|abrir|dobradi[cç]a|pivotante)/.test(text)) pendencias.push("Confirmar o sistema de abertura da esquadria.");
   if (!glassType) pendencias.push("Definir o tipo de vidro.");
   if (!thickness) pendencias.push("Confirmar a espessura do vidro.");
   if (!/esquerda|direita/.test(text)) pendencias.push("Confirmar o sentido de abertura.");
-  if (!/fix[oa]|m[oó]dulo fixo|sem m[oó]dulo fixo/.test(text)) pendencias.push("Confirmar se existe módulo fixo.");
   return {
     tipologia,
     linha_aluminio: namedLine ? `Linha ${namedLine.replace(/\b\w/g, (letter) => letter.toUpperCase())}` : "Linha a definir",
@@ -107,8 +121,8 @@ function text(elements: CadElement[], x: number, y: number, value: string, fill 
 
 function buildElevation(spec: ParametricWindowSpec): CadElement[] {
   const elements: CadElement[] = [];
-  if (!(spec.largura_mm > 0) || !(spec.altura_mm > 0) || !(spec.folhas > 0)) {
-    text(elements, 500, 430, "Geometria pendente — informe altura, largura e folhas", "#fbbf24", 22);
+  if (spec.tipologia === "a_definir" || !(spec.largura_mm > 0) || !(spec.altura_mm > 0) || !(spec.folhas > 0) || spec.modulo_fixo === null) {
+    text(elements, 500, 430, spec.tipologia === "a_definir" ? "Geometria pendente — confirme tipologia, abertura, altura, largura e folhas" : spec.modulo_fixo === null ? "Geometria pendente — confirme se existe módulo fixo" : "Geometria pendente — informe altura, largura e folhas", "#fbbf24", 22);
     return elements;
   }
   const { tipologia, largura_mm: width, altura_mm: height, folhas, modulo_fixo: fixed, cor_perfil: color } = spec;
@@ -190,7 +204,7 @@ function buildElevation(spec: ParametricWindowSpec): CadElement[] {
 export function buildParametricDrawing(spec: ParametricWindowSpec, prompt: string, _catalog: any[] = []): TechnicalDrawing {
   const width = Number.isFinite(spec.largura_mm) && spec.largura_mm > 0 ? spec.largura_mm : 0;
   const height = Number.isFinite(spec.altura_mm) && spec.altura_mm > 0 ? spec.altura_mm : 0;
-  const dimensionsKnown = width > 0 && height > 0 && spec.folhas > 0;
+  const dimensionsKnown = width > 0 && height > 0 && spec.folhas > 0 && spec.tipologia !== "a_definir" && spec.modulo_fixo !== null;
   const isDoor = spec.tipologia.startsWith("porta");
   const isBox = spec.tipologia === "box_banheiro";
   const assumptions = [
