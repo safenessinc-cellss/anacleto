@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, setDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, limit, setDoc } from "firebase/firestore";
 import { db, auth, storage } from "../../firebase";
 import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
@@ -33,7 +33,7 @@ export default function CatalogModule() {
 
   useEffect(() => {
     if (!authReady) return;
-    const q = query(collection(db, "catalog"), orderBy("name", "asc"));
+    const q = query(collection(db, "catalog"), orderBy("name", "asc"), limit(1000));
     const unsub = onSnapshot(q, (snap) => {
       const list: CatalogItem[] = [];
       snap.forEach(d => list.push({ id: d.id, ...d.data() } as CatalogItem));
@@ -123,7 +123,7 @@ export default function CatalogModule() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-black text-slate-900 dark:text-white">Produtos</h2>
+        <div><h2 className="text-2xl font-black text-slate-900 dark:text-white">Produtos</h2>{items.length>=1000&&<p className="mt-1 text-xs text-amber-700">Exibindo até 1.000 produtos. O histórico completo requer paginação.</p>}</div>
         <div className="flex gap-2">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
