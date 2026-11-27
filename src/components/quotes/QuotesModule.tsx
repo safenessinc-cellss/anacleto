@@ -396,7 +396,7 @@ export default function QuotesModule({ senderConfig, companies, onConvertToInvoi
     const confirmedCatalogPrice = hasConfirmedCatalogPrice(match) && hasRawCatalogPrice;
     const confirmedPrice = confirmedCatalogPrice ? rawCatalogPrice : 0;
     const estimatedPrice = !confirmedCatalogPrice && hasRawCatalogPrice ? rawCatalogPrice : 0;
-    const unitPrice = quantity > 0 ? (confirmedPrice > 0 ? confirmedPrice : estimatedPrice) : 0;
+    const unitPrice = confirmedPrice > 0 ? confirmedPrice : estimatedPrice;
     const item: QuoteItem = {
       id: `local_${crypto.randomUUID()}`,
       description: match ? `${match.name || match.description} · ${freeDescription}` : freeDescription,
