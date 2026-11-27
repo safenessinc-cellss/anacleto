@@ -68,6 +68,7 @@ export default function AllBudgetsModule({ onOpen }: { onOpen: (workflow: Budget
   const approveForProduction = async (row: Row) => {
     const issue = approvalIssue(row);
     if (issue) { setError(issue); return; }
+    if (!auth.currentUser) { setError("Sua sessão expirou. Entre novamente antes de aprovar."); return; }
     const collectionName = row.workflow === "smart" ? "smart_budgets" : row.workflow === "technical" ? "technical_budgets" : "quotes";
     setApprovingId(row.id); setError("");
     try {
