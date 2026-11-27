@@ -1,26 +1,10 @@
-import { createHash } from "node:crypto";
 import { generateText } from "ai";
 import { AI_CONFIG, getAIModel } from "../../src/server/ai-config.js";
 import { parseAIJson } from "../../src/server/ai-json.js";
 import { recordAIAudit } from "../../src/server/ai-audit.js";
+import { consumeRateLimit, getClientIp } from "../../src/server/rate-limit.js";
+import { getAIRateLimit } from "../../src/server/ai-limits.js";
 
-type RateState = { count: number; resetAt: number };
-const localWindows = new Map<string, RateState>();
-function send(res: any, status: number, payload: unknown) {
-  res.setHeader?.("Cache-Control", "no-store");
-  return res.status(status).json(payload);
-}
-function clientIp(req: any): string {
-  const trustedRealIp = String(req.headers?.["x-real-ip"] || "").trim();
-  const forwarded = String(req.headers?.["x-forwarded-for"] || "").split(",").map((value: string) => value.trim()).filter(Boolean);
-  const address = trustedRealIp || forwarded[forwarded.length - 1] || String(req.socket?.remoteAddress || req.ip || "unknown");
-  return createHash("sha256").update(address).digest("hex");
-}
-async function consumePublicQuota(ip: string): Promise<boolean> {
- const now=Date.now();for(const [key,value] of localWindows)if(now>=value.resetAt)localWindows.delete(key);
- const current=localWindows.get(ip);if(!current||now>=current.resetAt){localWindows.set(ip,{count:1,resetAt:now+3600000});return true;}
- current.count+=1;return current.count<=3;
-}
 export default async function handler(req: any, res: any) {
   const requestStartedAt = Date.now();
   let auditPrompt = "";
@@ -29,8 +13,15 @@ export default async function handler(req: any, res: any) {
     return send(res, 405, { error: "Método não permitido." });
   }
   try {
-    const ip = clientIp(req);
-    if (!(await consumePublicQuota(ip))) return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial." });
+    const quota = getAIRateLimit("public-quote-estimate");
+    try {
+      if (!(await consumeRateLimit("public-quote-estimate", getClientIp(req), quota.limit, quota.windowMs))) {
+        return send(res, 429, { error: "Limite público atingido: 3 solicitações por hora. Entre em contato com a equipe comercial.", code: "RATE_LIMITED" });
+      }
+    } catch (rateError: any) {
+      console.error("[PUBLIC_QUOTE_ESTIMATE_RATE_LIMIT]", String(rateError?.message || rateError).slice(0, 500));
+      return send(res, 503, { error: "Controle de uso indisponível no momento.", code: "RATE_LIMIT_UNAVAILABLE" });
+    }
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some(key => key !== "description")) {
       return send(res, 400, { error: "A solicitação contém campos não permitidos." });
