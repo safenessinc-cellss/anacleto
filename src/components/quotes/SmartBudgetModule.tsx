@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from "firebase/firestore";
 import { Sparkles, Trash2, Save, FileText, Loader2 } from "lucide-react";
 import { auth, db } from "../../firebase";
 import { useToast } from "../ToastContext";
@@ -59,21 +59,29 @@ export default function SmartBudgetModule({ initialBudgetId, hideHistory = false
     try {
       const user = auth.currentUser;
       if (!user) throw Error("Entre na sua conta.");
-      const names = ["catalog", "supplier_catalog", "registry_items", "price_table"];
-      const snaps = await Promise.all(names.map((name) => getDocs(collection(db, name))));
-      const catalog = snaps.flatMap((snap, index) => snap.docs.map((d) => {
-        const x = d.data();
-        return { id: d.id, name: x.name || x.description || "", sku: x.sku || x.code || "", category: x.category || "", unit: x.unit || "un", price: Number(x.price ?? 0), source: names[index] };
-      })).filter((item) => item.name);
-      const response = await fetch("/api/ai/budget-items", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + await user.getIdToken() }, body: JSON.stringify({ prompt: `Tipo de produto: ${productType}. ${request}`, productType, language, catalog }) });
+      const requestId = crypto.randomUUID();
+      const response = await fetch("/api/ai/budget-items", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + await user.getIdToken(),
+          "X-Request-ID": requestId,
+        },
+        body: JSON.stringify({ prompt: `Tipo de produto: ${productType}. ${request}`, productType, language }),
+        signal: AbortSignal.timeout(28_000),
+      });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw Error(data?.error || "Falha ao gerar com IA.");
       if (!Array.isArray(data?.items) || !data.items.length) throw Error("A IA não retornou itens válidos.");
       const next = data.items.map((x: any) => ({ id: crypto.randomUUID(), description: String(x.description || ""), quantity: Number(x.qty), unitPrice: x.priceSource === "catalog" && Number.isFinite(Number(x.price)) && Number(x.price) > 0 ? Number(x.price) : 0, sku: String(x.sku || ""), catalogItemId: String(x.catalogItemId || ""), supplier: String(x.supplier || ""), category: String(x.category || ""), priceSource: x.priceSource === "catalog" && Number(x.price) > 0 ? "catalog" : "pending", notes: String(x.notes || "") }));
       if (next.some((x: Item) => !x.description || !Number.isFinite(x.quantity) || x.quantity <= 0)) throw Error("A IA retornou dados inválidos.");
       setItems(next); showToast("Rascunho gerado. Revise os itens e preços.", "success");
-    } catch (e) { setError(e instanceof Error ? e.message : "Erro ao gerar orçamento."); }
-    finally { setBusy(false); }
+    } catch (e) {
+      const message = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
+        ? "A geração excedeu o tempo limite. O servidor não confirmou o resultado; tente novamente em instantes."
+        : e instanceof Error ? e.message : "Erro ao gerar orçamento.";
+      setError(message);
+    } finally { setBusy(false); }
   };
   const save = async () => {
     if (!client.trim() || !items.length) { setError("Informe o cliente e mantenha ao menos um item."); return; }
