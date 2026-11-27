@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import firebaseConfig from "../../../firebase-applet-config.json" with { type: "json" };
 import { authenticateFirebaseRequest } from "../firebase-auth.js";
 import { hasAIRole } from "../ai-roles.js";
@@ -55,6 +56,8 @@ export default async function handler(req: any, res: any) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") return res.status(405).json({ error: "Método não permitido." });
 
+  const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || randomUUID());
+  const startedAt = Date.now();
   let stage = "request_validation";
   try {
     const token = stripBearerPrefix(req.headers.authorization);
@@ -98,17 +101,19 @@ export default async function handler(req: any, res: any) {
       loadedAt: new Date().toISOString(),
     });
   } catch (error: any) {
-    const requestId = String(req.headers["x-vercel-id"] || req.headers["x-request-id"] || "");
+    const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
+    const statusCode = Number(error?.statusCode || (timedOut ? 504 : stage === "firebase_authentication" ? 503 : 502));
     console.error("[supplier/technical-options] failed", {
-      stage,
-      requestId,
-      message: String(error?.message || error),
+      stage, requestId, durationMs: Date.now() - startedAt,
+      code: error?.code || "TECHNICAL_OPTIONS_LOAD_FAILED",
+      statusCode, collection: error?.collection,
+      message: String(error?.message || error).slice(0, 1200),
       stack: error?.stack,
     });
-    return res.status(502).json({
-      error: "Falha ao carregar opções técnicas. Consulte o diagnóstico do servidor.",
-      code: "TECHNICAL_OPTIONS_LOAD_FAILED",
-      stage,
+    return res.status(statusCode >= 400 && statusCode < 600 ? statusCode : 502).json({
+      error: "Falha ao carregar opções técnicas.",
+      code: error?.code || "TECHNICAL_OPTIONS_LOAD_FAILED",
+      stage, requestId,
     });
   }
 }
