@@ -479,7 +479,15 @@ export default function TechnicalDrawingModule({ senderConfig, language = "pt"}:
       : /pret|#1f2937/i.test(spec.cor_perfil) ? "Preto"
       : /bronze|#80552f/i.test(spec.cor_perfil) ? "Bronze"
       : "Anodizado Natural";
-    return `${typeLabels[spec.tipologia]} ${spec.folhas} Folhas - ${spec.linha_aluminio} - ${spec.largura_mm}x${spec.altura_mm}mm - ${spec.cor_perfil === "#f8fafc" ? "Branco" : colorLabel} - Vidro ${spec.tipo_vidro} ${spec.cor_vidro || ""} ${spec.espessura_mm}mm`.replace(/\s+/g, " ").trim();
+    const dimensionsLabel = spec.altura_mm > 0 && spec.largura_mm > 0 ? `${spec.altura_mm} × ${spec.largura_mm} mm (altura × largura)` : "medidas pendentes";
+    const leavesLabel = spec.folhas > 0 ? `${spec.folhas} folhas` : "quantidade de folhas pendente";
+    const lineLabel = spec.linha_aluminio !== "a_definir" ? spec.linha_aluminio : "linha a definir";
+    const glassLabel = spec.tipo_vidro !== "a_definir" ? spec.tipo_vidro : "tipo de vidro a definir";
+    const glassColorLabel = spec.cor_vidro && spec.cor_vidro !== "a_definir" ? spec.cor_vidro : "cor do vidro a definir";
+    const thicknessLabel = spec.espessura_mm > 0 ? `${spec.espessura_mm} mm` : "espessura do vidro pendente";
+    const openingLabel = spec.abertura !== "a_definir" ? spec.abertura : "abertura a definir";
+    const fixedModuleLabel = spec.modulo_fixo === null ? "módulo fixo a definir" : spec.modulo_fixo ? "com módulo fixo" : "sem módulo fixo";
+    return [typeLabels[spec.tipologia], dimensionsLabel, leavesLabel, lineLabel, colorLabel, glassLabel, glassColorLabel, thicknessLabel, openingLabel, fixedModuleLabel].join(" · ");
   };
 
   const updateDrawingSpec = (patch: Partial<ParametricWindowSpec>) => {
