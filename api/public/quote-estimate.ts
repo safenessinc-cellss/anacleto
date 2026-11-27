@@ -12,15 +12,18 @@ function send(res: any, status: number, payload: unknown) {
 function buildLocalPublicEstimate(prompt: string) {
   const text = prompt.toLowerCase();
   const questions: string[] = [];
-  const hasDimensions = /\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b/i.test(prompt);
-  const hasQuantity = /\b\d+\s*(?:un(?:idades?)?|peças?|folhas?|pain[eé]is|m²|metros?)\b/i.test(prompt);
+  const hasDimensions = /altura\s*(?:de|:|=)?\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b[\s\S]{0,80}largura\s*(?:de|:|=)?\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\b/i.test(prompt)
+    || /\d+(?:[.,]\d+)?\s*(?:mm|cm|m)\s*[x×]\s*\d+(?:[.,]\d+)?\s*(?:mm|cm|m)?\b/i.test(prompt);
+  const hasQuantity = /\b\d+\s*(?:un(?:idades?)?|peças?|folhas?|pain[eé]is|portas?|janelas?|boxes?|m²|metros?)\b/i.test(prompt);
   const hasMaterial = /alum[ií]nio|vidro|madeira|aço|aço inox|concreto|pedra|porcelanato|gesso|tijolo|PVC/i.test(prompt);
   const hasFinish = /branco|preto|bronze|natural|anodiz|pintura|fosco|brilhante|amadeirado/i.test(prompt);
   if (!hasDimensions) questions.push("Informar as medidas de cada item em altura × largura, com unidade (mm, cm ou m).");
   if (!hasQuantity) questions.push("Confirmar a quantidade de unidades, vãos ou áreas.");
   if (!hasMaterial) questions.push("Definir o material e o sistema construtivo de cada serviço.");
   if (!hasFinish) questions.push("Definir acabamento, cor e padrão visual.");
-  const needsVisit = /reforma|piscina|churrasqueira|lareira|chimenea|pergolado|estrutura|constru[cç][aã]o|terreno|instala[cç][aã]o|esquadria|janela|porta|box/i.test(prompt);
+  const needsSiteInspection = /reforma|piscina|churrasqueira|lareira|chimenea|pergolado|estrutura|constru[cç][aã]o|terreno|instala[cç][aã]o|madeira laminada|\\bMLC\\b/i.test(prompt);
+  const needsOpeningMeasurement = /esquadria|janela|porta|box/i.test(prompt) && !hasDimensions;
+  const needsVisit = needsSiteInspection || needsOpeningMeasurement;
   if (needsVisit) questions.push("Agendar visita técnica para medir e avaliar acesso, estrutura e condições existentes.");
   if (questions.length === 0) questions.push("Confirmar escopo final e condições de instalação antes de emitir proposta vinculante.");
   return {
