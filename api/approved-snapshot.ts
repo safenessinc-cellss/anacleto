@@ -102,8 +102,10 @@ function digest(value: any) {
 function catalogMatch(item: any, catalog: any[]) {
   const id = String(item?.catalogItemId || item?.itemId || "").trim();
   const sku = String(item?.sku || item?.code || "").trim().toLowerCase();
+  const source = String(item?.catalogSource || "").trim();
   if (!id && !sku) return null;
   return catalog.find((row: any) => {
+    if (source && String(row.source || "") !== source) return false;
     const idMatch = !!id && String(row.id || "") === id;
     const skuMatch = !!sku && String(row.sku || row.code || "").trim().toLowerCase() === sku;
     return id && sku ? idMatch && skuMatch : id ? idMatch : skuMatch;
