@@ -71,37 +71,56 @@ export default async function handler(req: any, res: any) {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) return res.status(503).json({ error: "IA indisponível: configure GEMINI_API_KEY no Vercel." });
     const client = new GoogleGenAI({ apiKey });
-    const model = (process.env.ANACLETO_BUDGET_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.8-flash").replace(/^google\//, "");
-    const deadline = Date.now() + 40_000;
+    const configuredModel = (process.env.ANACLETO_BUDGET_MODEL || process.env.ANACLETO_AI_MODEL || "gemini-3.5-flash").replace(/^google\\//, "");
+    // One bounded attempt on the configured model, then a faster stable fallback.
+    const modelCandidates = [...new Set([configuredModel, "gemini-3.5-flash"])];
+    const deadline = Date.now() + 48_000;
     let result: any;
     let lastProviderError: any;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    let usedModel = configuredModel;
+    for (let attempt = 0; attempt < modelCandidates.length; attempt++) {
       const remaining = deadline - Date.now();
-      if (remaining < 1_500) break;
+      if (remaining < 3_000) break;
+      const currentModel = modelCandidates[attempt];
       try {
         result = await client.models.generateContent({
-      model,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        systemInstruction: `Você é o engenheiro orçamentista da Anacleto Esquadrias. Organize o pedido em linhas de orçamento no idioma ${language}. Use o catálogo fornecido apenas para reconhecer nomes, códigos e unidades; nunca invente códigos nem quantidades que dependam de medidas ausentes. Se faltar informação, mantenha uma linha pendente e explique exatamente o que falta. Não gere preço. Todos os valores serão preenchidos e conferidos pelo usuário. Catálogo de referência: ${JSON.stringify(catalog)}`,
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.1,
-        maxOutputTokens: 5000,
-        abortSignal: AbortSignal.timeout(Math.min(remaining, attempt === 0 ? Math.max(5_000, remaining - 1_500) : remaining)),
-      },
-    });
+          model: currentModel,
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          config: {
+            systemInstruction: `Você é o engenheiro orçamentista da Anacleto Esquadrias. Organize o pedido em linhas de orçamento no idioma ${language}. Use o catálogo fornecido apenas para reconhecer nomes, códigos e unidades; nunca invente códigos nem quantidades que dependam de medidas ausentes. Se faltar informação, mantenha uma linha pendente e explique exatamente o que falta. Não gere preço. Todos os valores serão preenchidos e conferidos pelo usuário. Catálogo de referência: ${JSON.stringify(catalog)}`,
+            responseMimeType: "application/json",
+            responseSchema,
+            temperature: 0.1,
+            maxOutputTokens: 3000,
+            abortSignal: AbortSignal.timeout(Math.min(22_000, remaining - 1_500)),
+          },
+        });
+        usedModel = currentModel;
         break;
       } catch (providerError: any) {
         lastProviderError = providerError;
         const status = Number(providerError?.status || providerError?.statusCode || 0);
-        const retryable = [408, 429, 500, 502, 503, 504].includes(status) || /high demand|temporarily unavailable|resource exhausted/i.test(String(providerError?.message || ""));
-        console.error("[BUDGET_ITEMS_AI] provider failure", { model, status, attempt, message: String(providerError?.message || providerError).slice(0, 800) });
-        if (attempt === 0 && retryable && Date.now() + 500 < deadline) { await new Promise(resolve => setTimeout(resolve, 350)); continue; }
-        break;
+        const message = String(providerError?.message || providerError);
+        const aborted = providerError?.name === "AbortError" || /aborted|timed? ?out|deadline/i.test(message);
+        const retryable = aborted || [408, 429, 500, 502, 503, 504].includes(status) ||
+          /high demand|temporarily unavailable|resource exhausted/i.test(message);
+        console.error("[BUDGET_ITEMS_AI] provider failure", {
+          model: currentModel, status, attempt, aborted,
+          message: message.slice(0, 800),
+        });
+        if (!retryable || attempt === modelCandidates.length - 1) break;
       }
     }
-    if (!result) throw Object.assign(new Error(String(lastProviderError?.message || "Provedor de IA indisponível.")), { statusCode: Number(lastProviderError?.status || lastProviderError?.statusCode || 503), code: "BUDGET_AI_PROVIDER_FAILED" });
+    if (!result) {
+      const aborted = lastProviderError?.name === "AbortError" || /aborted|timed? ?out|deadline/i.test(String(lastProviderError?.message || ""));
+      throw Object.assign(
+        new Error(aborted
+          ? "A geração demorou mais que o limite disponível. Tente novamente com uma descrição mais curta."
+          : "O provedor de IA está temporariamente indisponível. Tente novamente em instantes."),
+        { statusCode: 503, code: aborted ? "BUDGET_AI_TIMEOUT" : "BUDGET_AI_PROVIDER_FAILED" },
+      );
+    }
+    console.info("[BUDGET_ITEMS_AI] generation completed", { model: usedModel });
     const raw = result.text || "";
     let parsed: any;
     try { parsed = JSON.parse(raw); } catch { throw new Error("A IA retornou uma resposta que não pôde ser interpretada."); }
